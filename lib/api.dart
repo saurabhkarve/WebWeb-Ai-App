@@ -1,0 +1,100 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+
+import 'config.dart';
+
+typedef Json = Map<String, dynamic>;
+
+class ApiException implements Exception {
+  final String message;
+  final int status;
+  ApiException(this.message, [this.status = 0]);
+  @override
+  String toString() => message;
+}
+
+/// Thin client for the WebWeb API (same contract the web app uses: Bearer JWT, `{error}` on failure).
+class Api {
+  final String? Function() token;
+  final void Function()? onUnauthorized;
+  Api(this.token, {this.onUnauthorized});
+
+  Map<String, String> _headers({bool json = false}) => {
+        if (token() != null) 'Authorization': 'Bearer ${token()!}',
+        if (json) 'Content-Type': 'application/json',
+      };
+
+  Uri _u(String path, [Map<String, dynamic>? q]) {
+    final query = <String, String>{};
+    q?.forEach((k, v) {
+      if (v != null) query[k] = '$v';
+    });
+    return Uri.parse('$apiUrl$path').replace(queryParameters: query.isEmpty ? null : query);
+  }
+
+  dynamic _decode(http.Response r) {
+    dynamic data;
+    try {
+      data = r.body.isEmpty ? null : jsonDecode(utf8.decode(r.bodyBytes));
+    } catch (_) {
+      data = null;
+    }
+    if (r.statusCode == 401) {
+      onUnauthorized?.call();
+      throw ApiException('Please sign in again.', 401);
+    }
+    if (r.statusCode >= 400) {
+      final msg = data is Map ? data['error'] : null;
+      throw ApiException('${msg ?? 'Something went wrong.'}', r.statusCode);
+    }
+    return data;
+  }
+
+  Future<T> _send<T>(Future<http.Response> Function() call) async {
+    try {
+      return _decode(await call().timeout(const Duration(seconds: 25))) as T;
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException('Network error. Check your connection.');
+    }
+  }
+
+  Future<dynamic> get(String path, [Map<String, dynamic>? q]) => _send(() => http.get(_u(path, q), headers: _headers()));
+  Future<dynamic> post(String path, [Object? body]) =>
+      _send(() => http.post(_u(path), headers: _headers(json: true), body: jsonEncode(body ?? {})));
+  Future<dynamic> patch(String path, Object body) => _send(() => http.patch(_u(path), headers: _headers(json: true), body: jsonEncode(body)));
+  Future<dynamic> put(String path, Object body) => _send(() => http.put(_u(path), headers: _headers(json: true), body: jsonEncode(body)));
+  Future<dynamic> delete(String path, [Map<String, dynamic>? q]) => _send(() => http.delete(_u(path, q), headers: _headers()));
+
+  /// Multipart upload (field name `file`). Returns the decoded JSON.
+  Future<Json> upload(String path, List<int> bytes, String filename, String mime) async {
+    try {
+      final req = http.MultipartRequest('POST', _u(path))
+        ..headers.addAll(_headers())
+        ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename, contentType: MediaType.parse(mime)));
+      final res = await http.Response.fromStream(await req.send().timeout(const Duration(seconds: 60)));
+      return Map<String, dynamic>.from(_decode(res) as Map);
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException('Upload failed. Check your connection.');
+    }
+  }
+
+  static String mimeOf(String name) {
+    final n = name.toLowerCase();
+    if (n.endsWith('.png')) return 'image/png';
+    if (n.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
+  }
+
+  /// Uploads a photo for a post/story/product and returns its public URL.
+  Future<String> uploadImage(List<int> bytes, String filename) async =>
+      (await upload('/media', bytes, filename, mimeOf(filename)))['url'] as String;
+}
+
+/// Absolute URL for an uploaded file (the API already returns absolute URLs; this also accepts relative paths).
+String mediaUrl(String path) => path.startsWith('http') ? path : '$apiUrl$path';
