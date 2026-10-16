@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
@@ -140,7 +141,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           SizedBox(
             height: 160,
             child: Stack(clipBehavior: Clip.none, children: [
-              Container(height: 112, decoration: const BoxDecoration(gradient: kGoldGradient)),
+              // cover photo (bannerURL) like the web; the gold band when there is none
+              Container(
+                height: 112,
+                width: double.infinity,
+                decoration: const BoxDecoration(gradient: kGoldGradient),
+                child: u.bannerUrl == null ? null : Image.network(mediaUrl(u.bannerUrl!), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox()),
+              ),
               if (widget.handle != null && !own)
                 Positioned(
                   top: MediaQuery.of(context).padding.top + 6,
@@ -153,9 +160,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 top: 124,
                 child: own
                     ? OutlinedButton.icon(
-                        onPressed: () async {
-                          if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: u))) == true) _load();
-                        },
+                        onPressed: _edit,
                         icon: const Icon(Icons.edit_outlined, size: 16),
                         label: const Text('Edit'),
                       )
@@ -178,9 +183,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Wrap(spacing: 8, runSpacing: 8, children: [
                 InfoPill(icon: Icons.location_on_outlined, text: u.location),
                 InfoPill(text: u.category),
+                // GSTIN as a compact tag; opens the government's taxpayer search to verify it
+                if ((u.gstin ?? '').isNotEmpty)
+                  GestureDetector(
+                    onTap: () => launchUrl(Uri.parse('https://services.gst.gov.in/services/searchtp'), mode: LaunchMode.externalApplication),
+                    child: InfoPill(icon: Icons.receipt_long_outlined, text: 'GSTIN ${u.gstin}'),
+                  ),
                 if (own) InfoPill(text: labelOf(kUserTypes, u.userType)),
                 if ((u.contactMasked ?? '').isNotEmpty && !own) InfoPill(icon: Icons.call_outlined, text: u.contactMasked!),
               ]),
+              if (own) _strength(p),
               const SizedBox(height: 16),
               Row(children: [
                 Expanded(child: _stat('${u.statPosts ?? '–'}', 'Asks', p)),
@@ -230,6 +242,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ]),
       ),
     );
+  }
+
+  /// Own profile only: strength bar, the most valuable next step, and earned badges (never shown to visitors).
+  Widget _strength(Pal p) {
+    final c = context.watch<AuthProvider>().profile?.completion;
+    if (c == null) return const SizedBox();
+    final next = c.next;
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (c.percent < 100)
+          InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: _edit,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              decoration: BoxDecoration(color: kGold.withValues(alpha: .12), borderRadius: BorderRadius.circular(14), border: Border.all(color: kGold.withValues(alpha: .3))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Text('Profile strength ${c.percent}%', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                  const Spacer(),
+                  if (next != null) Text('Add ${next.label} · +${next.weight}%', style: const TextStyle(color: kGold, fontWeight: FontWeight.w700, fontSize: 12)),
+                ]),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(value: c.percent / 100, minHeight: 5, color: kGold, backgroundColor: p.border),
+                ),
+              ]),
+            ),
+          ),
+        if (c.badges.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(spacing: 6, runSpacing: 6, children: [for (final b in c.badges) GoldTag(b)]),
+        ],
+      ]),
+    );
+  }
+
+  Future<void> _edit() async {
+    final u = _u;
+    if (u == null) return;
+    if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: u))) == true) {
+      if (!mounted) return;
+      await context.read<AuthProvider>().loadProfile();
+      _load();
+    }
   }
 
   Widget _stat(String v, String l, Pal p) => Container(

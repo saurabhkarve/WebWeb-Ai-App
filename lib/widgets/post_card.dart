@@ -185,7 +185,7 @@ class _PostCardState extends State<PostCard> {
 
   Future<void> _share() async {
     final title = post.title ?? post.description ?? 'a post';
-    final text = 'Check this on WebWeb Ai:\n\n"$title"${post.locationPref == null ? '' : ' in ${post.locationPref}'}\n\nhttps://webweb.ai/post/${post.id}';
+    final text = 'Check this on WebWeb Ai:\n\n"$title"${post.locationPref == null ? '' : ' in ${post.locationPref}'}\n\n${post.webUrl}';
     try {
       await Share.share(text, subject: title);
     } catch (_) {
@@ -234,7 +234,7 @@ class _PostCardState extends State<PostCard> {
                   decoration: BoxDecoration(color: const Color(0xFFF4F2EC), borderRadius: BorderRadius.circular(8)),
                   child: Text((kCategoryShort[post.category] ?? 'Ask').toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF1E1E1E))),
                 ),
-                if ((post.matchReason ?? '').isNotEmpty) GoldTag(post.matchReason!),
+                if ((post.matchReason ?? '').isNotEmpty) GoldTag('${post.matchReason!}${post.distanceM == null ? '' : ' · ${formatDistance(post.distanceM!)}'}'),
               ]),
               const SizedBox(height: 8),
               Text(post.title ?? '', style: const TextStyle(fontSize: 18.5, fontWeight: FontWeight.w700, height: 1.25)),

@@ -83,6 +83,14 @@ String timeAgo(Object when) {
   if (diff.inHours < 24) return '${diff.inHours}h ago';
   return '${diff.inDays}d ago';
 }
+/// Same as the web's formatDistance.
+String formatDistance(num m) {
+  if (m <= 0) return '<1 km';
+  if (m < 1000) return '${(m / 50).round() * 50} m';
+  final km = m / 1000;
+  return '${km < 10 ? km.toStringAsFixed(1) : km.round()} km';
+}
+
 void toast(BuildContext context, String msg, {bool error = false}) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()

@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../auth_provider.dart';
+import '../location.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -29,6 +30,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   String? _photoUrl;
   bool _uploading = false;
   bool _saving = false;
+  bool _locating = false;
   String? _error;
 
   bool get _ent => _type == 'entrepreneur';
@@ -56,6 +58,19 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       if (mounted) toast(context, '$e', error: true);
     } finally {
       if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  /// Fills the location from GPS (nearest area), like the web onboarding's "Detect".
+  Future<void> _detect() async {
+    setState(() => _locating = true);
+    try {
+      final h = await currentLocation();
+      if (mounted) setState(() => _location = h.node);
+    } catch (e) {
+      if (mounted) toast(context, '$e. Pick one below.', error: true);
+    } finally {
+      if (mounted) setState(() => _locating = false);
     }
   }
 
@@ -199,6 +214,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         PickerField(label: 'Category', required: true, options: kProfileCategories, value: _category, hint: 'Select a category', onChanged: (v) => setState(() => _category = v)),
         const SizedBox(height: 18),
         PickerField(label: 'Location', required: true, options: kLocations, value: _location, hint: 'Select your location', onChanged: (v) => setState(() => _location = v)),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: _locating ? null : _detect,
+          icon: _locating ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.my_location, size: 18, color: kGold),
+          label: const Text('Detect my location', style: TextStyle(color: kGold, fontWeight: FontWeight.w700)),
+        ),
+        Text('Matches you with asks near you.', style: TextStyle(color: Pal.of(context).muted, fontSize: 12.5, fontWeight: FontWeight.w500)),
       ]);
 
   Widget _detailsStep() {

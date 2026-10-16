@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../api.dart';
 import '../auth_provider.dart';
+import '../location.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -27,6 +29,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late String _category = widget.profile.category;
   late String _location = widget.profile.location;
   late String? _photo = widget.profile.photoUrl;
+  late String? _banner = widget.profile.bannerUrl;
+  late final _gst = TextEditingController(text: widget.profile.gstin ?? '');
+  bool _locating = false;
   bool _saving = false;
   bool _uploading = false;
 
@@ -47,6 +52,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _pickBanner() async {
+    final api = context.read<AuthProvider>().api;
+    final f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 75);
+    if (f == null) return;
+    setState(() => _uploading = true);
+    try {
+      final url = await api.uploadImage(await f.readAsBytes(), f.name);
+      if (mounted) setState(() => _banner = url);
+    } catch (e) {
+      if (mounted) toast(context, '$e', error: true);
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _detect() async {
+    setState(() => _locating = true);
+    try {
+      final h = await currentLocation();
+      if (mounted) setState(() => _location = h.node);
+    } catch (e) {
+      if (mounted) toast(context, '$e', error: true);
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
   Future<void> _save() async {
     final patch = <String, dynamic>{};
     void ifChanged(String k, String now, String? before) {
@@ -63,6 +95,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (_services.text.trim() != _p.services.join('\n')) patch['services'] = _services.text.trim();
     if (_skills.text.trim() != _p.skills.join(', ')) patch['skills'] = _skills.text.trim();
     if (_photo != null && _photo != _p.photoUrl) patch['photoURL'] = _photo;
+    if (_banner != _p.bannerUrl) patch['bannerURL'] = _banner;
+    final gst = _gst.text.trim().toUpperCase();
+    if (gst != (_p.gstin ?? '')) {
+      if (gst.isNotEmpty && !RegExp(r'^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$').hasMatch(gst)) {
+        return toast(context, 'Enter a valid 15-character GSTIN', error: true);
+      }
+      patch['gstNumber'] = gst;
+    }
     if (patch.isEmpty) return Navigator.pop(context, false);
     setState(() => _saving = true);
     try {
@@ -78,7 +118,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   void dispose() {
-    for (final c in [_name, _company, _bio, _services, _skills, _experience, _education]) {
+    for (final c in [_name, _company, _bio, _services, _skills, _experience, _education, _gst]) {
       c.dispose();
     }
     super.dispose();
@@ -94,6 +134,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         child: Column(children: [
           Expanded(
             child: ListView(padding: const EdgeInsets.all(20), children: [
+              // cover photo, shown behind the profile header
+              GestureDetector(
+                onTap: _uploading ? null : _pickBanner,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    height: 96,
+                    decoration: const BoxDecoration(gradient: kGoldGradient),
+                    child: Stack(fit: StackFit.expand, children: [
+                      if (_banner != null) Image.network(mediaUrl(_banner!), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox()),
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: Container(
+                          margin: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+                          child: Text(_banner == null ? 'Add cover photo' : 'Change cover', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               Row(children: [
                 GestureDetector(
                   onTap: _uploading ? null : _pickPhoto,
@@ -110,11 +174,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               PickerField(label: 'Category', options: kProfileCategories, value: _category, onChanged: (v) => setState(() => _category = v)),
               const SizedBox(height: 14),
               PickerField(label: 'Location', options: kLocations, value: _location, onChanged: (v) => setState(() => _location = v)),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _locating ? null : _detect,
+                  icon: _locating ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.my_location, size: 18, color: kGold),
+                  label: const Text('Detect my location', style: TextStyle(color: kGold, fontWeight: FontWeight.w700)),
+                ),
+              ),
               const SizedBox(height: 14),
               AppField(controller: _bio, label: 'Short bio', maxLines: 2, maxLength: 160, caps: TextCapitalization.sentences),
               if (!job) ...[
                 const SizedBox(height: 14),
                 AppField(controller: _services, label: 'Services (one per line)', maxLines: 4, maxLength: 600),
+                const SizedBox(height: 14),
+                AppField(controller: _gst, label: 'GSTIN (optional)', hint: '15 characters, e.g. 27ABCDE1234F1Z5', maxLength: 15, caps: TextCapitalization.characters),
               ] else ...[
                 const SizedBox(height: 14),
                 AppField(controller: _skills, label: 'Skills (comma separated)', hint: 'e.g. Tally, GST, Excel', maxLines: 2, maxLength: 400),

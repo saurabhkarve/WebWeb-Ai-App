@@ -18,7 +18,9 @@ class ContactPicker extends StatefulWidget {
   final String askerName;
   /// How many contacts can still be referred on this ask (the API allows 5 per person per ask).
   final int maxSelect;
-  const ContactPicker({super.key, required this.askerName, this.maxSelect = 5});
+  /// Review-step wording: refer on an ask/item (default) or send in a chat.
+  final bool forChat;
+  const ContactPicker({super.key, required this.askerName, this.maxSelect = 5, this.forChat = false});
   @override
   State<ContactPicker> createState() => _ContactPickerState();
 }
@@ -83,7 +85,7 @@ class _ContactPickerState extends State<ContactPicker> {
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _ReviewSheet(asker: widget.askerName, selected: _selected, onRemove: (k) => setState(() => _selected.remove(k))),
+      builder: (_) => _ReviewSheet(asker: widget.askerName, forChat: widget.forChat, selected: _selected, onRemove: (k) => setState(() => _selected.remove(k))),
     );
     if (result == true && mounted) Navigator.pop(context, _selected.values.toList());
   }
@@ -167,9 +169,10 @@ class _ContactPickerState extends State<ContactPicker> {
 /// "Are you sure?" step: shows exactly what will be shared.
 class _ReviewSheet extends StatefulWidget {
   final String asker;
+  final bool forChat;
   final Map<String, PickedContact> selected;
   final void Function(String key) onRemove;
-  const _ReviewSheet({required this.asker, required this.selected, required this.onRemove});
+  const _ReviewSheet({required this.asker, this.forChat = false, required this.selected, required this.onRemove});
   @override
   State<_ReviewSheet> createState() => _ReviewSheetState();
 }
@@ -185,9 +188,9 @@ class _ReviewSheetState extends State<_ReviewSheet> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Refer ${items.length} contact${items.length == 1 ? '' : 's'}?', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+            Text('${widget.forChat ? 'Send' : 'Refer'} ${items.length} contact${items.length == 1 ? '' : 's'}?', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
-            Text('${widget.asker} will see these names and numbers. Other people only see that contacts were shared.', style: TextStyle(color: p.muted, fontWeight: FontWeight.w500)),
+            Text(widget.forChat ? '${widget.asker} will get these names and numbers in this chat.' : '${widget.asker} will see these names and numbers. Other people only see that contacts were shared.', style: TextStyle(color: p.muted, fontWeight: FontWeight.w500)),
             const SizedBox(height: 12),
             Flexible(
               child: ListView(shrinkWrap: true, children: [
@@ -212,7 +215,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
             Row(children: [
               Expanded(child: GoldButton(label: 'Back', outlined: true, onPressed: () => Navigator.pop(context, false))),
               const SizedBox(width: 10),
-              Expanded(flex: 2, child: GoldButton(label: 'Confirm & refer', icon: Icons.check, onPressed: () => Navigator.pop(context, true))),
+              Expanded(flex: 2, child: GoldButton(label: widget.forChat ? 'Send' : 'Confirm & refer', icon: Icons.check, onPressed: () => Navigator.pop(context, true))),
             ]),
           ]),
         ),

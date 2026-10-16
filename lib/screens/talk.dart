@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../auth_provider.dart';
 import '../call_manager.dart';
+import '../location.dart';
 import '../models.dart';
 import '../notifications.dart';
 import '../realtime.dart';
@@ -15,6 +16,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/active_call_banner.dart';
 import '../widgets/image_grid.dart';
+import 'contact_picker.dart';
 import 'find.dart' show FilterPill;
 import 'profile.dart';
 
@@ -471,23 +473,23 @@ class _ChatThreadState extends State<ChatThread> {
     }
   }
 
-  Future<void> _send({String? text, String? imageUrl}) async {
+  Future<void> _send({String? text, String? imageUrl, Map<String, dynamic>? attachment}) async {
     final t = text ?? _input.text.trim();
-    if (t.isEmpty && imageUrl == null) return;
+    if (t.isEmpty && imageUrl == null && attachment == null) return;
     final tmp = 'tmp${DateTime.now().microsecondsSinceEpoch}';
-    final pending = Msg(id: -DateTime.now().microsecondsSinceEpoch, senderUid: _me, text: t, imageUrl: imageUrl, createdAt: DateTime.now(), pending: true, tmpId: tmp);
+    final pending = Msg(id: -DateTime.now().microsecondsSinceEpoch, senderUid: _me, text: t, imageUrl: imageUrl, attachment: attachment, createdAt: DateTime.now(), pending: true, tmpId: tmp);
     if (text == null) _input.clear();
     _setTyping(false);
     setState(() => _msgs = [..._msgs, pending]);
     _toBottom();
     try {
-      final sent = Msg.fromJson(await _api.post('/chats/${widget.chatId}/messages', {'text': t, if (imageUrl != null) 'imageUrl': imageUrl}) as Map);
+      final sent = Msg.fromJson(await _api.post('/chats/${widget.chatId}/messages', {'text': t, if (imageUrl != null) 'imageUrl': imageUrl, if (attachment != null) 'attachment': attachment}) as Map);
       if (!mounted) return;
       setState(() => _msgs = [for (final m in _msgs) m.tmpId == tmp ? sent : m]);
     } catch (e) {
       if (!mounted) return;
       setState(() => _msgs = _msgs.where((m) => m.tmpId != tmp).toList());
-      if (text == null && imageUrl == null) _input.text = t; // give the text back so nothing is lost
+      if (text == null && imageUrl == null && attachment == null) _input.text = t; // give the text back so nothing is lost
       toast(context, '$e', error: true);
     }
   }
@@ -508,6 +510,28 @@ class _ChatThreadState extends State<ChatThread> {
     }
   }
 
+  /// Share contacts from the phone book (like WhatsApp): one message per contact.
+  Future<void> _sendContacts() async {
+    final picked = await Navigator.push<List<PickedContact>>(context, MaterialPageRoute(builder: (_) => ContactPicker(askerName: widget.peer.name, forChat: true)));
+    for (final c in picked ?? const <PickedContact>[]) {
+      await _send(text: '', attachment: {'type': 'contact', 'name': c.name.length > 60 ? c.name.substring(0, 60) : c.name, 'phone': _digits10(c.phone)});
+    }
+  }
+
+  static String _digits10(String v) {
+    final d = v.replaceAll(RegExp(r'\D'), '');
+    return d.length > 10 ? d.substring(d.length - 10) : d;
+  }
+
+  Future<void> _sendLocation() async {
+    try {
+      final h = await currentLocation();
+      await _send(text: '', attachment: {'type': 'location', 'lat': h.lat, 'lng': h.lng, if (h.node != 'Other') 'label': 'Near ${h.node}'});
+    } catch (e) {
+      if (mounted) toast(context, '$e', error: true);
+    }
+  }
+
   void _showAttachSheet() {
     showModalBottomSheet(
       context: context,
@@ -523,6 +547,14 @@ class _ChatThreadState extends State<ChatThread> {
               Navigator.pop(ctx);
               _pickAndSendImage(ImageSource.gallery);
             }),
+            _attachOption(Icons.person_outline, 'Contact', () {
+              Navigator.pop(ctx);
+              _sendContacts();
+            }),
+            _attachOption(Icons.place_outlined, 'Location', () {
+              Navigator.pop(ctx);
+              _sendLocation();
+            }),
           ]),
         ),
       ),
@@ -533,9 +565,9 @@ class _ChatThreadState extends State<ChatThread> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 6),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(padding: const EdgeInsets.all(16), decoration: const BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle), child: Icon(icon, color: Colors.black, size: 28)),
+            Container(padding: const EdgeInsets.all(14), decoration: const BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle), child: Icon(icon, color: Colors.black, size: 28)),
             const SizedBox(height: 8),
             Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
           ]),
@@ -627,7 +659,7 @@ class _ChatThreadState extends State<ChatThread> {
           Padding(
             padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
             child: Row(children: [
-              IconButton(icon: const Icon(Icons.add_photo_alternate_outlined, color: kGold), onPressed: _showAttachSheet, tooltip: 'Send image'),
+              IconButton(icon: const Icon(Icons.add_photo_alternate_outlined, color: kGold), onPressed: _showAttachSheet, tooltip: 'Attach'),
               Expanded(child: AppField(controller: _input, hint: 'Message', caps: TextCapitalization.sentences, onChanged: (v) => _setTyping(v.isNotEmpty), onSubmitted: (_) => _send())),
               const SizedBox(width: 8),
               InkWell(onTap: () => _send(), customBorder: const CircleBorder(), child: Container(width: 50, height: 50, decoration: const BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle), child: Icon(Icons.send_rounded, color: p.onGold, size: 21))),
@@ -660,7 +692,7 @@ class _ChatThreadState extends State<ChatThread> {
     );
   }
 
-  /// Contact / location / document attachments sent from the web.
+  /// Contact / location / document attachments (sent from the app or the web).
   Widget _attachment(Map<String, dynamic> a, bool mine, Pal p) {
     final fg = mine ? p.onGold : p.text;
     switch (a['type']) {

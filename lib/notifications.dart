@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -12,15 +11,20 @@ import 'api.dart';
 import 'auth_provider.dart';
 import 'models.dart';
 import 'realtime.dart';
+import 'screens/post_detail.dart';
+import 'screens/profile.dart';
 import 'screens/talk.dart' show ChatThread;
 
-/// Push (FCM) + local notifications for chats and calls.
+/// Push (FCM) + local notifications for chats, calls and activity on your asks.
 ///
 /// - App open or in background with a live WebSocket: events come over [RealtimeService]
 ///   and are shown as local notifications (unless that chat is already on screen).
 /// - App killed / socket gone: the backend sends an FCM push. Messages carry a
 ///   `notification` payload (shown by Android itself); incoming calls are data-only and
 ///   are turned into a full-screen call notification by [firebaseBackgroundHandler].
+/// - iOS: the server sends calls as a visible alert (iOS does not wake a killed app for
+///   data-only pushes); tapping it opens the app and the socket picks up the pending offer.
+/// - Tapping any notification opens what it is about: the chat, the ask, or the profile.
 class NotificationService with WidgetsBindingObserver {
   NotificationService(this.auth, this.rt, this.nav);
 
@@ -31,9 +35,11 @@ class NotificationService with WidgetsBindingObserver {
   /// Id of the chat currently on screen (set by ChatThread) — no notifications for it.
   static String? activeChat;
 
-  static bool get supported => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  static bool get supported => !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
+  static bool get _ios => defaultTargetPlatform == TargetPlatform.iOS;
 
   bool _ready = false;
+  bool _asked = false; // notification permission requested this run
   bool _foreground = true;
   String? _registeredFor; // auth token the FCM token was last sent with
   String? _fcmToken;
@@ -42,7 +48,7 @@ class NotificationService with WidgetsBindingObserver {
   Future<void> init() async {
     if (!supported || _ready) return;
     try {
-      await Firebase.initializeApp();
+      await initFirebase();
     } catch (e) {
       debugPrint('Firebase init failed: $e');
       return;
@@ -52,10 +58,8 @@ class NotificationService with WidgetsBindingObserver {
     await _initLocal(onTap: (r) => _openFromPayload(r.payload));
 
     final fm = FirebaseMessaging.instance;
-    await fm.requestPermission(alert: true, badge: true, sound: true);
-    await _local
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestNotificationsPermission();
+    // iOS: in the foreground we show our own local notification (see onMessage), so no system banner too.
+    await fm.setForegroundNotificationPresentationOptions(alert: false, badge: true, sound: false);
 
     // Foreground push: the WebSocket is probably down (otherwise the server would not push),
     // so show it ourselves.
@@ -86,13 +90,29 @@ class NotificationService with WidgetsBindingObserver {
     _foreground = state == AppLifecycleState.resumed;
   }
 
+  /// Asks for notification permission once the person is signed in and has a profile
+  /// (not on the login screen, where a cold prompt is usually declined).
+  Future<void> _askPermission() async {
+    if (_asked) return;
+    _asked = true;
+    await FirebaseMessaging.instance.requestPermission(alert: true, badge: true, sound: true);
+    await _local.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
+  }
+
   /// Sends this device's FCM token to the backend (once per login).
   Future<void> register() async {
     if (!_ready || auth.token == null || _registeredFor == auth.token) return;
     try {
+      await _askPermission();
+      // iOS hands out an FCM token only after APNs has registered the device.
+      if (_ios) {
+        for (var i = 0; i < 10 && await FirebaseMessaging.instance.getAPNSToken() == null; i++) {
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      }
       _fcmToken ??= await FirebaseMessaging.instance.getToken();
       if (_fcmToken == null) return;
-      await auth.api.post('/app/push/token', {'token': _fcmToken});
+      await auth.api.post('/app/push/token', {'token': _fcmToken, 'platform': _ios ? 'ios' : 'android'});
       _registeredFor = auth.token;
     } catch (e) {
       debugPrint('push token register failed: $e');
@@ -158,6 +178,16 @@ class NotificationService with WidgetsBindingObserver {
         if (_foreground && activeChat == d['chatId']) return;
         await showMessage(chatId: '${d['chatId']}', name: title ?? '${d['name']}', body: body ?? '');
         break;
+      case 'ask_response':
+      case 'item_referral':
+        await _local.show(
+          id: '${d['postId'] ?? d['productId']}'.hashCode & 0x7fffffff,
+          title: title ?? 'New activity',
+          body: body ?? '',
+          notificationDetails: _asksDetails,
+          payload: jsonEncode(d),
+        );
+        break;
       case 'missed_call':
         await _local.show(
           id: '${d['from']}missed'.hashCode,
@@ -182,7 +212,8 @@ class NotificationService with WidgetsBindingObserver {
 
   Future<void> _openFromData(Map<String, dynamic> d) async {
     // Calls: nothing to do — opening the app reconnects the socket and the server hands over the offer.
-    if (d['type'] != 'msg' && d['type'] != 'missed_call') return;
+    const routable = {'msg', 'missed_call', 'ask_response', 'item_referral'};
+    if (!routable.contains(d['type'])) return;
     // Wait until the user is logged in and the main shell is up.
     for (var i = 0; i < 40 && (auth.profile == null || nav.currentState == null); i++) {
       await Future.delayed(const Duration(milliseconds: 250));
@@ -190,6 +221,16 @@ class NotificationService with WidgetsBindingObserver {
     final nv = nav.currentState;
     if (nv == null || auth.profile == null) return;
     try {
+      if (d['type'] == 'ask_response' && d['postId'] != null) {
+        nv.push(MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${d['postId']}')));
+        return;
+      }
+      // other links carry the web path: /@handle opens that profile
+      final handle = RegExp(r'^/@([a-z0-9]+)').firstMatch('${d['path'] ?? ''}')?.group(1);
+      if (d['type'] == 'item_referral') {
+        if (handle != null) nv.push(MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
+        return;
+      }
       var chatId = '${d['chatId'] ?? ''}';
       if (chatId.isEmpty && d['from'] != null) chatId = (await auth.api.post('/chats', {'userId': d['from']}) as Map)['id'] as String;
       if (chatId.isEmpty || activeChat == chatId) return;
@@ -209,6 +250,12 @@ const _messagesChannel = AndroidNotificationChannel(
   description: 'New chat messages and missed calls',
   importance: Importance.high,
 );
+const _asksChannel = AndroidNotificationChannel(
+  'asks',
+  'Asks',
+  description: 'Responses and referrals on your asks and catalog',
+  importance: Importance.high,
+);
 const _callsChannel = AndroidNotificationChannel(
   'calls',
   'Incoming calls',
@@ -225,16 +272,33 @@ const _messageDetails = NotificationDetails(
     priority: Priority.high,
     category: AndroidNotificationCategory.message,
   ),
+  iOS: DarwinNotificationDetails(threadIdentifier: 'messages'),
+);
+
+const _asksDetails = NotificationDetails(
+  android: AndroidNotificationDetails(
+    'asks',
+    'Asks',
+    channelDescription: 'Responses and referrals on your asks and catalog',
+    importance: Importance.high,
+    priority: Priority.high,
+  ),
+  iOS: DarwinNotificationDetails(threadIdentifier: 'asks'),
 );
 
 Future<void> _initLocal({DidReceiveNotificationResponseCallback? onTap}) async {
   if (_localReady && onTap == null) return;
   await _local.initialize(
-    settings: const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+    settings: const InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      // permission is asked later by FirebaseMessaging.requestPermission (after sign-in)
+      iOS: DarwinInitializationSettings(requestAlertPermission: false, requestBadgePermission: false, requestSoundPermission: false),
+    ),
     onDidReceiveNotificationResponse: onTap,
   );
   final android = _local.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
   await android?.createNotificationChannel(_messagesChannel);
+  await android?.createNotificationChannel(_asksChannel);
   await android?.createNotificationChannel(_callsChannel);
   _localReady = true;
 }
@@ -272,6 +336,7 @@ Future<void> showIncomingCall({required String callId, required String from, req
         audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
         additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT: keep ringing
       ),
+      iOS: const DarwinNotificationDetails(presentSound: true, interruptionLevel: InterruptionLevel.timeSensitive),
     ),
     payload: jsonEncode({'type': 'call', 'callId': callId, 'from': from}),
   );
@@ -298,6 +363,27 @@ Future<void> handleCallData(Map<String, dynamic> d) async {
 /// Runs in its own isolate when a push arrives while the app is in the background or killed.
 @pragma('vm:entry-point')
 Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  await initFirebase();
   await handleCallData(message.data);
+}
+
+/// Android reads android/app/google-services.json. iOS takes its Firebase app from build-time
+/// --dart-define values (set in Codemagic), so no GoogleService-Info.plist has to be added to Xcode;
+/// without them it falls back to a GoogleService-Info.plist in the Runner target.
+Future<void> initFirebase() async {
+  if (Firebase.apps.isNotEmpty) return;
+  const iosAppId = String.fromEnvironment('FIREBASE_IOS_APP_ID');
+  if (defaultTargetPlatform == TargetPlatform.iOS && iosAppId.isNotEmpty) {
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: String.fromEnvironment('FIREBASE_IOS_API_KEY'),
+        appId: iosAppId,
+        messagingSenderId: String.fromEnvironment('FIREBASE_SENDER_ID'),
+        projectId: String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: 'webweb-ai'),
+        iosBundleId: 'ai.webweb.app',
+      ),
+    );
+    return;
+  }
+  await Firebase.initializeApp();
 }

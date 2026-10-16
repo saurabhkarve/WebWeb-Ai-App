@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../auth_provider.dart';
+import '../location.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -30,6 +31,10 @@ const _tips = {
   'funding': 'Share the amount, purpose and your business stage.',
 };
 
+/// Reach radius steps (web/src/lib/geo.ts RADIUS_STEPS); the last one covers all of India.
+const _radii = [5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 3000000];
+String _radiusLabel(int m) => m >= 3000000 ? 'Pan-India' : '${m ~/ 1000} km';
+
 /// Ask tab: post an Ask (requirement) or an Update.
 class AskScreen extends StatefulWidget {
   final VoidCallback onPosted;
@@ -52,11 +57,45 @@ class _AskScreenState extends State<AskScreen> {
   final List<String> _updatePhotos = [];
   bool _busy = false;
   bool _uploading = false;
+  /// Pin from "Use my location" (otherwise the server uses the area's centre).
+  Here? _here;
+  int _radius = 10000;
+  bool _locating = false;
+  int? _reach;
 
   @override
   void initState() {
     super.initState();
     _location = context.read<AuthProvider>().profile?.location;
+    _loadReach();
+  }
+
+  /// How many members this ask reaches (same count the web shows under the form).
+  Future<void> _loadReach() async {
+    try {
+      final d = await context.read<AuthProvider>().api.get('/users/reach', {
+        if (_location != null) 'location': _location,
+        if (_here != null) ...{'lat': _here!.lat, 'lng': _here!.lng, 'radiusM': _radius},
+      }) as Map;
+      if (mounted) setState(() => _reach = (d['members'] as num?)?.toInt());
+    } catch (_) {}
+  }
+
+  Future<void> _useMyLocation() async {
+    setState(() => _locating = true);
+    try {
+      final h = await currentLocation();
+      if (!mounted) return;
+      setState(() {
+        _here = h;
+        if (h.node != 'Other') _location = h.node;
+      });
+      _loadReach();
+    } catch (e) {
+      if (mounted) toast(context, '$e', error: true);
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
   }
 
   bool get _valid => _title.text.trim().length >= 5 && _desc.text.trim().length >= 20;
@@ -87,6 +126,7 @@ class _AskScreenState extends State<AskScreen> {
         if (_location != null) 'locationPref': _location,
         if (_budget.text.trim().isNotEmpty) 'budget': _budget.text.trim(),
         if (_urgency != null) 'urgency': _urgency,
+        if (_here != null) ...{'lat': _here!.lat, 'lng': _here!.lng, 'radiusM': _radius},
         'images': _photos,
       });
       if (!mounted) return;
@@ -260,7 +300,35 @@ class _AskScreenState extends State<AskScreen> {
           ),
           if (_detailsOpen) ...[
             const SizedBox(height: 12),
-            PickerField(label: 'Location', options: kLocations, value: _location, hint: 'Anywhere', onChanged: (v) => setState(() => _location = v)),
+            PickerField(label: 'Location', options: kLocations, value: _location, hint: 'Anywhere', onChanged: (v) {
+              setState(() {
+                _location = v;
+                _here = null; // a picked area replaces the GPS pin
+              });
+              _loadReach();
+            }),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _locating ? null : _useMyLocation,
+                icon: _locating ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(_here != null ? Icons.my_location : Icons.location_searching, size: 18, color: kGold),
+                label: Text(_here != null ? 'Using your current location' : 'Use my location', style: const TextStyle(color: kGold, fontWeight: FontWeight.w700)),
+              ),
+            ),
+            if (_here != null) ...[
+              Text('Reach: ${_radiusLabel(_radius)}', style: const TextStyle(fontWeight: FontWeight.w700)),
+              Slider(
+                value: _radii.indexOf(_radius).toDouble(),
+                min: 0,
+                max: (_radii.length - 1).toDouble(),
+                divisions: _radii.length - 1,
+                activeColor: kGold,
+                label: _radiusLabel(_radius),
+                onChanged: (v) => setState(() => _radius = _radii[v.round()]),
+                onChangeEnd: (_) => _loadReach(),
+              ),
+            ],
             const SizedBox(height: 12),
             PickerField(label: 'Urgency', options: kUrgencies, value: _urgency, hint: 'Any time', onChanged: (v) => setState(() => _urgency = v)),
             const SizedBox(height: 12),
@@ -275,7 +343,7 @@ class _AskScreenState extends State<AskScreen> {
           Row(children: [
             Icon(Icons.people_outline, size: 15, color: p.muted),
             const SizedBox(width: 6),
-            Expanded(child: Text('Reaches members in ${_location ?? 'your area'}', style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w500))),
+            Expanded(child: Text(_reach == null ? 'Reaches members in ${_location ?? 'your area'}' : 'Reaches $_reach member${_reach == 1 ? '' : 's'} ${_here != null ? 'within ${_radiusLabel(_radius)}' : 'in ${_location ?? 'your area'}'}', style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w500))),
             Text(_title.text.trim().length < 5 ? 'Add a title' : '', style: TextStyle(color: p.muted, fontSize: 12.5, fontWeight: FontWeight.w500)),
           ]),
           const SizedBox(height: 10),

@@ -1,0 +1,122 @@
+# Codemagic CI: builds the Android App Bundle and the iOS app from this repo.
+# Setup (one time, in the Codemagic UI) is described in CODEMAGIC.md.
+#
+# Environment variable groups used here:
+#   firebase      GOOGLE_SERVICES_JSON (base64 of android/app/google-services.json)
+#                 FIREBASE_IOS_API_KEY, FIREBASE_IOS_APP_ID, FIREBASE_SENDER_ID (from GoogleService-Info.plist)
+#   app_store     APP_STORE_APPLE_ID (the numeric Apple ID of the app in App Store Connect)
+# Code signing identities: Android keystore reference "webweb_upload"; iOS uses the
+# App Store Connect API key integration "WebWeb ASC" (automatic signing).
+
+definitions:
+  env: &env
+    flutter: stable
+    java: 17
+    vars: &vars
+      API_URL: https://biznetapi.webweb.ai
+  email: &email
+    email:
+      recipients:
+        - saurabh@skyq.in
+      notify:
+        success: true
+        failure: true
+
+workflows:
+  android-release:
+    name: Android release (AAB)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      <<: *env
+      groups:
+        - firebase
+      android_signing:
+        - webweb_upload
+    triggering:
+      events: [tag]
+      tag_patterns:
+        - pattern: "v*"
+    scripts:
+      - name: Firebase config
+        script: echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+      - name: Signing config (key.properties from the Codemagic keystore)
+        script: |
+          cat > android/key.properties <<EOF
+          storeFile=$CM_KEYSTORE_PATH
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          keyPassword=$CM_KEY_PASSWORD
+          EOF
+      - name: Dependencies
+        script: flutter pub get
+      - name: Analyze
+        script: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Build AAB
+        script: |
+          flutter build appbundle --release \
+            --build-number=$PROJECT_BUILD_NUMBER \
+            --dart-define=API_URL=$API_URL
+      - name: Build APK (for direct install / testing)
+        script: |
+          flutter build apk --release \
+            --build-number=$PROJECT_BUILD_NUMBER \
+            --dart-define=API_URL=$API_URL
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
+      - build/app/outputs/flutter-apk/app-release.apk
+      - build/app/outputs/mapping/release/mapping.txt
+    publishing:
+      <<: *email
+      # Uncomment after the first manual upload to Play Console and adding the service account JSON
+      # (GCLOUD_SERVICE_ACCOUNT_CREDENTIALS) to the "firebase" group or a "play" group:
+      # google_play:
+      #   credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+      #   track: internal
+      #   submit_as_draft: true
+
+  ios-release:
+    name: iOS release (TestFlight)
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    integrations:
+      app_store_connect: WebWeb ASC
+    environment:
+      <<: *env
+      xcode: latest
+      cocoapods: default
+      groups:
+        - firebase
+        - app_store
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: ai.webweb.app
+    triggering:
+      events: [tag]
+      tag_patterns:
+        - pattern: "v*"
+    scripts:
+      - name: Dependencies
+        script: flutter pub get
+      # (flutter build ipa runs CocoaPods itself for plugins that are not Swift packages)
+      - name: Signing profiles
+        script: xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          BUILD_NUMBER=$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0) + 1))
+          flutter build ipa --release \
+            --build-number=$BUILD_NUMBER \
+            --export-options-plist=/Users/builder/export_options.plist \
+            --dart-define=API_URL=$API_URL \
+            --dart-define=FIREBASE_IOS_API_KEY=$FIREBASE_IOS_API_KEY \
+            --dart-define=FIREBASE_IOS_APP_ID=$FIREBASE_IOS_APP_ID \
+            --dart-define=FIREBASE_SENDER_ID=$FIREBASE_SENDER_ID
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      <<: *email
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

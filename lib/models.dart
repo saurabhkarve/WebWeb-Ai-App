@@ -66,9 +66,41 @@ const kReactionEmoji = {'heart': '❤️', 'thumbs': '👍', 'namaskar': '🙏'}
 
 // ===================== profile =====================
 
+/// Profile strength (own profile only): what is done and what to add next.
+class CompletionItem {
+  final String key, label;
+  final int weight;
+  final bool done;
+  const CompletionItem(this.key, this.label, this.weight, this.done);
+}
+
+class Completion {
+  final int percent;
+  final List<CompletionItem> items;
+  final List<String> badges;
+  const Completion(this.percent, this.items, this.badges);
+  factory Completion.fromJson(Map j) => Completion(
+        (j['percent'] as num?)?.toInt() ?? 0,
+        ((j['items'] as List?) ?? const [])
+            .map((e) => e as Map)
+            .map((e) => CompletionItem('${e['key']}', '${e['label']}', (e['weight'] as num?)?.toInt() ?? 0, e['done'] == true))
+            .toList(),
+        _strings(j['badges']),
+      );
+  /// The undone item worth the most.
+  CompletionItem? get next {
+    final todo = items.where((i) => !i.done).toList()..sort((a, b) => b.weight.compareTo(a.weight));
+    return todo.isEmpty ? null : todo.first;
+  }
+}
+
 class Profile {
   final String uid, handle, name, company, userType, category, location;
-  final String? photoUrl, bio, experience, education, contactMasked;
+  final String? photoUrl, bannerUrl, bio, experience, education, contactMasked;
+  /// Public GSTIN (businesses); `gstNumber` on /me, `gstin` on public profiles.
+  final String? gstin;
+  /// Only on your own profile (GET /me).
+  final Completion? completion;
   final List<String> services, skills;
   final int contributions;
   final int? statPosts, statShared;
@@ -76,7 +108,7 @@ class Profile {
 
   const Profile({
     required this.uid, required this.handle, required this.name, required this.company, required this.userType,
-    required this.category, required this.location, this.photoUrl, this.bio, this.experience, this.education,
+    required this.category, required this.location, this.photoUrl, this.bannerUrl, this.gstin, this.completion, this.bio, this.experience, this.education,
     this.contactMasked, this.services = const [], this.skills = const [], this.contributions = 0,
     this.statPosts, this.statShared, required this.createdAt,
   });
@@ -89,7 +121,10 @@ class Profile {
     return Profile(
       uid: '${j['uid']}', handle: '${j['handle'] ?? ''}', name: '${j['name'] ?? ''}', company: '${j['company'] ?? ''}',
       userType: '${j['userType'] ?? 'entrepreneur'}', category: '${j['category'] ?? ''}', location: '${j['location'] ?? ''}',
-      photoUrl: j['photoURL'] as String?, bio: j['bio'] as String?, experience: j['experience'] as String?,
+      photoUrl: j['photoURL'] as String?, bannerUrl: j['bannerURL'] as String?,
+      gstin: (j['gstin'] ?? j['gstNumber']) as String?,
+      completion: j['completion'] == null ? null : Completion.fromJson(j['completion'] as Map),
+      bio: j['bio'] as String?, experience: j['experience'] as String?,
       education: j['education'] as String?, contactMasked: j['contactMasked'] as String?,
       services: _strings(j['services']), skills: _strings(j['skills']),
       contributions: (j['contributions'] as num?)?.toInt() ?? (stats?['contributions'] as num?)?.toInt() ?? 0,
@@ -115,7 +150,9 @@ class ResponseLog {
 
 class Post {
   final String id, kind, authorUid, authorName, authorCompany, authorHandle; // kind: requirement | update
-  final String? authorPhotoUrl, title, description, category, locationPref, budget, urgency, matchReason;
+  final String? authorPhotoUrl, title, description, category, locationPref, budget, urgency, matchReason, slug;
+  /// Metres from the viewer's area (matched feed only).
+  final num? distanceM;
   final List<String> images;
   final int sharesCount;
   final bool authorHasUpdate;
@@ -129,19 +166,22 @@ class Post {
   Post({
     required this.id, required this.kind, required this.authorUid, required this.authorName, required this.authorCompany,
     required this.authorHandle, this.authorPhotoUrl, this.title, this.description, this.category, this.locationPref, this.budget,
-    this.urgency, this.matchReason, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
+    this.urgency, this.matchReason, this.slug, this.distanceM, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
     this.recentResponses = const [], this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0,
     this.reacted = false, this.reposted = false, this.bookmarked = false, this.myReaction,
   });
 
   bool get isRequirement => kind == 'requirement';
 
+  /// Public link, same as the web (`/@handle/ask/slug`).
+  String get webUrl => isRequirement && authorHandle.isNotEmpty ? 'https://webweb.ai/@$authorHandle/ask/${slug ?? id}' : 'https://webweb.ai/post/$id';
+
   factory Post.fromJson(Map j) => Post(
         id: '${j['id']}', kind: '${j['kind']}', authorUid: '${j['authorUid']}', authorName: '${j['authorName']}',
         authorCompany: '${j['authorCompany'] ?? ''}', authorHandle: '${j['authorHandle'] ?? ''}', authorPhotoUrl: j['authorPhotoURL'] as String?,
         title: j['title'] as String?, description: j['description'] as String?, category: j['category'] as String?,
         locationPref: j['locationPref'] as String?, budget: j['budget'] as String?, urgency: j['urgency'] as String?,
-        matchReason: j['matchReason'] as String?, images: _strings(j['images']), sharesCount: (j['sharesCount'] as num?)?.toInt() ?? 0,
+        matchReason: j['matchReason'] as String?, slug: j['slug'] as String?, distanceM: j['distanceM'] as num?, images: _strings(j['images']), sharesCount: (j['sharesCount'] as num?)?.toInt() ?? 0,
         authorHasUpdate: j['authorHasUpdate'] == true, createdAt: _ms(j['createdAt']),
         recentResponses: ((j['recentResponses'] as List?) ?? const []).map((e) => ResponseLog.fromJson(e as Map)).toList(),
         reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, repostsCount: (j['repostsCount'] as num?)?.toInt() ?? 0,
@@ -229,6 +269,45 @@ class Product {
         id: '${j['id']}', name: '${j['name']}', kind: '${j['kind'] ?? 'product'}', available: j['available'] != false,
         price: j['price'] as String?, description: j['description'] as String?, imageUrl: j['imageUrl'] as String?,
       );
+}
+
+/// A catalog item in the Connect feed, with the same controls as an ask (GET /products/feed).
+class FeedProduct extends Product {
+  int reactionsCount, repostsCount, referralsCount, enquiriesCount;
+  String? myReaction;
+  bool bookmarked, reposted;
+  FeedProduct({
+    required super.id, required super.name, required super.kind, super.available, super.price, super.description, super.imageUrl,
+    this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0, this.enquiriesCount = 0, this.myReaction,
+    this.bookmarked = false, this.reposted = false,
+  });
+  factory FeedProduct.fromJson(Map j) => FeedProduct(
+        id: '${j['id']}', name: '${j['name']}', kind: '${j['kind'] ?? 'product'}', available: j['available'] != false,
+        price: j['price'] as String?, description: j['description'] as String?, imageUrl: j['imageUrl'] as String?,
+        reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, repostsCount: (j['repostsCount'] as num?)?.toInt() ?? 0,
+        referralsCount: (j['referralsCount'] as num?)?.toInt() ?? 0, enquiriesCount: (j['enquiriesCount'] as num?)?.toInt() ?? 0,
+        myReaction: j['myReaction'] as String?, bookmarked: j['bookmarked'] == true, reposted: j['reposted'] == true,
+      );
+}
+
+/// One business and some of what it offers.
+class CatalogGroup {
+  final Peer owner;
+  final String? location;
+  final String verification;
+  final int total;
+  final List<FeedProduct> items;
+  CatalogGroup({required this.owner, this.location, this.verification = 'none', required this.total, required this.items});
+  factory CatalogGroup.fromJson(Map j) {
+    final o = j['owner'] as Map;
+    return CatalogGroup(
+      owner: Peer.fromJson(o),
+      location: o['location'] as String?,
+      verification: '${o['verification'] ?? 'none'}',
+      total: (j['total'] as num?)?.toInt() ?? 0,
+      items: ((j['items'] as List?) ?? const []).map((e) => FeedProduct.fromJson(e as Map)).toList(),
+    );
+  }
 }
 
 class StoryItem {

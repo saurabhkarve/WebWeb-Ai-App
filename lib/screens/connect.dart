@@ -6,8 +6,10 @@ import '../auth_provider.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../widgets/catalog_strip.dart';
 import '../widgets/post_card.dart';
 import '../widgets/story_viewer.dart';
+import 'edit_profile.dart';
 
 /// Connect tab: Updates (24h stories) + the Asks / updates feed (GET /posts?matched=1, newest + relevance first).
 class ConnectScreen extends StatefulWidget {
@@ -21,6 +23,10 @@ class ConnectScreen extends StatefulWidget {
 class _ConnectScreenState extends State<ConnectScreen> {
   List<StoryGroup> _stories = [];
   List<Post> _posts = [];
+  /// Businesses and what they offer: one block after every third ask (like the web feed).
+  List<CatalogGroup> _catalog = [];
+  /// Strength strip closed for this app session.
+  static bool _hideStrength = false;
   bool _loading = true;
   bool _more = true;
   bool _loadingMore = false;
@@ -61,6 +67,9 @@ class _ConnectScreenState extends State<ConnectScreen> {
         _loading = false;
         _error = null;
       });
+      _api.get('/products/feed', {'limit': 10}).then((d) {
+        if (mounted) setState(() => _catalog = (d as List).map((e) => CatalogGroup.fromJson(e as Map)).toList());
+      }).catchError((_) {});
     } catch (e) {
       if (mounted) setState(() {
         _loading = false;
@@ -110,6 +119,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
         onRefresh: _load,
         child: ListView(controller: _scroll, padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
           const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: Align(alignment: Alignment.centerLeft, child: LogoInline())),
+          _strengthStrip(me, p),
           const SizedBox(height: 8),
           const RuleHeading(Icons.campaign_outlined, 'UPDATES'),
           const SizedBox(height: 12),
@@ -139,8 +149,55 @@ class _ConnectScreenState extends State<ConnectScreen> {
               const SizedBox(height: 12),
               GoldButton(label: 'Post an ask', onPressed: widget.onGoAsk),
             ])),
-          for (final post in _posts) PostCard(key: ValueKey(post.id), post: post),
+          for (var i = 0; i < _posts.length; i++) ...[
+            PostCard(key: ValueKey(_posts[i].id), post: _posts[i]),
+            // one business block after ask 3, 6, 9 ... (and after the last ask of a short feed)
+            if (_catalogAt(i) case final g?) CatalogStrip(key: ValueKey('cat-${g.owner.uid}'), group: g),
+          ],
           if (_loadingMore) const Padding(padding: EdgeInsets.all(16), child: PageLoader(size: 36)),
+        ]),
+      ),
+    );
+  }
+
+  CatalogGroup? _catalogAt(int i) {
+    final slot = (i + 1) % 3 == 0 ? (i + 1) ~/ 3 - 1 : (_posts.length < 3 && i == _posts.length - 1 ? 0 : -1);
+    return slot >= 0 && slot < _catalog.length ? _catalog[slot] : null;
+  }
+
+  /// Own profile below 100%: one thin line with the percent and the most valuable next step.
+  Widget _strengthStrip(Profile? me, Pal p) {
+    final c = me?.completion;
+    if (c == null || c.percent >= 100 || _hideStrength) return const SizedBox();
+    final next = c.next;
+    return InkWell(
+      onTap: () async {
+        if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: me!))) == true && mounted) {
+          context.read<AuthProvider>().loadProfile();
+        }
+      },
+      child: Container(
+        height: 30,
+        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.only(left: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          gradient: LinearGradient(colors: [kGold.withValues(alpha: .22), kGold.withValues(alpha: .06), Colors.transparent]),
+        ),
+        child: Row(children: [
+          Text('${c.percent}%', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5, color: kGold)),
+          const SizedBox(width: 8),
+          Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: c.percent / 100, minHeight: 4, color: kGold, backgroundColor: p.border))),
+          if (next != null) ...[
+            const SizedBox(width: 8),
+            Text('Add ${next.label} · +${next.weight}%', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11.5, color: kGold)),
+          ],
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            iconSize: 16,
+            icon: Icon(Icons.close, color: p.muted),
+            onPressed: () => setState(() => _hideStrength = true),
+          ),
         ]),
       ),
     );
