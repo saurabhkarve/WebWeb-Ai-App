@@ -40,8 +40,26 @@ workflows:
     scripts:
       - name: Firebase config
         script: |
-          echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
-          grep -q '"package_name": "ai.webweb.app"' android/app/google-services.json || { echo "google-services.json has no Android app ai.webweb.app"; exit 1; }
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "ERROR: GOOGLE_SERVICES_JSON is not set. Add it in App > Environment variables, group 'firebase'."; exit 1
+          fi
+          # accept the file pasted either base64-encoded or as plain JSON
+          if echo "$GOOGLE_SERVICES_JSON" | grep -q '"project_info"'; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          else
+            echo "$GOOGLE_SERVICES_JSON" | tr -d ' \n\r' | base64 --decode > android/app/google-services.json || { echo "ERROR: GOOGLE_SERVICES_JSON is not valid base64"; exit 1; }
+          fi
+          python3 - <<'PY'
+          import json, sys
+          try:
+              d = json.load(open("android/app/google-services.json"))
+          except Exception as e:
+              sys.exit(f"ERROR: google-services.json is not valid JSON ({e})")
+          ids = [c["client_info"]["android_client_info"]["package_name"] for c in d.get("client", [])]
+          print("google-services.json project:", d.get("project_info", {}).get("project_id"), "apps:", ids)
+          if "ai.webweb.app" not in ids:
+              sys.exit("ERROR: no Android app 'ai.webweb.app' in google-services.json. In Firebase add an Android app with package ai.webweb.app and download the file again.")
+          PY
       - name: Signing config (key.properties from the Codemagic keystore)
         script: |
           cat > android/key.properties <<EOF
@@ -105,7 +123,14 @@ workflows:
         script: xcode-project use-profiles
       - name: Firebase config (values passed to the app as --dart-define)
         script: |
-          echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > /tmp/gsi.plist
+          if [ -z "$GOOGLE_SERVICE_INFO_PLIST" ]; then
+            echo "ERROR: GOOGLE_SERVICE_INFO_PLIST is not set. Add it in App > Environment variables, group 'firebase'."; exit 1
+          fi
+          if echo "$GOOGLE_SERVICE_INFO_PLIST" | grep -q '<plist'; then
+            printf '%s' "$GOOGLE_SERVICE_INFO_PLIST" > /tmp/gsi.plist
+          else
+            echo "$GOOGLE_SERVICE_INFO_PLIST" | tr -d ' \n\r' | base64 --decode > /tmp/gsi.plist
+          fi
           pb() { /usr/libexec/PlistBuddy -c "Print :$1" /tmp/gsi.plist; }
           echo "FIREBASE_IOS_API_KEY=$(pb API_KEY)" >> $CM_ENV
           echo "FIREBASE_IOS_APP_ID=$(pb GOOGLE_APP_ID)" >> $CM_ENV
