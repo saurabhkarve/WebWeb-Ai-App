@@ -15,7 +15,7 @@
 1. Google Play Console developer account ($25). Personal accounts created after Nov 2023 need a **closed test with 12+ testers for 14 days** before production.
 2. Host `PRIVACY_POLICY.md` on a public page (e.g. https://webweb.ai/privacy) and fill the contact details.
 3. Deploy the API changes above on the live server and set up real SMS.
-4. **Package name** is still `in.allpos.allpos_app`. Decide the final id (e.g. `ai.webweb.app`) *before* the first upload - it can never change after publishing. Then in Firebase (project `webweb-ai`) add an Android app with that id, download the new `google-services.json` into `android/app/`, and change `applicationId`/`namespace` + `MainActivity` package.
+4. **Package name** is `ai.webweb.app` (Android and iOS). It can never change after the first upload. Firebase (project `webweb-ai`) needs an Android app with this id; `google-services.json` is injected by Codemagic (see CODEMAGIC.md).
 5. Firebase: add the SHA-1 / SHA-256 of the upload key and, after the first upload, of the Play App Signing key (Play Console > Setup > App signing).
 6. Build: `flutter build appbundle --release --dart-define=API_URL=https://biznetapi.webweb.ai`, upload `build/app/outputs/bundle/release/app-release.aab` (internal testing first).
 

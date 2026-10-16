@@ -2,8 +2,8 @@
 # Setup (one time, in the Codemagic UI) is described in CODEMAGIC.md.
 #
 # Environment variable groups used here:
-#   firebase      GOOGLE_SERVICES_JSON (base64 of android/app/google-services.json)
-#                 FIREBASE_IOS_API_KEY, FIREBASE_IOS_APP_ID, FIREBASE_SENDER_ID (from GoogleService-Info.plist)
+#   firebase      GOOGLE_SERVICES_JSON (base64 of google-services.json, Android app ai.webweb.app)
+#                 GOOGLE_SERVICE_INFO_PLIST (base64 of GoogleService-Info.plist, iOS app ai.webweb.app)
 #   app_store     APP_STORE_APPLE_ID (the numeric Apple ID of the app in App Store Connect)
 # Code signing identities: Android keystore reference "webweb_upload"; iOS uses the
 # App Store Connect API key integration "WebWeb ASC" (automatic signing).
@@ -39,7 +39,9 @@ workflows:
         - pattern: "v*"
     scripts:
       - name: Firebase config
-        script: echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+        script: |
+          echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+          grep -q '"package_name": "ai.webweb.app"' android/app/google-services.json || { echo "google-services.json has no Android app ai.webweb.app"; exit 1; }
       - name: Signing config (key.properties from the Codemagic keystore)
         script: |
           cat > android/key.properties <<EOF
@@ -101,6 +103,15 @@ workflows:
       # (flutter build ipa runs CocoaPods itself for plugins that are not Swift packages)
       - name: Signing profiles
         script: xcode-project use-profiles
+      - name: Firebase config (values passed to the app as --dart-define)
+        script: |
+          echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > /tmp/gsi.plist
+          pb() { /usr/libexec/PlistBuddy -c "Print :$1" /tmp/gsi.plist; }
+          echo "FIREBASE_IOS_API_KEY=$(pb API_KEY)" >> $CM_ENV
+          echo "FIREBASE_IOS_APP_ID=$(pb GOOGLE_APP_ID)" >> $CM_ENV
+          echo "FIREBASE_SENDER_ID=$(pb GCM_SENDER_ID)" >> $CM_ENV
+          echo "FIREBASE_PROJECT_ID=$(pb PROJECT_ID)" >> $CM_ENV
+          test "$(pb BUNDLE_ID)" = "ai.webweb.app" || { echo "GoogleService-Info.plist is for $(pb BUNDLE_ID), expected ai.webweb.app"; exit 1; }
       - name: Build IPA
         script: |
           BUILD_NUMBER=$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0) + 1))
@@ -110,7 +121,8 @@ workflows:
             --dart-define=API_URL=$API_URL \
             --dart-define=FIREBASE_IOS_API_KEY=$FIREBASE_IOS_API_KEY \
             --dart-define=FIREBASE_IOS_APP_ID=$FIREBASE_IOS_APP_ID \
-            --dart-define=FIREBASE_SENDER_ID=$FIREBASE_SENDER_ID
+            --dart-define=FIREBASE_SENDER_ID=$FIREBASE_SENDER_ID \
+            --dart-define=FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log

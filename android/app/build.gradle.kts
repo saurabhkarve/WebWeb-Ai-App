@@ -15,7 +15,7 @@ val keystoreProps = Properties().apply {
 }
 
 android {
-    namespace = "in.allpos.allpos_app"
+    namespace = "ai.webweb.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -27,7 +27,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "in.allpos.allpos_app"
+        applicationId = "ai.webweb.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         // Taken from pubspec.yaml `version: name+code`.

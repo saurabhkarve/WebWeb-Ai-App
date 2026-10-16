@@ -9,8 +9,7 @@ Both run when you push a tag starting with `v`, for example `v0.2.0`. You can al
 
 App ids:
 
-- Android: `in.allpos.allpos_app`. This is unchanged because it is already registered in Firebase.
-- iOS: `ai.webweb.app`.
+- Android and iOS: `ai.webweb.app`. It can never change after the first store upload.
 
 Production API: `https://biznetapi.webweb.ai`, set as `API_URL` in the yaml.
 
@@ -22,8 +21,9 @@ Production API: `https://biznetapi.webweb.ai`, set as `API_URL` in the yaml.
 
 ## 1. Firebase (push notifications)
 1. In Firebase, open Project settings, then Your apps.
-   - **Android.** The app `in.allpos.allpos_app` should already exist. Download `google-services.json`.
-   - **iOS.** Click **Add app**, choose iOS, and set the bundle id to `ai.webweb.app`. Download `GoogleService-Info.plist`. Do not add it to Xcode; the build passes its values in instead.
+   - **Android.** Click **Add app**, choose Android, and set the package name to `ai.webweb.app`. Skip the SDK steps. Download `google-services.json`.
+   - **iOS.** Click **Add app**, choose iOS, and set the bundle id to `ai.webweb.app`. Skip the SDK steps. Download `GoogleService-Info.plist`.
+   - Do not commit either file. Codemagic adds them at build time (step 3), and the build stops if a file is for a different id.
 2. Add the APNs key so Firebase can reach iPhones:
    1. In Apple Developer, go to Certificates, IDs & Profiles, then **Keys**, then **+**. Enable *Apple Push Notifications service (APNs)* and download the `.p8` file.
    2. In Firebase, go to Project settings, then **Cloud Messaging**, then *Apple app configuration*.
@@ -42,10 +42,8 @@ Open the app, then **Environment variables**. Add these and tick **Secure** for 
 
 | Group | Variable | Value |
 |---|---|---|
-| `firebase` | `GOOGLE_SERVICES_JSON` | Output of `base64 -i google-services.json \| pbcopy`. Paste it in. |
-| `firebase` | `FIREBASE_IOS_API_KEY` | `API_KEY` from `GoogleService-Info.plist` |
-| `firebase` | `FIREBASE_IOS_APP_ID` | `GOOGLE_APP_ID` from the plist, like `1:1234:ios:abcd` |
-| `firebase` | `FIREBASE_SENDER_ID` | `GCM_SENDER_ID` from the plist |
+| `firebase` | `GOOGLE_SERVICES_JSON` | Run `base64 -i ~/Downloads/google-services.json \| pbcopy`, then paste. |
+| `firebase` | `GOOGLE_SERVICE_INFO_PLIST` | Run `base64 -i ~/Downloads/GoogleService-Info.plist \| pbcopy`, then paste. |
 | `app_store` | `APP_STORE_APPLE_ID` | The numeric Apple ID of the app (step 5) |
 
 ## 4. Android signing (keystore)
