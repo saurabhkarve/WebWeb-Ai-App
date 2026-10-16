@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -8,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../auth_provider.dart';
 import '../call_manager.dart';
+import '../i18n.dart';
 import '../location.dart';
 import '../models.dart';
 import '../notifications.dart';
@@ -17,29 +21,31 @@ import '../widgets.dart';
 import '../widgets/active_call_banner.dart';
 import '../widgets/image_grid.dart';
 import 'contact_picker.dart';
-import 'find.dart' show FilterPill;
+import 'post_detail.dart';
 import 'profile.dart';
 
-/// Opens (or creates) the 1:1 chat with [peer] and shows it.
-Future<void> openChat(BuildContext context, Peer peer) async {
+/// Opens (or creates) the 1:1 chat with [peer]. [attachment] (an ask / update being replied to, an
+/// item enquiry) waits above the composer and goes out with the next message, like the web.
+Future<void> openChat(BuildContext context, Peer peer, {Map<String, dynamic>? attachment}) async {
   final api = context.read<AuthProvider>().api;
   try {
     final id = (await api.post('/chats', {'userId': peer.uid}) as Map)['id'] as String;
-    if (context.mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: id, peer: peer)));
+    if (context.mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: id, peer: peer, pending: attachment)));
   } catch (e) {
     if (context.mounted) toast(context, '$e', error: true);
   }
 }
 
 Future<bool> confirmDeleteChat(BuildContext context, String name) async {
+  final p = Pal.of(context);
   final r = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Delete chat?'),
-      content: Text('Your chat with $name will be removed from your account. $name will still have their copy.'),
+      title: Text(t('Delete chat?'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+      content: Text(t('Your chat with {name} will be removed from your account. {name} will still have their copy.', {'name': name}), style: TextStyle(fontSize: 14, color: p.muted)),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete', style: TextStyle(color: Colors.redAccent))),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('Cancel'), style: TextStyle(color: p.text, fontWeight: FontWeight.w700))),
+        TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('Delete'), style: TextStyle(color: p.danger, fontWeight: FontWeight.w700))),
       ],
     ),
   );
@@ -54,23 +60,17 @@ Future<void> placeCall(BuildContext context, Peer peer, bool video) async {
   }
 }
 
-// ---------- formatting helpers ----------
-String _clock(BuildContext c, DateTime d) => TimeOfDay.fromDateTime(d).format(c);
+// ---------- formatting helpers (web: en-IN, 12 hour, lower case) ----------
+const _months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+String _clock(DateTime d) => '${d.hour % 12 == 0 ? 12 : d.hour % 12}:${d.minute.toString().padLeft(2, '0')} ${d.hour < 12 ? 'am' : 'pm'}';
+String _dayTime(DateTime d) => '${d.day} ${_months[d.month - 1]}, ${_clock(d)}';
 bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
 
 String _dayLabel(DateTime d) {
   final now = DateTime.now();
-  if (_sameDay(d, now)) return 'Today';
-  if (_sameDay(d, now.subtract(const Duration(days: 1)))) return 'Yesterday';
-  const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return '${d.day} ${m[d.month - 1]} ${d.year}';
-}
-
-String _listTime(BuildContext c, DateTime d) {
-  final now = DateTime.now();
-  if (_sameDay(d, now)) return _clock(c, d);
-  if (_sameDay(d, now.subtract(const Duration(days: 1)))) return 'Yesterday';
-  return '${d.day}/${d.month}/${d.year % 100}';
+  if (_sameDay(d, now)) return t('Today');
+  if (_sameDay(d, now.subtract(const Duration(days: 1)))) return t('Yesterday');
+  return '${d.day} ${_months[d.month - 1]} ${d.year}';
 }
 
 String _duration(int s) => s >= 3600 ? '${s ~/ 3600}h ${(s % 3600) ~/ 60}m' : s >= 60 ? '${s ~/ 60}m ${s % 60}s' : '${s}s';
@@ -91,14 +91,60 @@ String callLabel(CallLog c, String meUid) {
   }
 }
 
+/// One-line description of a message, used in reply quotes (web quoteText).
+String quoteText(String text, String kind) {
+  if (text.isNotEmpty) return text;
+  return switch (kind) {
+    'contact' => '👤 Contact',
+    'location' => '📍 Location',
+    'document' => '📎 Document',
+    'profile' => '👤 Profile',
+    'post' => '↩ About a post',
+    'item' => '🛍 Item enquiry',
+    'cart' => '🛒 Cart',
+    'image' => '📷 Photo',
+    _ => '',
+  };
+}
+
+/// Sent (one grey tick), delivered (two grey), read (two blue).
 class Ticks extends StatelessWidget {
   final Msg m;
   const Ticks(this.m, {super.key});
   @override
   Widget build(BuildContext context) {
-    if (m.pending) return const Icon(Icons.access_time, size: 13, color: Color(0x991E1E1E));
+    final p = Pal.of(context);
+    if (m.pending) return WIcon(WI.clock, size: 13, color: p.muted);
     final read = m.readAt != null;
-    return Icon(read || m.deliveredAt != null ? Icons.done_all : Icons.done, size: 16, color: read ? const Color(0xFF1B6FD6) : const Color(0x991E1E1E));
+    return WIcon(read || m.deliveredAt != null ? WI.tickDouble : WI.tick, size: 16, color: read ? const Color(0xFF0EA5E9) : p.muted, strokeWidth: 1.8);
+  }
+}
+
+/// Dashed empty state with a gold disc icon (web chat Empty).
+class _Empty extends StatelessWidget {
+  final WI icon;
+  final String title, hint;
+  const _Empty(this.icon, this.title, this.hint);
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: DashedBox(
+        radius: 8,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+        child: SizedBox(
+          width: double.infinity,
+          child: Column(children: [
+            Container(width: 56, height: 56, alignment: Alignment.center, decoration: BoxDecoration(color: p.tagBg, shape: BoxShape.circle), child: WIcon(icon, size: 26, color: p.tagText)),
+            const SizedBox(height: 12),
+            Text(t(title), textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            ConstrainedBox(constraints: const BoxConstraints(maxWidth: 320), child: Text(t(hint), textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.muted))),
+          ]),
+        ),
+      ),
+    );
   }
 }
 
@@ -111,11 +157,10 @@ class TalkScreen extends StatefulWidget {
 }
 
 class _TalkScreenState extends State<TalkScreen> {
-  List<ChatSummary> _chats = [];
+  List<ChatSummary>? _chats;
   List<CallLog> _calls = [];
   List<Profile> _people = [];
-  bool _loading = true;
-  String _filter = 'all';
+  String _tab = 'chats';
   final _q = TextEditingController();
   StreamSubscription? _sub;
   Timer? _debounce, _peopleDebounce, _poll;
@@ -134,10 +179,8 @@ class _TalkScreenState extends State<TalkScreen> {
         _debounce = Timer(const Duration(milliseconds: 250), _load);
       }
     });
-    // safety net if the socket is down
-    _poll = Timer.periodic(const Duration(seconds: 8), (_) {
-      if (!context.read<RealtimeService>().connected) _load();
-    });
+    // light refresh like the web (and the safety net when the socket is down)
+    _poll = Timer.periodic(const Duration(seconds: 6), (_) => _load());
   }
 
   Future<void> _load() async {
@@ -148,14 +191,13 @@ class _TalkScreenState extends State<TalkScreen> {
       setState(() {
         _chats = c.map((e) => ChatSummary.fromJson(e as Map, _me)).toList();
         _calls = k.map((e) => CallLog.fromJson(e as Map)).toList();
-        _loading = false;
       });
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _chats ??= []);
     }
   }
 
-  /// Everyone matching the search box (newest members when empty), so a new chat can be started.
+  /// People matching the search box (newest members when empty), so a new chat can be started.
   Future<void> _loadPeople() async {
     try {
       final d = await _api.get('/app/people', {'q': _q.text.trim()}) as List;
@@ -185,8 +227,8 @@ class _TalkScreenState extends State<TalkScreen> {
     try {
       await _api.delete('/app/chats/${c.id}');
       if (mounted) {
-        setState(() => _chats.removeWhere((x) => x.id == c.id));
-        toast(context, 'Chat deleted');
+        setState(() => _chats?.removeWhere((x) => x.id == c.id));
+        toast(context, t('Chat deleted'));
       }
       return true;
     } catch (e) {
@@ -195,136 +237,240 @@ class _TalkScreenState extends State<TalkScreen> {
     }
   }
 
+  Future<void> _open(ChatSummary c) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: c.id, peer: c.peer)));
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final rt = context.watch<RealtimeService>();
+    final all = _chats;
     final q = _q.text.trim().toLowerCase();
-    final chats = _chats.where((c) {
-      if (_filter == 'unread' && !c.unread) return false;
+    final unreadCount = (all ?? const []).where((c) => c.unread).length;
+    final chats = (all ?? const <ChatSummary>[]).where((c) {
+      if (_tab == 'unread' && !c.unread) return false;
       if (q.isEmpty) return true;
       return '${c.peer.name} ${c.peer.company} ${c.lastMessage ?? ''}'.toLowerCase().contains(q);
     }).toList();
-    final calls = _calls.where((c) => q.isEmpty || (c.peer?.name ?? '').toLowerCase().contains(q)).toList();
-    final showCalls = _filter == 'calls';
-    final chatted = _chats.map((c) => c.peer.uid).toSet();
+    final chatted = (all ?? const <ChatSummary>[]).map((c) => c.peer.uid).toSet();
     final morePeople = _people.where((u) => !chatted.contains(u.uid)).toList();
+    final n = all?.length ?? 0;
 
-    return SafeArea(
-      bottom: false,
-      child: RefreshIndicator(
-        color: kGold,
-        onRefresh: () async {
-          await _load();
-          await _loadPeople();
-        },
-        child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
-          Row(children: [
-            const Expanded(child: Text('Talk', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700))),
-            Container(width: 9, height: 9, decoration: BoxDecoration(color: rt.connected ? kGreen : Colors.orange, shape: BoxShape.circle)),
-            const SizedBox(width: 6),
-            Text(rt.connected ? 'Live' : 'Connecting…', style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w600)),
-          ]),
-          Text('${_chats.length} ${_chats.length == 1 ? 'conversation' : 'conversations'}', style: TextStyle(color: p.muted, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 14),
-          Container(
-            height: 50,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(color: p.field, borderRadius: BorderRadius.circular(30)),
-            child: Row(children: [
-              Icon(Icons.search, color: p.muted),
-              const SizedBox(width: 10),
-              Expanded(child: TextField(controller: _q, onChanged: _onSearch, decoration: InputDecoration(hintText: 'Search people or messages', hintStyle: TextStyle(color: p.muted), border: InputBorder.none, isDense: true))),
-            ]),
+    Widget tabChip(String id, String label) {
+      final on = _tab == id;
+      return GestureDetector(
+        onTap: () => setState(() => _tab = id),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            gradient: on ? kGoldGradient : null,
+            color: on ? null : p.chip,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: on ? const [BoxShadow(color: Color(0x14000000), blurRadius: 2, offset: Offset(0, 1))] : null,
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 42,
-            child: ListView(scrollDirection: Axis.horizontal, children: [
-              for (final e in {'all': 'All chats', 'unread': 'Unread', 'calls': 'Calls'}.entries)
-                Padding(padding: const EdgeInsets.only(right: 8), child: FilterPill(label: e.value, selected: _filter == e.key, onTap: () => setState(() => _filter = e.key))),
-            ]),
-          ),
-          const SizedBox(height: 12),
-          if (_loading)
-            const Padding(padding: EdgeInsets.all(40), child: PageLoader())
-          else if (showCalls)
-            if (calls.isEmpty) _empty(p, 'No calls yet', 'Open a chat and tap the call or video icon.') else for (final c in calls) _callTile(c, p)
-          else ...[
-            for (final c in chats) _chatTile(c, p),
-            if (_filter == 'all' && morePeople.isNotEmpty) ...[
-              Padding(padding: const EdgeInsets.only(top: 14, bottom: 4), child: Text(q.isEmpty ? 'START A NEW CHAT' : 'PEOPLE', style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .8))),
-              for (final u in morePeople) _personTile(u, p),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text(t(label), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: on ? kInk : p.muted)),
+            if (id == 'unread' && unreadCount > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                decoration: BoxDecoration(color: kInk, borderRadius: BorderRadius.circular(10)),
+                child: Text('$unreadCount', style: const TextStyle(fontSize: 11, height: 16 / 11, fontWeight: FontWeight.w700, color: kGold)),
+              ),
             ],
-            if (chats.isEmpty && (_filter != 'all' || morePeople.isEmpty))
-              _empty(p, _filter == 'unread' ? 'No unread messages' : (q.isEmpty ? 'No messages yet' : 'No results'), _filter == 'unread' ? 'You are all caught up.' : (q.isEmpty ? 'Search for a person to start a chat.' : 'Try a different name.')),
+          ]),
+        ),
+      );
+    }
+
+    return LogoRefresh(
+      onRefresh: () async {
+        await _load();
+        await _loadPeople();
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, islandSpace(context)),
+        children: [
+          Text(t('Talk'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1)),
+          const SizedBox(height: 4),
+          Text(
+            all == null
+                ? t('Your conversations')
+                : '$n ${t(n == 1 ? 'conversation' : 'conversations')}${unreadCount > 0 ? ' · $unreadCount ${t('unread')}' : ''}',
+            style: TextStyle(fontSize: 14, color: p.muted),
+          ),
+          const SizedBox(height: 12),
+          if (_tab != 'calls') ...[
+            Container(
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(30)),
+              child: Row(children: [
+                WIcon(WI.search, size: 18, color: p.muted),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _q,
+                    onChanged: _onSearch,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: t('Search people or messages'),
+                      hintStyle: TextStyle(color: p.muted, fontSize: 14),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 12),
           ],
-        ]),
+          SizedBox(
+            height: 36,
+            child: OverflowBox(
+              maxWidth: MediaQuery.of(context).size.width,
+              child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16), children: [
+                tabChip('chats', 'All chats'),
+                const SizedBox(width: 8),
+                tabChip('unread', 'Unread'),
+                const SizedBox(width: 8),
+                tabChip('calls', 'Calls'),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_tab == 'calls') ...[
+            if (_calls.isEmpty) const _Empty(WI.phone, 'No calls yet', 'Open a chat and tap the call or video icon.'),
+            for (final c in _calls) ...[_callTile(c, p), const SizedBox(height: 4)],
+          ] else if (all == null)
+            const Padding(padding: EdgeInsets.symmetric(vertical: 48), child: Center(child: LogoLoader()))
+          else ...[
+            if (chats.isEmpty && _tab == 'chats' && q.isEmpty && morePeople.isEmpty) const _Empty(WI.talk, 'No messages yet', 'Open a public page or a post and tap Message.'),
+            if (chats.isEmpty && (_tab == 'unread' || q.isNotEmpty) && (_tab == 'unread' || morePeople.isEmpty))
+              _Empty(WI.search, _tab == 'unread' && q.isEmpty ? "You're all caught up" : 'No matches', _tab == 'unread' && q.isEmpty ? 'No unread conversations.' : 'Try a different name or word.'),
+            for (final c in chats) ...[_chatTile(c, p), const SizedBox(height: 4)],
+            if (_tab == 'chats' && morePeople.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 16, bottom: 6),
+                child: Text(t(q.isEmpty ? 'Start a new chat' : 'People'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.muted)),
+              ),
+              for (final u in morePeople) ...[_personTile(u, p), const SizedBox(height: 4)],
+            ],
+          ],
+        ],
       ),
     );
   }
 
-  Widget _empty(Pal p, String title, String sub) => DashedBox(
-        radius: 18,
-        padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-        child: SizedBox(
-          width: double.infinity,
-          child: Column(children: [
-            Container(width: 56, height: 56, decoration: BoxDecoration(color: kGold.withValues(alpha: .2), shape: BoxShape.circle), child: const Icon(Icons.forum_outlined, color: kGold)),
-            const SizedBox(height: 14),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-            const SizedBox(height: 4),
-            Text(sub, textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontWeight: FontWeight.w500)),
+  Widget _row(Pal p, {required Widget avatar, required Widget top, required Widget bottom, bool highlight = false, VoidCallback? onTap, VoidCallback? onLongPress, Widget? trailing}) {
+    return Material(
+      color: highlight ? kGold.withValues(alpha: .1) : p.chip.withValues(alpha: .4),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: highlight ? kGold.withValues(alpha: .6) : Colors.transparent)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(children: [
+            avatar,
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [top, const SizedBox(height: 2), bottom])),
+            if (trailing != null) trailing,
           ]),
         ),
-      );
+      ),
+    );
+  }
 
   Widget _avatar(Peer u) {
-    final on = context.read<RealtimeService>().isOnline(u.uid);
+    final on = context.watch<RealtimeService>().isOnline(u.uid);
     return Stack(clipBehavior: Clip.none, children: [
-      Avatar(name: u.name, photoUrl: u.photoUrl, ring: u.userType == 'entrepreneur'),
-      if (on) Positioned(right: 0, bottom: 0, child: Container(width: 13, height: 13, decoration: BoxDecoration(color: kGreen, shape: BoxShape.circle, border: Border.all(color: Pal.of(context).canvas, width: 2)))),
+      Avatar(name: u.name, photoUrl: u.photoUrl, size: 40, type: u.userType, badge: 16),
+      if (on)
+        Positioned(
+          left: -1,
+          bottom: -1,
+          child: Container(width: 12, height: 12, decoration: BoxDecoration(color: kGreen, shape: BoxShape.circle, border: Border.all(color: Pal.of(context).canvas, width: 2))),
+        ),
     ]);
   }
+
+  Widget _nameLine(Pal p, Peer u) => Text.rich(
+        TextSpan(children: [
+          TextSpan(text: u.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+          if (u.company.isNotEmpty) TextSpan(text: ' · ${u.company}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: p.muted)),
+        ]),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 15, height: 1.25),
+      );
 
   Widget _chatTile(ChatSummary c, Pal p) => Dismissible(
         key: ValueKey('chat-${c.id}'),
         direction: DismissDirection.endToStart,
         confirmDismiss: (_) => _deleteChat(c),
-        background: Container(alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), color: Colors.redAccent, child: const Icon(Icons.delete_outline, color: Colors.white)),
-        child: ListTile(
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          decoration: BoxDecoration(color: p.danger, borderRadius: BorderRadius.circular(8)),
+          child: const WIcon(WI.trash, color: Colors.white),
+        ),
+        child: _row(
+          p,
+          highlight: c.unread,
+          onTap: () => _open(c),
           onLongPress: () => _deleteChat(c),
-          contentPadding: EdgeInsets.zero,
-          leading: _avatar(c.peer),
-          title: Text(c.peer.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-          subtitle: Text(c.lastMessage ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: c.unread ? p.text : p.muted, fontWeight: c.unread ? FontWeight.w700 : FontWeight.w500)),
-          trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-            if (c.lastMessageAt != null) Text(_listTime(context, c.lastMessageAt!), style: TextStyle(color: c.unread ? kGold : p.muted, fontSize: 12, fontWeight: FontWeight.w600)),
-            if (c.unread) ...[const SizedBox(height: 6), Container(width: 11, height: 11, decoration: const BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle))],
+          avatar: _avatar(c.peer),
+          top: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Expanded(child: _nameLine(p, c.peer)),
+            if (c.lastMessageAt != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Text(timeAgo(c.lastMessageAt!), style: TextStyle(fontSize: 12, fontWeight: c.unread ? FontWeight.w700 : FontWeight.w500, color: c.unread ? p.text : p.muted)),
+              ),
           ]),
-          onTap: () async {
-            await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: c.id, peer: c.peer)));
-            _load();
-          },
+          bottom: Row(children: [
+            Expanded(
+              child: Text(c.lastMessage ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, height: 1.25, fontWeight: c.unread ? FontWeight.w700 : FontWeight.w500, color: c.unread ? p.text : p.muted)),
+            ),
+            if (c.unread) ...[const SizedBox(width: 8), Container(width: 10, height: 10, decoration: const BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle))],
+          ]),
         ),
       );
 
-  Widget _personTile(Profile u, Pal p) => ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: _avatar(Peer.fromProfile(u)),
-        title: Text(u.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: Text('@${u.handle} · ${u.company} · ${u.location}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted)),
-        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-          IconButton(icon: const Icon(Icons.call_outlined, color: kGold), onPressed: () => placeCall(context, Peer.fromProfile(u), false)),
-          IconButton(icon: const Icon(Icons.chat_bubble_outline, color: kGold), onPressed: () async {
-            await openChat(context, Peer.fromProfile(u));
-            _load();
-          }),
-        ]),
-        onTap: () async {
-          await openChat(context, Peer.fromProfile(u));
-          _load();
-        },
+  Widget _personTile(Profile u, Pal p) {
+    final peer = Peer.fromProfile(u);
+    Future<void> chat() async {
+      await openChat(context, peer);
+      _load();
+    }
+
+    return _row(
+      p,
+      onTap: chat,
+      avatar: _avatar(peer),
+      top: _nameLine(p, peer),
+      bottom: Text('@${u.handle}${u.location.isEmpty ? '' : ' · ${u.location}'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, height: 1.25, color: p.muted)),
+      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+        _roundIcon(p, WI.phone, t('Call'), () => placeCall(context, peer, false)),
+        _roundIcon(p, WI.talk, t('Message'), chat),
+      ]),
+    );
+  }
+
+  Widget _roundIcon(Pal p, WI icon, String label, VoidCallback onTap) => Semantics(
+        button: true,
+        label: label,
+        child: InkResponse(onTap: onTap, radius: 20, child: SizedBox(width: 40, height: 40, child: Center(child: WIcon(icon, size: 22, color: p.text)))),
       );
 
   Widget _callTile(CallLog c, Pal p) {
@@ -332,22 +478,26 @@ class _TalkScreenState extends State<TalkScreen> {
     if (peer == null) return const SizedBox.shrink();
     final outgoing = c.callerUid == _me;
     final missed = !outgoing && c.status != 'completed';
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: _avatar(peer),
-      title: Text(peer.name, style: TextStyle(fontWeight: FontWeight.w700, color: missed ? Colors.redAccent : null)),
-      subtitle: Row(children: [
-        Icon(outgoing ? Icons.call_made : (missed ? Icons.call_missed : Icons.call_received), size: 15, color: missed ? Colors.redAccent : kGreen),
-        const SizedBox(width: 4),
-        Flexible(child: Text('${_listTime(context, c.createdAt)} · ${callLabel(c, _me)}', overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted))),
-      ]),
-      trailing: IconButton(icon: Icon(c.video ? Icons.videocam_outlined : Icons.call_outlined, color: kGold), onPressed: () => placeCall(context, peer, c.video)),
+    final color = missed ? p.danger : p.muted;
+    return _row(
+      p,
       onTap: () => openChat(context, peer),
+      avatar: _avatar(peer),
+      top: Row(children: [
+        Expanded(child: Text(peer.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w700, color: missed ? p.danger : p.text))),
+        Text(timeAgo(c.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
+      ]),
+      bottom: Row(children: [
+        WIcon(outgoing ? WI.callOut : (missed ? WI.callMissed : WI.callIn), size: 15, color: missed ? p.danger : kGreen),
+        const SizedBox(width: 4),
+        Flexible(child: Text(t(callLabel(c, _me)), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, height: 1.25, color: color))),
+      ]),
+      trailing: Padding(padding: const EdgeInsets.only(left: 4), child: _roundIcon(p, c.video ? WI.video : WI.phone, t('Call'), () => placeCall(context, peer, c.video))),
     );
   }
 }
 
-// ============================ Chat thread ============================
+// ============================ Chat thread (web chat/[chatId]) ============================
 
 /// A row in the thread: a message or a call-log entry.
 class _Item {
@@ -358,10 +508,14 @@ class _Item {
   DateTime get at => msg?.createdAt ?? call!.createdAt;
 }
 
+const _chatReactions = ['👍', '❤️', '🙏', '😂', '😮'];
+
 class ChatThread extends StatefulWidget {
   final String chatId;
   final Peer peer;
-  const ChatThread({super.key, required this.chatId, required this.peer});
+  /// sent along with the next message (reply to an ask / update, item enquiry)
+  final Map<String, dynamic>? pending;
+  const ChatThread({super.key, required this.chatId, required this.peer, this.pending});
   @override
   State<ChatThread> createState() => _ChatThreadState();
 }
@@ -371,9 +525,12 @@ class _ChatThreadState extends State<ChatThread> {
   final _scroll = ScrollController();
   List<Msg> _msgs = [];
   List<CallLog> _calls = [];
+  bool _loaded = false;
   bool _typing = false;
-  bool _uploading = false;
   bool _iAmTyping = false;
+  int? _selected; // message showing the reaction bar
+  Msg? _replyTo;
+  late Map<String, dynamic>? _pending = widget.pending;
   Timer? _typingOff, _iTypingOff, _poll;
   StreamSubscription? _sub;
   late final RealtimeService _rt = context.read<RealtimeService>();
@@ -387,9 +544,10 @@ class _ChatThreadState extends State<ChatThread> {
     NotificationService.activeChat = widget.chatId;
     _load();
     _sub = _rt.events.listen(_onEvent);
-    // if the socket is down, fall back to polling like the web does
-    _poll = Timer.periodic(const Duration(seconds: 6), (_) {
+    // reactions are polled (like the web); messages too when the socket is down
+    _poll = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!_rt.connected) _loadNew();
+      _loadReactions();
     });
   }
 
@@ -403,8 +561,24 @@ class _ChatThreadState extends State<ChatThread> {
       setState(() {
         _msgs = d;
         _calls = k;
+        _loaded = true;
       });
       _toBottom(jump: true);
+      _loadReactions();
+    } catch (_) {
+      if (mounted) setState(() => _loaded = true);
+    }
+  }
+
+  Future<void> _loadReactions() async {
+    try {
+      final r = Map<String, dynamic>.from(await _api.get('/chats/${widget.chatId}/reactions') as Map);
+      if (!mounted) return;
+      setState(() {
+        for (final m in _msgs) {
+          m.reactions = ((r['${m.id}'] as List?) ?? const []).map((e) => MsgReaction.fromJson(e as Map)).toList();
+        }
+      });
     } catch (_) {}
   }
 
@@ -473,106 +647,69 @@ class _ChatThreadState extends State<ChatThread> {
     }
   }
 
+  /// Sends the composer text (with the waiting attachment), or a photo / attachment from the sheet.
   Future<void> _send({String? text, String? imageUrl, Map<String, dynamic>? attachment}) async {
-    final t = text ?? _input.text.trim();
-    if (t.isEmpty && imageUrl == null && attachment == null) return;
+    final fromComposer = text == null && imageUrl == null && attachment == null;
+    final body = text ?? _input.text.trim();
+    final att = attachment ?? (fromComposer ? _pending : null);
+    if (body.isEmpty && imageUrl == null && att == null) return;
+    final reply = _replyTo;
     final tmp = 'tmp${DateTime.now().microsecondsSinceEpoch}';
-    final pending = Msg(id: -DateTime.now().microsecondsSinceEpoch, senderUid: _me, text: t, imageUrl: imageUrl, attachment: attachment, createdAt: DateTime.now(), pending: true, tmpId: tmp);
-    if (text == null) _input.clear();
+    final pending = Msg(
+      id: -DateTime.now().microsecondsSinceEpoch, senderUid: _me, text: body, imageUrl: imageUrl, attachment: att,
+      replyTo: reply == null ? null : MsgQuote(id: '${reply.id}', senderUid: reply.senderUid, text: reply.text, kind: reply.kind),
+      createdAt: DateTime.now(), pending: true, tmpId: tmp,
+    );
+    if (fromComposer) _input.clear();
     _setTyping(false);
-    setState(() => _msgs = [..._msgs, pending]);
+    setState(() {
+      _msgs = [..._msgs, pending];
+      _replyTo = null;
+      if (fromComposer) _pending = null;
+    });
     _toBottom();
     try {
-      final sent = Msg.fromJson(await _api.post('/chats/${widget.chatId}/messages', {'text': t, if (imageUrl != null) 'imageUrl': imageUrl, if (attachment != null) 'attachment': attachment}) as Map);
+      final sent = Msg.fromJson(await _api.post('/chats/${widget.chatId}/messages', {
+        'text': body,
+        if (imageUrl != null) 'imageUrl': imageUrl,
+        if (att != null) 'attachment': att,
+        if (reply != null) 'replyToId': reply.id,
+      }) as Map);
       if (!mounted) return;
       setState(() => _msgs = [for (final m in _msgs) m.tmpId == tmp ? sent : m]);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _msgs = _msgs.where((m) => m.tmpId != tmp).toList());
-      if (text == null && imageUrl == null && attachment == null) _input.text = t; // give the text back so nothing is lost
+      setState(() {
+        _msgs = _msgs.where((m) => m.tmpId != tmp).toList();
+        if (fromComposer) {
+          _input.text = body; // give everything back so nothing is lost
+          _pending = att;
+          _replyTo = reply;
+        }
+      });
       toast(context, '$e', error: true);
     }
   }
 
-  Future<void> _pickAndSendImage(ImageSource source) async {
-    try {
-      final file = await ImagePicker().pickImage(source: source, imageQuality: 75, maxWidth: 1280);
-      if (file == null) return;
-      setState(() => _uploading = true);
-      final url = await _api.uploadImage(await file.readAsBytes(), file.name);
-      if (mounted) setState(() => _uploading = false);
-      await _send(text: '', imageUrl: url);
-    } catch (e) {
-      if (mounted) {
-        setState(() => _uploading = false);
-        toast(context, 'Could not send image: $e', error: true);
+  Future<void> _react(Msg m, String emoji) async {
+    final mineNow = m.reactions.where((r) => r.mine).map((r) => r.emoji).firstOrNull;
+    final next = mineNow == emoji ? null : emoji;
+    setState(() {
+      _selected = null;
+      final kept = [for (final r in m.reactions) r.mine ? MsgReaction(r.emoji, r.count - 1, false) : r].where((r) => r.count > 0).toList();
+      if (next == null) {
+        m.reactions = kept;
+      } else {
+        final hit = kept.indexWhere((r) => r.emoji == next);
+        m.reactions = hit >= 0 ? [for (var i = 0; i < kept.length; i++) i == hit ? MsgReaction(next, kept[i].count + 1, true) : kept[i]] : [...kept, MsgReaction(next, 1, true)];
       }
-    }
-  }
-
-  /// Share contacts from the phone book (like WhatsApp): one message per contact.
-  Future<void> _sendContacts() async {
-    final picked = await Navigator.push<List<PickedContact>>(context, MaterialPageRoute(builder: (_) => ContactPicker(askerName: widget.peer.name, forChat: true)));
-    for (final c in picked ?? const <PickedContact>[]) {
-      await _send(text: '', attachment: {'type': 'contact', 'name': c.name.length > 60 ? c.name.substring(0, 60) : c.name, 'phone': _digits10(c.phone)});
-    }
-  }
-
-  static String _digits10(String v) {
-    final d = v.replaceAll(RegExp(r'\D'), '');
-    return d.length > 10 ? d.substring(d.length - 10) : d;
-  }
-
-  Future<void> _sendLocation() async {
+    });
     try {
-      final h = await currentLocation();
-      await _send(text: '', attachment: {'type': 'location', 'lat': h.lat, 'lng': h.lng, if (h.node != 'Other') 'label': 'Near ${h.node}'});
-    } catch (e) {
-      if (mounted) toast(context, '$e', error: true);
+      await _api.put('/chats/${widget.chatId}/messages/${m.id}/reaction', {'emoji': next});
+    } catch (_) {
+      _loadReactions();
     }
   }
-
-  void _showAttachSheet() {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-            _attachOption(Icons.camera_alt_outlined, 'Camera', () {
-              Navigator.pop(ctx);
-              _pickAndSendImage(ImageSource.camera);
-            }),
-            _attachOption(Icons.photo_library_outlined, 'Gallery', () {
-              Navigator.pop(ctx);
-              _pickAndSendImage(ImageSource.gallery);
-            }),
-            _attachOption(Icons.person_outline, 'Contact', () {
-              Navigator.pop(ctx);
-              _sendContacts();
-            }),
-            _attachOption(Icons.place_outlined, 'Location', () {
-              Navigator.pop(ctx);
-              _sendLocation();
-            }),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  Widget _attachOption(IconData icon, String label, VoidCallback onTap) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 6),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(padding: const EdgeInsets.all(14), decoration: const BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle), child: Icon(icon, color: Colors.black, size: 28)),
-            const SizedBox(height: 8),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-          ]),
-        ),
-      );
 
   void _setTyping(bool on) {
     if (on != _iAmTyping) {
@@ -581,6 +718,17 @@ class _ChatThreadState extends State<ChatThread> {
     }
     _iTypingOff?.cancel();
     if (on) _iTypingOff = Timer(const Duration(seconds: 2), () => _setTyping(false));
+  }
+
+  Future<void> _deleteChat() async {
+    final yes = await confirmDeleteChat(context, _peer.name);
+    if (!yes || !mounted) return;
+    try {
+      await _api.delete('/app/chats/${widget.chatId}');
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) toast(context, '$e', error: true);
+    }
   }
 
   @override
@@ -603,159 +751,874 @@ class _ChatThreadState extends State<ChatThread> {
     final p = Pal.of(context);
     final on = context.watch<RealtimeService>().isOnline(_peer.uid);
     final items = _timeline;
+    final top = MediaQuery.of(context).padding.top;
+    final canSend = _input.text.trim().isNotEmpty || _pending != null;
     return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 0,
-        title: InkWell(
-          onTap: _peer.handle.isEmpty ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: _peer.handle))),
+      backgroundColor: p.canvas,
+      body: Column(children: [
+        // header: back, picture + name (open the profile), call buttons
+        Container(
+          padding: EdgeInsets.fromLTRB(8, top + 8, 8, 8),
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border))),
           child: Row(children: [
-            Avatar(name: _peer.name, photoUrl: _peer.photoUrl, size: 38),
-            const SizedBox(width: 10),
+            Semantics(
+              button: true,
+              label: t('Back'),
+              child: InkResponse(onTap: () => Navigator.maybePop(context), radius: 20, child: Padding(padding: const EdgeInsets.all(4), child: WIcon(WI.back, size: 28, color: p.text))),
+            ),
+            const SizedBox(width: 8),
             Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(_peer.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-                Text(_typing ? 'typing…' : (on ? 'online' : _peer.company), overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: _typing || on ? kGreen : p.muted, fontWeight: FontWeight.w600)),
-              ]),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _peer.handle.isEmpty ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: _peer.handle))),
+                child: Row(children: [
+                  Avatar(name: _peer.name, photoUrl: _peer.photoUrl, size: 36, type: _peer.userType, badge: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(_peer.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25)),
+                      Text(
+                        _typing ? t('typing…') : (on ? t('online') : _peer.company),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, height: 1.25, color: _typing || on ? kGreen : p.muted, fontWeight: _typing || on ? FontWeight.w600 : FontWeight.w500),
+                      ),
+                    ]),
+                  ),
+                ]),
+              ),
+            ),
+            _headerBtn(p, WI.video, t('Video call'), () => placeCall(context, _peer, true)),
+            _headerBtn(p, WI.phone, t('Call'), () => placeCall(context, _peer, false)),
+            PopupMenuButton<String>(
+              tooltip: t('More'),
+              icon: WIcon(WI.more, size: 24, color: p.text),
+              onSelected: (v) => v == 'delete' ? _deleteChat() : null,
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Row(children: [WIcon(WI.trash, size: 18, color: p.danger), const SizedBox(width: 10), Text(t('Delete chat'), style: TextStyle(color: p.danger, fontWeight: FontWeight.w600))]),
+                ),
+              ],
             ),
           ]),
         ),
-        actions: [
-          IconButton(icon: const Icon(Icons.videocam_outlined), onPressed: () => placeCall(context, _peer, true)),
-          IconButton(icon: const Icon(Icons.call_outlined), onPressed: () => placeCall(context, _peer, false)),
-          PopupMenuButton<String>(
-            onSelected: (v) async {
-              if (v != 'delete') return;
-              final yes = await confirmDeleteChat(context, _peer.name);
-              if (!yes || !context.mounted) return;
-              try {
-                await _api.delete('/app/chats/${widget.chatId}');
-                if (context.mounted) Navigator.pop(context);
-              } catch (e) {
-                if (context.mounted) toast(context, '$e', error: true);
-              }
+        const ActiveCallBanner(),
+        Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () {
+              FocusScope.of(context).unfocus();
+              if (_selected != null) setState(() => _selected = null);
             },
-            itemBuilder: (_) => const [PopupMenuItem(value: 'delete', child: Text('Delete chat'))],
+            child: !_loaded
+                ? const Center(child: LogoLoader())
+                : items.isEmpty
+                    ? Center(child: Text(t('Say hello 👋'), style: TextStyle(color: p.muted, fontWeight: FontWeight.w600)))
+                    : ListView.builder(
+                        controller: _scroll,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: items.length,
+                        itemBuilder: (_, i) {
+                          final it = items[i];
+                          final showDay = i == 0 || !_sameDay(items[i - 1].at, it.at);
+                          return Column(children: [
+                            if (showDay) _dayPill(_dayLabel(it.at), p),
+                            it.call != null ? _callRow(it.call!, p) : Padding(padding: const EdgeInsets.only(bottom: 8), child: _message(it.msg!, p)),
+                          ]);
+                        },
+                      ),
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: Column(children: [
-          const ActiveCallBanner(),
-          if (_uploading) const LinearProgressIndicator(color: kGold, minHeight: 2),
-          Expanded(
-            child: items.isEmpty
-                ? Center(child: Text('Say hello 👋', style: TextStyle(color: p.muted, fontWeight: FontWeight.w600)))
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                    itemCount: items.length,
-                    itemBuilder: (_, i) {
-                      final it = items[i];
-                      final showDay = i == 0 || !_sameDay(items[i - 1].at, it.at);
-                      return Column(children: [if (showDay) _pill(_dayLabel(it.at), p), it.call != null ? _callRow(it.call!, p) : _bubble(it.msg!, p)]);
-                    },
+        ),
+        if (_pending != null) _pendingBox(p),
+        if (_replyTo != null) _replyBox(p),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(6, 4, 4, 4),
+              decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(30), border: Border.all(color: p.border)),
+              child: Row(children: [
+                Semantics(
+                  button: true,
+                  label: t('Attach'),
+                  child: GestureDetector(
+                    onTap: _openAttach,
+                    child: Container(width: 32, height: 32, decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle), child: Center(child: WIcon(WI.plus, size: 20, color: p.text, strokeWidth: 2.2))),
                   ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _input,
+                    minLines: 1,
+                    maxLines: 5,
+                    textCapitalization: TextCapitalization.sentences,
+                    onChanged: (v) {
+                      _setTyping(v.isNotEmpty);
+                      setState(() {});
+                    },
+                    style: const TextStyle(fontSize: 16),
+                    decoration: InputDecoration(
+                      hintText: _pending != null ? t('Add a message with your enquiry…') : t('Message...'),
+                      hintStyle: TextStyle(color: p.muted),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Semantics(
+                  button: true,
+                  label: t('Send'),
+                  child: GestureDetector(
+                    onTap: canSend ? () => _send() : null,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 150),
+                      opacity: canSend ? 1 : .4,
+                      child: Container(width: 40, height: 40, decoration: const BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle), child: const Center(child: WIcon(WI.send, size: 20, color: kInk, strokeWidth: 2.2))),
+                    ),
+                  ),
+                ),
+              ]),
+            ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
-            child: Row(children: [
-              IconButton(icon: const Icon(Icons.add_photo_alternate_outlined, color: kGold), onPressed: _showAttachSheet, tooltip: 'Attach'),
-              Expanded(child: AppField(controller: _input, hint: 'Message', caps: TextCapitalization.sentences, onChanged: (v) => _setTyping(v.isNotEmpty), onSubmitted: (_) => _send())),
-              const SizedBox(width: 8),
-              InkWell(onTap: () => _send(), customBorder: const CircleBorder(), child: Container(width: 50, height: 50, decoration: const BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle), child: Icon(Icons.send_rounded, color: p.onGold, size: 21))),
-            ]),
-          ),
-        ]),
-      ),
+        ),
+      ]),
     );
   }
 
-  Widget _pill(String t, Pal p) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(10)), child: Text(t, style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w600))),
+  Widget _headerBtn(Pal p, WI icon, String label, VoidCallback onTap) => Semantics(
+        button: true,
+        label: label,
+        child: InkResponse(onTap: onTap, radius: 20, child: Padding(padding: const EdgeInsets.all(8), child: WIcon(icon, size: 24, color: p.text))),
+      );
+
+  Widget _dayPill(String s, Pal p) => Padding(
+        padding: const EdgeInsets.only(bottom: 12, top: 4),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20)),
+          child: Text(s, style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w600)),
+        ),
       );
 
   Widget _callRow(CallLog c, Pal p) {
     final mine = c.callerUid == _me;
     final missed = !mine && c.status != 'completed';
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
+        decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(c.video ? Icons.videocam_outlined : Icons.call_outlined, size: 17, color: missed ? Colors.redAccent : kGreen),
+          WIcon(c.video ? WI.video : WI.phone, size: 16, color: missed ? p.danger : kGreen),
           const SizedBox(width: 8),
-          Text('${callLabel(c, _me)}  ·  ${_clock(context, c.createdAt)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: missed ? Colors.redAccent : p.text)),
+          Text('${t(callLabel(c, _me))}  ·  ${_clock(c.createdAt)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: missed ? p.danger : p.text)),
         ]),
       ),
     );
   }
 
-  /// Contact / location / document attachments (sent from the app or the web).
+  Widget _smallBtn(Pal p, WI icon, String label, VoidCallback onTap) => Semantics(
+        button: true,
+        label: label,
+        child: GestureDetector(
+          onTap: onTap,
+          child: SizedBox(width: 28, height: 28, child: Center(child: Opacity(opacity: .7, child: WIcon(icon, size: 18, color: p.muted)))),
+        ),
+      );
+
+  Widget _message(Msg m, Pal p) {
+    final mine = m.senderUid == _me;
+    final open = _selected == m.id;
+    final maxW = MediaQuery.of(context).size.width * .75 - 32;
+    final pad = m.imageUrl != null ? const EdgeInsets.all(4) : (m.attachment != null ? const EdgeInsets.all(6) : const EdgeInsets.symmetric(horizontal: 16, vertical: 8));
+    final fg = mine ? p.onInk : p.text;
+    final bubble = GestureDetector(
+      onTap: mine ? null : () => setState(() => _selected = open ? null : m.id),
+      onLongPress: () {
+        if (m.text.isNotEmpty) {
+          Clipboard.setData(ClipboardData(text: m.text));
+          toast(context, t('Copied'));
+        }
+      },
+      child: Container(
+        constraints: BoxConstraints(maxWidth: maxW),
+        padding: pad,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(color: mine ? p.ink : p.chip, borderRadius: BorderRadius.circular(8)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          if (m.replyTo != null)
+            Container(
+              margin: EdgeInsets.fromLTRB(m.imageUrl != null || m.attachment != null ? 4 : 0, m.imageUrl != null || m.attachment != null ? 4 : 0, m.imageUrl != null || m.attachment != null ? 4 : 0, 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: mine ? kInk.withValues(alpha: .1) : p.canvas.withValues(alpha: .7),
+                borderRadius: BorderRadius.circular(8),
+                border: Border(left: BorderSide(color: fg.withValues(alpha: .4), width: 4)),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(m.replyTo!.senderUid == _me ? t('You') : _peer.name, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg)),
+                Text(quoteText(m.replyTo!.text, m.replyTo!.kind), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: fg.withValues(alpha: .8))),
+              ]),
+            ),
+          if (m.imageUrl != null)
+            GestureDetector(
+              onTap: () => openImageViewer(context, [m.imageUrl!], 0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: ConstrainedBox(constraints: BoxConstraints(maxHeight: 256, maxWidth: maxW), child: NetImg(m.imageUrl!, width: maxW)),
+              ),
+            ),
+          if (m.attachment != null) _attachment(m.attachment!, mine, p),
+          if (m.text.isNotEmpty)
+            Padding(
+              padding: m.imageUrl != null ? const EdgeInsets.symmetric(horizontal: 12, vertical: 4) : (m.attachment != null ? const EdgeInsets.fromLTRB(6, 6, 6, 2) : EdgeInsets.zero),
+              child: Text(m.text, style: TextStyle(fontSize: 15, color: fg, height: 1.4)),
+            ),
+        ]),
+      ),
+    );
+
+    final row = Row(mainAxisSize: MainAxisSize.min, textDirection: mine ? TextDirection.rtl : TextDirection.ltr, children: [
+      Flexible(child: bubble),
+      const SizedBox(width: 4),
+      _smallBtn(p, WI.reply, t('Reply'), () => setState(() {
+            _replyTo = m;
+            _selected = null;
+          })),
+      if (mine)
+        _smallBtn(p, WI.info, t('Message info'), () => _showInfo(m))
+      else
+        _smallBtn(p, WI.smile, t('React'), () => setState(() => _selected = open ? null : m.id)),
+    ]);
+
+    final mineReaction = m.reactions.where((r) => r.mine).map((r) => r.emoji).firstOrNull;
+    return _SwipeToReply(
+      onReply: () => setState(() => _replyTo = m),
+      child: Column(crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start, children: [
+        if (open && !mine)
+          Container(
+            margin: const EdgeInsets.only(bottom: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: p.canvas,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: p.border),
+              boxShadow: const [BoxShadow(color: Color(0x1A1E1E1E), blurRadius: 12, offset: Offset(0, 4))],
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              for (final e in _chatReactions)
+                GestureDetector(
+                  onTap: () => _react(m, e),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: mineReaction == e ? p.chip : Colors.transparent, borderRadius: BorderRadius.circular(20)),
+                    child: Text(e, style: const TextStyle(fontSize: 20, height: 1.2)),
+                  ),
+                ),
+            ]),
+          ),
+        row,
+        if (m.reactions.isNotEmpty)
+          Transform.translate(
+            offset: const Offset(0, -8),
+            child: Padding(
+              padding: EdgeInsets.only(left: mine ? 0 : 12, right: mine ? 12 : 0),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                for (final r in m.reactions)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: p.canvas,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: r.mine ? p.text.withValues(alpha: .5) : p.border),
+                      boxShadow: const [BoxShadow(color: Color(0x0F1E1E1E), blurRadius: 4, offset: Offset(0, 1))],
+                    ),
+                    child: Text(r.count > 1 ? '${r.emoji} ${r.count}' : r.emoji, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, height: 1.2)),
+                  ),
+              ]),
+            ),
+          ),
+        Padding(
+          padding: EdgeInsets.only(left: 12, right: 12, top: m.reactions.isNotEmpty ? 0 : 2),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text(_clock(m.createdAt), style: TextStyle(fontSize: 11, color: p.muted)),
+            if (mine) ...[const SizedBox(width: 4), Ticks(m)],
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  /// Contact / location / document / post / profile / item / cart attachments (web AttachmentView).
   Widget _attachment(Map<String, dynamic> a, bool mine, Pal p) {
-    final fg = mine ? p.onGold : p.text;
+    final fg = mine ? p.onInk : p.text;
+    final boxColor = mine ? kInk.withValues(alpha: .1) : p.canvas;
+    TextStyle label() => TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg.withValues(alpha: .7), letterSpacing: 0);
+    Widget box({required Widget child, VoidCallback? onTap, bool goldEdge = false, EdgeInsets padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 10)}) => GestureDetector(
+          onTap: onTap,
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 224),
+            padding: padding,
+            decoration: BoxDecoration(
+              color: boxColor,
+              borderRadius: BorderRadius.circular(8),
+              border: goldEdge ? const Border(left: BorderSide(color: kGold, width: 4)) : null,
+            ),
+            child: child,
+          ),
+        );
     switch (a['type']) {
-      case 'contact':
-        return InkWell(
-          onTap: () => launchUrl(Uri(scheme: 'tel', path: '+91${a['phone']}')),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.call, size: 22, color: fg), const SizedBox(width: 10), Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${a['name']}', style: TextStyle(fontWeight: FontWeight.w700, color: fg)), Text('+91 ${a['phone']}', style: TextStyle(decoration: TextDecoration.underline, color: fg))]))]),
+      case 'post':
+        return box(
+          goldEdge: true,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${a['postId']}'))),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Flexible(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Text('${t(a['kind'] == 'ask' ? 'Reply to ask' : 'Reply to update').toUpperCase()}${a['by'] != null ? ' · ${a['by']}' : ''}', style: label().copyWith(fontSize: 11)),
+                const SizedBox(height: 2),
+                Text('${a['title']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg, height: 1.35)),
+                if (a['snippet'] != null) Text('${a['snippet']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: fg.withValues(alpha: .75))),
+              ]),
+            ),
+            if (a['imageUrl'] != null) ...[const SizedBox(width: 10), ClipRRect(borderRadius: BorderRadius.circular(6), child: NetImg('${a['imageUrl']}', width: 56, height: 56))],
+          ]),
+        );
+      case 'profile':
+        return box(
+          goldEdge: true,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: '${a['handle']}'))),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Avatar(name: '${a['name']}', photoUrl: a['photoURL'] as String?, size: 44),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Text(t('Shared a page').toUpperCase(), style: label()),
+                Text('${a['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg)),
+                Text('@${a['handle']}${a['subtitle'] != null ? ' · ${a['subtitle']}' : ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: fg.withValues(alpha: .75))),
+              ]),
+            ),
+          ]),
+        );
+      case 'item':
+        final icon = a['kind'] == 'service' ? WI.service : WI.box;
+        return box(
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: a['imageUrl'] != null
+                  ? NetImg('${a['imageUrl']}', width: 48, height: 48)
+                  : Container(width: 48, height: 48, color: Colors.black.withValues(alpha: .1), child: Center(child: WIcon(icon, size: 24, color: fg))),
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Text(t(a['kind'] == 'service' ? 'Service enquiry' : 'Product enquiry').toUpperCase(), style: label()),
+                Text('${a['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg)),
+                if (a['price'] != null) Text('${a['price']}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg.withValues(alpha: .8))),
+              ]),
+            ),
+          ]),
+        );
+      case 'cart':
+        final items = ((a['items'] as List?) ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        final n = items.fold<int>(0, (s, i) => s + ((i['qty'] as num?)?.toInt() ?? 1));
+        return box(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              WIcon(WI.cart, size: 16, color: fg),
+              const SizedBox(width: 6),
+              Text('${t('Cart').toUpperCase()} · $n ${t(n == 1 ? 'item' : 'items')}', style: label().copyWith(color: fg.withValues(alpha: .8))),
+            ]),
+            const SizedBox(height: 6),
+            for (final i in items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+                  Text('${i['qty']}×', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg)),
+                  const SizedBox(width: 8),
+                  Flexible(child: Text('${i['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg))),
+                  if (i['price'] != null) ...[const SizedBox(width: 8), Text('${i['price']}', style: TextStyle(fontSize: 12, color: fg.withValues(alpha: .8)))],
+                ]),
+              ),
+          ]),
+        );
+      case 'document':
+        final size = (a['size'] as num?)?.toDouble() ?? 0;
+        final mb = size / 1024 / 1024;
+        return box(
+          onTap: () => launchUrl(Uri.parse(mediaUrl('${a['url']}')), mode: LaunchMode.externalApplication),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            WIcon(WI.file, size: 28, color: fg),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Text('${a['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg)),
+                Text(mb >= 1 ? '${mb.toStringAsFixed(1)} MB' : '${math.max(1, (size / 1024).round())} KB', style: TextStyle(fontSize: 12, color: fg.withValues(alpha: .7))),
+              ]),
+            ),
+          ]),
         );
       case 'location':
-        return InkWell(
-          onTap: () => launchUrl(Uri.parse('https://www.google.com/maps?q=${a['lat']},${a['lng']}'), mode: LaunchMode.externalApplication),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.place_outlined, size: 22, color: fg), const SizedBox(width: 10), Text('${a['label'] ?? 'Shared location'}', style: TextStyle(fontWeight: FontWeight.w700, color: fg))]),
+        final lat = (a['lat'] as num).toDouble(), lng = (a['lng'] as num).toDouble();
+        return GestureDetector(
+          onTap: () => launchUrl(Uri.parse('https://www.google.com/maps?q=$lat,$lng'), mode: LaunchMode.externalApplication),
+          child: Container(
+            width: 224,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(8)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              MapPreview(lat: lat, lng: lng),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(children: [
+                  WIcon(WI.pin, size: 20, color: p.text),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('${a['label'] ?? t('Shared location')}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                      Text(t('Tap to open in Maps'), style: TextStyle(fontSize: 12, color: p.text.withValues(alpha: .7))),
+                    ]),
+                  ),
+                ]),
+              ),
+            ]),
+          ),
         );
-      default:
-        return InkWell(
-          onTap: () => launchUrl(Uri.parse(mediaUrl('${a['url']}')), mode: LaunchMode.externalApplication),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.insert_drive_file_outlined, size: 22, color: fg), const SizedBox(width: 10), Flexible(child: Text('${a['name']}', overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w700, color: fg)))]),
+      default: // contact
+        return box(
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            WIcon(WI.phone, size: 28, color: fg),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Text('${a['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg)),
+                GestureDetector(
+                  onTap: () => launchUrl(Uri(scheme: 'tel', path: '+91${a['phone']}')),
+                  child: Text('+91 ${a['phone']}', style: TextStyle(fontSize: 14, color: fg, decoration: TextDecoration.underline, decorationColor: fg)),
+                ),
+              ]),
+            ),
+          ]),
         );
     }
   }
 
-  Widget _bubble(Msg m, Pal p) {
-    final mine = m.senderUid == _me;
-    final hasImage = m.imageUrl != null;
-    return Align(
-      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 3),
-        padding: hasImage ? const EdgeInsets.all(4) : const EdgeInsets.fromLTRB(12, 8, 10, 6),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * .78),
-        decoration: BoxDecoration(
-          gradient: mine ? kGoldGradient : null,
-          color: mine ? null : p.card,
-          border: mine ? null : Border.all(color: p.border),
-          borderRadius: BorderRadius.only(topLeft: const Radius.circular(16), topRight: const Radius.circular(16), bottomLeft: Radius.circular(mine ? 16 : 4), bottomRight: Radius.circular(mine ? 4 : 16)),
+  Widget _pendingBox(Pal p) {
+    final a = _pending!;
+    final isPost = a['type'] == 'post';
+    final items = ((a['items'] as List?) ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final title = isPost
+        ? '${t(a['kind'] == 'ask' ? 'Replying to ask' : 'Replying to update')}${a['by'] != null ? ' · ${a['by']}' : ''}'
+        : a['type'] == 'cart'
+            ? t('Sending your cart · {n} items', {'n': items.fold<int>(0, (s, i) => s + ((i['qty'] as num?)?.toInt() ?? 1))})
+            : t('Enquiring about {name}', {'name': '${a['name']}'});
+    final sub = isPost ? '${a['title']}' : (a['type'] == 'cart' ? items.map((i) => '${i['qty']}× ${i['name']}').join(', ') : (a['price'] as String?));
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(padding: const EdgeInsets.only(top: 2), child: WIcon(isPost ? WI.reply : WI.cart, size: 16, color: p.text)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            if (sub != null && sub.isNotEmpty) Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.text.withValues(alpha: .8))),
+            const SizedBox(height: 2),
+            Text(t('Write a message and send it along.'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          ]),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.end, mainAxisSize: MainAxisSize.min, children: [
-          if (hasImage)
-            GestureDetector(
-              onTap: () => openImageViewer(context, [m.imageUrl!], 0),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(mediaUrl(m.imageUrl!), width: 220, height: 200, fit: BoxFit.cover,
-                    loadingBuilder: (_, child, prog) => prog == null ? child : Container(width: 220, height: 180, color: Colors.black12, child: const Center(child: LogoLoader(size: 36))),
-                    errorBuilder: (_, __, ___) => Container(width: 220, height: 140, color: Colors.black12, child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)))),
+        GestureDetector(onTap: () => setState(() => _pending = null), child: WIcon(WI.close, size: 16, color: p.text)),
+      ]),
+    );
+  }
+
+  Widget _replyBox(Pal p) {
+    final r = _replyTo!;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(8)),
+      child: Row(children: [
+        WIcon(WI.reply, size: 16, color: p.text),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(t('Replying to {name}', {'name': r.senderUid == _me ? t('yourself') : _peer.name}), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            Text(quoteText(r.text, r.kind), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.text.withValues(alpha: .8))),
+          ]),
+        ),
+        GestureDetector(onTap: () => setState(() => _replyTo = null), child: WIcon(WI.close, size: 16, color: p.text)),
+      ]),
+    );
+  }
+
+  void _showInfo(Msg m) {
+    final p = Pal.of(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: p.canvas,
+      barrierColor: kInk.withValues(alpha: .6),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        Widget row(String label, DateTime? at, {bool last = false}) => Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: last ? null : BoxDecoration(border: Border(bottom: BorderSide(color: p.border))),
+              child: Row(children: [
+                Expanded(child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+                Text(at == null ? '—' : _dayTime(at), style: TextStyle(fontSize: 14, color: p.muted)),
+              ]),
+            );
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [
+                Expanded(child: Text(t('Message info'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+                GestureDetector(onTap: () => Navigator.pop(ctx), child: WIcon(WI.close, size: 24, color: p.text)),
+              ]),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(8)),
+                child: Text(quoteText(m.text, m.kind).isEmpty ? t('Message') : quoteText(m.text, m.kind), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14)),
               ),
-            ),
-          if (m.attachment != null) Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: _attachment(m.attachment!, mine, p)),
-          if (m.text.isNotEmpty)
-            Padding(
-              padding: hasImage ? const EdgeInsets.fromLTRB(8, 6, 8, 2) : EdgeInsets.zero,
-              // no Align: the bubble hugs the text instead of stretching to the max width
-              child: Text(m.text, style: TextStyle(color: mine ? p.onGold : p.text, fontSize: 15.5, fontWeight: FontWeight.w500)),
-            ),
-          const SizedBox(height: 2),
-          Padding(
-            padding: hasImage ? const EdgeInsets.only(right: 6, bottom: 4) : EdgeInsets.zero,
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Text(_clock(context, m.createdAt), style: TextStyle(fontSize: 11, color: mine ? const Color(0x991E1E1E) : p.muted)),
-              if (mine) ...[const SizedBox(width: 3), Ticks(m)],
+              const SizedBox(height: 8),
+              row(t('Sent'), m.createdAt),
+              row(t('Delivered to {name}', {'name': _peer.name}), m.deliveredAt),
+              row(t('Read by {name}', {'name': _peer.name}), m.readAt, last: true),
             ]),
           ),
+        );
+      },
+    );
+  }
+
+  // ---------- attach sheet (web attach-sheet.tsx) ----------
+  void _openAttach() {
+    final p = Pal.of(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: p.canvas,
+      barrierColor: kInk.withValues(alpha: .6),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => _AttachSheet(
+        peerName: _peer.name,
+        onSend: ({String? imageUrl, Map<String, dynamic>? attachment}) => _send(text: '', imageUrl: imageUrl, attachment: attachment),
+      ),
+    );
+  }
+}
+
+/// Drag a message to the right to reply. Vertical scrolling is left alone.
+class _SwipeToReply extends StatefulWidget {
+  final VoidCallback onReply;
+  final Widget child;
+  const _SwipeToReply({required this.onReply, required this.child});
+  @override
+  State<_SwipeToReply> createState() => _SwipeToReplyState();
+}
+
+class _SwipeToReplyState extends State<_SwipeToReply> {
+  static const _max = 72.0, _trigger = 56.0;
+  double _dx = 0;
+  bool _armed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final k = math.min(1.0, _dx / _trigger);
+    return GestureDetector(
+      onHorizontalDragUpdate: (d) => setState(() {
+        _dx = (_dx + d.delta.dx).clamp(0, _max);
+        if (!_armed && _dx >= _trigger) {
+          _armed = true;
+          HapticFeedback.lightImpact();
+        } else if (_dx < _trigger) {
+          _armed = false;
+        }
+      }),
+      onHorizontalDragEnd: (_) {
+        if (_dx >= _trigger) widget.onReply();
+        setState(() {
+          _dx = 0;
+          _armed = false;
+        });
+      },
+      onHorizontalDragCancel: () => setState(() => _dx = 0),
+      child: Stack(children: [
+        Positioned(
+          left: 0,
+          top: 0,
+          bottom: 0,
+          child: Center(
+            child: Opacity(
+              opacity: k,
+              child: Transform.scale(
+                scale: .6 + k * .4,
+                child: Container(width: 32, height: 32, decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle), child: Center(child: WIcon(WI.reply, size: 16, color: p.text))),
+              ),
+            ),
+          ),
+        ),
+        AnimatedContainer(
+          duration: Duration(milliseconds: _dx == 0 ? 200 : 0),
+          transform: Matrix4.translationValues(_dx, 0, 0),
+          child: SizedBox(width: double.infinity, child: widget.child),
+        ),
+      ]),
+    );
+  }
+}
+
+typedef _SendAttachment = Future<void> Function({String? imageUrl, Map<String, dynamic>? attachment});
+
+class _AttachSheet extends StatefulWidget {
+  final String peerName;
+  final _SendAttachment onSend;
+  const _AttachSheet({required this.peerName, required this.onSend});
+  @override
+  State<_AttachSheet> createState() => _AttachSheetState();
+}
+
+class _AttachSheetState extends State<_AttachSheet> {
+  String _mode = 'menu';
+  String? _busy, _error;
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    super.dispose();
+  }
+
+  Future<void> _run(String label, Future<void> Function() fn) async {
+    setState(() {
+      _busy = label;
+      _error = null;
+    });
+    try {
+      await fn();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e'.isEmpty ? t('Could not send.') : '$e');
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  Future<void> _media() async {
+    final src = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Pal.of(context).canvas,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(leading: const WIcon(WI.camera), title: Text(t('Camera')), onTap: () => Navigator.pop(ctx, ImageSource.camera)),
+          ListTile(leading: const WIcon(WI.imageAdd), title: Text(t('Gallery')), onTap: () => Navigator.pop(ctx, ImageSource.gallery)),
         ]),
+      ),
+    );
+    if (src == null || !mounted) return;
+    final f = await ImagePicker().pickImage(source: src, imageQuality: 75, maxWidth: 1280);
+    if (f == null || !mounted) return;
+    final api = context.read<AuthProvider>().api;
+    await _run('photo', () async => widget.onSend(imageUrl: await api.uploadImage(await f.readAsBytes(), f.name)));
+  }
+
+  Future<void> _document() async {
+    final f = await FilePicker.pickFile(type: FileType.custom, allowedExtensions: const ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv']);
+    if (f == null || !mounted) return;
+    final api = context.read<AuthProvider>().api;
+    await _run('document', () async {
+      final bytes = await f.readAsBytes();
+      if (bytes.length > 10 * 1024 * 1024) throw ApiException(t('File must be under 10 MB.'));
+      final ext = (f.extension ?? '').toLowerCase();
+      final mime = switch (ext) {
+        'pdf' => 'application/pdf',
+        'doc' => 'application/msword',
+        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls' => 'application/vnd.ms-excel',
+        'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'ppt' => 'application/vnd.ms-powerpoint',
+        'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'csv' => 'text/csv',
+        _ => 'text/plain',
+      };
+      final d = await api.upload('/media/file', bytes, f.name, mime);
+      await widget.onSend(attachment: {'type': 'document', 'url': d['url'], 'name': d['name'] ?? f.name, 'size': d['size'] ?? bytes.length});
+    });
+  }
+
+  Future<void> _location() => _run('location', () async {
+        final h = await currentLocation();
+        await widget.onSend(attachment: {'type': 'location', 'lat': h.lat, 'lng': h.lng, if (h.node != 'Other') 'label': 'Near ${h.node}'});
+      });
+
+  Future<void> _pickContact() async {
+    final picked = await Navigator.push<List<PickedContact>>(context, MaterialPageRoute(builder: (_) => ContactPicker(askerName: widget.peerName, forChat: true, maxSelect: 1)));
+    if (picked == null || picked.isEmpty || !mounted) return;
+    setState(() {
+      _name.text = picked.first.name;
+      final d = picked.first.phone.replaceAll(RegExp(r'\D'), '');
+      _phone.text = d.length > 10 ? d.substring(d.length - 10) : d;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final auth = context.read<AuthProvider>();
+    Widget tile(WI icon, String label, String busyKey, String busyLabel, VoidCallback onTap) => Material(
+          color: p.chip,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: _busy != null ? null : onTap,
+            child: Opacity(
+              opacity: _busy != null && _busy != busyKey ? .5 : 1,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(children: [
+                  WIcon(icon, size: 28, color: p.text),
+                  const SizedBox(height: 8),
+                  Text(_busy == busyKey ? t(busyLabel) : t(label), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ),
+          ),
+        );
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 24),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(child: Text(t(_mode == 'menu' ? 'Share' : 'Share a contact'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+          GestureDetector(onTap: () => Navigator.pop(context), child: WIcon(WI.close, size: 24, color: p.text)),
+        ]),
+        const SizedBox(height: 12),
+        if (_mode == 'menu')
+          Column(children: [
+            Row(children: [
+              Expanded(child: tile(WI.camera, 'Media', 'photo', 'Sending…', _media)),
+              const SizedBox(width: 12),
+              Expanded(child: tile(WI.file, 'Document', 'document', 'Sending…', _document)),
+            ]),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(child: tile(WI.pin, 'Location', 'location', 'Locating…', _location)),
+              const SizedBox(width: 12),
+              Expanded(child: tile(WI.refer, 'Contact', 'contact', 'Sending…', () => setState(() => _mode = 'contact'))),
+            ]),
+          ])
+        else ...[
+          if (auth.phone.length == 10 && auth.profile != null) ...[
+            GoldButton(
+              label: t('Share my contact'),
+              wi: WI.phone,
+              outlined: true,
+              height: 44,
+              onPressed: _busy != null ? null : () => _run('contact', () => widget.onSend(attachment: {'type': 'contact', 'name': auth.profile!.name, 'phone': auth.phone})),
+            ),
+            const SizedBox(height: 12),
+          ],
+          GoldButton(label: t('Pick from phonebook'), outlined: true, height: 44, onPressed: _pickContact),
+          const SizedBox(height: 12),
+          AppField(controller: _name, hint: t('Name'), onChanged: (_) => setState(() {})),
+          const SizedBox(height: 12),
+          AppField(
+            controller: _phone,
+            hint: t('10-digit mobile number'),
+            keyboard: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            GoldButton(label: t('Back'), outlined: true, height: 44, onPressed: () => setState(() => _mode = 'menu')),
+            const SizedBox(width: 8),
+            Expanded(
+              child: GoldButton(
+                label: t('Send contact'),
+                height: 44,
+                loading: _busy == 'contact',
+                onPressed: _name.text.trim().isEmpty || _phone.text.length < 10 || _busy != null
+                    ? null
+                    : () => _run('contact', () => widget.onSend(attachment: {'type': 'contact', 'name': _name.text.trim(), 'phone': _phone.text})),
+              ),
+            ),
+          ]),
+        ],
+        if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
+      ]),
+    );
+  }
+}
+
+/// Small OpenStreetMap preview with the place at the centre (web map-preview.tsx), built from plain
+/// tiles so it is cheap in a chat thread. Attribution shown as OSM requires.
+class MapPreview extends StatelessWidget {
+  final double lat, lng;
+  final int zoom;
+  final double height;
+  const MapPreview({super.key, required this.lat, required this.lng, this.zoom = 15, this.height = 128});
+
+  @override
+  Widget build(BuildContext context) {
+    const tile = 256.0;
+    final scale = tile * math.pow(2, zoom);
+    final s = math.sin(lat * math.pi / 180);
+    final px = (lng + 180) / 360 * scale;
+    final py = (0.5 - math.log((1 + s) / (1 - s)) / (4 * math.pi)) * scale;
+    final tx = (px / tile).floor(), ty = (py / tile).floor();
+    final ox = px - tx * tile, oy = py - ty * tile;
+    final max = math.pow(2, zoom).toInt();
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: ColoredBox(
+        color: const Color(0xFFE5E3DF),
+        child: LayoutBuilder(builder: (context, c) {
+          final cx = c.maxWidth / 2, cy = c.maxHeight / 2;
+          return Stack(clipBehavior: Clip.hardEdge, children: [
+            for (var dy = -1; dy <= 1; dy++)
+              for (var dx = -1; dx <= 1; dx++)
+                if (ty + dy >= 0 && ty + dy < max)
+                  Positioned(
+                    left: cx + dx * tile - ox,
+                    top: cy + dy * tile - oy,
+                    width: tile,
+                    height: tile,
+                    child: Image.network(
+                      'https://tile.openstreetmap.org/$zoom/${((tx + dx) % max + max) % max}/${ty + dy}.png',
+                      headers: const {'User-Agent': 'WebWebAI/1.0 (ai.webweb.app)'},
+                      errorBuilder: (_, __, ___) => const SizedBox(),
+                    ),
+                  ),
+            Positioned(left: cx - 14, top: cy - 28, child: const WIcon(WI.pin, size: 28, color: Color(0xFFE53935), strokeWidth: 2.2)),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                color: Colors.white.withValues(alpha: .75),
+                child: const Text('© OpenStreetMap', style: TextStyle(fontSize: 9, color: Color(0xFF333333))),
+              ),
+            ),
+          ]);
+        }),
       ),
     );
   }

@@ -4,11 +4,11 @@ import 'package:provider/provider.dart';
 
 import 'auth_provider.dart';
 import 'call_manager.dart';
+import 'i18n.dart';
 import 'notifications.dart';
 import 'realtime.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding.dart';
-import 'screens/otp_screen.dart';
 import 'screens/shell.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -22,12 +22,14 @@ void main() {
   final realtime = RealtimeService();
   final calls = CallManager(realtime, navKey);
   final notifications = NotificationService(auth, realtime, navKey);
+  final i18n = I18n()..init();
   auth.beforeLogout = notifications.unregister;
   auth.init();
   notifications.init();
   runApp(MultiProvider(
     providers: [
       ChangeNotifierProvider.value(value: auth),
+      ChangeNotifierProvider.value(value: i18n),
       ChangeNotifierProvider(create: (_) => ThemeController()..init()),
       ChangeNotifierProvider.value(value: realtime),
       ChangeNotifierProvider.value(value: calls),
@@ -49,7 +51,8 @@ class App extends StatelessWidget {
       themeMode: context.watch<ThemeController>().mode,
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
-      home: const Gate(),
+      // a language switch rebuilds every screen with the new strings (web: t() re-renders on change)
+      home: KeyedSubtree(key: ValueKey(context.watch<I18n>().lang), child: const Gate()),
     );
   }
 }
@@ -73,7 +76,7 @@ class Gate extends StatelessWidget {
       }
     });
     if (!auth.ready) return const _Splash();
-    if (!auth.isLoggedIn) return auth.otpSent ? const OtpScreen() : const LoginScreen();
+    if (!auth.isLoggedIn) return const LoginScreen();
     if (!auth.profileLoaded) return const _ProfileLoading();
     if (auth.profile == null) return const OnboardingFlow();
     return const Shell();
@@ -83,7 +86,7 @@ class Gate extends StatelessWidget {
 class _Splash extends StatelessWidget {
   const _Splash();
   @override
-  Widget build(BuildContext context) => const Scaffold(body: PageLoader(size: 84));
+  Widget build(BuildContext context) => const Scaffold(body: Center(child: LogoLoader(size: 56)));
 }
 
 class _ProfileLoading extends StatelessWidget {
@@ -100,11 +103,11 @@ class _ProfileLoading extends StatelessWidget {
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Text(auth.error!, textAlign: TextAlign.center),
                   const SizedBox(height: 16),
-                  GoldButton(label: 'Retry', onPressed: () {
+                  GoldButton(label: t('Try again'), onPressed: () {
                     auth.error = null;
                     auth.loadProfile();
                   }),
-                  TextButton(onPressed: auth.logout, child: const Text('Log out')),
+                  TextButton(onPressed: auth.logout, child: Text(t('Log out'))),
                 ]),
               ),
       ),

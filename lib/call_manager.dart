@@ -104,7 +104,7 @@ class CallManager extends ChangeNotifier {
   static Uint8List _ringbackWav() {
     const rate = 8000;
     const seconds = 4;
-    final n = rate * seconds;
+    const n = rate * seconds;
     final data = ByteData(44 + n * 2);
     void str(int o, String v) {
       for (var i = 0; i < v.length; i++) {

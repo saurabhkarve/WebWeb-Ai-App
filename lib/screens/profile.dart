@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
+import '../config.dart';
+import '../i18n.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -13,12 +16,13 @@ import '../widgets/post_card.dart';
 import '../widgets/story_viewer.dart';
 import 'catalog.dart';
 import 'edit_profile.dart';
-import 'find.dart' show FilterPill;
+import 'find.dart';
 import 'post_detail.dart';
 import 'talk.dart';
 
-/// One profile for everyone: the Profile tab (own, [handle] == null) and any member's page.
-/// Contact numbers are never shown in full; people reach you through Talk, Call or "Ask contact".
+/// One profile for everyone (web profile-view.tsx): your own page ([handle] == null) and any member's.
+/// Cover band with the back arrow, picture, one quiet stats line, name, tags, then the actions and
+/// the Asks / Connects / Updates / Catalog (or Resume) tabs. Contact numbers are never shown in full.
 class ProfileScreen extends StatefulWidget {
   final String? handle;
   const ProfileScreen({super.key, this.handle});
@@ -26,7 +30,9 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-enum _Tab { posts, deals, stories, products }
+enum _Tab { posts, deals, updates, products }
+
+const _kindText = {'contact': 'contact', 'media': 'a photo', 'info': 'information'};
 
 class _ProfileScreenState extends State<ProfileScreen> {
   Profile? _u;
@@ -35,9 +41,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<Post>? _posts;
   List<Deal>? _deals;
   List<AskItem> _asks = [];
-  List<StoryItem>? _stories;
+  List<StoryItem>? _updates;
   List<Product>? _products;
+  List<Map<String, dynamic>>? _areas;
   bool _requested = false;
+  String? _mediaBusy;
+  String _catFilter = 'all';
 
   Api get _api => context.read<AuthProvider>().api;
   bool get _own => widget.handle == null || widget.handle == context.read<AuthProvider>().profile?.handle;
@@ -63,7 +72,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _loadTabs(Profile u) async {
+  void _loadTabs(Profile u) {
     final api = _api;
     api.get('/users/${u.uid}/products').then((d) {
       if (mounted) setState(() => _products = (d as List).map((e) => Product.fromJson(e as Map)).toList());
@@ -75,10 +84,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }).catchError((_) {
       if (mounted) setState(() => _posts = []);
     });
-    api.get('/users/${u.uid}/stories').then((d) {
-      if (mounted) setState(() => _stories = (d as List).map((e) => StoryItem.fromJson(e as Map)).toList());
+    api.get('/users/${u.uid}/updates').then((d) {
+      if (mounted) setState(() => _updates = (d as List).map((e) => StoryItem.fromJson(e as Map)).toList());
     }).catchError((_) {
-      if (mounted) setState(() => _stories = []);
+      if (mounted) setState(() => _updates = []);
+    });
+    api.get('/areas/user/${u.uid}').then((d) {
+      if (mounted) setState(() => _areas = (d as List).map((e) => Map<String, dynamic>.from(e as Map)).toList());
+    }).catchError((_) {
+      if (mounted) setState(() => _areas = []);
     });
     _loadDeals(u);
   }
@@ -107,180 +121,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _shareLink() async {
-    final text = '${_u!.name} · ${_u!.company}\nhttps://webweb.ai/@${_u!.handle}';
-    try {
-      await Share.share(text);
-    } catch (_) {
-      await Clipboard.setData(ClipboardData(text: text));
-      if (mounted) toast(context, 'Link copied');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Pal.of(context);
-    final u = _u;
-    if (u == null) {
-      return Scaffold(
-        appBar: widget.handle == null ? null : AppBar(),
-        body: _error != null ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: p.muted)))) : const PageLoader(),
-      );
-    }
-    final isJob = u.isJobSeeker;
-    final own = _own;
-    final tabs = own && !isJob
-        ? [_Tab.posts, _Tab.deals, _Tab.stories, _Tab.products]
-        : [_Tab.products, _Tab.posts, _Tab.deals, _Tab.stories];
-    final tab = _tabSel ?? (own && !isJob ? _Tab.posts : _Tab.products);
-    return Scaffold(
-      body: RefreshIndicator(
-        color: kGold,
-        onRefresh: _load,
-        child: ListView(padding: EdgeInsets.zero, children: [
-          SizedBox(
-            height: 160,
-            child: Stack(clipBehavior: Clip.none, children: [
-              // cover photo (bannerURL) like the web; the gold band when there is none
-              Container(
-                height: 112,
-                width: double.infinity,
-                decoration: const BoxDecoration(gradient: kGoldGradient),
-                child: u.bannerUrl == null ? null : Image.network(mediaUrl(u.bannerUrl!), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox()),
-              ),
-              if (widget.handle != null && !own)
-                Positioned(
-                  top: MediaQuery.of(context).padding.top + 6,
-                  left: 12,
-                  child: CircleAvatar(backgroundColor: Colors.black38, child: IconButton(icon: const Icon(Icons.chevron_left, color: Colors.white, size: 26), onPressed: () => Navigator.pop(context))),
-                ),
-              Positioned(left: 16, top: 112 - 40, child: Container(padding: const EdgeInsets.all(3), decoration: BoxDecoration(color: p.canvas, shape: BoxShape.circle), child: Avatar(name: u.name, size: 80, ring: true, photoUrl: u.photoUrl))),
-              Positioned(
-                right: 16,
-                top: 124,
-                child: own
-                    ? OutlinedButton.icon(
-                        onPressed: _edit,
-                        icon: const Icon(Icons.edit_outlined, size: 16),
-                        label: const Text('Edit'),
-                      )
-                    : Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                        decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20), border: Border.all(color: p.border)),
-                        child: Text(labelOf(kUserTypes, u.userType), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                      ),
-              ),
-            ]),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(u.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
-              Text('@${u.handle}', style: const TextStyle(color: kGold, fontWeight: FontWeight.w700)),
-              Text(u.company, style: TextStyle(color: p.muted, fontWeight: FontWeight.w500)),
-              if ((u.bio ?? '').isNotEmpty) ...[const SizedBox(height: 10), Text(u.bio!, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500))],
-              const SizedBox(height: 12),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                InfoPill(icon: Icons.location_on_outlined, text: u.location),
-                InfoPill(text: u.category),
-                // GSTIN as a compact tag; opens the government's taxpayer search to verify it
-                if ((u.gstin ?? '').isNotEmpty)
-                  GestureDetector(
-                    onTap: () => launchUrl(Uri.parse('https://services.gst.gov.in/services/searchtp'), mode: LaunchMode.externalApplication),
-                    child: InfoPill(icon: Icons.receipt_long_outlined, text: 'GSTIN ${u.gstin}'),
-                  ),
-                if (own) InfoPill(text: labelOf(kUserTypes, u.userType)),
-                if ((u.contactMasked ?? '').isNotEmpty && !own) InfoPill(icon: Icons.call_outlined, text: u.contactMasked!),
-              ]),
-              if (own) _strength(p),
-              const SizedBox(height: 16),
-              Row(children: [
-                Expanded(child: _stat('${u.statPosts ?? '–'}', 'Asks', p)),
-                const SizedBox(width: 8),
-                Expanded(child: _stat('${u.statShared ?? '–'}', 'Connects', p)),
-                const SizedBox(width: 8),
-                Expanded(child: _stat('${u.contributions}', 'Contributions', p)),
-              ]),
-              const SizedBox(height: 16),
-              if (own)
-                SizedBox(width: double.infinity, child: GoldButton(label: 'Share my page', icon: Icons.share_outlined, onPressed: _shareLink))
-              else ...[
-                Row(children: [
-                  Expanded(child: GoldButton(label: 'Talk', icon: Icons.chat_bubble_outline, onPressed: _message)),
-                  const SizedBox(width: 10),
-                  Expanded(child: GoldButton(label: 'Call', icon: Icons.call_outlined, outlined: true, onPressed: () => placeCall(context, Peer.fromProfile(u), false))),
-                ]),
-                const SizedBox(height: 10),
-                SizedBox(width: double.infinity, child: GoldButton(label: _requested ? 'Requested' : 'Ask contact', icon: Icons.person_add_alt, outlined: true, onPressed: _requested ? null : _askContact)),
-              ],
-              const SizedBox(height: 18),
-            ]),
-          ),
-          Container(
-            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border))),
-            child: Row(children: [
-              for (final t in tabs)
-                Expanded(
-                  child: InkWell(
-                    onTap: () => setState(() => _tabSel = t),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: tab == t ? p.text : Colors.transparent, width: 2))),
-                      child: Column(children: [
-                        Icon(_tabIcon(t, isJob), size: 18, color: tab == t ? p.text : p.muted),
-                        const SizedBox(height: 3),
-                        Text(_tabLabel(t, isJob), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: tab == t ? p.text : p.muted)),
-                      ]),
-                    ),
-                  ),
-                ),
-            ]),
-          ),
-          Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 8), child: _tabBody(tab, u, p)),
-          if (own) _settings(u),
-          const SizedBox(height: 24),
-        ]),
-      ),
-    );
-  }
-
-  /// Own profile only: strength bar, the most valuable next step, and earned badges (never shown to visitors).
-  Widget _strength(Pal p) {
-    final c = context.watch<AuthProvider>().profile?.completion;
-    if (c == null) return const SizedBox();
-    final next = c.next;
-    return Padding(
-      padding: const EdgeInsets.only(top: 14),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (c.percent < 100)
-          InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: _edit,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              decoration: BoxDecoration(color: kGold.withValues(alpha: .12), borderRadius: BorderRadius.circular(14), border: Border.all(color: kGold.withValues(alpha: .3))),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Text('Profile strength ${c.percent}%', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                  const Spacer(),
-                  if (next != null) Text('Add ${next.label} · +${next.weight}%', style: const TextStyle(color: kGold, fontWeight: FontWeight.w700, fontSize: 12)),
-                ]),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(value: c.percent / 100, minHeight: 5, color: kGold, backgroundColor: p.border),
-                ),
-              ]),
-            ),
-          ),
-        if (c.badges.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Wrap(spacing: 6, runSpacing: 6, children: [for (final b in c.badges) GoldTag(b)]),
-        ],
-      ]),
-    );
-  }
-
   Future<void> _edit() async {
     final u = _u;
     if (u == null) return;
@@ -291,98 +131,512 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Widget _stat(String v, String l, Pal p) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border.withValues(alpha: .6))),
-        child: Column(children: [Text(v, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)), Text(l, style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w600))]),
-      );
+  /// New profile picture or cover (or remove the cover when [remove]).
+  Future<void> _changeMedia(String kind, {bool remove = false}) async {
+    final auth = context.read<AuthProvider>();
+    XFile? f;
+    if (!remove) {
+      f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: kind == 'banner' ? 1600 : 1000, imageQuality: 82);
+      if (f == null) return;
+    }
+    setState(() => _mediaBusy = kind);
+    try {
+      if (kind == 'photo') {
+        await auth.updateProfile({'photoURL': await auth.uploadAvatar(await f!.readAsBytes(), f.name)});
+      } else {
+        await auth.updateProfile({'bannerURL': remove ? null : await auth.uploadAvatar(await f!.readAsBytes(), f.name)});
+      }
+      await _load();
+    } catch (e) {
+      if (mounted) toast(context, '$e', error: true);
+    } finally {
+      if (mounted) setState(() => _mediaBusy = null);
+    }
+  }
 
-  static IconData _tabIcon(_Tab t, bool job) => switch (t) {
-        _Tab.posts => Icons.grid_view_outlined,
-        _Tab.deals => Icons.handshake_outlined,
-        _Tab.stories => Icons.auto_stories_outlined,
-        _Tab.products => job ? Icons.description_outlined : Icons.inventory_2_outlined,
+  Future<void> _shareTalkLink() async {
+    final url = '$siteUrl/@${_u!.handle}/talk';
+    try {
+      await SharePlus.instance.share(ShareParams(text: url, subject: '${t('Talk')}: ${_u!.name}'));
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: url));
+      if (mounted) toast(context, t('Link copied!'));
+    }
+  }
+
+  void _openPicture() {
+    final u = _u!;
+    final live = (_updates ?? const <StoryItem>[]).where((s) => DateTime.now().difference(s.createdAt).inHours < 24).toList();
+    if (u.hasUpdate && live.isNotEmpty) {
+      _openUpdates(live);
+    } else if ((u.photoUrl ?? '').isNotEmpty) {
+      showDialog(
+        context: context,
+        barrierColor: kInk.withValues(alpha: .9),
+        builder: (ctx) => GestureDetector(
+          onTap: () => Navigator.pop(ctx),
+          child: Stack(children: [
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 384),
+                  child: AspectRatio(aspectRatio: 1, child: ClipOval(child: NetImg(u.photoUrl!))),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 16,
+              top: MediaQuery.of(ctx).padding.top + 16,
+              child: const WIcon(WI.close, size: 28, color: Colors.white),
+            ),
+          ]),
+        ),
+      );
+    }
+  }
+
+  Future<void> _openUpdates(List<StoryItem> items) async {
+    final u = _u!;
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => StoryViewer(
+          groups: [StoryGroup(uid: u.uid, name: u.name, company: u.company, userType: u.userType, verification: u.verification, handle: u.handle, photoUrl: u.photoUrl, items: items)],
+          meUid: context.read<AuthProvider>().profile?.uid,
+          onDelete: (id) async => _api.delete('/updates/$id'),
+        ),
+      ),
+    );
+    if (changed == true && _u != null) _loadTabs(_u!);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final u = _u;
+    if (u == null) {
+      return SubPage(
+        title: widget.handle == null ? t('Profile') : '@${widget.handle}',
+        body: _error != null
+            ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: p.muted))))
+            : const PageLoader(),
+      );
+    }
+    final isJob = u.isJobSeeker;
+    final own = _own;
+    final tabs = own && !isJob ? [_Tab.posts, _Tab.deals, _Tab.updates, _Tab.products] : [_Tab.products, _Tab.posts, _Tab.deals, _Tab.updates];
+    final tab = _tabSel ?? (own && !isJob ? _Tab.posts : _Tab.products);
+    final me = context.watch<AuthProvider>().profile;
+    final completion = own ? me?.completion : null;
+
+    return Scaffold(
+      backgroundColor: p.canvas,
+      body: LogoRefresh(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 32),
+          children: [
+            _cover(p, u, own),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _pictureRow(p, u, own),
+                const SizedBox(height: 6),
+                Text.rich(
+                  TextSpan(children: [
+                    TextSpan(text: displayName(u.userType, u.name, u.company)),
+                    if (u.verification > 0) WidgetSpan(alignment: PlaceholderAlignment.middle, child: Padding(padding: const EdgeInsets.only(left: 6), child: VerifiedBadge(level: u.verification, size: 20))),
+                  ]),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.375),
+                ),
+                Text.rich(
+                  TextSpan(children: [
+                    TextSpan(text: '@${u.handle}', style: TextStyle(fontWeight: FontWeight.w700, color: p.link)),
+                    TextSpan(text: ' · ${isJob ? u.company : u.name}'),
+                  ]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14, color: p.muted, height: 1.375),
+                ),
+                if ((u.bio ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(u.bio!, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, height: 1.43))),
+                const SizedBox(height: 6),
+                _tags(p, u, own),
+                if (own && completion != null && completion.badges.isNotEmpty) _badges(p, completion.badges),
+                if (own && completion != null && completion.percent < 100) _StrengthCard(completion: completion, onTap: _edit),
+                const SizedBox(height: 8),
+                own ? _ownActions(p) : _visitorActions(p, u),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            _tabBar(p, tabs, tab, isJob, own),
+            Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: _tabBody(tab, u, p)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------- header ----------
+
+  Widget _cover(Pal p, Profile u, bool own) {
+    final top = MediaQuery.of(context).padding.top;
+    final hasBanner = (u.bannerUrl ?? '').isNotEmpty;
+    final themeCtl = context.watch<ThemeController>();
+    final dark = p.dark;
+    Widget roundBtn({required Widget child, required String label, required VoidCallback onTap}) => Semantics(
+          button: true,
+          label: label,
+          child: GestureDetector(
+            onTap: onTap,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(color: hasBanner ? Colors.white.withValues(alpha: .75) : Colors.transparent, shape: BoxShape.circle),
+              child: child,
+            ),
+          ),
+        );
+    Widget chip(WI icon, String label, VoidCallback? onTap) => GestureDetector(
+          onTap: _mediaBusy != null ? null : onTap,
+          child: Opacity(
+            opacity: _mediaBusy != null ? .6 : 1,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: .8), borderRadius: BorderRadius.circular(20)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                WIcon(icon, size: 14, color: kInk, strokeWidth: 2.1),
+                const SizedBox(width: 4),
+                Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kInk)),
+              ]),
+            ),
+          ),
+        );
+    return SizedBox(
+      height: top + 112,
+      child: Stack(fit: StackFit.expand, children: [
+        hasBanner ? NetImg(u.bannerUrl!) : CoverPattern(seed: u.handle.isEmpty ? u.name : u.handle),
+        Positioned(
+          top: top,
+          left: 8,
+          right: 12,
+          height: 56,
+          child: Row(children: [
+            roundBtn(label: t('Back'), onTap: () => Navigator.maybePop(context), child: const WIcon(WI.back, size: 28, color: kInk)),
+            const Spacer(),
+            roundBtn(
+              label: dark ? 'Switch to light mode' : 'Switch to dark mode',
+              onTap: () => themeCtl.set(dark ? ThemeMode.light : ThemeMode.dark),
+              child: Padding(padding: const EdgeInsets.all(2), child: WIcon(dark ? WI.sun : WI.moon, size: 20, color: kInk)),
+            ),
+          ]),
+        ),
+        if (own)
+          Positioned(
+            right: 12,
+            bottom: 8,
+            child: Row(children: [
+              if (hasBanner) ...[chip(WI.trash, t('Remove'), () => _changeMedia('banner', remove: true)), const SizedBox(width: 6)],
+              chip(WI.camera, _mediaBusy == 'banner' ? t('Uploading…') : t(hasBanner ? 'Change cover' : 'Add cover'), () => _changeMedia('banner')),
+            ]),
+          ),
+      ]),
+    );
+  }
+
+  Widget _pictureRow(Pal p, Profile u, bool own) {
+    final name = displayName(u.userType, u.name, u.company);
+    TextSpan stat(String? v, String label) => TextSpan(children: [
+          TextSpan(text: v ?? '–', style: TextStyle(fontWeight: FontWeight.w700, color: p.text)),
+          TextSpan(text: ' ${t(label)}'),
+        ]);
+    return Transform.translate(
+      offset: const Offset(0, -28),
+      child: Padding(
+        padding: const EdgeInsets.only(left: 12),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Stack(clipBehavior: Clip.none, children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(color: p.canvas, shape: BoxShape.circle),
+              child: GestureDetector(onTap: _openPicture, child: Avatar(name: name, photoUrl: u.photoUrl, size: 56, ring: u.hasUpdate)),
+            ),
+            if (own)
+              Positioned(
+                right: -4,
+                bottom: -4,
+                child: Semantics(
+                  button: true,
+                  label: t('Change profile picture'),
+                  child: GestureDetector(
+                    onTap: _mediaBusy != null ? null : () => _changeMedia('photo'),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(color: p.ink, shape: BoxShape.circle, border: Border.all(color: p.canvas, width: 2)),
+                      child: Center(child: _mediaBusy == 'photo' ? const LogoLoader(size: 18) : WIcon(WI.camera, size: 15, color: p.onInk, strokeWidth: 2.1)),
+                    ),
+                  ),
+                ),
+              ),
+          ]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text.rich(
+                TextSpan(children: [
+                  stat(u.statPosts?.toString(), 'Asks'),
+                  const TextSpan(text: ' · '),
+                  stat(u.statShared?.toString(), 'Connects'),
+                  const TextSpan(text: ' · '),
+                  stat('${u.contributions}', 'Contributions'),
+                ]),
+                textAlign: TextAlign.right,
+                style: TextStyle(fontSize: 12, height: 1.25, color: p.muted),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _tags(Pal p, Profile u, bool own) {
+    Widget tag({WI? icon, required String text, Color? bg, Color? fg, VoidCallback? onTap, double iconSize = 14}) {
+      final c = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(color: bg ?? p.chip, borderRadius: BorderRadius.circular(20)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (icon != null) ...[WIcon(icon, size: iconSize, color: fg ?? p.text, strokeWidth: 2.2), const SizedBox(width: 4)],
+          Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg ?? p.text))),
+        ]),
+      );
+      return onTap == null ? c : GestureDetector(onTap: onTap, child: c);
+    }
+
+    final gst = u.gstin;
+    return Transform.translate(
+      offset: const Offset(0, 0),
+      child: Wrap(spacing: 6, runSpacing: 6, children: [
+        tag(icon: u.isEntrepreneur ? WI.business : WI.user, text: t(labelOf(kUserTypes, u.userType))),
+        if (u.location.isNotEmpty) tag(icon: WI.pin, text: t(labelOf(kLocations, u.location))),
+        if (u.category.isNotEmpty) tag(text: t(labelOf(kProfileCategories, u.category))),
+        // a GSTIN is public record: tap to check it on the GST portal
+        if ((gst ?? '').isNotEmpty)
+          tag(
+            icon: WI.checkCircle,
+            iconSize: 12,
+            text: 'GSTIN $gst',
+            bg: kGold.withValues(alpha: .15),
+            fg: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00),
+            onTap: () => launchUrl(Uri.parse('https://services.gst.gov.in/services/searchtp'), mode: LaunchMode.externalApplication),
+          ),
+      ]),
+    );
+  }
+
+  Widget _badges(Pal p, List<String> badges) {
+    final fg = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: SizedBox(
+        height: 22,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: badges.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 6),
+          itemBuilder: (_, i) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(color: kGold.withValues(alpha: .15), borderRadius: BorderRadius.circular(20)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              WIcon(WI.checkCircle, size: 11, color: fg),
+              const SizedBox(width: 4),
+              Text(t(badges[i]), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg)),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _ownActions(Pal p) => Row(children: [
+        Expanded(child: _ActionBtn(label: t('Edit profile'), wi: WI.edit, gold: true, onTap: _edit)),
+        const SizedBox(width: 8),
+        Expanded(child: _ActionBtn(label: t('Share profile'), onTap: () => showShareProfileSheet(context, _u!, isSelf: true))),
+        const SizedBox(width: 8),
+        Expanded(child: _ActionBtn(label: t('Talk link'), wi: WI.talk, onTap: _shareTalkLink)),
+      ]);
+
+  Widget _visitorActions(Pal p, Profile u) => Row(children: [
+        Expanded(child: _ActionBtn(label: t('Talk'), wi: WI.talk, gold: true, onTap: _message)),
+        const SizedBox(width: 8),
+        Expanded(child: _ActionBtn(label: t('Call'), wi: WI.phone, onTap: () => placeCall(context, Peer.fromProfile(u), false))),
+        const SizedBox(width: 8),
+        Expanded(child: _ActionBtn(label: t(_requested ? 'Requested' : 'Ask contact'), wi: WI.ask, onTap: _requested ? null : _askContact)),
+        const SizedBox(width: 8),
+        SizedBox(width: 40, child: _ActionBtn(wi: WI.share, label: '', semantic: t('Share profile'), onTap: () => showShareProfileSheet(context, u, isSelf: false))),
+      ]);
+
+  // ---------- tabs ----------
+
+  static WI _tabIcon(_Tab t) => switch (t) {
+        _Tab.posts => WI.ask,
+        _Tab.deals => WI.deals,
+        _Tab.updates => WI.updates,
+        _Tab.products => WI.box,
       };
 
   static String _tabLabel(_Tab t, bool job) => switch (t) {
-        _Tab.posts => 'Posts',
-        _Tab.deals => 'Deals',
-        _Tab.stories => 'Stories',
-        _Tab.products => job ? 'Resume' : 'Products',
+        _Tab.posts => 'Asks',
+        _Tab.deals => 'Connects',
+        _Tab.updates => 'Updates',
+        _Tab.products => job ? 'Resume' : 'Catalog',
       };
 
-  Widget _empty(String t, Pal p) => Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Center(child: Text(t, textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontWeight: FontWeight.w500))));
+  Widget _tabBar(Pal p, List<_Tab> tabs, _Tab tab, bool isJob, bool own) => Container(
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border))),
+        child: Row(children: [
+          for (final x in tabs)
+            Expanded(
+              child: InkWell(
+                onTap: () => setState(() => _tabSel = x),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(border: Border(bottom: BorderSide(color: tab == x ? p.text : Colors.transparent, width: 2))),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    WIcon(_tabIcon(x), size: 16, color: tab == x ? p.text : p.muted, still: true),
+                    const SizedBox(width: 6),
+                    Flexible(child: Text(t(_tabLabel(x, isJob)), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: tab == x ? p.text : p.muted))),
+                  ]),
+                ),
+              ),
+            ),
+        ]),
+      );
+
+  Widget _loading() => const Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: LogoLoader()));
 
   Widget _tabBody(_Tab tab, Profile u, Pal p) {
     switch (tab) {
       case _Tab.posts:
-        if (_posts == null) return const Padding(padding: EdgeInsets.all(24), child: PageLoader(size: 40));
-        if (_posts!.isEmpty) return _empty('No posts yet.', p);
-        return Column(children: [for (final x in _posts!) PostCard(key: ValueKey(x.id), post: x)]);
+        if (_posts == null) return _loading();
+        if (_posts!.isEmpty) return EmptyState(title: t('No asks yet'));
+        return Transform.translate(
+          offset: const Offset(0, -16),
+          child: Column(children: [for (final x in _posts!) PostCard(key: ValueKey(x.id), post: x, onChanged: () => _loadTabs(u))]),
+        );
       case _Tab.deals:
-        return _deals == null ? const Padding(padding: EdgeInsets.all(24), child: PageLoader(size: 40)) : _dealsBody(p);
-      case _Tab.stories:
-        if (_stories == null) return const Padding(padding: EdgeInsets.all(24), child: PageLoader(size: 40));
-        if (_stories!.isEmpty) return _empty('No stories yet.', p);
+        return _dealsBody(p);
+      case _Tab.updates:
+        if (_updates == null) return _loading();
+        if (_updates!.isEmpty) return EmptyState(title: t('No updates yet'));
         return GridView.count(
           crossAxisCount: 3,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
           mainAxisSpacing: 4,
           crossAxisSpacing: 4,
           childAspectRatio: 3 / 4,
           children: [
-            for (final s in _stories!)
+            for (final s in _updates!)
               GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StoryViewer(groups: [StoryGroup(uid: u.uid, name: u.name, handle: u.handle, photoUrl: u.photoUrl, items: [s])]))),
+                onTap: () => _openUpdates(_updates!),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: s.imageUrl != null
-                      ? Image.network(mediaUrl(s.imageUrl!), fit: BoxFit.cover)
-                      : Container(color: p.chip, padding: const EdgeInsets.all(8), alignment: Alignment.center, child: Text(s.text ?? '', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
+                  child: Stack(fit: StackFit.expand, children: [
+                    s.imageUrl != null
+                        ? NetImg(s.imageUrl!)
+                        : Container(
+                            decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF3A3A3A), kInk], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+                            padding: const EdgeInsets.all(8),
+                            alignment: Alignment.center,
+                            child: Text(s.text ?? '', textAlign: TextAlign.center, maxLines: 6, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+                          ),
+                    Positioned(
+                      left: 4,
+                      bottom: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(color: kInk.withValues(alpha: .7), borderRadius: BorderRadius.circular(4)),
+                        child: Text(timeAgo(s.createdAt), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+                      ),
+                    ),
+                  ]),
                 ),
               ),
           ],
         );
       case _Tab.products:
-        return u.isJobSeeker ? _resume(u, p) : _catalog(u, p);
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _areasSection(p, u),
+          u.isJobSeeker ? _resume(u, p) : _catalog(u, p),
+        ]);
     }
   }
 
   Widget _dealsBody(Pal p) {
-    const kind = {'contact': 'contact', 'media': 'a photo', 'info': 'information'};
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (_asks.isNotEmpty) ...[
-        const Text('Asked you to share', style: TextStyle(fontWeight: FontWeight.w700)),
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (_own && _asks.isNotEmpty) ...[
+        Text(t('Asked to share'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         for (final a in _asks)
           Container(
             margin: const EdgeInsets.only(top: 8),
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${a.ownerName} (${a.ownerCompany}) asked you to reveal ${kind[a.kind] ?? a.kind} for "${a.postTitle}"'),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: a.ownerName, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  TextSpan(text: ' (${a.ownerCompany}) asked you to reveal ${_kindText[a.kind] ?? a.kind} for '),
+                  WidgetSpan(
+                    child: GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: a.postId))),
+                      child: Text(a.postTitle, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, decoration: TextDecoration.underline)),
+                    ),
+                  ),
+                ]),
+                style: const TextStyle(fontSize: 14),
+              ),
               const SizedBox(height: 8),
               Row(children: [
-                Expanded(child: GoldButton(label: 'Approve', onPressed: () => _answer(a, true))),
-                const SizedBox(width: 10),
-                Expanded(child: GoldButton(label: 'Decline', outlined: true, onPressed: () => _answer(a, false))),
+                Expanded(child: GoldButton(label: t('Approve'), height: 32, onPressed: () => _answer(a, true))),
+                const SizedBox(width: 8),
+                Expanded(child: GoldButton(label: t('Decline'), height: 32, outlined: true, onPressed: () => _answer(a, false))),
               ]),
             ]),
           ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
       ],
-      if (_deals!.isEmpty)
-        _empty('No deals yet. Respond to asks to build your track record.', p)
+      if (_deals == null)
+        _loading()
+      else if (_deals!.isEmpty)
+        EmptyState(title: t('No connects yet'), hint: t('Contacts shared in closed loop show up here, without the contact itself.'))
       else
-        for (final d in _deals!)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.check_circle, color: kGreen, size: 28),
-            title: Text(d.postTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
-            subtitle: Text('Shared ${kind[d.kind] ?? d.kind} with ${d.ownerName} · ${timeAgo(d.createdAt)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontSize: 12.5)),
-            trailing: Text('${d.rating == 1 ? '👍' : d.rating == -1 ? '👎' : ''}${d.reaction == null ? '' : kReactionEmoji[d.reaction] ?? ''}', style: const TextStyle(fontSize: 18)),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: d.postId))),
-          ),
+        for (var i = 0; i < _deals!.length; i++)
+          Builder(builder: (_) {
+            final d = _deals![i];
+            return InkWell(
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: d.postId))),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: i == 0 ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border))),
+                child: Row(children: [
+                  const WIcon(WI.checkCircle, size: 24, color: Color(0xFF059669)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(d.postTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                      Text('Shared ${_kindText[d.kind] ?? d.kind} with ${d.ownerName} · ${timeAgo(d.createdAt)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+                    ]),
+                  ),
+                  Text('${d.rating == 1 ? '👍' : d.rating == -1 ? '👎' : ''}${d.reaction == null ? '' : kReactionEmoji[d.reaction] ?? ''}', style: const TextStyle(fontSize: 18)),
+                ]),
+              ),
+            );
+          }),
     ]);
   }
 
@@ -395,182 +649,862 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  /// Serviceable areas (catalog) / preferred job locations (resume), as chips.
+  Widget _areasSection(Pal p, Profile u) {
+    final areas = _areas;
+    if (areas == null) return const SizedBox.shrink();
+    final biz = u.isEntrepreneur;
+    if (areas.isEmpty) {
+      if (!_own) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: DashedBox(
+          radius: 8,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          onTap: _edit,
+          child: Row(children: [
+            WIcon(WI.pin, size: 16, color: p.link),
+            const SizedBox(width: 8),
+            Text(t(biz ? 'Add your serviceable areas' : 'Add your preferred job locations'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link)),
+          ]),
+        ),
+      );
+    }
+    String radius(num m) => m >= 3000000 ? t('Pan-India') : (m >= 1000 ? '${m % 1000 == 0 ? m ~/ 1000 : (m / 1000).toStringAsFixed(1)} km' : '$m m');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          WIcon(WI.pin, size: 16, color: p.muted),
+          const SizedBox(width: 6),
+          Text(t(biz ? 'Serviceable areas' : 'Preferred job locations'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+        ]),
+        const SizedBox(height: 8),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          for (final a in areas)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: p.field, borderRadius: BorderRadius.circular(20)),
+              child: Text('${a['label']} · ${radius((a['radiusM'] as num?) ?? 0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            ),
+        ]),
+      ]),
+    );
+  }
+
   Widget _catalog(Profile u, Pal p) {
     final all = _products;
-    if (all == null) return const Padding(padding: EdgeInsets.all(24), child: PageLoader(size: 40));
-    final goods = all.where((x) => x.kind != 'service').toList();
-    final offered = all.where((x) => x.kind == 'service').toList();
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (goods.isNotEmpty) ...[
-        const Text('Catalog', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-        const SizedBox(height: 8),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: .8,
-          children: [
-            for (final g in goods)
-              Opacity(
-                opacity: g.available ? 1 : .55,
-                child: Container(
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Expanded(child: SizedBox(width: double.infinity, child: g.imageUrl != null ? Image.network(mediaUrl(g.imageUrl!), fit: BoxFit.cover) : Container(color: p.chip, child: Icon(Icons.inventory_2_outlined, size: 36, color: p.muted)))),
-                    Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(g.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-                        if ((g.price ?? '').isNotEmpty) Text(g.price!, style: const TextStyle(color: kGold, fontWeight: FontWeight.w800)),
-                        if (!g.available) Text('Unavailable', style: TextStyle(color: p.muted, fontSize: 12)),
-                      ]),
-                    ),
-                  ]),
-                ),
-              ),
-          ],
+    if (all == null) return _loading();
+    String catOf(Product x) => x.category ?? (x.kind == 'service' ? 'Services' : 'Other');
+    final chips = {for (final x in all) catOf(x)}.toList()
+      ..sort((a, b) => ((a == 'Services' || a == 'Other') ? 1 : 0).compareTo((b == 'Services' || b == 'Other') ? 1 : 0));
+    final filtering = chips.length > 1;
+    final items = all.where((x) => !filtering || _catFilter == 'all' || catOf(x) == _catFilter).toList();
+    final showPlain = !filtering || _catFilter == 'all' || _catFilter == 'Services';
+    final cols = MediaQuery.of(context).size.width >= 420 ? 3 : 2;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (filtering) ...[
+        SizedBox(
+          height: 36,
+          child: OverflowBox(
+            maxWidth: MediaQuery.of(context).size.width,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: chips.length + 1,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final c = i == 0 ? 'all' : chips[i - 1];
+                return ScopeChip(label: c == 'all' ? t('All') : c, selected: _catFilter == c, onTap: () => setState(() => _catFilter = c));
+              },
+            ),
+          ),
         ),
         const SizedBox(height: 16),
       ],
-      if (offered.isNotEmpty || u.services.isNotEmpty) ...[
-        const Text('Services', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+      if (items.isNotEmpty)
+        GridView.count(
+          crossAxisCount: cols,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: .66,
+          children: [for (final x in items) _CatalogTile(item: x, onTap: _own ? null : () => _showItem(x, u))],
+        ),
+      if (showPlain && u.services.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        Text(t('Services'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
-        for (final s in offered)
-          Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
-            child: Row(children: [
-              if (s.imageUrl != null) Padding(padding: const EdgeInsets.only(right: 12), child: NetImage(s.imageUrl, size: 48)),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(s.name, style: const TextStyle(fontWeight: FontWeight.w700)), if ((s.description ?? '').isNotEmpty) Text(s.description!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontSize: 12.5))])),
-              if ((s.price ?? '').isNotEmpty) Text(s.price!, style: const TextStyle(color: kGold, fontWeight: FontWeight.w800)),
+        for (final s in u.services)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8, left: 4, right: 4),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(padding: const EdgeInsets.only(top: 1), child: WIcon(WI.checkCircle, size: 20, color: p.link)),
+              const SizedBox(width: 8),
+              Expanded(child: Text(s, style: const TextStyle(fontSize: 14))),
             ]),
           ),
-        for (final s in u.services) Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [const Icon(Icons.check_circle_outline, size: 18, color: kGold), const SizedBox(width: 8), Expanded(child: Text(s))])),
       ],
-      if (all.isEmpty && u.services.isEmpty) _empty(_own ? 'Add your products and services so people can find you.' : 'Nothing listed yet.', p),
+      if (all.isEmpty && u.services.isEmpty) EmptyState(title: t('Nothing listed yet'), hint: _own ? t('Add products and services to your free website.') : null),
       if (_own) ...[
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: GoldButton(label: 'Manage catalog', outlined: true, icon: Icons.edit_outlined, onPressed: () async {
+        const SizedBox(height: 16),
+        GoldButton(
+          label: t('Manage catalog'),
+          outlined: true,
+          height: 40,
+          onPressed: () async {
             await Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogScreen()));
             if (_u != null) _loadTabs(_u!);
-          }),
+          },
         ),
       ],
     ]);
   }
 
-  /// One resume entry per line; "Role · Company · Years" renders as title + detail.
-  Widget _resumeList(String title, String? text, Pal p) {
-    final rows = (text ?? '').split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
-    if (rows.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.only(left: 14),
-          decoration: BoxDecoration(border: Border(left: BorderSide(color: p.border, width: 2))),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            for (final r in rows)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Builder(builder: (_) {
-                  final parts = r.split(RegExp(r'\s[·|]\s'));
-                  return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(parts.first, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    if (parts.length > 1) Text(parts.skip(1).join(' · '), style: TextStyle(color: p.muted, fontSize: 13)),
-                  ]);
-                }),
-              ),
+  /// Visitor taps an item: a sheet with the photo, details and Enquire (web ItemActionSheet, without the cart).
+  void _showItem(Product x, Profile u) {
+    final p = Pal.of(context);
+    final business = displayName(u.userType, u.name, u.company);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: p.canvas,
+      barrierColor: kInk.withValues(alpha: .6),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * .9),
+        child: ListView(shrinkWrap: true, padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(ctx).padding.bottom + 24), children: [
+          Row(children: [
+            Expanded(child: Text(x.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+            GestureDetector(onTap: () => Navigator.pop(ctx), child: WIcon(WI.close, size: 24, color: p.text)),
           ]),
-        ),
-      ]),
+          const SizedBox(height: 12),
+          if (x.imageUrl != null)
+            ClipRRect(borderRadius: BorderRadius.circular(8), child: AspectRatio(aspectRatio: 1, child: NetImg(x.imageUrl!))),
+          const SizedBox(height: 12),
+          Row(children: [
+            WIcon(x.kind == 'service' ? WI.service : WI.box, size: 16, color: p.muted),
+            const SizedBox(width: 6),
+            Text(t(x.kind == 'service' ? 'Service' : 'Product'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
+            if (!x.available) Text(' · ${t('Unavailable')}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
+            const Spacer(),
+            if ((x.price ?? '').isNotEmpty) Text(x.price!, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.link)),
+          ]),
+          if ((x.description ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(x.description!, style: const TextStyle(fontSize: 14, height: 1.43))),
+          const SizedBox(height: 16),
+          GoldButton(
+            label: t('Enquire'),
+            wi: WI.talk,
+            onPressed: () {
+              Navigator.pop(ctx);
+              openChat(context, Peer.fromProfile(u), attachment: {
+                'type': 'item',
+                'name': x.name.length > 80 ? x.name.substring(0, 80) : x.name,
+                'kind': x.kind,
+                if ((x.price ?? '').isNotEmpty) 'price': x.price,
+                if (x.imageUrl != null) 'imageUrl': x.imageUrl,
+              });
+              _api.post('/products/${x.id}/enquire', {}).catchError((_) => null);
+            },
+          ),
+          const SizedBox(height: 8),
+          Text(t('Opens a chat with {name}', {'name': business}), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.muted)),
+        ]),
+      ),
     );
   }
 
   Widget _resume(Profile u, Pal p) {
     final empty = u.skills.isEmpty && (u.experience ?? '').isEmpty && (u.education ?? '').isEmpty;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Future<void> save(String field, String next) async {
+      await context.read<AuthProvider>().updateProfile({field: next});
+      await _load();
+    }
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (u.skills.isNotEmpty) ...[
-        const Text('Skills', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+        Text(t('Skills'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
-        Wrap(spacing: 8, runSpacing: 8, children: [for (final s in u.skills) InfoPill(text: s)]),
-        const SizedBox(height: 16),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          for (final s in u.skills)
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FindScreen(standalone: true, initialQuery: s, initialScope: 'people'))),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20), border: Border.all(color: p.border.withValues(alpha: .7))),
+                child: Text(s, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              ),
+            ),
+        ]),
+        const SizedBox(height: 20),
       ],
-      _resumeList('Experience', u.experience, p),
-      _resumeList('Education', u.education, p),
-      if (empty) _empty(_own ? 'Add your skills, experience and education.' : 'No resume details yet.', p),
-      if (_own)
-        SizedBox(
-          width: double.infinity,
-          child: GoldButton(label: 'Update resume', outlined: true, onPressed: () async {
-            if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: u))) == true) _load();
-          }),
-        ),
+      _ResumeList(title: t('Experience'), text: u.experience, icon: WI.business, kind: 'experience', editable: _own, onSave: (v) => save('experience', v)),
+      const SizedBox(height: 20),
+      _ResumeList(title: t('Education'), text: u.education, icon: WI.school, kind: 'education', editable: _own, onSave: (v) => save('education', v)),
+      if (!_own && empty) EmptyState(title: t('No resume details yet')),
+      if (_own) ...[
+        const SizedBox(height: 20),
+        GoldButton(label: t('Edit skills'), outlined: true, height: 40, onPressed: _edit),
+      ],
     ]);
   }
+}
 
-  // ---------- own-profile settings ----------
-  Widget _settings(Profile u) {
+/// Profile action button (web Button, 40 px, 13 px text): gold for the main action, cream otherwise.
+class _ActionBtn extends StatelessWidget {
+  final String label;
+  final String? semantic;
+  final WI? wi;
+  final bool gold;
+  final VoidCallback? onTap;
+  const _ActionBtn({required this.label, this.semantic, this.wi, this.gold = false, this.onTap});
+  @override
+  Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final theme = context.watch<ThemeController>();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Divider(color: p.border),
-        const SizedBox(height: 8),
-        SizedBox(width: double.infinity, child: GoldButton(label: 'Saved posts', outlined: true, icon: Icons.bookmark_border, onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const _SavedPosts())))),
-        const SizedBox(height: 18),
-        Text('Appearance', style: TextStyle(color: p.muted, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        Container(
-          height: 52,
-          padding: const EdgeInsets.all(5),
-          decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(30), border: Border.all(color: p.border)),
-          child: Row(children: [
-            for (final m in [(ThemeMode.system, 'System'), (ThemeMode.light, 'Light'), (ThemeMode.dark, 'Dark')])
-              Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 2), child: FilterPill(label: m.$2, selected: theme.mode == m.$1, onTap: () => theme.set(m.$1)))),
-          ]),
+    final fg = gold ? kInk : p.text;
+    return Semantics(
+      button: true,
+      label: semantic ?? label,
+      child: Opacity(
+        opacity: onTap == null ? .5 : 1,
+        child: Material(
+          color: Colors.transparent,
+          child: Ink(
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: gold ? kGoldGradient : null,
+              color: gold ? null : p.chip,
+              border: gold ? null : Border.all(color: p.border.withValues(alpha: .7)),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  if (wi != null) WIcon(wi!, size: 16, color: fg, strokeWidth: 1.9, still: true),
+                  if (wi != null && label.isNotEmpty) const SizedBox(width: 6),
+                  if (label.isNotEmpty) Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: fg))),
+                ]),
+              ),
+            ),
+          ),
         ),
-        const SizedBox(height: 18),
-        SizedBox(width: double.infinity, child: GoldButton(label: 'Log out', icon: Icons.logout, outlined: true, onPressed: () => context.read<AuthProvider>().logout())),
+      ),
+    );
+  }
+}
+
+/// Own profile: how complete the page is and the next best step (web StrengthCard).
+class _StrengthCard extends StatelessWidget {
+  final Completion completion;
+  final VoidCallback onTap;
+  const _StrengthCard({required this.completion, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final fg = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
+    final next = completion.next;
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(colors: [kGold.withValues(alpha: .2), kGold.withValues(alpha: .07), kGold.withValues(alpha: 0)]),
+      ),
+      child: Row(children: [
+        Text('${completion.percent}%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg, fontFeatures: const [FontFeature.tabularFigures()])),
+        const SizedBox(width: 10),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: SizedBox(
+              height: 4,
+              child: Stack(children: [
+                Container(color: p.text.withValues(alpha: .1)),
+                FractionallySizedBox(widthFactor: completion.percent / 100, child: Container(decoration: const BoxDecoration(gradient: kGoldGradient))),
+              ]),
+            ),
+          ),
+        ),
+        if (next != null) ...[
+          const SizedBox(width: 10),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * .5),
+            child: GestureDetector(
+              onTap: onTap,
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: '+ ${t(next.label)} '),
+                  TextSpan(text: '+${next.weight}%', style: TextStyle(color: fg.withValues(alpha: .7))),
+                ]),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
+              ),
+            ),
+          ),
+        ],
       ]),
     );
   }
 }
 
-class _SavedPosts extends StatefulWidget {
-  const _SavedPosts();
+/// Catalog item on a profile (web: square photo with a Product / Service tag, name, price, two lines).
+class _CatalogTile extends StatelessWidget {
+  final Product item;
+  final VoidCallback? onTap;
+  const _CatalogTile({required this.item, this.onTap});
   @override
-  State<_SavedPosts> createState() => _SavedPostsState();
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final service = item.kind == 'service';
+    final icon = service ? WI.service : WI.box;
+    return Opacity(
+      opacity: item.available ? 1 : .6,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            AspectRatio(
+              aspectRatio: 1,
+              child: Stack(fit: StackFit.expand, children: [
+                if (item.imageUrl != null) NetImg(item.imageUrl!) else ColoredBox(color: p.chip, child: Center(child: WIcon(icon, size: 28, color: p.muted))),
+                Positioned(
+                  left: 4,
+                  bottom: 4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: p.ink.withValues(alpha: .55), borderRadius: BorderRadius.circular(10)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      WIcon(icon, size: 10, color: p.onInk, strokeWidth: 2.4),
+                      const SizedBox(width: 4),
+                      Text(t(service ? 'Service' : 'Product'), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, height: 1, color: p.onInk)),
+                    ]),
+                  ),
+                ),
+                if (!item.available)
+                  Positioned(
+                    left: 4,
+                    top: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(color: kInk.withValues(alpha: .8), borderRadius: BorderRadius.circular(10)),
+                      child: Text(t('Unavailable'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+                    ),
+                  ),
+              ]),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(6),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, height: 1.25)),
+                if ((item.price ?? '').isNotEmpty) Text(item.price!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, height: 1.25, color: p.link)),
+                if ((item.description ?? '').isNotEmpty)
+                  Padding(padding: const EdgeInsets.only(top: 2), child: Text(item.description!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, height: 1.35, color: p.muted))),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
 }
 
-class _SavedPostsState extends State<_SavedPosts> {
-  List<Post>? _posts;
+/// A resume line "Role · Organisation · 2019 - 2021" split into its parts.
+class _Entry {
+  final String raw, head, org, period, from, to;
+  final bool current;
+  _Entry(this.raw, this.head, this.org, this.period, this.from, this.to, this.current);
+  factory _Entry.parse(String row) {
+    final parts = row.split(RegExp(r'\s[·|]\s')).map((e) => e.trim()).toList();
+    final last = parts.length > 1 ? parts.last : '';
+    final hasPeriod = RegExp(r'(\d{4}|present|current|now)', caseSensitive: false).hasMatch(last);
+    final ft = hasPeriod ? last.split(RegExp(r'\s*[-–]\s*')) : <String>[];
+    return _Entry(
+      row,
+      parts.isEmpty ? '' : parts.first,
+      parts.length <= 1 ? '' : parts.sublist(1, hasPeriod ? parts.length - 1 : parts.length).join(' · '),
+      hasPeriod ? last : '',
+      ft.isNotEmpty ? ft[0].trim() : '',
+      ft.length > 1 ? ft[1].trim() : '',
+      RegExp(r'(present|current|now)\s*$', caseSensitive: false).hasMatch(last),
+    );
+  }
+}
+
+/// Resume timeline (web ResumeList): a gold rail with a node per entry; the current role is haloed.
+/// On your own profile entries can be added, edited and deleted.
+class _ResumeList extends StatelessWidget {
+  final String title;
+  final String? text;
+  final WI icon;
+  final String kind;
+  final bool editable;
+  final Future<void> Function(String next) onSave;
+  const _ResumeList({required this.title, required this.text, required this.icon, required this.kind, required this.editable, required this.onSave});
+
   @override
-  void initState() {
-    super.initState();
-    context.read<AuthProvider>().api.get('/posts/bookmarks').then((d) {
-      if (mounted) setState(() => _posts = (d as List).map((e) => Post.fromJson(e as Map)).toList());
-    }).catchError((_) {
-      if (mounted) setState(() => _posts = []);
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final rows = (text ?? '').split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    if (rows.isEmpty && !editable) return const SizedBox.shrink();
+    final entries = rows.map(_Entry.parse).toList();
+    Future<void> write(List<String> next) => onSave(next.join('\n'));
+    Future<void> openSheet(int? index) => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: p.canvas,
+          barrierColor: kInk.withValues(alpha: .6),
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          builder: (_) => _ResumeEntrySheet(
+            kind: kind,
+            initial: index == null ? null : rows[index],
+            onSave: (line) => write(index == null ? [...rows, line] : [for (var j = 0; j < rows.length; j++) j == index ? line : rows[j]]),
+          ),
+        );
+    final tagFg = p.dark ? const Color(0xFFFFC700) : const Color(0xFF7A5A00);
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        Container(width: 28, height: 28, decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle), child: Center(child: WIcon(icon, size: 15, color: p.text, strokeWidth: 2.1))),
+        const SizedBox(width: 8),
+        Expanded(child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+        if (editable)
+          GestureDetector(
+            onTap: () => openSheet(null),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [WIcon(WI.plus, size: 14, color: p.text), const SizedBox(width: 4), Text(t('Add'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))]),
+            ),
+          ),
+      ]),
+      const SizedBox(height: 12),
+      if (entries.isEmpty && editable)
+        DashedBox(
+          radius: 8,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Text('Nothing here yet. Tap Add to put your $kind on your profile.', style: TextStyle(fontSize: 14, color: p.muted)),
+        ),
+      for (var i = 0; i < entries.length; i++)
+        IntrinsicHeight(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            // rail + node
+            SizedBox(
+              width: 38,
+              child: Stack(children: [
+                if (i < entries.length - 1)
+                  Positioned(
+                    left: 13,
+                    top: 12,
+                    bottom: 0,
+                    child: Container(width: 2, decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [kGold.withValues(alpha: .8), p.border]))),
+                  ),
+                Positioned(
+                  left: 8,
+                  top: 4,
+                  child: Opacity(
+                    opacity: entries[i].current ? 1 : .7,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        gradient: kGoldGradient,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: p.canvas, width: 0),
+                        boxShadow: [
+                          BoxShadow(color: p.canvas, spreadRadius: 4),
+                          if (entries[i].current) const BoxShadow(color: Color(0x40D8B81C), spreadRadius: 8),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: i < entries.length - 1 ? 20 : 0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(color: p.chip.withValues(alpha: .6), borderRadius: BorderRadius.circular(8)),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Expanded(child: Text(entries[i].head, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.375))),
+                      if (entries[i].current)
+                        Container(
+                          margin: const EdgeInsets.only(left: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(color: kGold.withValues(alpha: .25), borderRadius: BorderRadius.circular(20)),
+                          child: Text(t('Current'), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: tagFg)),
+                        ),
+                      if (editable) ...[
+                        GestureDetector(onTap: () => openSheet(i), child: Padding(padding: const EdgeInsets.all(4), child: WIcon(WI.edit, size: 16, color: p.muted))),
+                        GestureDetector(
+                          onTap: () async {
+                            final ok = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                content: Text(t('Delete this entry?')),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('Cancel'), style: TextStyle(color: p.text))),
+                                  TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('Delete'), style: TextStyle(color: p.danger))),
+                                ],
+                              ),
+                            );
+                            if (ok == true) {
+                              try {
+                                await write([for (var j = 0; j < rows.length; j++) if (j != i) rows[j]]);
+                              } catch (_) {}
+                            }
+                          },
+                          child: Padding(padding: const EdgeInsets.all(4), child: WIcon(WI.trash, size: 16, color: p.muted)),
+                        ),
+                      ],
+                    ]),
+                    if (entries[i].org.isNotEmpty) Text(entries[i].org, style: TextStyle(fontSize: 14, color: p.muted, height: 1.375)),
+                    if (entries[i].period.isNotEmpty)
+                      Padding(padding: const EdgeInsets.only(top: 4), child: Text(entries[i].period, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
+                  ]),
+                ),
+              ),
+            ),
+          ]),
+        ),
+    ]);
+  }
+}
+
+class _ResumeEntrySheet extends StatefulWidget {
+  final String kind;
+  final String? initial;
+  final Future<void> Function(String line) onSave;
+  const _ResumeEntrySheet({required this.kind, this.initial, required this.onSave});
+  @override
+  State<_ResumeEntrySheet> createState() => _ResumeEntrySheetState();
+}
+
+class _ResumeEntrySheetState extends State<_ResumeEntrySheet> {
+  late final _Entry? _e0 = widget.initial == null ? null : _Entry.parse(widget.initial!);
+  late final _head = TextEditingController(text: _e0?.head ?? '');
+  late final _org = TextEditingController(text: _e0?.org ?? '');
+  late final _from = TextEditingController(text: _e0?.from ?? '');
+  late final _to = TextEditingController(text: _e0 != null && !_e0!.current ? _e0!.to : '');
+  late bool _current = _e0?.current ?? false;
+  bool _busy = false;
+  String? _error;
+
+  bool get _isExp => widget.kind == 'experience';
+
+  Future<void> _save() async {
+    final from = _from.text.trim(), to = _to.text.trim();
+    final period = from.isNotEmpty ? '$from${_current ? ' - Present' : to.isNotEmpty ? ' - $to' : ''}' : (_current ? 'Present' : to);
+    final line = [_head.text.trim(), _org.text.trim(), period].where((s) => s.isNotEmpty).join(' · ');
+    setState(() {
+      _busy = true;
+      _error = null;
     });
+    try {
+      await widget.onSave(line);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Saved posts', style: TextStyle(fontWeight: FontWeight.w700))),
+  void dispose() {
+    _head.dispose();
+    _org.dispose();
+    _from.dispose();
+    _to.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final digits = [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(4)];
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 24),
+      child: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Expanded(child: Text('${widget.initial != null ? 'Edit' : 'Add'} ${_isExp ? 'experience' : 'education'}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+            GestureDetector(onTap: () => Navigator.pop(context), child: WIcon(WI.close, size: 24, color: p.text)),
+          ]),
+          const SizedBox(height: 16),
+          AppField(controller: _head, label: _isExp ? 'Role *' : 'Course / degree *', hint: _isExp ? 'e.g. CNC Operator' : 'e.g. ITI Fitter', maxLength: 80, onChanged: (_) => setState(() {})),
+          const SizedBox(height: 12),
+          AppField(controller: _org, label: _isExp ? 'Company, place' : 'Institute, place', hint: _isExp ? 'e.g. Precision Tools Pvt Ltd, Turbhe' : 'e.g. Govt ITI Panvel', maxLength: 80),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: AppField(controller: _from, label: t('From (year)'), hint: '2019', keyboard: TextInputType.number, inputFormatters: digits)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _current
+                  ? AppField(label: t('To (year)'), hint: 'Present', enabled: false)
+                  : AppField(controller: _to, label: t('To (year)'), hint: '2022', keyboard: TextInputType.number, inputFormatters: digits),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () => setState(() => _current = !_current),
+            child: Row(children: [
+              SizedBox(width: 24, height: 24, child: Checkbox(value: _current, activeColor: kInk, onChanged: (v) => setState(() => _current = v ?? false))),
+              const SizedBox(width: 8),
+              Text(_isExp ? 'I currently work here' : 'I am currently studying here', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            ]),
+          ),
+          if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
+          const SizedBox(height: 16),
+          GoldButton(label: t('Save'), loading: _busy, onPressed: _head.text.trim().length < 2 ? null : _save),
+        ]),
+      ),
+    );
+  }
+}
+
+// ======================= share profile (web share-profile-sheet.tsx) =======================
+
+/// Share a profile: send it in a chat, copy the link, or hand it to another app.
+Future<void> showShareProfileSheet(BuildContext context, Profile profile, {required bool isSelf}) {
+  final p = Pal.of(context);
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: p.canvas,
+    barrierColor: kInk.withValues(alpha: .6),
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    builder: (_) => _ShareProfileSheet(profile: profile, isSelf: isSelf),
+  );
+}
+
+class _ShareProfileSheet extends StatefulWidget {
+  final Profile profile;
+  final bool isSelf;
+  const _ShareProfileSheet({required this.profile, required this.isSelf});
+  @override
+  State<_ShareProfileSheet> createState() => _ShareProfileSheetState();
+}
+
+class _ShareProfileSheetState extends State<_ShareProfileSheet> {
+  bool _chat = false;
+  List<ChatSummary>? _chats;
+  final _q = TextEditingController();
+  String? _sending;
+  final Set<String> _sent = {};
+
+  Profile get _p => widget.profile;
+  String get _url => '$siteUrl/@${_p.handle}';
+  String get _title => displayName(_p.userType, _p.name, _p.company);
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openChats() async {
+    setState(() => _chat = true);
+    final auth = context.read<AuthProvider>();
+    try {
+      final d = await auth.api.get('/chats') as List;
+      if (mounted) setState(() => _chats = d.map((e) => ChatSummary.fromJson(e as Map, auth.profile?.uid ?? '')).toList());
+    } catch (_) {
+      if (mounted) setState(() => _chats = []);
+    }
+  }
+
+  Future<void> _send(ChatSummary c) async {
+    setState(() => _sending = c.id);
+    try {
+      await context.read<AuthProvider>().api.post('/chats/${c.id}/messages', {
+        'text': '',
+        'attachment': {
+          'type': 'profile',
+          'handle': _p.handle,
+          'name': _title,
+          'subtitle': [labelOf(kProfileCategories, _p.category), _p.location].where((e) => e.isNotEmpty).join(' · '),
+          if (_p.photoUrl != null) 'photoURL': _p.photoUrl,
+          'path': '/@${_p.handle}',
+        },
+      });
+      if (mounted) setState(() => _sent.add(c.id));
+    } catch (e) {
+      if (mounted) toast(context, t('Could not send'), error: true);
+    } finally {
+      if (mounted) setState(() => _sending = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    Widget row(Widget icon, String title, String hint, VoidCallback onTap) => InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            child: Row(children: [
+              Container(width: 40, height: 40, decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle), child: Center(child: icon)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  Text(hint, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+                ]),
+              ),
+            ]),
+          ),
+        );
+    final q = _q.text.trim().toLowerCase();
+    final rows = (_chats ?? const <ChatSummary>[]).where((c) => q.isEmpty || '${c.peer.name} ${c.peer.company}'.toLowerCase().contains(q)).toList();
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .85),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 16),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            if (_chat) GestureDetector(onTap: () => setState(() => _chat = false), child: Padding(padding: const EdgeInsets.only(right: 8), child: WIcon(WI.back, size: 20, color: p.text))),
+            Expanded(child: Text(t(_chat ? 'Send in chat' : 'Share profile'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+            GestureDetector(onTap: () => Navigator.pop(context), child: WIcon(WI.close, size: 24, color: p.text)),
+          ]),
+          const SizedBox(height: 12),
+          if (!_chat) ...[
+            row(WIcon(WI.talk, size: 20, color: p.text), t('Send in chat'), t('Pick a conversation'), _openChats),
+            row(WIcon(WI.clip, size: 20, color: p.text), t('Copy link'), _url.replaceFirst(RegExp(r'^https?://'), ''), () async {
+              await Clipboard.setData(ClipboardData(text: _url));
+              if (context.mounted) {
+                Navigator.pop(context);
+                toast(context, t('Link copied'));
+              }
+            }),
+            row(WIcon(WI.share, size: 20, color: p.text), t('More apps'), t('WhatsApp, email and others'), () async {
+              try {
+                await SharePlus.instance.share(ShareParams(text: _url, subject: widget.isSelf ? t('My WEBWEB AI page') : _title));
+              } catch (_) {}
+            }),
+          ] else ...[
+            Container(
+              height: 40,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20)),
+              child: Row(children: [
+                WIcon(WI.search, size: 16, color: p.muted),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _q,
+                    onChanged: (_) => setState(() {}),
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: t('Search conversations'),
+                      hintStyle: TextStyle(color: p.muted),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 8),
+            if (_chats == null) const Padding(padding: EdgeInsets.all(24), child: Center(child: LogoLoader(size: 32))),
+            if (_chats != null && rows.isEmpty)
+              Padding(padding: const EdgeInsets.symmetric(vertical: 32), child: Text(t('No conversations yet. Start one from a profile.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.muted))),
+            Flexible(
+              child: ListView(shrinkWrap: true, children: [
+                for (final c in rows)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(children: [
+                      Avatar(name: c.peer.name, photoUrl: c.peer.photoUrl, size: 40, type: c.peer.userType, badge: 16),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(c.peer.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                          if (c.peer.company.isNotEmpty) Text(c.peer.company, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+                        ]),
+                      ),
+                      GestureDetector(
+                        onTap: _sending != null || _sent.contains(c.id) ? null : () => _send(c),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(gradient: _sent.contains(c.id) ? null : kGoldGradient, color: _sent.contains(c.id) ? p.chip : null, borderRadius: BorderRadius.circular(20)),
+                          child: _sending == c.id
+                              ? const Text('…', style: TextStyle(fontWeight: FontWeight.w700, color: kInk))
+                              : _sent.contains(c.id)
+                                  ? WIcon(WI.checkCircle, size: 16, color: p.text)
+                                  : const Row(mainAxisSize: MainAxisSize.min, children: [
+                                      WIcon(WI.send, size: 13, color: kInk),
+                                      SizedBox(width: 4),
+                                      Text('Send', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kInk)),
+                                    ]),
+                        ),
+                      ),
+                    ]),
+                  ),
+              ]),
+            ),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
+/// Saved asks (bookmarks), opened from the account menu.
+class SavedPostsScreen extends StatefulWidget {
+  const SavedPostsScreen({super.key});
+  @override
+  State<SavedPostsScreen> createState() => SavedPostsScreenState();
+}
+
+class SavedPostsScreenState extends State<SavedPostsScreen> {
+  List<Post>? _posts;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final d = await context.read<AuthProvider>().api.get('/posts/bookmarks');
+      if (mounted) setState(() => _posts = (d as List).map((e) => Post.fromJson(e as Map)).toList());
+    } catch (_) {
+      if (mounted) setState(() => _posts = []);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SubPage(
+        title: t('Saved asks'),
         body: _posts == null
-            ? const PageLoader()
-            : _posts!.isEmpty
-                ? Center(child: Text('Nothing saved yet', style: TextStyle(color: Pal.of(context).muted, fontWeight: FontWeight.w600)))
-                : ListView(padding: const EdgeInsets.all(16), children: [for (final x in _posts!) PostCard(key: ValueKey(x.id), post: x)]),
+            ? const Center(child: LogoLoader())
+            : LogoRefresh(
+                onRefresh: _load,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).padding.bottom + 24),
+                  children: [
+                    if (_posts!.isEmpty) EmptyState(title: t('Nothing saved yet'), hint: t('Tap Save on an ask to keep it here.')),
+                    for (final x in _posts!) PostCard(key: ValueKey(x.id), post: x),
+                  ],
+                ),
+              ),
       );
 }

@@ -96,5 +96,10 @@ class Api {
       (await upload('/media', bytes, filename, mimeOf(filename)))['url'] as String;
 }
 
-/// Absolute URL for an uploaded file (the API already returns absolute URLs; this also accepts relative paths).
-String mediaUrl(String path) => path.startsWith('http') ? path : '$apiUrl$path';
+/// Absolute URL for an image. The API returns absolute URLs for uploads; relative paths are either
+/// uploads on the API (`/uploads/...`) or static files of the website (`/demo/...`, as the web serves them).
+String mediaUrl(String path) {
+  if (path.startsWith('http')) return path;
+  if (path.startsWith('/uploads/')) return '$apiUrl$path';
+  return '$siteUrl$path';
+}

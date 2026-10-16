@@ -99,6 +99,29 @@ class NotificationService with WidgetsBindingObserver {
     await _local.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
   }
 
+  /// Whether this phone shows our notifications (for the "Get alerts on this device" row).
+  Future<bool> alertsEnabled() async {
+    if (!_ready) return true; // nothing to offer (e.g. Firebase not configured in this build)
+    try {
+      final st = (await FirebaseMessaging.instance.getNotificationSettings()).authorizationStatus;
+      return st == AuthorizationStatus.authorized || st == AuthorizationStatus.provisional;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Asks again; when the person already said no, the OS will not ask, so open the app's settings.
+  Future<bool> enableAlerts() async {
+    if (!_ready) return true;
+    final st = (await FirebaseMessaging.instance.requestPermission(alert: true, badge: true, sound: true)).authorizationStatus;
+    final on = st == AuthorizationStatus.authorized || st == AuthorizationStatus.provisional;
+    if (on) {
+      _registeredFor = null;
+      await register();
+    }
+    return on;
+  }
+
   /// Sends this device's FCM token to the backend (once per login).
   Future<void> register() async {
     if (!_ready || auth.token == null || _registeredFor == auth.token) return;

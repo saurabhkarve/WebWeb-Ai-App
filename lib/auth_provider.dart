@@ -17,6 +17,10 @@ class AuthProvider extends ChangeNotifier {
   bool loading = false;
   bool otpSent = false;
   String phone = ''; // 10 digits
+  /// set when signing in by email instead of a mobile number (web "Use email instead")
+  String? email;
+  /// the signed-in account's email, when it has one (from /me)
+  String? accountEmail;
   String? error;
 
   bool get isLoggedIn => token != null;
@@ -39,6 +43,9 @@ class AuthProvider extends ChangeNotifier {
     try {
       final d = await api.get('/me') as Map;
       userId = d['user']?['id'] as String?;
+      final ph = '${d['user']?['phone'] ?? ''}'.replaceAll(RegExp(r'\D'), '');
+      if (ph.length >= 10) phone = ph.substring(ph.length - 10);
+      accountEmail = d['user']?['email'] as String?;
       profile = d['profile'] == null ? null : Profile.fromJson(d['profile'] as Map);
       profileLoaded = true;
       error = null;
@@ -52,13 +59,26 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ---------- login ----------
-  Future<bool> sendOtp(String phone10) async {
+  Future<bool> sendOtp(String phone10) => _send({'phone': phone10}, () {
+        phone = phone10;
+        email = null;
+      });
+
+  Future<bool> sendEmailOtp(String address) {
+    final clean = address.trim().toLowerCase();
+    return _send({'email': clean}, () => email = clean);
+  }
+
+  /// Sends the code again to the same number or email.
+  Future<bool> resendOtp() => email != null ? sendEmailOtp(email!) : sendOtp(phone);
+
+  Future<bool> _send(Map<String, dynamic> target, void Function() onSent) async {
     loading = true;
     error = null;
     notifyListeners();
     try {
-      await api.post('/auth/send-otp', {'phone': phone10});
-      phone = phone10;
+      await api.post('/auth/send-otp', target);
+      onSent();
       otpSent = true;
       return true;
     } catch (e) {
@@ -75,7 +95,7 @@ class AuthProvider extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      final d = await api.post('/auth/verify-otp', {'phone': phone, 'code': code}) as Map;
+      final d = await api.post('/auth/verify-otp', {if (email != null) 'email': email else 'phone': phone, 'code': code}) as Map;
       token = d['token'] as String;
       (await SharedPreferences.getInstance()).setString('token', token!);
       otpSent = false;
@@ -98,11 +118,14 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ---------- profile ----------
-  /// One-time onboarding (POST /me/profile). The server makes the @handle from the company name.
-  Future<void> createProfile(Map<String, dynamic> body) async {
-    await api.post('/me/profile', body);
-    await loadProfile();
-  }
+  /// One-time onboarding (POST /me/profile): name, @handle and type. Returns the new profile without
+  /// switching to the app yet, so onboarding can show its optional second step first.
+  Future<Profile> createProfile(Map<String, dynamic> body) async =>
+      Profile.fromJson((await api.post('/me/profile', body) as Map)['profile'] as Map);
+
+  /// PATCH /me/profile and return the updated profile (with its completion), without a reload.
+  Future<Profile> patchProfile(Map<String, dynamic> patch) async =>
+      Profile.fromJson((await api.patch('/me/profile', patch) as Map)['profile'] as Map);
 
   Future<void> updateProfile(Map<String, dynamic> patch) async {
     await api.patch('/me/profile', patch);

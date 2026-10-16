@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 
+import '../i18n.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -44,7 +45,7 @@ class _ContactPickerState extends State<ContactPicker> {
       if (!{'granted', 'limited'}.contains(status.name)) {
         setState(() {
           _loading = false;
-          _error = 'Contacts permission is needed to refer people from your phone book.';
+          _error = t('Contacts permission is needed to refer people from your phone book.');
         });
         return;
       }
@@ -60,15 +61,19 @@ class _ContactPickerState extends State<ContactPicker> {
         }
       }
       out.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-      if (mounted) setState(() {
-        _all = out;
-        _loading = false;
-      });
-    } catch (e) {
-      if (mounted) setState(() {
-        _loading = false;
-        _error = 'Could not read your contacts.';
-      });
+      if (mounted) {
+        setState(() {
+          _all = out;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = t('Could not read your contacts.');
+        });
+      }
     }
   }
 
@@ -85,6 +90,9 @@ class _ContactPickerState extends State<ContactPicker> {
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Pal.of(context).canvas,
+      barrierColor: kInk.withValues(alpha: .6),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => _ReviewSheet(asker: widget.askerName, forChat: widget.forChat, selected: _selected, onRemove: (k) => setState(() => _selected.remove(k))),
     );
     if (result == true && mounted) Navigator.pop(context, _selected.values.toList());
@@ -101,28 +109,68 @@ class _ContactPickerState extends State<ContactPicker> {
     final p = Pal.of(context);
     final q = _search.text.trim().toLowerCase();
     final list = q.isEmpty ? _all : _all.where((c) => c.name.toLowerCase().contains(q) || c.phone.contains(q)).toList();
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_selected.isEmpty ? 'Select contacts' : '${_selected.length} selected', style: const TextStyle(fontWeight: FontWeight.w700)),
-        actions: [if (_selected.isNotEmpty) TextButton(onPressed: () => setState(_selected.clear), child: const Text('Clear'))],
-      ),
+    return SubPage(
+      title: _selected.isEmpty ? t('Select contacts') : '${_selected.length} ${t('selected')}',
+      actions: [
+        if (_selected.isNotEmpty)
+          GestureDetector(
+            onTap: () => setState(_selected.clear),
+            child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), child: Text(t('Clear'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link))),
+          ),
+      ],
       body: Column(children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: AppField(controller: _search, hint: 'Search name or number', prefixIcon: Icon(Icons.search, color: p.muted), onChanged: (_) => setState(() {})),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(30)),
+            child: Row(children: [
+              WIcon(WI.search, size: 20, color: p.muted),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _search,
+                  onChanged: (_) => setState(() {}),
+                  style: const TextStyle(fontSize: 16),
+                  decoration: InputDecoration(
+                    hintText: t('Search name or number'),
+                    hintStyle: TextStyle(color: p.muted, fontWeight: FontWeight.w500),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    filled: false,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+              if (_search.text.isNotEmpty)
+                GestureDetector(
+                  onTap: () => setState(_search.clear),
+                  child: WIcon(WI.close, size: 18, color: p.muted),
+                ),
+            ]),
+          ),
         ),
         if (_selected.isNotEmpty)
           SizedBox(
-            height: 42,
-            child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
+            height: 40,
+            child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16), children: [
               for (final e in _selected.entries)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: InputChip(
-                    label: Text(e.value.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    onDeleted: () => setState(() => _selected.remove(e.key)),
-                    backgroundColor: p.chip,
-                    side: BorderSide(color: p.border),
+                  child: Container(
+                    padding: const EdgeInsets.only(left: 12, right: 6),
+                    decoration: BoxDecoration(color: p.ink, borderRadius: BorderRadius.circular(20)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text(e.value.name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.onInk)),
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: () => setState(() => _selected.remove(e.key)),
+                        child: Padding(padding: const EdgeInsets.all(4), child: WIcon(WI.close, size: 14, color: p.onInk)),
+                      ),
+                    ]),
                   ),
                 ),
             ]),
@@ -131,37 +179,67 @@ class _ContactPickerState extends State<ContactPicker> {
           child: _loading
               ? const Center(child: LogoLoader())
               : _error != null
-                  ? Center(child: Padding(padding: const EdgeInsets.all(28), child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: p.muted))))
+                  ? EmptyState(title: _error!)
                   : list.isEmpty
-                      ? Center(child: Text(_all.isEmpty ? 'No contacts with phone numbers' : 'No match', style: TextStyle(color: p.muted)))
+                      ? EmptyState(title: t(_all.isEmpty ? 'No contacts with phone numbers' : 'No match'))
                       : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           itemCount: list.length,
                           itemBuilder: (_, i) {
                             final c = list[i];
                             final on = _selected.containsKey(_key(c.phone));
-                            return CheckboxListTile(
-                              value: on,
-                              onChanged: (_) => _toggle(c),
-                              activeColor: kGold,
-                              checkColor: Colors.black,
-                              controlAffinity: ListTileControlAffinity.trailing,
-                              secondary: Avatar(name: c.name, size: 42),
-                              title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                              subtitle: Text(c.phone, style: TextStyle(color: p.muted)),
+                            return InkWell(
+                              onTap: () => _toggle(c),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: i == 0 ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border.withValues(alpha: .6)))),
+                                child: Row(children: [
+                                  Avatar(name: c.name, size: 40),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.25)),
+                                      Text(c.phone, style: TextStyle(fontSize: 14, color: p.muted, height: 1.25)),
+                                    ]),
+                                  ),
+                                  _Check(on: on),
+                                ]),
+                              ),
                             );
                           },
                         ),
         ),
-        SafeArea(
-          top: false,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-            decoration: BoxDecoration(color: p.card, border: Border(top: BorderSide(color: p.border))),
-            child: GoldButton(label: _selected.isEmpty ? 'Select at least one contact' : 'Review ${_selected.length} contact${_selected.length == 1 ? '' : 's'}', onPressed: _selected.isEmpty ? null : _review),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+          decoration: BoxDecoration(color: p.canvas, border: Border(top: BorderSide(color: p.border))),
+          child: GoldButton(
+            label: _selected.isEmpty ? t('Select at least one contact') : 'Review ${_selected.length} contact${_selected.length == 1 ? '' : 's'}',
+            onPressed: _selected.isEmpty ? null : _review,
           ),
         ),
       ]),
+    );
+  }
+}
+
+/// The web's checkbox: rounded square, ink when ticked.
+class _Check extends StatelessWidget {
+  final bool on;
+  const _Check({required this.on});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        color: on ? p.ink : Colors.transparent,
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: on ? p.ink : p.border, width: 1.5),
+      ),
+      child: on ? WIcon(WI.check, size: 16, strokeWidth: 2.4, color: p.onInk) : null,
     );
   }
 }
@@ -182,43 +260,60 @@ class _ReviewSheetState extends State<_ReviewSheet> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final items = widget.selected.entries.toList();
-    return SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .8),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${widget.forChat ? 'Send' : 'Refer'} ${items.length} contact${items.length == 1 ? '' : 's'}?', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Text(widget.forChat ? '${widget.asker} will get these names and numbers in this chat.' : '${widget.asker} will see these names and numbers. Other people only see that contacts were shared.', style: TextStyle(color: p.muted, fontWeight: FontWeight.w500)),
-            const SizedBox(height: 12),
-            Flexible(
-              child: ListView(shrinkWrap: true, children: [
-                for (final e in items)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Avatar(name: e.value.name, size: 40),
-                    title: Text(e.value.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text(e.value.phone, style: const TextStyle(color: kGold, fontWeight: FontWeight.w600)),
-                    trailing: IconButton(
-                      icon: Icon(Icons.close, color: p.muted),
-                      onPressed: () {
-                        widget.onRemove(e.key);
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .8),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Expanded(
+              child: Text('${widget.forChat ? 'Send' : 'Refer'} ${items.length} contact${items.length == 1 ? '' : 's'}?', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            ),
+            GestureDetector(onTap: () => Navigator.pop(context, false), child: WIcon(WI.close, size: 24, color: p.text)),
+          ]),
+          const SizedBox(height: 4),
+          Text(
+            widget.forChat
+                ? '${widget.asker} will get these names and numbers in this chat.'
+                : '${widget.asker} will see these names and numbers. Other people only see that contacts were shared.',
+            style: TextStyle(fontSize: 14, color: p.muted),
+          ),
+          const SizedBox(height: 12),
+          Flexible(
+            child: ListView(shrinkWrap: true, children: [
+              for (var i = 0; i < items.length; i++)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: i == 0 ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border))),
+                  child: Row(children: [
+                    Avatar(name: items[i].value.name, size: 40),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(items[i].value.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.25)),
+                        Text(items[i].value.phone, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.link, height: 1.25)),
+                      ]),
+                    ),
+                    InkResponse(
+                      radius: 20,
+                      onTap: () {
+                        widget.onRemove(items[i].key);
                         setState(() {});
                         if (widget.selected.isEmpty) Navigator.pop(context, false);
                       },
+                      child: Padding(padding: const EdgeInsets.all(8), child: WIcon(WI.close, size: 20, color: p.muted)),
                     ),
-                  ),
-              ]),
-            ),
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(child: GoldButton(label: 'Back', outlined: true, onPressed: () => Navigator.pop(context, false))),
-              const SizedBox(width: 10),
-              Expanded(flex: 2, child: GoldButton(label: widget.forChat ? 'Send' : 'Confirm & refer', icon: Icons.check, onPressed: () => Navigator.pop(context, true))),
+                  ]),
+                ),
             ]),
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: GoldButton(label: t('Back'), outlined: true, onPressed: () => Navigator.pop(context, false))),
+            const SizedBox(width: 8),
+            Expanded(flex: 2, child: GoldButton(label: widget.forChat ? t('Send') : t('Confirm & refer'), wi: WI.check, onPressed: () => Navigator.pop(context, true))),
           ]),
-        ),
+        ]),
       ),
     );
   }

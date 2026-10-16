@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
+import '../i18n.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../widgets/image_grid.dart';
 import '../widgets/post_card.dart';
+import '../widgets/reaction_picker.dart';
+import '../widgets/response_sheet.dart';
 import 'profile.dart';
 import 'talk.dart' show openChat;
 
-/// One post. Visitors can respond (share contact / photo / info) and answer the owner's "ask to share";
-/// the owner sees who responded (content only after approval), can rate them, and sees referred contacts.
+const _kindWord = {'contact': 'your contact', 'media': 'a photo', 'info': 'some information'};
+
+/// One ask or update (web post/[id]). Visitors respond (contact / photo / info), then see the status
+/// and the owner's feedback; the owner sees who responded, rates them, and the referred contacts.
 class PostDetailScreen extends StatefulWidget {
   final String postId;
   final bool openReply;
@@ -72,19 +78,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
-  Future<void> _respond() async {
-    final done = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => _RespondSheet(postId: _post!.id),
-    );
-    if (done == true) _load();
+  Future<void> _respond({ExistingResponse? existing}) async {
+    if (await showResponseSheet(context, _post!.id, existing: existing)) _load();
   }
 
-  Future<void> _answer(bool approve) async {
+  Future<void> _run(Future<void> Function() fn) async {
     setState(() => _busy = true);
     try {
-      await _api.post('/posts/${_post!.id}/share/answer', {'approve': approve});
+      await fn();
       await _load();
     } catch (e) {
       if (mounted) toast(context, '$e', error: true);
@@ -93,23 +94,31 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
+  Future<void> _withdraw() async {
+    if (!await _confirm(t('Delete your response?'), t('The owner will no longer see it.'), t('Delete'))) return;
+    await _run(() async => _api.delete('/posts/${_post!.id}/share'));
+  }
+
+  Future<void> _removeAsk() async {
+    if (!await _confirm(t('Delete this ask?'), t("It will be removed from the feed along with its responses and referrals. This can't be undone."), t('Delete'), cancel: t('Keep'))) return;
+    setState(() => _busy = true);
+    try {
+      await _api.delete('/posts/${_post!.id}');
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        toast(context, '$e', error: true);
+      }
+    }
+  }
+
   Future<void> _deleteReferral(Referral r) async {
-    final yes = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Remove this contact?'),
-        content: Text('${r.name} will no longer be shared with ${_post!.authorName}.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remove', style: TextStyle(color: Colors.redAccent))),
-        ],
-      ),
-    );
-    if (yes != true) return;
+    if (!await _confirm(t('Remove this contact?'), t('{name} will no longer be shared with {owner}.', {'name': r.name, 'owner': _post!.authorName}), t('Remove'))) return;
     try {
       await _api.delete('/app/posts/${_post!.id}/referrals/${r.id}');
       if (mounted) {
-        toast(context, 'Removed');
+        toast(context, t('Removed'));
         _load();
       }
     } catch (e) {
@@ -117,52 +126,194 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
+  Future<bool> _confirm(String title, String body, String yes, {String? cancel}) async {
+    final p = Pal.of(context);
+    final r = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        content: Text(body, style: TextStyle(fontSize: 14, color: p.muted)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(cancel ?? t('Cancel'), style: TextStyle(color: p.text, fontWeight: FontWeight.w700))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(yes, style: TextStyle(color: p.danger, fontWeight: FontWeight.w700))),
+        ],
+      ),
+    );
+    return r == true;
+  }
+
+  void _message(String uid, {String name = '', String company = '', String handle = '', String? photo, String? type}) =>
+      openChat(context, Peer(uid: uid, name: name, company: company, handle: handle, photoUrl: photo, userType: type ?? 'entrepreneur'));
+
+  Future<void> _editAsk() async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Pal.of(context).canvas,
+      barrierColor: kInk.withValues(alpha: .6),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => _EditAskSheet(post: _post!),
+    );
+    if (saved == true) _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final post = _post;
-    return Scaffold(
-      appBar: AppBar(title: Text(post == null ? '' : (post.isRequirement ? 'Ask' : 'Update'), style: const TextStyle(fontWeight: FontWeight.w700))),
-      body: post == null
-          ? (_missing ? Center(child: Text('Post not found', style: TextStyle(color: p.muted, fontWeight: FontWeight.w600))) : const PageLoader())
-          : RefreshIndicator(
-              color: kGold,
-              onRefresh: _load,
-              child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 32), children: [
-                PostCard(post: post, detail: true, onReply: _isOwner || !post.isRequirement ? null : _respond, onChanged: () {}),
-                const SizedBox(height: 14),
-                if (!_isOwner && !post.isRequirement)
-                  SizedBox(
-                    width: double.infinity,
-                    child: GoldButton(label: 'Message ${post.authorName.split(' ').first}', outlined: true, icon: Icons.chat_bubble_outline, onPressed: () => openChat(context, Peer(uid: post.authorUid, name: post.authorName, company: post.authorCompany, handle: post.authorHandle, photoUrl: post.authorPhotoUrl))),
-                  ),
-                if (!_isOwner && post.isRequirement) _visitorSection(post, p),
-                if (_isOwner && post.isRequirement) _ownerSection(post, p),
-                if (!_isOwner && _referrals.isNotEmpty) _myReferrals(p),
+    if (post == null) {
+      return SubPage(
+        title: '',
+        body: _missing ? EmptyState(title: t('Not found')) : const Center(child: LogoLoader()),
+      );
+    }
+    final isAsk = post.isRequirement;
+    final owner = _isOwner;
+    final hasDetails = (post.locationPref ?? '').isNotEmpty || (post.budget ?? '').isNotEmpty || (post.urgency ?? '').isNotEmpty;
+
+    Widget iconBtn(WI icon, String label, VoidCallback onTap, {Color? color}) => Semantics(
+          button: true,
+          label: label,
+          child: InkResponse(onTap: onTap, radius: 20, child: Padding(padding: const EdgeInsets.all(8), child: WIcon(icon, size: 20, color: color ?? p.muted))),
+        );
+
+    return SubPage(
+      title: t(isAsk ? 'Ask' : 'Update'),
+      body: LogoRefresh(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 32),
+          children: [
+            // author row
+            Row(children: [
+              GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.authorHandle))),
+                child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: 44, ring: post.authorHasUpdate, type: post.authorType, badge: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.authorHandle))),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.25))),
+                      if (post.authorVerification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: post.authorVerification)],
+                    ]),
+                    Text('${post.authorType == 'entrepreneur' ? post.authorName : post.authorCompany} · ${timeAgo(post.createdAt)}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted, height: 1.25)),
+                  ]),
+                ),
+              ),
+              if (owner) ...[
+                iconBtn(WI.edit, t('Edit ask'), _editAsk),
+                iconBtn(WI.trash, t('Delete ask'), _removeAsk, color: p.danger),
+              ],
+              iconBtn(WI.share, t('Share this ask'), () async {
+                try {
+                  await SharePlus.instance.share(ShareParams(text: post.webUrl, subject: post.title ?? 'WebWeb AI ask'));
+                } catch (_) {}
+              }),
+            ]),
+            const SizedBox(height: 20),
+            if (isAsk) ...[
+              Text('#${t(post.category == 'other' && (post.categoryLabel ?? '').isNotEmpty ? post.categoryLabel! : labelOf(kPostCategories, post.category))}',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link)),
+              const SizedBox(height: 8),
+              Text(post.title ?? '', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1.375)),
+              const SizedBox(height: 8),
+            ],
+            if ((post.description ?? '').isNotEmpty)
+              SelectableText(post.description!, style: isAsk ? const TextStyle(fontSize: 16, height: 1.625) : const TextStyle(fontSize: 18, height: 1.375)),
+            ImageGrid(post.images, shareUrl: post.webUrl),
+            if (hasDetails) ...[
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
+                child: Column(children: [
+                  for (final (i, d) in [
+                    if ((post.locationPref ?? '').isNotEmpty) (WI.pin, 'Location', t(post.locationPref!)),
+                    if ((post.budget ?? '').isNotEmpty) (WI.rupee, 'Budget', post.budget!),
+                    if ((post.urgency ?? '').isNotEmpty) (WI.clock, 'Urgency', t(labelOf(kUrgencies, post.urgency))),
+                  ].indexed)
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: i == 0 ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border))),
+                      child: Row(children: [
+                        WIcon(d.$1, size: 20, color: p.muted),
+                        const SizedBox(width: 12),
+                        Text(t(d.$2), style: TextStyle(fontSize: 14, color: p.muted)),
+                        const Spacer(),
+                        Flexible(child: Text(d.$3, textAlign: TextAlign.right, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+                      ]),
+                    ),
+                ]),
+              ),
+            ],
+            if (isAsk) ...[
+              const SizedBox(height: 20),
+              Row(children: [
+                WIcon(WI.users, size: 20, color: p.text),
+                const SizedBox(width: 8),
+                Text(ResponseActivity.countLabel(post.sharesCount, post.referralsCount), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
               ]),
+              if (!owner)
+                ResponseActivity(hideHeader: true, items: post.recentResponses, total: post.sharesCount + post.referralsCount, referrals: post.referralsCount),
+            ],
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              decoration: BoxDecoration(border: Border.symmetric(horizontal: BorderSide(color: p.border))),
+              child: PostActions(
+                post: post,
+                onChanged: () => setState(() {}),
+                onReply: () {
+                  if (owner) return toast(context, t('Responses to your ask are on its page'));
+                  if (isAsk && _mine?.shared != true) {
+                    _respond();
+                    return;
+                  }
+                  _message(post.authorUid, name: post.authorName, company: post.authorCompany, handle: post.authorHandle, photo: post.authorPhotoUrl, type: post.authorType);
+                },
+              ),
             ),
+            const SizedBox(height: 20),
+            // updates have no response flow: just offer a message
+            if (!owner && !isAsk)
+              GoldButton(
+                label: '${t('Message')} ${post.authorName.split(' ').first}',
+                wi: WI.talk,
+                outlined: true,
+                onPressed: () => _message(post.authorUid, name: post.authorName, company: post.authorCompany, handle: post.authorHandle, photo: post.authorPhotoUrl, type: post.authorType),
+              ),
+            if (!owner && isAsk) _visitor(post, p),
+            if (owner && isAsk) _ownerSection(post, p),
+            if (!owner && _referrals.isNotEmpty) _myReferrals(p),
+          ],
+        ),
+      ),
     );
   }
 
   // ---------- visitor ----------
-  Widget _visitorSection(Post post, Pal p) {
+  Widget _visitor(Post post, Pal p) {
     final mine = _mine;
-    const word = {'contact': 'your contact', 'media': 'a photo', 'info': 'some information'};
-    if (mine == null) return const SizedBox.shrink();
-    if (!mine.shared) {
-      return SizedBox(width: double.infinity, child: GoldButton(label: 'Respond · share contact, photo or info', onPressed: _respond));
+    if (mine == null || !mine.shared) {
+      return GoldButton(label: t('Respond · share contact, photo or info'), onPressed: () => _respond());
     }
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    final kind = _kindWord[mine.kind ?? 'contact'] ?? 'your contact';
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(14)),
+        decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(8)),
         child: Row(children: [
-          const Icon(Icons.check_circle, color: kGreen),
-          const SizedBox(width: 10),
+          const WIcon(WI.checkCircle, size: 20, color: Color(0xFF059669)),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'You shared ${word[mine.kind ?? 'contact']}${mine.rating == 1 ? ' · 👍 from owner' : mine.rating == -1 ? ' · 👎 from owner' : ''}${mine.ownerReaction == null ? '' : ' · ${kReactionEmoji[mine.ownerReaction]}'}',
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              '${t('You shared')} ${t(kind)}${mine.rating == 1 ? ' · 👍 ${t('from owner')}' : ''}${mine.rating == -1 ? ' · 👎 ${t('from owner')}' : ''}${mine.ownerReaction != null ? ' · ${kReactionEmoji[mine.ownerReaction]}' : ''}',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
             ),
           ),
         ]),
@@ -170,84 +321,154 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       if (mine.askStatus == 'asked') ...[
         const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${post.authorName} asked you to share it with them.', style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 2),
-            Text('Approve to reveal ${word[mine.kind ?? 'contact']} to the owner.', style: TextStyle(color: p.muted, fontSize: 13)),
-            const SizedBox(height: 10),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(t('{name} asked you to share it with them.', {'name': post.authorName}), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            Text(t('Approve to reveal {what} to the owner.', {'what': t(kind)}), style: TextStyle(fontSize: 12, color: p.muted)),
+            const SizedBox(height: 8),
             Row(children: [
-              Expanded(child: GoldButton(label: 'Approve', loading: _busy, onPressed: () => _answer(true))),
-              const SizedBox(width: 10),
-              Expanded(child: GoldButton(label: 'Decline', outlined: true, onPressed: _busy ? null : () => _answer(false))),
+              Expanded(child: GoldButton(label: t('Approve'), height: 40, loading: _busy, onPressed: () => _run(() async => _api.post('/posts/${post.id}/share/answer', {'approve': true})))),
+              const SizedBox(width: 8),
+              Expanded(child: GoldButton(label: t('Decline'), height: 40, outlined: true, onPressed: _busy ? null : () => _run(() async => _api.post('/posts/${post.id}/share/answer', {'approve': false})))),
             ]),
           ]),
         ),
       ],
-      if (mine.askStatus == 'approved') Padding(padding: const EdgeInsets.only(top: 8), child: Text('The owner can see what you shared.', style: TextStyle(color: p.muted))),
+      if (mine.askStatus == 'approved') Padding(padding: const EdgeInsets.only(top: 12), child: Text(t('The owner can see what you shared.'), style: TextStyle(fontSize: 14, color: p.muted))),
       const SizedBox(height: 12),
-      SizedBox(
-        width: double.infinity,
-        child: GoldButton(label: 'Message ${post.authorName.split(' ').first}', outlined: true, icon: Icons.chat_bubble_outline, onPressed: () => openChat(context, Peer(uid: post.authorUid, name: post.authorName, company: post.authorCompany, handle: post.authorHandle, photoUrl: post.authorPhotoUrl))),
+      Row(children: [
+        Expanded(
+          child: GoldButton(
+            label: t('Edit response'),
+            height: 40,
+            outlined: true,
+            onPressed: _busy ? null : () => _respond(existing: ExistingResponse(mine.kind ?? 'contact', text: mine.text, imageUrl: mine.imageUrl)),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: _DangerButton(label: t('Delete response'), onPressed: _busy ? null : _withdraw)),
+      ]),
+      const SizedBox(height: 12),
+      GoldButton(
+        label: '${t('Message')} ${post.authorName.split(' ').first}',
+        wi: WI.talk,
+        outlined: true,
+        onPressed: () => _message(post.authorUid, name: post.authorName, company: post.authorCompany, handle: post.authorHandle, photo: post.authorPhotoUrl, type: post.authorType),
       ),
     ]);
   }
 
-  Widget _myReferrals(Pal p) => Padding(
-        padding: const EdgeInsets.only(top: 18),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Contacts you referred', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-          const SizedBox(height: 4),
-          for (final r in _referrals)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Avatar(name: r.name, size: 40),
-              title: Text(r.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text(r.phone, style: const TextStyle(color: kGold, fontWeight: FontWeight.w600)),
-              trailing: IconButton(tooltip: 'Remove', icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => _deleteReferral(r)),
+  Widget _myReferrals(Pal p) => Container(
+        margin: const EdgeInsets.only(top: 20),
+        padding: const EdgeInsets.only(top: 16),
+        decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(t('Contacts you referred'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          for (var i = 0; i < _referrals.length; i++)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: i == 0 ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border))),
+              child: Row(children: [
+                Avatar(name: _referrals[i].name, size: 40),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(_referrals[i].name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    Text(_referrals[i].phone, style: TextStyle(fontSize: 14, color: p.link)),
+                  ]),
+                ),
+                InkResponse(onTap: () => _deleteReferral(_referrals[i]), radius: 20, child: Padding(padding: const EdgeInsets.all(8), child: WIcon(WI.trash, size: 20, color: p.danger))),
+              ]),
             ),
         ]),
       );
 
   // ---------- owner ----------
   Widget _ownerSection(Post post, Pal p) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Responses', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-      const SizedBox(height: 6),
-      if (_shares.isEmpty)
-        Padding(padding: const EdgeInsets.symmetric(vertical: 18), child: Text('No responses yet. People who respond will appear here.', style: TextStyle(color: p.muted, fontWeight: FontWeight.w500)))
-      else
-        for (final s in _shares) _ShareTile(postId: post.id, share: s, onChanged: _load),
-      if (_referrals.isNotEmpty) ...[
-        const SizedBox(height: 18),
-        const Text('Referred contacts', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-        for (final r in _referrals)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text.rich(TextSpan(children: [
-                TextSpan(text: '${r.name} · ', style: const TextStyle(fontWeight: FontWeight.w700)),
-                TextSpan(text: r.phone, style: const TextStyle(color: kGold, fontWeight: FontWeight.w700)),
-              ])),
-              if ((r.note ?? '').isNotEmpty) Text(r.note!),
-              Row(children: [
-                Expanded(child: Text('Referred by ${r.referrerName ?? ''} · ${timeAgo(r.createdAt)}', style: TextStyle(color: p.muted, fontSize: 12.5))),
-                IconButton(visualDensity: VisualDensity.compact, icon: const Icon(Icons.call, color: kGreen, size: 20), onPressed: () => launchUrl(Uri(scheme: 'tel', path: r.phone.replaceAll(' ', '')))),
-              ]),
-            ]),
-          ),
-      ],
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Container(
+        padding: const EdgeInsets.only(top: 16),
+        decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(t('Responses'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          if (_shares.isEmpty)
+            EmptyState(title: t('No responses yet'), hint: t('People who respond will appear here.'))
+          else
+            for (var i = 0; i < _shares.length; i++) _ShareTile(postId: post.id, share: _shares[i], first: i == 0, onChanged: _load),
+        ]),
+      ),
+      if (_referrals.isNotEmpty)
+        Container(
+          margin: const EdgeInsets.only(top: 20),
+          padding: const EdgeInsets.only(top: 16),
+          decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border))),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(t('Referred contacts'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            for (var i = 0; i < _referrals.length; i++)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: i == 0 ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border))),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text.rich(TextSpan(children: [
+                    TextSpan(text: '${_referrals[i].name} · ', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    WidgetSpan(
+                      child: GestureDetector(
+                        onTap: () => launchUrl(Uri(scheme: 'tel', path: _referrals[i].phone.replaceAll(' ', ''))),
+                        child: Text(_referrals[i].phone, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.link)),
+                      ),
+                    ),
+                  ]), style: const TextStyle(fontSize: 16)),
+                  if ((_referrals[i].note ?? '').isNotEmpty) Text(_referrals[i].note!, style: const TextStyle(fontSize: 14)),
+                  Text.rich(
+                    TextSpan(children: [
+                      TextSpan(text: '${t('Referred by')} '),
+                      TextSpan(text: _referrals[i].referrerName ?? '', style: const TextStyle(fontWeight: FontWeight.w700)),
+                      TextSpan(text: ' · ${timeAgo(_referrals[i].createdAt)}'),
+                    ]),
+                    style: TextStyle(fontSize: 12, color: p.muted),
+                  ),
+                ]),
+              ),
+          ]),
+        ),
     ]);
   }
 }
 
-/// Owner's row for one responder: who + what type; content only after they approve.
+class _DangerButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  const _DangerButton({required this.label, this.onPressed});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Opacity(
+      opacity: onPressed == null ? .5 : 1,
+      child: Material(
+        color: Colors.transparent,
+        child: Ink(
+          height: 40,
+          decoration: BoxDecoration(color: p.chip, border: Border.all(color: p.border.withValues(alpha: .7)), borderRadius: BorderRadius.circular(20)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: onPressed,
+            child: Center(child: Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.danger))),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Owner's row for one responder (web response-log.tsx): who + what type, the content once they
+/// approved, thumbs up / down, a reaction and Message.
 class _ShareTile extends StatefulWidget {
   final String postId;
   final ContactShare share;
+  final bool first;
   final VoidCallback onChanged;
-  const _ShareTile({required this.postId, required this.share, required this.onChanged});
+  const _ShareTile({required this.postId, required this.share, required this.first, required this.onChanged});
   @override
   State<_ShareTile> createState() => _ShareTileState();
 }
@@ -255,6 +476,7 @@ class _ShareTile extends StatefulWidget {
 class _ShareTileState extends State<_ShareTile> {
   bool _busy = false;
   ContactShare get s => widget.share;
+  Api get _api => context.read<AuthProvider>().api;
 
   Future<void> _run(Future<void> Function() fn) async {
     setState(() => _busy = true);
@@ -268,185 +490,200 @@ class _ShareTileState extends State<_ShareTile> {
     }
   }
 
-  Api get _api => context.read<AuthProvider>().api;
+  Future<void> _rate(Map<String, dynamic> body) => _run(() async => _api.post('/posts/${widget.postId}/shares/${s.sharerUid}/rate', body));
 
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     const label = {'contact': 'Contact', 'media': 'Photo', 'info': 'Info'};
+    Widget thumb(WI icon, bool on, Color onBg, Color onFg, VoidCallback onTap) => GestureDetector(
+          onTap: _busy ? null : onTap,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: on ? onBg : Colors.transparent),
+            child: WIcon(icon, size: 20, color: on ? onFg : p.muted),
+          ),
+        );
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      decoration: widget.first ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
           GestureDetector(
             onTap: s.sharerHandle == null ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: s.sharerHandle!))),
-            child: Avatar(name: s.sharerName, photoUrl: s.sharerPhotoUrl, size: 44),
+            child: Avatar(name: s.sharerName, photoUrl: s.sharerPhotoUrl, size: 44, type: s.sharerType, badge: 18),
           ),
           const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(s.sharerName, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15.5)),
-            Text(s.sharerCompany, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted, fontSize: 13)),
-          ])),
-          Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(8)), child: Text('${label[s.kind] ?? s.kind} shared', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(s.sharerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.25)),
+              Text(s.sharerCompany, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted, height: 1.25)),
+            ]),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(6)),
+            child: Text('${t(label[s.kind] ?? s.kind)} ${t('shared')}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+          ),
         ]),
         const SizedBox(height: 8),
-        if (s.revealed)
+        // what they shared: the owner only, once revealed
+        if ((s.payload ?? '').isNotEmpty)
           Container(
-            width: double.infinity,
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(12)),
-            child: s.kind == 'media' && s.payload != null
-                ? ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(mediaUrl(s.payload!), fit: BoxFit.contain, height: 220))
+            decoration: BoxDecoration(color: p.field, borderRadius: BorderRadius.circular(8)),
+            child: s.kind == 'media'
+                ? GestureDetector(
+                    onTap: () => openImageViewer(context, [s.payload!], 0),
+                    child: ClipRRect(borderRadius: BorderRadius.circular(8), child: ConstrainedBox(constraints: const BoxConstraints(maxHeight: 256), child: NetImg(s.payload!, fit: BoxFit.contain))),
+                  )
                 : s.kind == 'contact'
-                    ? InkWell(
-                        onTap: () => launchUrl(Uri(scheme: 'tel', path: (s.payload ?? '').replaceAll(' ', ''))),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.call, size: 18, color: kGreen), const SizedBox(width: 8), Text(s.payload ?? '', style: const TextStyle(fontWeight: FontWeight.w700))]),
+                    ? GestureDetector(
+                        onTap: () => launchUrl(Uri(scheme: 'tel', path: s.payload!.replaceAll(' ', ''))),
+                        child: Row(children: [WIcon(WI.phone, size: 16, color: p.text), const SizedBox(width: 8), Text(s.payload!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))]),
                       )
-                    : Text(s.payload ?? ''),
+                    : SelectableText(s.payload!, style: const TextStyle(fontSize: 14)),
           )
         else
           Row(children: [
             Expanded(
               child: Text(
-                s.askStatus == 'asked' ? 'Waiting for them to approve.' : s.askStatus == 'declined' ? 'They declined. You can ask again.' : 'Content is private until they approve.',
-                style: TextStyle(color: p.muted, fontSize: 12.5),
+                t(s.askStatus == 'asked' ? 'Waiting for them to approve.' : (s.askStatus == 'declined' ? 'They declined. You can ask again.' : 'Content is private until they approve.')),
+                style: TextStyle(fontSize: 12, color: p.muted),
               ),
             ),
-            SizedBox(
-              width: 120,
-              child: GoldButton(label: s.askStatus == 'asked' ? 'Asked ✓' : 'Ask to share', outlined: true, loading: _busy, onPressed: s.askStatus == 'asked' ? null : () => _run(() async => _api.post('/posts/${widget.postId}/shares/${s.sharerUid}/ask'))),
+            GestureDetector(
+              onTap: s.askStatus == 'asked' || _busy ? null : () => _run(() async => _api.post('/posts/${widget.postId}/shares/${s.sharerUid}/ask')),
+              child: Text(t(s.askStatus == 'asked' ? 'Asked ✓' : 'Ask to share'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: s.askStatus == 'asked' ? p.muted : p.link)),
             ),
           ]),
         const SizedBox(height: 4),
         Row(children: [
-          _thumb(Icons.thumb_up_outlined, s.rating == 1, Colors.green, () => _run(() async => _api.post('/posts/${widget.postId}/shares/${s.sharerUid}/rate', {'rating': s.rating == 1 ? null : 1}))),
-          _thumb(Icons.thumb_down_outlined, s.rating == -1, Colors.redAccent, () => _run(() async => _api.post('/posts/${widget.postId}/shares/${s.sharerUid}/rate', {'rating': s.rating == -1 ? null : -1}))),
-          InkWell(
-            borderRadius: BorderRadius.circular(20),
-            onTap: () async {
-              final v = await showModalBottomSheet<String>(
-                context: context,
-                builder: (ctx) => SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, mainAxisSize: MainAxisSize.min, children: [
-                      for (final r in kReactions) GestureDetector(onTap: () => Navigator.pop(ctx, r), child: Text(kReactionEmoji[r]!, style: const TextStyle(fontSize: 34))),
-                    ]),
-                  ),
-                ),
-              );
-              if (v != null) _run(() async => _api.post('/posts/${widget.postId}/shares/${s.sharerUid}/rate', {'reaction': v == s.ownerReaction ? null : v}));
-            },
-            child: Padding(padding: const EdgeInsets.all(8), child: Text(s.ownerReaction == null ? '☺' : kReactionEmoji[s.ownerReaction]!, style: const TextStyle(fontSize: 20))),
+          thumb(WI.thumbsUp, s.rating == 1, const Color(0xFFD1FAE5), const Color(0xFF047857), () => _rate({'rating': s.rating == 1 ? null : 1})),
+          const SizedBox(width: 4),
+          thumb(WI.thumbsDown, s.rating == -1, const Color(0xFFFFE4E6), const Color(0xFFBE123C), () => _rate({'rating': s.rating == -1 ? null : -1})),
+          const SizedBox(width: 4),
+          ReactionPicker(
+            value: s.ownerReaction,
+            onChange: (r) => _rate({'reaction': r}),
+            trigger: (_) => Container(
+              height: 36,
+              constraints: const BoxConstraints(minWidth: 36),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              alignment: Alignment.center,
+              child: Text(s.ownerReaction == null ? '☺' : kReactionEmoji[s.ownerReaction] ?? '☺', style: TextStyle(fontSize: 18, color: p.muted)),
+            ),
           ),
           const Spacer(),
-          SizedBox(width: 110, child: GoldButton(label: 'Message', outlined: true, onPressed: () => openChat(context, Peer(uid: s.sharerUid, name: s.sharerName, company: s.sharerCompany, handle: s.sharerHandle ?? '', photoUrl: s.sharerPhotoUrl)))),
+          GoldButton(
+            label: t('Message'),
+            height: 32,
+            outlined: true,
+            onPressed: () => openChat(context, Peer(uid: s.sharerUid, name: s.sharerName, company: s.sharerCompany, handle: s.sharerHandle ?? '', photoUrl: s.sharerPhotoUrl, userType: s.sharerType ?? 'entrepreneur')),
+          ),
         ]),
       ]),
     );
   }
-
-  Widget _thumb(IconData icon, bool on, Color color, VoidCallback onTap) => InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: _busy ? null : onTap,
-        child: Container(margin: const EdgeInsets.only(right: 4), padding: const EdgeInsets.all(8), decoration: BoxDecoration(shape: BoxShape.circle, color: on ? color.withValues(alpha: .18) : null), child: Icon(icon, size: 20, color: on ? color : Pal.of(context).muted)),
-      );
 }
 
-/// Bottom sheet: how to respond to an ask (contact, photo or information).
-class _RespondSheet extends StatefulWidget {
-  final String postId;
-  const _RespondSheet({required this.postId});
+/// Owner edits an ask (web edit-ask-sheet.tsx): title, category, description, location, urgency, budget.
+class _EditAskSheet extends StatefulWidget {
+  final Post post;
+  const _EditAskSheet({required this.post});
   @override
-  State<_RespondSheet> createState() => _RespondSheetState();
+  State<_EditAskSheet> createState() => _EditAskSheetState();
 }
 
-class _RespondSheetState extends State<_RespondSheet> {
-  String _kind = 'contact';
-  final _text = TextEditingController();
-  XFile? _file;
+class _EditAskSheetState extends State<_EditAskSheet> {
+  late final _title = TextEditingController(text: widget.post.title ?? '');
+  late final _desc = TextEditingController(text: widget.post.description ?? '');
+  late final _budget = TextEditingController(text: widget.post.budget ?? '');
+  late String _category = widget.post.category ?? 'other';
+  late String _location = widget.post.locationPref ?? '';
+  late String _urgency = widget.post.urgency ?? '';
   bool _busy = false;
   String? _error;
 
-  bool get _ready => _kind == 'contact' || (_kind == 'media' && _file != null) || (_kind == 'info' && _text.text.trim().length >= 2);
+  bool get _isAsk => widget.post.isRequirement;
+  bool get _ready => _isAsk ? _title.text.trim().length >= 5 && _desc.text.trim().length >= 20 : _desc.text.trim().isNotEmpty || widget.post.images.isNotEmpty;
 
-  Future<void> _submit() async {
-    final api = context.read<AuthProvider>().api;
+  Future<void> _save() async {
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      final body = <String, dynamic>{'kind': _kind};
-      if (_kind == 'media') body['imageUrl'] = await api.uploadImage(await _file!.readAsBytes(), _file!.name);
-      if (_kind == 'info') body['text'] = _text.text.trim();
-      await api.post('/posts/${widget.postId}/share', body);
+      final api = context.read<AuthProvider>().api;
+      await api.patch(
+        '/posts/${widget.post.id}',
+        _isAsk
+            ? {'title': _title.text.trim(), 'description': _desc.text.trim(), 'category': _category, 'locationPref': _location, 'budget': _budget.text.trim(), 'urgency': _urgency}
+            : {'text': _desc.text.trim(), 'images': widget.post.images},
+      );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) setState(() {
-        _busy = false;
-        _error = '$e';
-      });
+      if (mounted) setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
   void dispose() {
-    _text.dispose();
+    _title.dispose();
+    _desc.dispose();
+    _budget.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    const options = [
-      ('contact', Icons.call_outlined, 'Share my contact', 'The owner sees you shared. Your number is revealed only if you approve.'),
-      ('media', Icons.photo_camera_outlined, 'Share a photo', 'Product photo, brochure or proof. Shown only after you approve.'),
-      ('info', Icons.chat_bubble_outline, 'Share information', 'A short note, price or offer. Shown only after you approve.'),
-    ];
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 20),
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .92),
       child: SingleChildScrollView(
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Respond to this requirement', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 12),
-          for (final o in options)
-            GestureDetector(
-              onTap: () => setState(() => _kind = o.$1),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: _kind == o.$1 ? p.text : p.border), color: _kind == o.$1 ? p.chip : null),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Container(width: 38, height: 38, decoration: BoxDecoration(color: p.canvas, shape: BoxShape.circle), child: Icon(o.$2)),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(o.$3, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    Text(o.$4, style: TextStyle(color: p.muted, fontSize: 13)),
-                  ])),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Expanded(child: Text(t(_isAsk ? 'Edit ask' : 'Edit update'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+            GestureDetector(onTap: () => Navigator.pop(context), child: WIcon(WI.close, size: 24, color: p.text)),
+          ]),
+          const SizedBox(height: 16),
+          if (_isAsk) ...[
+            AppField(controller: _title, label: t('Title *'), maxLength: 100, onChanged: (_) => setState(() {})),
+            const SizedBox(height: 12),
+            Text(t('Category'), style: const TextStyle(fontSize: 14)),
+            const SizedBox(height: 6),
+            SelectPill(value: _category, placeholder: t('Category'), rounded: false, height: 44, options: [for (final o in kPostCategories) Option(o.value, t(o.label))], onChanged: (v) => setState(() => _category = v.isEmpty ? _category : v)),
+            const SizedBox(height: 12),
+          ],
+          AppField(controller: _desc, label: t(_isAsk ? 'Description *' : 'Description'), maxLines: 5, maxLength: 1000, onChanged: (_) => setState(() {})),
+          if (_isAsk) ...[
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(t('Location'), style: const TextStyle(fontSize: 14)),
+                  const SizedBox(height: 6),
+                  SelectPill(value: _location, placeholder: t('Anywhere'), rounded: false, height: 44, options: [for (final o in kLocations) Option(o.value, t(o.label))], onChanged: (v) => setState(() => _location = v)),
                 ]),
               ),
-            ),
-          if (_kind == 'media') ...[
-            const SizedBox(height: 4),
-            GoldButton(
-              label: _file == null ? 'Choose a photo' : 'Photo selected: ${_file!.name}',
-              outlined: true,
-              icon: Icons.photo_library_outlined,
-              onPressed: () async {
-                final f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1280, imageQuality: 75);
-                if (f != null) setState(() => _file = f);
-              },
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(t('Urgency'), style: const TextStyle(fontSize: 14)),
+                  const SizedBox(height: 6),
+                  SelectPill(value: _urgency, placeholder: t('Any time'), rounded: false, height: 44, options: [for (final o in kUrgencies) Option(o.value, t(o.label))], onChanged: (v) => setState(() => _urgency = v)),
+                ]),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            AppField(controller: _budget, label: t('Budget'), hint: 'e.g. ₹25,000 - ₹35,000', maxLength: 60),
           ],
-          if (_kind == 'info') ...[
-            const SizedBox(height: 4),
-            AppField(controller: _text, hint: 'e.g. We can supply 2000 boxes/month at ₹18 each, delivery in 2 days.', maxLines: 3, maxLength: 500, onChanged: (_) => setState(() {})),
-          ],
-          if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: const TextStyle(color: Colors.redAccent))),
-          const SizedBox(height: 14),
-          SizedBox(width: double.infinity, child: GoldButton(label: 'Send', loading: _busy, onPressed: _ready ? _submit : null)),
+          if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
+          const SizedBox(height: 16),
+          GoldButton(label: t('Save changes'), loading: _busy, onPressed: _ready ? _save : null),
         ]),
       ),
     );

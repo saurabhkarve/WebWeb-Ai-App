@@ -42,13 +42,21 @@ const kPostCategories = [
   Option('machinery', 'Machinery / Equipment for Sale or Rent'),
   Option('space', 'Space / Office / Godown Requirement'),
   Option('training', 'Training / Skill Development'),
+  Option('jobwork', 'Job Work / Contract Manufacturing'),
+  Option('compliance', 'GST / Compliance / Legal Help'),
+  Option('export', 'Export / Import Help'),
+  Option('tender', 'Tender / Government Order'),
+  Option('digital', 'Website / Digital Marketing'),
+  Option('repair', 'Repair / Maintenance Service'),
   Option('other', 'Other'),
 ];
 
 const kCategoryShort = {
   'job': 'Jobs / Manpower', 'supplier': 'Supplier / Vendor', 'buyer': 'Buyer / Customer', 'logistics': 'Logistics',
   'funding': 'Funding', 'advice': 'Advice', 'mentorship': 'Mentorship', 'partnership': 'Partnership',
-  'machinery': 'Machinery', 'space': 'Space / Godown', 'training': 'Training', 'other': 'Other',
+  'machinery': 'Machinery', 'space': 'Space / Godown', 'training': 'Training', 'jobwork': 'Job work',
+  'compliance': 'GST / Legal', 'export': 'Export / Import', 'tender': 'Tenders', 'digital': 'Digital',
+  'repair': 'Repair / AMC', 'other': 'Other',
 };
 
 const kUrgencies = [Option('immediate', 'Immediate'), Option('7_days', 'Within 7 days'), Option('30_days', 'Within 30 days'), Option('flexible', 'Flexible')];
@@ -60,6 +68,15 @@ String labelOf(List<Option> options, String? value) {
   }
   return value;
 }
+
+/// web verified-badge.tsx VERIFICATION_LABEL / VERIFICATION_HOW
+const kVerificationLabel = {0: 'Not verified', 1: 'Contact verified', 2: 'Documents verified', 3: 'Owner verified · Premium'};
+const kVerificationHow = {
+  0: 'No verification badge yet.',
+  1: 'Confirmed with a one-time code on their mobile number or email.',
+  2: 'A valid GST number was added to the profile.',
+  3: 'Documents verified and a proven track record of 3+ positive ratings.',
+};
 
 const kReactions = ['heart', 'thumbs', 'namaskar'];
 const kReactionEmoji = {'heart': '❤️', 'thumbs': '👍', 'namaskar': '🙏'};
@@ -104,13 +121,17 @@ class Profile {
   final List<String> services, skills;
   final int contributions;
   final int? statPosts, statShared;
+  /// 0 none, 1 mobile verified, 2 documents, 3 owner verified (premium)
+  final int verification;
+  /// has a live update (gold ring on the avatar)
+  final bool hasUpdate;
   final DateTime createdAt;
 
   const Profile({
     required this.uid, required this.handle, required this.name, required this.company, required this.userType,
     required this.category, required this.location, this.photoUrl, this.bannerUrl, this.gstin, this.completion, this.bio, this.experience, this.education,
     this.contactMasked, this.services = const [], this.skills = const [], this.contributions = 0,
-    this.statPosts, this.statShared, required this.createdAt,
+    this.statPosts, this.statShared, this.verification = 1, this.hasUpdate = false, required this.createdAt,
   });
 
   bool get isEntrepreneur => userType == 'entrepreneur';
@@ -129,6 +150,7 @@ class Profile {
       services: _strings(j['services']), skills: _strings(j['skills']),
       contributions: (j['contributions'] as num?)?.toInt() ?? (stats?['contributions'] as num?)?.toInt() ?? 0,
       statPosts: (stats?['posts'] as num?)?.toInt(), statShared: (stats?['shared'] as num?)?.toInt(),
+      verification: (j['verificationLevel'] as num?)?.toInt() ?? 1, hasUpdate: stats?['hasUpdate'] == true,
       createdAt: _ms(j['createdAt']),
     );
   }
@@ -137,20 +159,25 @@ class Profile {
 // ===================== posts =====================
 
 class ResponseLog {
-  final String uid, name, handle, kind; // kind: contact | media | info
+  final String uid, name, handle, kind; // kind: contact | media | info | referral
+  final String userType, company;
+  final int verification;
   final String? photoUrl, reaction;
   final int? rating;
   final DateTime createdAt;
-  ResponseLog({required this.uid, required this.name, required this.handle, required this.kind, this.photoUrl, this.reaction, this.rating, required this.createdAt});
+  ResponseLog({required this.uid, required this.name, required this.handle, required this.kind, this.userType = 'entrepreneur', this.company = '', this.verification = 0, this.photoUrl, this.reaction, this.rating, required this.createdAt});
   factory ResponseLog.fromJson(Map j) => ResponseLog(
         uid: '${j['uid']}', name: '${j['name']}', handle: '${j['handle'] ?? ''}', kind: '${j['kind']}', photoUrl: j['photoURL'] as String?,
+        userType: '${j['userType'] ?? 'entrepreneur'}', company: '${j['company'] ?? ''}', verification: (j['verification'] as num?)?.toInt() ?? 0,
         reaction: j['reaction'] as String?, rating: (j['rating'] as num?)?.toInt(), createdAt: _ms(j['createdAt']),
       );
 }
 
 class Post {
   final String id, kind, authorUid, authorName, authorCompany, authorHandle; // kind: requirement | update
-  final String? authorPhotoUrl, title, description, category, locationPref, budget, urgency, matchReason, slug;
+  final String? authorPhotoUrl, title, description, category, locationPref, budget, urgency, matchReason, slug, categoryLabel;
+  final String authorType;
+  final int authorVerification;
   /// Metres from the viewer's area (matched feed only).
   final num? distanceM;
   final List<String> images;
@@ -166,12 +193,15 @@ class Post {
   Post({
     required this.id, required this.kind, required this.authorUid, required this.authorName, required this.authorCompany,
     required this.authorHandle, this.authorPhotoUrl, this.title, this.description, this.category, this.locationPref, this.budget,
-    this.urgency, this.matchReason, this.slug, this.distanceM, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
+    this.urgency, this.matchReason, this.slug, this.categoryLabel, this.authorType = 'entrepreneur', this.authorVerification = 1, this.distanceM, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
     this.recentResponses = const [], this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0,
     this.reacted = false, this.reposted = false, this.bookmarked = false, this.myReaction,
   });
 
   bool get isRequirement => kind == 'requirement';
+  String get shownName => authorType == 'entrepreneur' && authorCompany.isNotEmpty ? authorCompany : authorName;
+  /// Category chip text: own label for "Other", else the short name.
+  String get categoryText => category == 'other' && (categoryLabel ?? '').isNotEmpty ? categoryLabel! : (kCategoryShort[category] ?? 'Ask');
 
   /// Public link, same as the web (`/@handle/ask/slug`).
   String get webUrl => isRequirement && authorHandle.isNotEmpty ? 'https://webweb.ai/@$authorHandle/ask/${slug ?? id}' : 'https://webweb.ai/post/$id';
@@ -181,7 +211,8 @@ class Post {
         authorCompany: '${j['authorCompany'] ?? ''}', authorHandle: '${j['authorHandle'] ?? ''}', authorPhotoUrl: j['authorPhotoURL'] as String?,
         title: j['title'] as String?, description: j['description'] as String?, category: j['category'] as String?,
         locationPref: j['locationPref'] as String?, budget: j['budget'] as String?, urgency: j['urgency'] as String?,
-        matchReason: j['matchReason'] as String?, slug: j['slug'] as String?, distanceM: j['distanceM'] as num?, images: _strings(j['images']), sharesCount: (j['sharesCount'] as num?)?.toInt() ?? 0,
+        matchReason: j['matchReason'] as String?, slug: j['slug'] as String?, categoryLabel: j['categoryLabel'] as String?,
+        authorType: '${j['authorType'] ?? 'entrepreneur'}', authorVerification: (j['authorVerification'] as num?)?.toInt() ?? 1, distanceM: j['distanceM'] as num?, images: _strings(j['images']), sharesCount: (j['sharesCount'] as num?)?.toInt() ?? 0,
         authorHasUpdate: j['authorHasUpdate'] == true, createdAt: _ms(j['createdAt']),
         recentResponses: ((j['recentResponses'] as List?) ?? const []).map((e) => ResponseLog.fromJson(e as Map)).toList(),
         reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, repostsCount: (j['repostsCount'] as num?)?.toInt() ?? 0,
@@ -194,28 +225,31 @@ class Post {
 class MyResponse {
   final bool shared;
   final String? kind, askStatus, ownerReaction;
+  /// your own content (info text / photo), for editing
+  final String? text, imageUrl;
   final int? rating;
-  const MyResponse({required this.shared, this.kind, this.askStatus, this.ownerReaction, this.rating});
+  const MyResponse({required this.shared, this.kind, this.askStatus, this.ownerReaction, this.text, this.imageUrl, this.rating});
   factory MyResponse.fromJson(Map j) => MyResponse(
         shared: j['shared'] == true, kind: j['kind'] as String?, askStatus: j['askStatus'] as String?,
-        ownerReaction: j['ownerReaction'] as String?, rating: (j['rating'] as num?)?.toInt(),
+        ownerReaction: j['ownerReaction'] as String?, text: j['text'] as String?, imageUrl: j['imageUrl'] as String?,
+        rating: (j['rating'] as num?)?.toInt(),
       );
 }
 
 /// Owner's view of one response (content only after the responder approved).
 class ContactShare {
-  final String sharerUid, sharerName, sharerCompany, kind;
-  final String? sharerHandle, sharerPhotoUrl, askStatus, ownerReaction, payload;
+  final String id, sharerUid, sharerName, sharerCompany, kind;
+  final String? sharerType, sharerHandle, sharerPhotoUrl, askStatus, ownerReaction, payload;
   final int? rating;
   final bool revealed;
   final DateTime createdAt;
   ContactShare({
-    required this.sharerUid, required this.sharerName, required this.sharerCompany, required this.kind, this.sharerHandle,
+    this.id = '', required this.sharerUid, required this.sharerName, required this.sharerCompany, required this.kind, this.sharerType, this.sharerHandle,
     this.sharerPhotoUrl, this.askStatus, this.ownerReaction, this.payload, this.rating, required this.revealed, required this.createdAt,
   });
   factory ContactShare.fromJson(Map j) => ContactShare(
-        sharerUid: '${j['sharerUid']}', sharerName: '${j['sharerName']}', sharerCompany: '${j['sharerCompany'] ?? ''}', kind: '${j['kind']}',
-        sharerHandle: j['sharerHandle'] as String?, sharerPhotoUrl: j['sharerPhotoURL'] as String?, askStatus: j['askStatus'] as String?,
+        id: '${j['id'] ?? j['sharerUid']}', sharerUid: '${j['sharerUid']}', sharerName: '${j['sharerName']}', sharerCompany: '${j['sharerCompany'] ?? ''}', kind: '${j['kind']}',
+        sharerType: j['sharerType'] as String?, sharerHandle: j['sharerHandle'] as String?, sharerPhotoUrl: j['sharerPhotoURL'] as String?, askStatus: j['askStatus'] as String?,
         ownerReaction: j['ownerReaction'] as String?, payload: j['payload'] as String?, rating: (j['rating'] as num?)?.toInt(),
         revealed: j['revealed'] == true, createdAt: _ms(j['createdAt']),
       );
@@ -263,11 +297,12 @@ class Deal {
 class Product {
   final String id, name, kind; // kind: product | service
   final bool available;
-  final String? price, description, imageUrl;
-  Product({required this.id, required this.name, required this.kind, this.available = true, this.price, this.description, this.imageUrl});
+  final String? price, description, imageUrl, category;
+  Product({required this.id, required this.name, required this.kind, this.available = true, this.price, this.description, this.imageUrl, this.category});
   factory Product.fromJson(Map j) => Product(
         id: '${j['id']}', name: '${j['name']}', kind: '${j['kind'] ?? 'product'}', available: j['available'] != false,
         price: j['price'] as String?, description: j['description'] as String?, imageUrl: j['imageUrl'] as String?,
+        category: (j['category'] as String?)?.trim().isEmpty == true ? null : j['category'] as String?,
       );
 }
 
@@ -294,16 +329,16 @@ class FeedProduct extends Product {
 class CatalogGroup {
   final Peer owner;
   final String? location;
-  final String verification;
+  final int verification;
   final int total;
   final List<FeedProduct> items;
-  CatalogGroup({required this.owner, this.location, this.verification = 'none', required this.total, required this.items});
+  CatalogGroup({required this.owner, this.location, this.verification = 0, required this.total, required this.items});
   factory CatalogGroup.fromJson(Map j) {
     final o = j['owner'] as Map;
     return CatalogGroup(
       owner: Peer.fromJson(o),
       location: o['location'] as String?,
-      verification: '${o['verification'] ?? 'none'}',
+      verification: (o['verification'] as num?)?.toInt() ?? 0,
       total: (j['total'] as num?)?.toInt() ?? 0,
       items: ((j['items'] as List?) ?? const []).map((e) => FeedProduct.fromJson(e as Map)).toList(),
     );
@@ -314,17 +349,29 @@ class StoryItem {
   final String id;
   final String? imageUrl, text;
   final DateTime createdAt;
-  StoryItem({required this.id, this.imageUrl, this.text, required this.createdAt});
-  factory StoryItem.fromJson(Map j) => StoryItem(id: '${j['id']}', imageUrl: j['imageUrl'] as String?, text: j['text'] as String?, createdAt: _ms(j['createdAt']));
+  int reactionsCount;
+  String? myReaction;
+  /// set when this update is a repost of someone else's: {handle, name}
+  final Map<String, dynamic>? repostedFrom;
+  StoryItem({required this.id, this.imageUrl, this.text, required this.createdAt, this.reactionsCount = 0, this.myReaction, this.repostedFrom});
+  factory StoryItem.fromJson(Map j) => StoryItem(
+        id: '${j['id']}', imageUrl: j['imageUrl'] as String?, text: j['text'] as String?, createdAt: _ms(j['createdAt']),
+        reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, myReaction: j['myReaction'] as String?,
+        repostedFrom: j['repostedFrom'] == null ? null : Map<String, dynamic>.from(j['repostedFrom'] as Map),
+      );
 }
 
 class StoryGroup {
   final String uid, name, handle;
+  final String userType, company;
+  final int verification;
   final String? photoUrl;
   final List<StoryItem> items;
-  StoryGroup({required this.uid, required this.name, required this.handle, this.photoUrl, required this.items});
+  StoryGroup({required this.uid, required this.name, required this.handle, this.userType = 'entrepreneur', this.company = '', this.verification = 0, this.photoUrl, required this.items});
+  String get shownName => userType == 'entrepreneur' && company.isNotEmpty ? company : name;
   factory StoryGroup.fromJson(Map j) => StoryGroup(
         uid: '${j['uid']}', name: '${j['name']}', handle: '${j['handle'] ?? ''}', photoUrl: j['photoURL'] as String?,
+        userType: '${j['userType'] ?? 'entrepreneur'}', company: '${j['company'] ?? ''}', verification: (j['verification'] as num?)?.toInt() ?? 0,
         items: ((j['items'] as List?) ?? const []).map((e) => StoryItem.fromJson(e as Map)).toList(),
       );
 }
@@ -335,30 +382,53 @@ class StoryGroup {
 class Peer {
   final String uid, name, company, handle, userType;
   final String? photoUrl;
-  const Peer({required this.uid, required this.name, this.company = '', this.handle = '', this.userType = 'entrepreneur', this.photoUrl});
+  final int verification;
+  const Peer({required this.uid, required this.name, this.company = '', this.handle = '', this.userType = 'entrepreneur', this.photoUrl, this.verification = 0});
+  String get shownName => userType == 'entrepreneur' && company.isNotEmpty ? company : name;
   factory Peer.fromJson(Map j) => Peer(
         uid: '${j['uid']}', name: '${j['name'] ?? ''}', company: '${j['company'] ?? ''}', handle: '${j['handle'] ?? ''}',
         userType: '${j['userType'] ?? 'entrepreneur'}', photoUrl: j['photoURL'] as String?,
+        verification: (j['verification'] ?? j['verificationLevel'] as num?)?.toInt() ?? 0,
       );
-  factory Peer.fromProfile(Profile p) => Peer(uid: p.uid, name: p.name, company: p.company, handle: p.handle, userType: p.userType, photoUrl: p.photoUrl);
+  factory Peer.fromProfile(Profile p) => Peer(uid: p.uid, name: p.name, company: p.company, handle: p.handle, userType: p.userType, photoUrl: p.photoUrl, verification: p.verification);
+}
+
+/// The message a reply quotes (web: Message.replyTo).
+class MsgQuote {
+  final String id, senderUid, text, kind;
+  const MsgQuote({required this.id, required this.senderUid, required this.text, required this.kind});
+  factory MsgQuote.fromJson(Map j) => MsgQuote(id: '${j['id']}', senderUid: '${j['senderUid']}', text: '${j['text'] ?? ''}', kind: '${j['kind'] ?? 'text'}');
+}
+
+class MsgReaction {
+  final String emoji;
+  final int count;
+  final bool mine;
+  const MsgReaction(this.emoji, this.count, this.mine);
+  factory MsgReaction.fromJson(Map j) => MsgReaction('${j['emoji']}', (j['count'] as num?)?.toInt() ?? 1, j['mine'] == true);
 }
 
 class Msg {
   final int id;
   final String senderUid, text;
   final String? imageUrl;
-  final Map<String, dynamic>? attachment; // {type: contact|location|document, ...}
+  final Map<String, dynamic>? attachment; // {type: contact|location|document|post|profile|item|cart, ...}
+  final MsgQuote? replyTo;
   final DateTime createdAt;
   DateTime? deliveredAt, readAt;
+  List<MsgReaction> reactions;
   /// Local-only: a message that is still being sent.
   final bool pending;
   final String? tmpId;
-  Msg({required this.id, required this.senderUid, required this.text, this.imageUrl, this.attachment, required this.createdAt, this.deliveredAt, this.readAt, this.pending = false, this.tmpId});
+  Msg({required this.id, required this.senderUid, required this.text, this.imageUrl, this.attachment, this.replyTo, required this.createdAt, this.deliveredAt, this.readAt, this.reactions = const [], this.pending = false, this.tmpId});
   factory Msg.fromJson(Map j) => Msg(
         id: int.tryParse('${j['id']}') ?? 0, senderUid: '${j['senderUid']}', text: '${j['text'] ?? ''}', imageUrl: j['imageUrl'] as String?,
-        attachment: j['attachment'] == null ? null : Map<String, dynamic>.from(j['attachment'] as Map), createdAt: _ms(j['createdAt']),
+        attachment: j['attachment'] == null ? null : Map<String, dynamic>.from(j['attachment'] as Map),
+        replyTo: j['replyTo'] == null ? null : MsgQuote.fromJson(j['replyTo'] as Map), createdAt: _ms(j['createdAt']),
         deliveredAt: _msOpt(j['deliveredAt']), readAt: _msOpt(j['readAt']),
       );
+  /// What kind of message this is, for reply quotes.
+  String get kind => (attachment?['type'] as String?) ?? (imageUrl != null ? 'image' : 'text');
 }
 
 class ChatSummary {
@@ -375,7 +445,7 @@ class ChatSummary {
     final p = Map<String, dynamic>.from((info[other] as Map?) ?? {});
     return ChatSummary(
       id: '${j['id']}',
-      peer: Peer(uid: other, name: '${p['name'] ?? ''}', company: '${p['company'] ?? ''}', handle: '${p['handle'] ?? ''}', photoUrl: p['photoURL'] as String?),
+      peer: Peer(uid: other, name: '${p['name'] ?? ''}', company: '${p['company'] ?? ''}', handle: '${p['handle'] ?? ''}', userType: '${p['userType'] ?? 'entrepreneur'}', photoUrl: p['photoURL'] as String?),
       lastMessage: j['lastMessage'] as String?, lastMessageAt: _msOpt(j['lastMessageAt']), unread: j['unread'] == true,
     );
   }

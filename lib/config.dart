@@ -7,3 +7,7 @@ String get apiUrl => (_override.isNotEmpty ? _override : 'http://localhost:4000'
 
 /// WebSocket endpoint of the same API (chat events, presence, call signalling).
 String get wsUrl => '${apiUrl.replaceFirst(RegExp(r'^http'), 'ws')}/app/ws';
+
+/// The website (public pages, share links, and static images such as /demo/... that live on the site).
+const _site = String.fromEnvironment('SITE_URL');
+String get siteUrl => (_site.isNotEmpty ? _site : 'https://webweb.ai').replaceFirst(RegExp(r'/$'), '');

@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../call_manager.dart';
+import '../i18n.dart';
+import '../theme.dart';
+import '../widgets.dart';
 
 /// WhatsApp / AirMsg style top active call banner.
 /// Shown when a call is running in the background and the call screen is minimized.
@@ -32,7 +35,7 @@ class _ActiveCallBannerState extends State<ActiveCallBanner> {
   }
 
   String _timeString(DateTime? connectedAt) {
-    if (connectedAt == null) return 'Connecting…';
+    if (connectedAt == null) return t('Connecting…');
     final diff = DateTime.now().difference(connectedAt);
     String two(int n) => n.toString().padLeft(2, '0');
     if (diff.inHours > 0) {
@@ -53,7 +56,7 @@ class _ActiveCallBannerState extends State<ActiveCallBanner> {
 
     final isConnecting = c.state != CallState.connected;
     final timeOrStatus = isConnecting
-        ? (c.state == CallState.ringing ? 'Ringing…' : 'Connecting…')
+        ? t(c.state == CallState.ringing ? 'Ringing…' : 'Connecting…')
         : _timeString(c.connectedAt);
 
     return Material(
@@ -64,7 +67,7 @@ class _ActiveCallBannerState extends State<ActiveCallBanner> {
           margin: const EdgeInsets.fromLTRB(12, 6, 12, 6),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E2832),
+            color: kInk,
             borderRadius: BorderRadius.circular(16),
             boxShadow: const [
               BoxShadow(
@@ -74,7 +77,7 @@ class _ActiveCallBannerState extends State<ActiveCallBanner> {
               ),
             ],
             border: Border.all(
-              color: isConnecting ? Colors.orangeAccent : const Color(0xFF2AAE6B),
+              color: isConnecting ? kGold : const Color(0xFF10B981),
               width: 1.5,
             ),
           ),
@@ -91,16 +94,14 @@ class _ActiveCallBannerState extends State<ActiveCallBanner> {
                         padding: const EdgeInsets.all(7),
                         decoration: BoxDecoration(
                           color: isConnecting
-                              ? Colors.orangeAccent.withValues(alpha: .2)
-                              : const Color(0xFF2AAE6B).withValues(alpha: .2),
+                              ? kGold.withValues(alpha: .2)
+                              : const Color(0xFF10B981).withValues(alpha: .2),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          c.video ? Icons.videocam : Icons.call,
+                        child: WIcon(
+                          c.video ? WI.video : WI.phone,
                           size: 18,
-                          color: isConnecting
-                              ? Colors.orangeAccent
-                              : const Color(0xFF2AAE6B),
+                          color: isConnecting ? kGold : const Color(0xFF10B981),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -122,9 +123,7 @@ class _ActiveCallBannerState extends State<ActiveCallBanner> {
                             Text(
                               timeOrStatus,
                               style: TextStyle(
-                                color: isConnecting
-                                    ? Colors.orangeAccent
-                                    : Colors.white70,
+                                color: isConnecting ? kGold : Colors.white70,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -132,9 +131,9 @@ class _ActiveCallBannerState extends State<ActiveCallBanner> {
                           ],
                         ),
                       ),
-                      const Text(
-                        'Tap to return',
-                        style: TextStyle(
+                      Text(
+                        t('Tap to return'),
+                        style: const TextStyle(
                           color: Colors.white54,
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
@@ -149,23 +148,22 @@ class _ActiveCallBannerState extends State<ActiveCallBanner> {
               // Quick Controls
               IconButton(
                 visualDensity: VisualDensity.compact,
-                icon: Icon(
-                  c.muted ? Icons.mic_off : Icons.mic,
-                  color: c.muted ? Colors.redAccent : Colors.white70,
+                icon: WIcon(
+                  c.muted ? WI.micOff : WI.mic,
+                  color: c.muted ? const Color(0xFFDC2626) : Colors.white70,
                   size: 20,
                 ),
                 onPressed: cm.toggleMute,
-                tooltip: c.muted ? 'Unmute' : 'Mute',
+                tooltip: t(c.muted ? 'Unmute' : 'Mute'),
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(
-                  Icons.call_end,
-                  color: Colors.redAccent,
-                  size: 20,
+                icon: Transform.rotate(
+                  angle: 2.356,
+                  child: const WIcon(WI.phone, color: Color(0xFFDC2626), size: 20),
                 ),
                 onPressed: () => cm.hangUp(),
-                tooltip: 'End Call',
+                tooltip: t('End'),
               ),
             ],
           ),

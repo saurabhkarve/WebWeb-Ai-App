@@ -1,60 +1,151 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
-import '../api.dart';
+import '../i18n.dart';
 import '../theme.dart';
+import '../widgets.dart';
 
-/// Photos on a post: 1 = wide, 2 = side by side, 3-4 = grid. Tap opens a full-screen viewer.
+/// Post media, same as the web (image-grid.tsx): 1 image = full width (up to 512 px tall), 2 = side by
+/// side, 3 = one tall + two stacked, 4 = 2x2; 16:9 frame, 2 px gaps, rounded outer corners with a border.
+/// Tap any image: full-screen viewer that swipes between photos, with a counter, share and close.
 class ImageGrid extends StatelessWidget {
   final List<String> images;
-  const ImageGrid(this.images, {super.key});
+  /// link shared from the viewer (the ask's page)
+  final String? shareUrl;
+  const ImageGrid(this.images, {super.key, this.shareUrl});
 
   @override
   Widget build(BuildContext context) {
     if (images.isEmpty) return const SizedBox.shrink();
     final p = Pal.of(context);
-    Widget tile(int i, {double? aspect}) => GestureDetector(
-          onTap: () => openImageViewer(context, images, i),
-          child: AspectRatio(
-            aspectRatio: aspect ?? 1,
-            child: Image.network(mediaUrl(images[i]), fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: p.field, child: Icon(Icons.broken_image_outlined, color: p.muted))),
-          ),
-        );
     final shown = images.take(4).toList();
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: shown.length == 1
-            ? tile(0, aspect: 16 / 10)
-            : GridView.count(
-                crossAxisCount: 2,
-                mainAxisSpacing: 3,
-                crossAxisSpacing: 3,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                childAspectRatio: shown.length == 2 ? 1 : 1.4,
-                children: [for (var i = 0; i < shown.length; i++) tile(i, aspect: shown.length == 2 ? 1 : 1.4)],
+    final n = shown.length;
+    Widget tile(int i) => GestureDetector(
+          onTap: () => openImageViewer(context, images, i, shareUrl: shareUrl),
+          child: Stack(fit: StackFit.expand, children: [
+            ColoredBox(color: p.chip, child: NetImg(shown[i])),
+            if (i == 3 && images.length > 4)
+              Container(
+                color: kInk.withValues(alpha: .55),
+                alignment: Alignment.center,
+                child: Text('+${images.length - 4}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white)),
               ),
-      ),
+          ]),
+        );
+    const gap = 2.0;
+    Widget body;
+    if (n == 1) {
+      body = GestureDetector(
+        onTap: () => openImageViewer(context, images, 0, shareUrl: shareUrl),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 512, minHeight: 120),
+          child: SizedBox(width: double.infinity, child: ColoredBox(color: p.chip, child: NetImg(shown[0], fit: BoxFit.cover))),
+        ),
+      );
+    } else {
+      body = AspectRatio(
+        aspectRatio: 16 / 9,
+        child: n == 2
+            ? Row(children: [Expanded(child: tile(0)), const SizedBox(width: gap), Expanded(child: tile(1))])
+            : Row(children: [
+                Expanded(
+                  child: n == 3
+                      ? tile(0)
+                      : Column(children: [Expanded(child: tile(0)), const SizedBox(height: gap), Expanded(child: tile(2))]),
+                ),
+                const SizedBox(width: gap),
+                Expanded(
+                  child: Column(children: [
+                    Expanded(child: tile(1)),
+                    const SizedBox(height: gap),
+                    Expanded(child: tile(n == 3 ? 2 : 3)),
+                  ]),
+                ),
+              ]),
+      );
+    }
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
+      child: ClipRRect(borderRadius: BorderRadius.circular(13), child: body),
     );
   }
 }
 
-void openImageViewer(BuildContext context, List<String> images, int start) {
-  Navigator.of(context).push(MaterialPageRoute(builder: (_) => _Viewer(images, start)));
+void openImageViewer(BuildContext context, List<String> images, int start, {String? shareUrl}) {
+  Navigator.of(context).push(PageRouteBuilder(
+    opaque: false,
+    barrierColor: Colors.black,
+    pageBuilder: (_, __, ___) => _Viewer(images, start, shareUrl),
+    transitionsBuilder: (_, a, __, child) => FadeTransition(opacity: a, child: child),
+  ));
 }
 
-class _Viewer extends StatelessWidget {
+class _Viewer extends StatefulWidget {
   final List<String> images;
   final int start;
-  const _Viewer(this.images, this.start);
+  final String? shareUrl;
+  const _Viewer(this.images, this.start, this.shareUrl);
   @override
-  Widget build(BuildContext context) => Scaffold(
-        backgroundColor: Colors.black,
-        appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white),
-        body: PageView(
-          controller: PageController(initialPage: start),
-          children: [for (final u in images) InteractiveViewer(child: Center(child: Image.network(mediaUrl(u), fit: BoxFit.contain)))],
+  State<_Viewer> createState() => _ViewerState();
+}
+
+class _ViewerState extends State<_Viewer> {
+  late final _pc = PageController(initialPage: widget.start);
+  late int _i = widget.start;
+
+  @override
+  void dispose() {
+    _pc.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final n = widget.images.length;
+    Widget roundBtn(WI icon, String label, VoidCallback onTap) => Semantics(
+          button: true,
+          label: label,
+          child: GestureDetector(
+            onTap: onTap,
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: .12), shape: BoxShape.circle),
+              child: WIcon(icon, size: 20, color: Colors.white, strokeWidth: 1.9),
+            ),
+          ),
+        );
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(children: [
+        PageView.builder(
+          controller: _pc,
+          itemCount: n,
+          onPageChanged: (i) => setState(() => _i = i),
+          itemBuilder: (_, i) => InteractiveViewer(maxScale: 4, child: Center(child: NetImg(widget.images[i], fit: BoxFit.contain))),
         ),
-      );
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              if (n > 1)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: .12), borderRadius: BorderRadius.circular(20)),
+                  child: Text('${_i + 1} / $n', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+                ),
+              const Spacer(),
+              if (widget.shareUrl != null) ...[
+                roundBtn(WI.share, t('Share'), () => SharePlus.instance.share(ShareParams(text: widget.shareUrl!))),
+                const SizedBox(width: 8),
+              ],
+              roundBtn(WI.close, t('Close'), () => Navigator.pop(context)),
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
 }

@@ -1,8 +1,13 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
+import '../i18n.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -10,28 +15,33 @@ import '../widgets/catalog_strip.dart';
 import '../widgets/post_card.dart';
 import '../widgets/story_viewer.dart';
 import 'edit_profile.dart';
+import 'find.dart';
 
-/// Connect tab: Updates (24h stories) + the Asks / updates feed (GET /posts?matched=1, newest + relevance first).
+/// Connect (home), same as the web feed (feed-page.tsx): profile-strength strip, Updates row, then the
+/// Asks timeline with a business catalog block after every third ask. Pull down to refresh (the W draws
+/// itself), new asks are announced with a chip instead of shuffling the list.
 class ConnectScreen extends StatefulWidget {
   final int refreshTick;
+  final int topTick;
   final VoidCallback onGoAsk;
-  const ConnectScreen({super.key, required this.refreshTick, required this.onGoAsk});
+  const ConnectScreen({super.key, required this.refreshTick, this.topTick = 0, required this.onGoAsk});
   @override
   State<ConnectScreen> createState() => _ConnectScreenState();
 }
 
+const _page = 12;
+
 class _ConnectScreenState extends State<ConnectScreen> {
-  List<StoryGroup> _stories = [];
-  List<Post> _posts = [];
-  /// Businesses and what they offer: one block after every third ask (like the web feed).
+  List<Post>? _posts;
   List<CatalogGroup> _catalog = [];
-  /// Strength strip closed for this app session.
-  static bool _hideStrength = false;
-  bool _loading = true;
-  bool _more = true;
-  bool _loadingMore = false;
+  List<Post> _fresh = [];
   String? _error;
+  bool _hasMore = true;
+  bool _loadingMore = false;
+  int _offset = 0;
   final _scroll = ScrollController();
+  final _updatesKey = GlobalKey<_UpdatesBarState>();
+  Timer? _poll;
 
   Api get _api => context.read<AuthProvider>().api;
 
@@ -39,183 +49,493 @@ class _ConnectScreenState extends State<ConnectScreen> {
   void initState() {
     super.initState();
     _load();
+    _api.get('/products/feed', {'limit': 10}).then((d) {
+      if (mounted) setState(() => _catalog = (d as List).map((e) => CatalogGroup.fromJson(e as Map)).toList());
+    }).catchError((_) {});
     _scroll.addListener(() {
       if (_scroll.position.pixels > _scroll.position.maxScrollExtent - 600) _loadMore();
     });
+    _poll = Timer.periodic(const Duration(seconds: 30), (_) => _checkFresh());
   }
 
   @override
   void didUpdateWidget(covariant ConnectScreen old) {
     super.didUpdateWidget(old);
-    if (old.refreshTick != widget.refreshTick) _load();
+    if (old.refreshTick != widget.refreshTick) _refresh();
+    if (old.topTick != widget.topTick) _toTop();
   }
 
   @override
   void dispose() {
     _scroll.dispose();
+    _poll?.cancel();
     super.dispose();
+  }
+
+  void _toTop() {
+    if (_scroll.hasClients) _scroll.animateTo(0, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
   }
 
   Future<void> _load() async {
     try {
-      final results = await Future.wait([_api.get('/posts', {'matched': 1, 'limit': 30}), _api.get('/stories')]);
+      final d = (await _api.get('/posts', {'matched': 1, 'limit': _page}) as List).map((e) => Post.fromJson(e as Map)).toList();
       if (!mounted) return;
       setState(() {
-        _posts = (results[0] as List).map((e) => Post.fromJson(e as Map)).toList();
-        _stories = (results[1] as List).map((e) => StoryGroup.fromJson(e as Map)).toList();
-        _more = _posts.length >= 30;
-        _loading = false;
+        _posts = d;
+        _offset = d.length;
+        _hasMore = d.length == _page;
         _error = null;
+        _fresh = [];
       });
-      _api.get('/products/feed', {'limit': 10}).then((d) {
-        if (mounted) setState(() => _catalog = (d as List).map((e) => CatalogGroup.fromJson(e as Map)).toList());
-      }).catchError((_) {});
     } catch (e) {
-      if (mounted) setState(() {
-        _loading = false;
-        _error = '$e';
-      });
+      if (mounted) setState(() => _error = t('Could not load posts. Please try again.'));
     }
+  }
+
+  /// Pull to refresh: posts, updates and the profile strength.
+  Future<void> _refresh() async {
+    await Future.wait([
+      _load(),
+      _updatesKey.currentState?.load() ?? Future.value(),
+      context.read<AuthProvider>().loadProfile(),
+    ]);
   }
 
   Future<void> _loadMore() async {
-    if (_loadingMore || !_more || _posts.isEmpty) return;
-    _loadingMore = true;
+    if (_loadingMore || !_hasMore || _posts == null) return;
+    setState(() => _loadingMore = true);
     try {
-      final d = (await _api.get('/posts', {'before': _posts.last.createdAt.millisecondsSinceEpoch, 'limit': 30}) as List).map((e) => Post.fromJson(e as Map)).toList();
-      if (mounted) setState(() {
-        _posts.addAll(d.where((x) => !_posts.any((y) => y.id == x.id)));
-        _more = d.length >= 30;
+      final d = (await _api.get('/posts', {'matched': 1, 'limit': _page, 'offset': _offset}) as List).map((e) => Post.fromJson(e as Map)).toList();
+      if (!mounted) return;
+      _offset += d.length;
+      setState(() {
+        final seen = _posts!.map((p) => p.id).toSet();
+        _posts = [..._posts!, ...d.where((p) => !seen.contains(p.id))];
+        _hasMore = d.length == _page;
       });
     } catch (_) {
+      // stay put; the next scroll tries again
     } finally {
-      _loadingMore = false;
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
-  Future<void> _addStory() async {
-    if (await showStoryComposer(context) == true) _load();
+  /// Quietly look for newer posts; never shuffle the list under the reader.
+  Future<void> _checkFresh() async {
+    final cur = _posts;
+    if (cur == null || !mounted) return;
+    try {
+      final latest = (await _api.get('/posts', {'limit': 20}) as List).map((e) => Post.fromJson(e as Map)).toList();
+      final seen = cur.map((p) => p.id).toSet();
+      final newest = cur.fold<int>(0, (m, p) => p.createdAt.millisecondsSinceEpoch > m ? p.createdAt.millisecondsSinceEpoch : m);
+      final fresh = latest.where((p) => !seen.contains(p.id) && p.createdAt.millisecondsSinceEpoch > newest).toList();
+      if (mounted && fresh.length != _fresh.length) setState(() => _fresh = fresh);
+    } catch (_) {}
   }
 
-  Future<void> _openStories(int index) async {
-    final me = context.read<AuthProvider>().profile?.uid;
-    final deleted = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => StoryViewer(groups: _stories, startGroup: index, meUid: me, onDelete: (id) async => _api.delete('/stories/$id'))),
-    );
-    if (deleted == true) _load();
+  void _showFresh() {
+    setState(() {
+      _posts = [..._fresh, ...?_posts];
+      _fresh = [];
+    });
+    _toTop();
+  }
+
+  /// One business block after ask 3, 6, 9 ... (and after the last ask of a short feed).
+  CatalogGroup? _catalogAt(int i, int n) {
+    final slot = (i + 1) % 3 == 0 ? (i + 1) ~/ 3 - 1 : (n < 3 && i == n - 1 ? 0 : -1);
+    return slot >= 0 && slot < _catalog.length ? _catalog[slot] : null;
   }
 
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final me = context.watch<AuthProvider>().profile;
-    final mineIdx = _stories.indexWhere((g) => g.uid == me?.uid);
-    final others = [for (var i = 0; i < _stories.length; i++) if (i != mineIdx) i];
-    return SafeArea(
-      bottom: false,
-      child: RefreshIndicator(
-        color: kGold,
-        onRefresh: _load,
-        child: ListView(controller: _scroll, padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-          const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: Align(alignment: Alignment.centerLeft, child: LogoInline())),
-          _strengthStrip(me, p),
-          const SizedBox(height: 8),
-          const RuleHeading(Icons.campaign_outlined, 'UPDATES'),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 96,
-            child: ListView(scrollDirection: Axis.horizontal, children: [
-              _tile(
-                avatar: Stack(clipBehavior: Clip.none, children: [
-                  Avatar(name: me?.name ?? '?', photoUrl: me?.photoUrl, size: 62, ring: mineIdx >= 0),
-                  Positioned(right: -4, bottom: -2, child: Container(width: 24, height: 24, decoration: const BoxDecoration(color: kGold, shape: BoxShape.circle), child: const Icon(Icons.add, size: 18, color: Color(0xFF1E1E1E)))),
-                ]),
-                label: 'Your update',
-                onTap: mineIdx >= 0 ? () => _openStories(mineIdx) : _addStory,
-                onLongPress: _addStory,
-              ),
-              for (final i in others)
-                _tile(avatar: Avatar(name: _stories[i].name, photoUrl: _stories[i].photoUrl, size: 62, ring: true), label: _stories[i].name, onTap: () => _openStories(i)),
-            ]),
-          ),
-          const SizedBox(height: 14),
-          const RuleHeading(Icons.back_hand_outlined, 'ASKS'),
-          if (_loading) const Padding(padding: EdgeInsets.all(40), child: PageLoader()),
-          if (_error != null) Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: p.muted))),
-          if (!_loading && _error == null && _posts.isEmpty)
-            Padding(padding: const EdgeInsets.all(24), child: Column(children: [
-              Text('Nothing here yet', style: TextStyle(color: p.muted, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 12),
-              GoldButton(label: 'Post an ask', onPressed: widget.onGoAsk),
-            ])),
-          for (var i = 0; i < _posts.length; i++) ...[
-            PostCard(key: ValueKey(_posts[i].id), post: _posts[i]),
-            // one business block after ask 3, 6, 9 ... (and after the last ask of a short feed)
-            if (_catalogAt(i) case final g?) CatalogStrip(key: ValueKey('cat-${g.owner.uid}'), group: g),
-          ],
-          if (_loadingMore) const Padding(padding: EdgeInsets.all(16), child: PageLoader(size: 36)),
-        ]),
+    final posts = _posts;
+    final children = <Widget>[
+      const _StrengthNudge(),
+      const SizedBox(height: 12),
+      RuleHeading(WI.updates, t('Updates')),
+      const SizedBox(height: 6),
+      _UpdatesBar(key: _updatesKey),
+      const SizedBox(height: 12),
+      RuleHeading(WI.ask, t('Asks')),
+      if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
+      if (posts == null && _error == null) const PageLoader(),
+      if (posts != null && posts.isEmpty) _empty(p),
+      if (posts != null)
+        for (var i = 0; i < posts.length; i++) ...[
+          PostCard(key: ValueKey(posts[i].id), post: posts[i]),
+          if (_catalogAt(i, posts.length) case final g?) CatalogStrip(key: ValueKey('cat-${g.owner.uid}'), group: g),
+        ],
+      if (posts != null && posts.isNotEmpty)
+        (_loadingMore || _hasMore)
+            ? const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Center(child: LogoLoader(size: 40)))
+            : _EndOfFeed(count: posts.length, onAsk: widget.onGoAsk, onFind: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FindScreen(standalone: true))), onTop: _toTop),
+    ];
+    return Stack(children: [
+      LogoRefresh(
+        onRefresh: _refresh,
+        child: ListView(
+          controller: _scroll,
+          padding: EdgeInsets.only(bottom: islandSpace(context)),
+          // catalog strips scroll edge to edge (web -mx-4); everything else keeps the 16 px gutter
+          children: [for (final c in children) c is CatalogStrip ? c : Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: c)],
+        ),
       ),
-    );
+      if (_fresh.isNotEmpty)
+        Positioned(
+          top: 8,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: GestureDetector(
+              onTap: _showFresh,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: kGoldGradient,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: const [BoxShadow(color: Color(0x2E1E1E1E), blurRadius: 28, spreadRadius: -12, offset: Offset(0, 10))],
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const RotatedBox(quarterTurns: 3, child: WIcon(WI.arrow, size: 16, color: kInk, strokeWidth: 2.2)),
+                  const SizedBox(width: 6),
+                  Text(t(_fresh.length == 1 ? '{n} new ask' : '{n} new asks', {'n': _fresh.length}), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
+                ]),
+              ),
+            ),
+          ),
+        ),
+    ]);
   }
 
-  CatalogGroup? _catalogAt(int i) {
-    final slot = (i + 1) % 3 == 0 ? (i + 1) ~/ 3 - 1 : (_posts.length < 3 && i == _posts.length - 1 ? 0 : -1);
-    return slot >= 0 && slot < _catalog.length ? _catalog[slot] : null;
-  }
+  Widget _empty(Pal p) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        child: Column(children: [
+          Text(t('Nothing here yet'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(t('Tap Ask to post a requirement or an update.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.muted)),
+        ]),
+      );
+}
 
-  /// Own profile below 100%: one thin line with the percent and the most valuable next step.
-  Widget _strengthStrip(Profile? me, Pal p) {
+// ======================= profile strength strip =======================
+
+/// Own profile below 100 %: one thin edge-to-edge line with the percent and the single most valuable next step.
+class _StrengthNudge extends StatefulWidget {
+  const _StrengthNudge();
+  @override
+  State<_StrengthNudge> createState() => _StrengthNudgeState();
+}
+
+class _StrengthNudgeState extends State<_StrengthNudge> {
+  static bool _hidden = false; // closed for this app session (web: sessionStorage)
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final me = context.watch<AuthProvider>().profile;
     final c = me?.completion;
-    if (c == null || c.percent >= 100 || _hideStrength) return const SizedBox();
+    if (c == null || c.percent >= 100 || _hidden) return const SizedBox(height: 0);
     final next = c.next;
-    return InkWell(
-      onTap: () async {
-        if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: me!))) == true && mounted) {
-          context.read<AuthProvider>().loadProfile();
-        }
-      },
+    final ink = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
+    // the list has 16 px side padding; the strip reaches the screen edges like the web's -mx-4
+    return SizedBox(
+      height: 28,
+      child: OverflowBox(
+      maxWidth: MediaQuery.of(context).size.width,
       child: Container(
-        height: 30,
-        margin: const EdgeInsets.only(bottom: 4),
-        padding: const EdgeInsets.only(left: 10),
+        height: 28,
+        width: MediaQuery.of(context).size.width,
+        padding: const EdgeInsets.only(left: 16, right: 4),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          gradient: LinearGradient(colors: [kGold.withValues(alpha: .22), kGold.withValues(alpha: .06), Colors.transparent]),
+          gradient: LinearGradient(colors: [kGold.withValues(alpha: .2), kGold.withValues(alpha: .07), kGold.withValues(alpha: 0)]),
+          border: Border(bottom: BorderSide(color: kGold.withValues(alpha: .2))),
         ),
         child: Row(children: [
-          Text('${c.percent}%', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5, color: kGold)),
-          const SizedBox(width: 8),
-          Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: c.percent / 100, minHeight: 4, color: kGold, backgroundColor: p.border))),
-          if (next != null) ...[
-            const SizedBox(width: 8),
-            Text('Add ${next.label} · +${next.weight}%', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11.5, color: kGold)),
-          ],
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            iconSize: 16,
-            icon: Icon(Icons.close, color: p.muted),
-            onPressed: () => setState(() => _hideStrength = true),
+          Text('${c.percent}%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: ink, fontFeatures: const [FontFeature.tabularFigures()])),
+          const SizedBox(width: 10),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                height: 4,
+                color: p.text.withValues(alpha: .1),
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(widthFactor: c.percent / 100, child: Container(decoration: const BoxDecoration(gradient: kGoldGradient))),
+              ),
+            ),
           ),
+          if (next != null) ...[
+            const SizedBox(width: 10),
+            Flexible(
+              child: GestureDetector(
+                onTap: () async {
+                  final auth = context.read<AuthProvider>();
+                  if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: me!))) == true) auth.loadProfile();
+                },
+                child: Text('${t('Add')} ${t(next.label)} · +${next.weight}%', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: ink)),
+              ),
+            ),
+          ],
+          GestureDetector(
+            onTap: () => setState(() => _hidden = true),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), child: Text('×', style: TextStyle(fontSize: 14, color: p.muted, height: 1.2))),
+          ),
+        ]),
+      ),
+      ),
+    );
+  }
+}
+
+// ======================= updates row =======================
+
+const _seenKey = 'webweb_seen_updates';
+
+/// Updates row above the feed (web updates-bar.tsx): your tile first ("+" always adds), then everyone
+/// else; gold ring = unseen, grey ring = seen.
+class _UpdatesBar extends StatefulWidget {
+  const _UpdatesBar({super.key});
+  @override
+  State<_UpdatesBar> createState() => _UpdatesBarState();
+}
+
+class _UpdatesBarState extends State<_UpdatesBar> {
+  List<StoryGroup> _groups = [];
+  Set<String> _seen = {};
+
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((sp) {
+      try {
+        final ids = (jsonDecode(sp.getString(_seenKey) ?? '[]') as List).map((e) => '$e').toSet();
+        if (mounted) setState(() => _seen = ids);
+      } catch (_) {}
+    });
+    load();
+  }
+
+  Future<void> load() async {
+    try {
+      final d = await context.read<AuthProvider>().api.get('/updates') as List;
+      if (mounted) setState(() => _groups = d.map((e) => StoryGroup.fromJson(e as Map)).toList());
+    } catch (_) {
+      if (mounted) setState(() => _groups = []);
+    }
+  }
+
+  Future<void> _markSeen(String id) async {
+    if (_seen.contains(id)) return;
+    setState(() => _seen = {..._seen, id});
+    final sp = await SharedPreferences.getInstance();
+    final list = _seen.toList();
+    sp.setString(_seenKey, jsonEncode(list.length > 300 ? list.sublist(list.length - 300) : list));
+  }
+
+  Future<void> _open(int idx) async {
+    final api = context.read<AuthProvider>().api;
+    final me = context.read<AuthProvider>().profile?.uid;
+    final deleted = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => StoryViewer(groups: _groups, startGroup: idx, meUid: me, onSeen: _markSeen, onDelete: (id) async => api.delete('/updates/$id')),
+      ),
+    );
+    if (deleted == true) load();
+  }
+
+  Future<void> _compose() async {
+    if (await showStoryComposer(context) == true) load();
+  }
+
+  bool _allSeen(StoryGroup g) => g.items.every((it) => _seen.contains(it.id));
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final me = context.watch<AuthProvider>().profile;
+    final mineIdx = _groups.indexWhere((g) => g.uid == me?.uid);
+    final others = [for (var i = 0; i < _groups.length; i++) if (_groups[i].uid != me?.uid) i];
+    return SizedBox(
+      height: 100,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        children: [
+          _UpdateTile(
+            name: me?.name ?? '',
+            photoUrl: me?.photoUrl,
+            label: t('Your update'),
+            ring: mineIdx >= 0 ? (_allSeen(_groups[mineIdx]) ? _Ring.seen : _Ring.unseen) : _Ring.none,
+            onTap: mineIdx >= 0 ? () => _open(mineIdx) : _compose,
+            plus: _compose,
+          ),
+          for (final i in others)
+            _UpdateTile(
+              name: _groups[i].shownName,
+              photoUrl: _groups[i].photoUrl,
+              label: _groups[i].shownName,
+              type: _groups[i].userType,
+              verification: _groups[i].verification,
+              ring: _allSeen(_groups[i]) ? _Ring.seen : _Ring.unseen,
+              onTap: () => _open(i),
+            ),
+          if (others.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: SizedBox(
+                  width: MediaQuery.of(context).size.width - 32 - 96,
+                  child: Text(t('Updates from other members will show up here.'), style: TextStyle(fontSize: 12, color: p.muted)),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _Ring { none, seen, unseen }
+
+class _UpdateTile extends StatelessWidget {
+  final String name, label;
+  final String? photoUrl, type;
+  final int verification;
+  final _Ring ring;
+  final VoidCallback onTap;
+  final VoidCallback? plus;
+  const _UpdateTile({required this.name, required this.label, this.photoUrl, this.type, this.verification = 0, required this.ring, required this.onTap, this.plus});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    const box = 74.0; // 64 photo + 2 x 2.5 ring + 2 x 2.5 gap
+    final ini = Text(initials(name), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.muted));
+    return Container(
+      width: 84,
+      margin: const EdgeInsets.only(right: 12),
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(children: [
+          SizedBox(
+            width: box,
+            height: box,
+            child: Stack(clipBehavior: Clip.none, children: [
+              Container(
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: ring == _Ring.unseen ? kGoldGradient : null,
+                  color: ring == _Ring.seen ? p.border : (ring == _Ring.none ? Colors.transparent : null),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: p.canvas),
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: p.chip),
+                    child: (photoUrl ?? '').isNotEmpty
+                        ? Image.network(mediaUrl(photoUrl!), width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_, __, ___) => ini)
+                        : ini,
+                  ),
+                ),
+              ),
+              // type badge (others) or the "+" (own tile), centred on the ring's 45 degree edge
+              if (plus != null)
+                Positioned(
+                  left: box * .854 - 12,
+                  top: box * .854 - 12,
+                  child: GestureDetector(
+                    onTap: plus,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle, border: Border.all(color: p.canvas, width: 2)),
+                      child: const WIcon(WI.plus, size: 16, color: kInk, strokeWidth: 3),
+                    ),
+                  ),
+                )
+              else if (type != null)
+                Positioned(
+                  left: box * .854 - 8.5,
+                  top: box * .854 - 8.5,
+                  child: Container(
+                    width: 17,
+                    height: 17,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: p.typeBadge, shape: BoxShape.circle, border: Border.all(color: p.canvas, width: 2)),
+                    child: WIcon(type == 'entrepreneur' ? WI.business : WI.user, size: 9, color: p.onInk, strokeWidth: 2.4),
+                  ),
+                ),
+            ]),
+          ),
+          const SizedBox(height: 4),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12))),
+            if (verification > 0) ...[const SizedBox(width: 2), VerifiedBadge(level: verification, size: 12)],
+          ]),
         ]),
       ),
     );
   }
+}
 
-  Widget _tile({required Widget avatar, required String label, required VoidCallback onTap, VoidCallback? onLongPress}) {
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: Container(
-        width: 78,
-        margin: const EdgeInsets.only(right: 8),
-        child: Column(children: [
-          avatar,
-          const SizedBox(height: 6),
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+// ======================= end of feed =======================
+
+class _EndOfFeed extends StatefulWidget {
+  final int count;
+  final VoidCallback onAsk, onFind, onTop;
+  const _EndOfFeed({required this.count, required this.onAsk, required this.onFind, required this.onTop});
+  @override
+  State<_EndOfFeed> createState() => _EndOfFeedState();
+}
+
+class _EndOfFeedState extends State<_EndOfFeed> {
+  int _play = 1; // plays once when it appears, again on every tap
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    Widget btn(String label, {WI? icon, String? glyph, bool gold = false, required VoidCallback onTap}) => GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(gradient: gold ? kGoldGradient : null, color: gold ? null : p.chip, borderRadius: BorderRadius.circular(20)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (icon != null) WIcon(icon, size: 16, color: gold ? kInk : p.text, strokeWidth: 1.9),
+              if (glyph != null) Text(glyph, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.text)),
+              const SizedBox(width: 6),
+              Text(t(label), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: gold ? kInk : p.text)),
+            ]),
+          ),
+        );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 32, 16, 24),
+      child: Column(children: [
+        GestureDetector(onTap: () => setState(() => _play++), child: AnimatedLogo(size: 44, playKey: _play)),
+        const SizedBox(height: 12),
+        Text(t("You're all caught up"), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 2),
+        Text(t(widget.count == 1 ? "That's all {n} ask near you for now." : "That's all {n} asks near you for now.", {'n': widget.count}),
+            textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.muted)),
+        const SizedBox(height: 16),
+        Wrap(alignment: WrapAlignment.center, spacing: 8, runSpacing: 8, children: [
+          btn('Post an Ask', icon: WI.ask, gold: true, onTap: widget.onAsk),
+          btn('Find people', icon: WI.search, onTap: widget.onFind),
+          btn('Back to top', glyph: '↑', onTap: widget.onTop),
         ]),
-      ),
+      ]),
     );
   }
 }

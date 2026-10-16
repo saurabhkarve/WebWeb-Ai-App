@@ -8,6 +8,7 @@ environment:
 
 dependencies:
   audioplayers: ^6.8.1
+  file_picker: ^13.1.0
   firebase_core: ^4.15.0
   firebase_messaging: ^16.7.0
   flutter:
@@ -38,6 +39,7 @@ flutter:
   assets:
     - assets/logo.png
     - assets/logo_mark.svg
+    - assets/i18n/
   fonts:
     - family: Akash
       fonts:
@@ -47,6 +49,8 @@ flutter:
           weight: 500
         - asset: assets/fonts/Akash-700.ttf
           weight: 700
+        - asset: assets/fonts/Akash-900.ttf
+          weight: 900
 
 flutter_launcher_icons:
   android: true
