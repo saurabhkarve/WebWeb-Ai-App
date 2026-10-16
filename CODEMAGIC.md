@@ -76,7 +76,14 @@ Keep a backup of the `.jks` file and its passwords. If you lose them, you cannot
 4. In App Store Connect, go to **Apps**, then **+**, then **New App**.
    - Platform: iOS. Name: *WebWeb Ai*. Bundle ID: `ai.webweb.app`. SKU: `webweb-ai`.
    - Open the new app, then **App Information**. Copy the **Apple ID** (a number) into `APP_STORE_APPLE_ID`.
-5. Codemagic then creates the distribution certificate and provisioning profile on its own, because the yaml has `ios_signing`. You do not need a Mac for this.
+5. Create the signing files once. No Mac is needed. Codemagic does not create these by itself; the build only picks them up.
+   1. **Certificate.** In Codemagic, go to **Team settings → Code signing identities → iOS certificates → Generate certificate**. Choose the key `WebWeb ASC` and the type **Apple Distribution**, then save. Keep the downloaded `.p12` and its password somewhere safe.
+   2. **Provisioning profile.** In Apple Developer, go to **Profiles → +**, then **Distribution → App Store Connect**.
+      - App ID: `ai.webweb.app`.
+      - Certificate: the Apple Distribution certificate from step 1. It is the newest one.
+      - Name: `WebWeb App Store`. Click **Generate**.
+   3. **Bring the profile into Codemagic.** Go to **Team settings → Code signing identities → iOS provisioning profiles → Fetch profiles**. Pick key `WebWeb ASC`, tick `WebWeb App Store`, and save. It should show a green tick, meaning a matching certificate was found.
+   4. If you later turn on a new capability for the App ID, the profile becomes invalid. Edit and re-save it in Apple Developer, then fetch it again in Codemagic.
 
 ## 6. Build
 - **From Codemagic:** open the app, click **Start new build**, then pick a workflow (`android-release` or `ios-release`) and the `main` branch.
