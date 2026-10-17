@@ -481,14 +481,16 @@ class _AskFormState extends State<_AskForm> {
     super.dispose();
   }
 
-  Widget _fieldLabel(Pal p, String label, String field) {
+  Widget _fieldActions(Pal p, String field) {
     final ctl = field == 'title' ? _title : _desc;
     final has = ctl.text.isNotEmpty;
     final canPolish = _aiOn && (_title.text.trim().length >= 3 || _desc.text.trim().length >= 10);
+    if (!has && !canPolish) return const SizedBox.shrink();
+    // the placeholder names the field; this row only carries its actions
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(children: [
-        Expanded(child: Text(t(label), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400))),
+        const Spacer(),
         if (has)
           GestureDetector(
             onTap: () {
@@ -608,7 +610,6 @@ class _AskFormState extends State<_AskForm> {
                     : '';
     final score = [titleOk, desc.trim().length >= 60, _location.isNotEmpty, _urgency.isNotEmpty, _budget.isNotEmpty, _photos.isNotEmpty].where((x) => x).length;
     final strength = score >= 5 ? 'Strong ask' : (score >= 3 ? 'Good ask' : 'Basic ask');
-    final summary = [_location.isEmpty ? t('Anywhere') : t(_location), _urgency.isEmpty ? t('Any time') : t(labelOf(kUrgencies, _urgency)), _budget.isEmpty ? t('No budget') : _budget].join(' · ');
     final w = MediaQuery.of(context).size.width;
 
     Widget hScroll(List<Widget> children, {double height = 40}) => SizedBox(
@@ -623,6 +624,13 @@ class _AskFormState extends State<_AskForm> {
               itemBuilder: (_, i) => Center(child: children[i]),
             ),
           ),
+        );
+    Widget detail(WI icon, String value) => Flexible(
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            WIcon(icon, size: 16, color: p.muted),
+            const SizedBox(width: 4),
+            Flexible(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+          ]),
         );
     Widget pill(String label, bool on, VoidCallback onTap, {double h = 40, double font = 14}) => GestureDetector(
           onTap: onTap,
@@ -639,10 +647,6 @@ class _AskFormState extends State<_AskForm> {
     final form = ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
-        Text(t('Ask the network to share a contact or an opinion for your business need.'), style: TextStyle(fontSize: 12, color: p.muted)),
-        const SizedBox(height: 8),
-        _caps(p, 'What do you need?'),
-        const SizedBox(height: 6),
         hScroll(height: 40, [
           for (final o in kPostCategories)
             GestureDetector(
@@ -671,20 +675,6 @@ class _AskFormState extends State<_AskForm> {
         if (_category == 'other') ...[
           const SizedBox(height: 6),
           TextField(controller: _other, maxLength: 40, onChanged: (_) => setState(() {}), decoration: _input(p, t('What is this about? e.g. Event stall, Legal help, Insurance'))),
-          const SizedBox(height: 4),
-          Text(t('Name it in a few words so the right people find it.'), style: TextStyle(fontSize: 12, color: p.muted)),
-        ],
-        if (tip != null) ...[
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(color: p.chip.withValues(alpha: .6), borderRadius: BorderRadius.circular(8)),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('💡', style: TextStyle(fontSize: 12)),
-              const SizedBox(width: 6),
-              Expanded(child: Text(t(tip.$1), style: TextStyle(fontSize: 12, color: p.muted))),
-            ]),
-          ),
         ],
         if (suggestion != null && !_dismissed) ...[
           const SizedBox(height: 8),
@@ -717,18 +707,21 @@ class _AskFormState extends State<_AskForm> {
             ]),
           ),
         ],
-        if (samples.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _caps(p, 'Start from a template', icon: WI.sparkle),
-          const SizedBox(height: 6),
+        // quick starts, only while nothing is written yet (or to undo one)
+        if (samples.isNotEmpty && ((title.trim().isEmpty && desc.trim().isEmpty) || _undoTpl != null)) ...[
+          const SizedBox(height: 4),
           hScroll(height: 36, [
             for (final s in samples)
               GestureDetector(
                 onTap: () => _applyTemplate(s.$2, s.$3),
                 child: DashedBox(
                   radius: 20,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  child: Text(t(s.$1), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    WIcon(WI.sparkle, size: 13, color: p.link),
+                    const SizedBox(width: 4),
+                    Text(t(s.$1), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.link)),
+                  ]),
                 ),
               ),
             if (_undoTpl != null)
@@ -744,7 +737,7 @@ class _AskFormState extends State<_AskForm> {
         ],
         if (_aiError != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_aiError!, style: TextStyle(fontSize: 12, color: p.danger))),
         const SizedBox(height: 12),
-        _fieldLabel(p, 'Title *', 'title'),
+        _fieldActions(p, 'title'),
         TextField(
           controller: _title,
           focusNode: _titleFocus,
@@ -772,7 +765,7 @@ class _AskFormState extends State<_AskForm> {
           ),
         _suggestion(p, 'title') ?? const SizedBox.shrink(),
         const SizedBox(height: 12),
-        _fieldLabel(p, 'Description *', 'description'),
+        _fieldActions(p, 'description'),
         TextField(
           controller: _desc,
           focusNode: _descFocus,
@@ -781,7 +774,7 @@ class _AskFormState extends State<_AskForm> {
           maxLength: 1000,
           textCapitalization: TextCapitalization.sentences,
           style: const TextStyle(fontSize: 16),
-          decoration: _input(p, t('Describe what you need: quantity, quality, area, timing'), error: descBlank ? t('Replace the [brackets] with your details') : null),
+          decoration: _input(p, t(tip?.$1 ?? 'Describe what you need: quantity, quality, area, timing'), error: descBlank ? t('Replace the [brackets] with your details') : null),
         ),
         _suggestion(p, 'description') ?? const SizedBox.shrink(),
         if (desc.length > 800) Align(alignment: Alignment.centerRight, child: Text('${desc.length}/1000', style: TextStyle(fontSize: 12, color: p.muted))),
@@ -846,13 +839,19 @@ class _AskFormState extends State<_AskForm> {
               borderRadius: BorderRadius.circular(8),
               onTap: () => setState(() => _more = !_more),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 child: Row(children: [
                   Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(t('Location, timing and budget'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25)),
-                      Text(summary, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted, height: 1.25)),
-                    ]),
+                    child: Semantics(
+                      label: t('Location, timing and budget'),
+                      child: Row(children: [
+                        detail(WI.pin, _location.isEmpty ? t('Anywhere') : t(_location)),
+                        const SizedBox(width: 12),
+                        detail(WI.clock, _urgency.isEmpty ? t('Any time') : t(labelOf(kUrgencies, _urgency))),
+                        const SizedBox(width: 12),
+                        detail(WI.rupee, _budget.isEmpty ? t('Any') : _budget),
+                      ]),
+                    ),
                   ),
                   AnimatedRotation(turns: _more ? .25 : 0, duration: const Duration(milliseconds: 150), child: WIcon(WI.chevronRight, size: 20, color: p.muted)),
                 ]),
@@ -966,8 +965,10 @@ class _AskFormState extends State<_AskForm> {
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted),
               ),
             ),
-            const SizedBox(width: 12),
-            Text(t(ready ? strength : missing), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+            if (ready || title.trim().isNotEmpty || desc.trim().isNotEmpty) ...[
+              const SizedBox(width: 12),
+              Text(t(ready ? strength : missing), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+            ],
           ]),
           const SizedBox(height: 8),
           SizedBox(width: double.infinity, child: GoldButton(label: t('Publish Ask'), wi: WI.askPlus, loading: _busy, onPressed: ready ? _publish : null)),
