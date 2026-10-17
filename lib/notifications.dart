@@ -185,13 +185,16 @@ class NotificationService with WidgetsBindingObserver {
         if (m['senderUid'] == me) return;
         final chatId = '${e['chatId']}';
         if (_foreground && activeChat == chatId) return;
+        // in the background the server sends a push for it (the app told it so); avoid showing it twice
+        if (!_foreground && _ready && rt.serverPush) return;
         final name = await _chatPeerName(chatId);
         final hasImage = m['imageUrl'] != null;
         final text = '${m['text'] ?? ''}';
         await showMessage(chatId: chatId, name: name, body: text.isNotEmpty ? text : (hasImage ? '📷 Photo' : 'New message'));
         break;
       case 'notify':
-        // the API decided this is worth showing; it chose the socket because the app is connected
+        // the API decided this is worth showing; it chose the socket because the app is connected and in front
+        if (!_foreground && _ready && rt.serverPush) return;
         final data = Map<String, dynamic>.from(e['data'] ?? {});
         await showActivity(data, title: '${e['title'] ?? ''}', body: '${e['body'] ?? ''}');
         break;

@@ -300,7 +300,7 @@ class _AskFormState extends State<_AskForm> {
       final c = kNodeCoords[profile!.location];
       setState(() {
         _location = profile.location;
-        if (c != null) _geo = (lat: c[0], lng: c[1], radiusM: 10000);
+        if (c != null) _geo = (lat: c[0], lng: c[1], radiusM: 100000);
       });
     } else {
       setState(() {});
@@ -323,7 +323,7 @@ class _AskFormState extends State<_AskForm> {
         final g = draft['geo'] as Map?;
         if (g != null) {
           final r = (g['radiusM'] as num).toInt();
-          _geo = (lat: (g['lat'] as num).toDouble(), lng: (g['lng'] as num).toDouble(), radiusM: _radii.contains(r) ? r : 10000);
+          _geo = (lat: (g['lat'] as num).toDouble(), lng: (g['lng'] as num).toDouble(), radiusM: _radii.contains(r) ? r : 100000);
         }
         _savedDraft = null;
     });
@@ -370,7 +370,7 @@ class _AskFormState extends State<_AskForm> {
     final c = kNodeCoords[name];
     setState(() {
       _location = name;
-      if (c != null) _geo = (lat: c[0], lng: c[1], radiusM: _geo?.radiusM ?? 10000);
+      if (c != null) _geo = (lat: c[0], lng: c[1], radiusM: _geo?.radiusM ?? 100000);
     });
     _saveDraft();
     _loadReach();
@@ -385,7 +385,7 @@ class _AskFormState extends State<_AskForm> {
       final h = await currentLocation();
       if (!mounted) return;
       setState(() {
-        _geo = (lat: h.lat, lng: h.lng, radiusM: _geo?.radiusM ?? 10000);
+        _geo = (lat: h.lat, lng: h.lng, radiusM: _geo?.radiusM ?? 100000);
         _location = h.node == 'Other' ? '' : h.node;
       });
       _loadReach();

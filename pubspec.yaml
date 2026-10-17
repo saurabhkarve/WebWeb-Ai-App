@@ -23,6 +23,7 @@ dependencies:
   http: ^1.2.0
   http_parser: ^4.1.2
   image_picker: ^1.2.4
+  package_info_plus: ^10.2.2
   provider: ^6.1.2
   share_plus: ^13.3.1
   shared_preferences: ^2.2.3

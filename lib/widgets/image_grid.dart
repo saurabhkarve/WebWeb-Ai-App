@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:provider/provider.dart';
 
+import '../auth_provider.dart';
 import '../i18n.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../share_log.dart';
 
 /// Post media, same as the web (image-grid.tsx): 1 image = full width (up to 512 px tall), 2 = side by
 /// side, 3 = one tall + two stacked, 4 = 2x2; 16:9 frame, 2 px gaps, rounded outer corners with a border.
 /// Tap any image: full-screen viewer that swipes between photos, with a counter, share and close.
 class ImageGrid extends StatelessWidget {
   final List<String> images;
+
   /// link shared from the viewer (the ask's page)
   final String? shareUrl;
-  const ImageGrid(this.images, {super.key, this.shareUrl});
+
+  /// the post's id, to record the share
+  final String? shareRef;
+  const ImageGrid(this.images, {super.key, this.shareUrl, this.shareRef});
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +27,7 @@ class ImageGrid extends StatelessWidget {
     final shown = images.take(4).toList();
     final n = shown.length;
     Widget tile(int i) => GestureDetector(
-          onTap: () => openImageViewer(context, images, i, shareUrl: shareUrl),
+          onTap: () => openImageViewer(context, images, i, shareUrl: shareUrl, shareRef: shareRef),
           child: Stack(fit: StackFit.expand, children: [
             ColoredBox(color: p.chip, child: NetImg(shown[i])),
             if (i == 3 && images.length > 4)
@@ -36,7 +42,7 @@ class ImageGrid extends StatelessWidget {
     Widget body;
     if (n == 1) {
       body = GestureDetector(
-        onTap: () => openImageViewer(context, images, 0, shareUrl: shareUrl),
+        onTap: () => openImageViewer(context, images, 0, shareUrl: shareUrl, shareRef: shareRef),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 512, minHeight: 120),
           child: SizedBox(width: double.infinity, child: ColoredBox(color: p.chip, child: NetImg(shown[0], fit: BoxFit.cover))),
@@ -49,9 +55,7 @@ class ImageGrid extends StatelessWidget {
             ? Row(children: [Expanded(child: tile(0)), const SizedBox(width: gap), Expanded(child: tile(1))])
             : Row(children: [
                 Expanded(
-                  child: n == 3
-                      ? tile(0)
-                      : Column(children: [Expanded(child: tile(0)), const SizedBox(height: gap), Expanded(child: tile(2))]),
+                  child: n == 3 ? tile(0) : Column(children: [Expanded(child: tile(0)), const SizedBox(height: gap), Expanded(child: tile(2))]),
                 ),
                 const SizedBox(width: gap),
                 Expanded(
@@ -72,11 +76,11 @@ class ImageGrid extends StatelessWidget {
   }
 }
 
-void openImageViewer(BuildContext context, List<String> images, int start, {String? shareUrl}) {
+void openImageViewer(BuildContext context, List<String> images, int start, {String? shareUrl, String? shareRef}) {
   Navigator.of(context).push(PageRouteBuilder(
     opaque: false,
     barrierColor: Colors.black,
-    pageBuilder: (_, __, ___) => _Viewer(images, start, shareUrl),
+    pageBuilder: (_, __, ___) => _Viewer(images, start, shareUrl, shareRef),
     transitionsBuilder: (_, a, __, child) => FadeTransition(opacity: a, child: child),
   ));
 }
@@ -84,8 +88,8 @@ void openImageViewer(BuildContext context, List<String> images, int start, {Stri
 class _Viewer extends StatefulWidget {
   final List<String> images;
   final int start;
-  final String? shareUrl;
-  const _Viewer(this.images, this.start, this.shareUrl);
+  final String? shareUrl, shareRef;
+  const _Viewer(this.images, this.start, this.shareUrl, this.shareRef);
   @override
   State<_Viewer> createState() => _ViewerState();
 }
@@ -138,7 +142,7 @@ class _ViewerState extends State<_Viewer> {
                 ),
               const Spacer(),
               if (widget.shareUrl != null) ...[
-                roundBtn(WI.share, t('Share'), () => SharePlus.instance.share(ShareParams(text: widget.shareUrl!))),
+                roundBtn(WI.share, t('Share'), () => shareAndLog(context.read<AuthProvider>().api, entity: 'post', ref: widget.shareRef ?? '', text: widget.shareUrl!)),
                 const SizedBox(width: 8),
               ],
               roundBtn(WI.close, t('Close'), () => Navigator.pop(context)),

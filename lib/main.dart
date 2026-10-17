@@ -11,6 +11,7 @@ import 'screens/login_screen.dart';
 import 'screens/onboarding.dart';
 import 'screens/shell.dart';
 import 'theme.dart';
+import 'update_check.dart';
 import 'widgets.dart';
 
 final navKey = GlobalKey<NavigatorState>();
@@ -51,8 +52,39 @@ class App extends StatelessWidget {
       themeMode: context.watch<ThemeController>().mode,
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
+      // update prompts (Admin > App updates) sit over every screen, the login too
+      builder: (context, child) => UpdateGate(child: _KeyboardDismissOnScroll(child: child ?? const SizedBox())),
       // a language switch rebuilds every screen with the new strings (web: t() re-renders on change)
       home: KeyedSubtree(key: ValueKey(context.watch<I18n>().lang), child: const Gate()),
+    );
+  }
+}
+
+/// Dragging any list downwards while the keyboard is up puts the keyboard away (WhatsApp-style), on every
+/// screen. Scrolling inside the text field that has the keyboard does not count.
+class _KeyboardDismissOnScroll extends StatelessWidget {
+  final Widget child;
+  const _KeyboardDismissOnScroll({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<ScrollNotification>(
+      onNotification: (n) {
+        final drag = n is ScrollUpdateNotification ? n.dragDetails : (n is OverscrollNotification ? n.dragDetails : null);
+        if (drag == null || drag.delta.dy < 3 || n.metrics.axis != Axis.vertical) return false;
+        if (MediaQuery.viewInsetsOf(context).bottom <= 0) return false;
+        final focus = FocusManager.instance.primaryFocus;
+        final field = focus?.context;
+        if (focus == null || field == null) return false;
+        var inside = false;
+        n.context?.visitAncestorElements((e) {
+          inside = e == field;
+          return !inside;
+        });
+        if (!inside) focus.unfocus();
+        return false;
+      },
+      child: child,
     );
   }
 }
@@ -103,10 +135,12 @@ class _ProfileLoading extends StatelessWidget {
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Text(auth.error!, textAlign: TextAlign.center),
                   const SizedBox(height: 16),
-                  GoldButton(label: t('Try again'), onPressed: () {
-                    auth.error = null;
-                    auth.loadProfile();
-                  }),
+                  GoldButton(
+                      label: t('Try again'),
+                      onPressed: () {
+                        auth.error = null;
+                        auth.loadProfile();
+                      }),
                   TextButton(onPressed: auth.logout, child: Text(t('Log out'))),
                 ]),
               ),

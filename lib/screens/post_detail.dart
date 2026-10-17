@@ -22,6 +22,7 @@ const _kindWord = {'contact': 'your contact', 'media': 'a photo', 'info': 'some 
 class PostDetailScreen extends StatefulWidget {
   final String postId;
   final bool openReply;
+
   /// "+N more" from the feed: open with the whole response log shown
   final bool expandResponses;
   const PostDetailScreen({super.key, required this.postId, this.openReply = false, this.expandResponses = false});
@@ -229,9 +230,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               Text(post.title ?? '', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1.375)),
               const SizedBox(height: 8),
             ],
-            if ((post.description ?? '').isNotEmpty)
-              SelectableText(post.description!, style: isAsk ? const TextStyle(fontSize: 16, height: 1.625) : const TextStyle(fontSize: 18, height: 1.375)),
-            ImageGrid(post.images, shareUrl: post.webUrl),
+            if ((post.description ?? '').isNotEmpty) SelectableText(post.description!, style: isAsk ? const TextStyle(fontSize: 16, height: 1.625) : const TextStyle(fontSize: 18, height: 1.375)),
+            ImageGrid(post.images, shareUrl: post.webUrl, shareRef: post.id),
             if (hasDetails) ...[
               const SizedBox(height: 20),
               Container(
@@ -342,7 +342,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             Row(children: [
               Expanded(child: GoldButton(label: t('Approve'), height: 40, loading: _busy, onPressed: () => _run(() async => _api.post('/posts/${post.id}/share/answer', {'approve': true})))),
               const SizedBox(width: 8),
-              Expanded(child: GoldButton(label: t('Decline'), height: 40, outlined: true, onPressed: _busy ? null : () => _run(() async => _api.post('/posts/${post.id}/share/answer', {'approve': false})))),
+              Expanded(
+                  child:
+                      GoldButton(label: t('Decline'), height: 40, outlined: true, onPressed: _busy ? null : () => _run(() async => _api.post('/posts/${post.id}/share/answer', {'approve': false})))),
             ]),
           ]),
         ),
@@ -422,15 +424,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: i == 0 ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border))),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text.rich(TextSpan(children: [
-                    TextSpan(text: '${_referrals[i].name} · ', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    WidgetSpan(
-                      child: GestureDetector(
-                        onTap: () => launchUrl(Uri(scheme: 'tel', path: _referrals[i].phone.replaceAll(' ', ''))),
-                        child: Text(_referrals[i].phone, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.link)),
-                      ),
-                    ),
-                  ]), style: const TextStyle(fontSize: 16)),
+                  Text.rich(
+                      TextSpan(children: [
+                        TextSpan(text: '${_referrals[i].name} · ', style: const TextStyle(fontWeight: FontWeight.w700)),
+                        WidgetSpan(
+                          child: GestureDetector(
+                            onTap: () => launchUrl(Uri(scheme: 'tel', path: _referrals[i].phone.replaceAll(' ', ''))),
+                            child: Text(_referrals[i].phone, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.link)),
+                          ),
+                        ),
+                      ]),
+                      style: const TextStyle(fontSize: 16)),
                   if ((_referrals[i].note ?? '').isNotEmpty) Text(_referrals[i].note!, style: const TextStyle(fontSize: 14)),
                   Text.rich(
                     TextSpan(children: [
@@ -521,16 +525,22 @@ class _ShareTileState extends State<_ShareTile> {
       decoration: widget.first ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          GestureDetector(
-            onTap: s.sharerHandle == null ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: s.sharerHandle!))),
-            child: Avatar(name: s.sharerName, photoUrl: s.sharerPhotoUrl, size: 44, type: s.sharerType, badge: 18),
-          ),
-          const SizedBox(width: 12),
+          // photo and name both open their page
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(s.sharerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.25)),
-              Text(s.sharerCompany, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted, height: 1.25)),
-            ]),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: (s.sharerHandle ?? '').isEmpty ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: s.sharerHandle!))),
+              child: Row(children: [
+                Avatar(name: s.sharerName, photoUrl: s.sharerPhotoUrl, size: 44, type: s.sharerType, badge: 18),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(s.sharerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.25)),
+                    Text(s.sharerCompany, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted, height: 1.25)),
+                  ]),
+                ),
+              ]),
+            ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -591,7 +601,8 @@ class _ShareTileState extends State<_ShareTile> {
             label: t('Message'),
             height: 32,
             outlined: true,
-            onPressed: () => openChat(context, Peer(uid: s.sharerUid, name: s.sharerName, company: s.sharerCompany, handle: s.sharerHandle ?? '', photoUrl: s.sharerPhotoUrl, userType: s.sharerType ?? 'entrepreneur')),
+            onPressed: () => openChat(
+                context, Peer(uid: s.sharerUid, name: s.sharerName, company: s.sharerCompany, handle: s.sharerHandle ?? '', photoUrl: s.sharerPhotoUrl, userType: s.sharerType ?? 'entrepreneur')),
           ),
         ]),
       ]),
@@ -667,7 +678,13 @@ class _EditAskSheetState extends State<_EditAskSheet> {
             const SizedBox(height: 12),
             Text(t('Category'), style: const TextStyle(fontSize: 14)),
             const SizedBox(height: 6),
-            SelectPill(value: _category, placeholder: t('Category'), rounded: false, height: 44, options: [for (final o in kPostCategories) Option(o.value, t(o.label))], onChanged: (v) => setState(() => _category = v.isEmpty ? _category : v)),
+            SelectPill(
+                value: _category,
+                placeholder: t('Category'),
+                rounded: false,
+                height: 44,
+                options: [for (final o in kPostCategories) Option(o.value, t(o.label))],
+                onChanged: (v) => setState(() => _category = v.isEmpty ? _category : v)),
             const SizedBox(height: 12),
           ],
           AppField(controller: _desc, label: t(_isAsk ? 'Description *' : 'Description'), maxLines: 5, maxLength: 1000, onChanged: (_) => setState(() {})),
@@ -678,7 +695,13 @@ class _EditAskSheetState extends State<_EditAskSheet> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(t('Location'), style: const TextStyle(fontSize: 14)),
                   const SizedBox(height: 6),
-                  SelectPill(value: _location, placeholder: t('Anywhere'), rounded: false, height: 44, options: [for (final o in kLocations) Option(o.value, t(o.label))], onChanged: (v) => setState(() => _location = v)),
+                  SelectPill(
+                      value: _location,
+                      placeholder: t('Anywhere'),
+                      rounded: false,
+                      height: 44,
+                      options: [for (final o in kLocations) Option(o.value, t(o.label))],
+                      onChanged: (v) => setState(() => _location = v)),
                 ]),
               ),
               const SizedBox(width: 12),
@@ -686,7 +709,13 @@ class _EditAskSheetState extends State<_EditAskSheet> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(t('Urgency'), style: const TextStyle(fontSize: 14)),
                   const SizedBox(height: 6),
-                  SelectPill(value: _urgency, placeholder: t('Any time'), rounded: false, height: 44, options: [for (final o in kUrgencies) Option(o.value, t(o.label))], onChanged: (v) => setState(() => _urgency = v)),
+                  SelectPill(
+                      value: _urgency,
+                      placeholder: t('Any time'),
+                      rounded: false,
+                      height: 44,
+                      options: [for (final o in kUrgencies) Option(o.value, t(o.label))],
+                      onChanged: (v) => setState(() => _urgency = v)),
                 ]),
               ),
             ]),

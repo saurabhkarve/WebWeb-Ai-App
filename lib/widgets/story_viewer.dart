@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
@@ -14,6 +13,7 @@ import '../screens/profile.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'reaction_picker.dart' show ReactionGlyph;
+import '../share_log.dart';
 
 /// Full-screen update player (web update-viewer.tsx): tap right / left to move, auto-advances every
 /// 5 s. Others' updates get a right rail (react, repost, share) and a message field that replies in
@@ -78,6 +78,7 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
   }
 
   bool _away = false; // the author's page is open on top
+  double _pullDown = 0; // swipe down to close: how far the screen follows the finger
   bool get _paused => _insightsOpen || _focus.hasFocus || _picker || _away;
 
   /// Tapping the author opens their page; the update waits and carries on when you come back.
@@ -179,7 +180,7 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
 
   Future<void> _share() async {
     try {
-      await SharePlus.instance.share(ShareParams(text: '$siteUrl/update/${_item.id}', subject: '${_group.shownName} · ${t('Update')}'));
+      await shareAndLog(_api, entity: 'update', ref: _item.id, text: '$siteUrl/update/${_item.id}', subject: '${_group.shownName} · ${t('Update')}');
     } catch (_) {}
   }
 
@@ -310,278 +311,296 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
     return Scaffold(
       backgroundColor: kInk,
       resizeToAvoidBottomInset: false,
-      body: Stack(children: [
-        // content
-        Positioned.fill(
-          child: it.imageUrl != null
-              ? NetImg(it.imageUrl!, fit: BoxFit.contain, fallback: const SizedBox())
-              : Container(
-                  decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF3A3A3A), kInk], begin: Alignment.topLeft, end: Alignment.bottomRight)),
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.all(32),
-                  child: Text(it.text ?? '', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700, height: 1.33)),
-                ),
-        ),
-        if (it.imageUrl != null && (it.text ?? '').isNotEmpty)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 32 + 76 + bottomInset),
-              decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [kInk.withValues(alpha: .8), kInk.withValues(alpha: 0)])),
-              child: Text(it.text!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+      body: Transform.translate(
+        offset: Offset(0, _pullDown),
+        child: Opacity(
+          opacity: (1 - _pullDown / 600).clamp(0.4, 1).toDouble(),
+          child: Stack(children: [
+            // content
+            Positioned.fill(
+              child: it.imageUrl != null
+                  ? NetImg(it.imageUrl!, fit: BoxFit.contain, fallback: const SizedBox())
+                  : Container(
+                      decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF3A3A3A), kInk], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.all(32),
+                      child: Text(it.text ?? '', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700, height: 1.33)),
+                    ),
             ),
-          ),
-        // tap zones (previous = left third)
-        Positioned(
-          top: top + 72,
-          bottom: 96 + bottomInset,
-          left: 0,
-          right: 0,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapUp: (d) {
-              if (_focus.hasFocus) return _focus.unfocus();
-              if (_picker) return _closePicker();
-              d.localPosition.dx < MediaQuery.of(context).size.width / 3 ? _prev() : _next();
-            },
-            onLongPressStart: (_) => _progress.stop(),
-            onLongPressEnd: (_) => _syncPause(),
-          ),
-        ),
-        // top bar: progress, author, delete / close
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          child: Container(
-            padding: EdgeInsets.fromLTRB(12, top + 12, 12, 24),
-            decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [kInk.withValues(alpha: .6), kInk.withValues(alpha: 0)])),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              AnimatedBuilder(
-                animation: _progress,
-                builder: (_, __) => Row(children: [
-                  for (var k = 0; k < g.items.length; k++) ...[
-                    if (k > 0) const SizedBox(width: 4),
+            if (it.imageUrl != null && (it.text ?? '').isNotEmpty)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, 32 + 76 + bottomInset),
+                  decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [kInk.withValues(alpha: .8), kInk.withValues(alpha: 0)])),
+                  child: Text(it.text!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            // tap zones (previous = left third)
+            Positioned(
+              top: top + 72,
+              bottom: 96 + bottomInset,
+              left: 0,
+              right: 0,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapUp: (d) {
+                  if (_focus.hasFocus) return _focus.unfocus();
+                  if (_picker) return _closePicker();
+                  d.localPosition.dx < MediaQuery.of(context).size.width / 3 ? _prev() : _next();
+                },
+                onLongPressStart: (_) => _progress.stop(),
+                onLongPressEnd: (_) => _syncPause(),
+                // swipe down closes the update (the screen follows the finger, then slides away)
+                onVerticalDragStart: (_) => _progress.stop(),
+                onVerticalDragUpdate: (d) => setState(() => _pullDown = (_pullDown + d.delta.dy).clamp(0, 1000).toDouble()),
+                onVerticalDragEnd: (d) {
+                  if (_pullDown > 110 || (d.primaryVelocity ?? 0) > 700) {
+                    Navigator.of(context).maybePop();
+                  } else {
+                    setState(() => _pullDown = 0);
+                    _syncPause();
+                  }
+                },
+              ),
+            ),
+            // top bar: progress, author, delete / close
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              child: Container(
+                padding: EdgeInsets.fromLTRB(12, top + 12, 12, 24),
+                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [kInk.withValues(alpha: .6), kInk.withValues(alpha: 0)])),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  AnimatedBuilder(
+                    animation: _progress,
+                    builder: (_, __) => Row(children: [
+                      for (var k = 0; k < g.items.length; k++) ...[
+                        if (k > 0) const SizedBox(width: 4),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: k < _i ? 1 : (k == _i ? _progress.value : 0),
+                              minHeight: 2,
+                              backgroundColor: Colors.white.withValues(alpha: .3),
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ]),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    // author: opens their page
                     Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: k < _i ? 1 : (k == _i ? _progress.value : 0),
-                          minHeight: 2,
-                          backgroundColor: Colors.white.withValues(alpha: .3),
-                          color: Colors.white,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Semantics(
+                          button: true,
+                          label: g.shownName,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => _openAuthor(g.handle),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Avatar(name: g.shownName, size: 32, photoUrl: g.photoUrl, type: g.userType, badge: 14),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(mine ? t('Your update') : g.shownName,
+                                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                              ),
+                              if (!mine && g.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: g.verification, size: 14)],
+                              const SizedBox(width: 8),
+                              Text(timeAgo(it.createdAt), style: TextStyle(color: Colors.white.withValues(alpha: .7), fontSize: 12)),
+                            ]),
+                          ),
                         ),
                       ),
                     ),
-                  ],
-                ]),
-              ),
-              const SizedBox(height: 12),
-              Row(children: [
-                // author: opens their page
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Semantics(
+                    if (mine && widget.onDelete != null)
+                      Semantics(
+                        button: true,
+                        label: t('Delete update'),
+                        child: GestureDetector(
+                          onTap: () async {
+                            _progress.stop();
+                            await widget.onDelete!(it.id);
+                            if (context.mounted) Navigator.of(context).pop(true);
+                          },
+                          behavior: HitTestBehavior.opaque,
+                          child: const SizedBox(width: 40, height: 40, child: Center(child: WIcon(WI.trash, size: 20, color: Colors.white))),
+                        ),
+                      ),
+                    Semantics(
                       button: true,
-                      label: g.shownName,
+                      label: t('Close'),
+                      // 48 pt wide: centred on the same column as the react / repost / share buttons below
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTap: () => _openAuthor(g.handle),
+                        onTap: () => Navigator.of(context).pop(),
+                        child: const SizedBox(width: 48, height: 40, child: Center(child: WIcon(WI.close, size: 24, color: Colors.white))),
+                      ),
+                    ),
+                  ]),
+                  if (it.repostedFrom != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: .15), borderRadius: BorderRadius.circular(20)),
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Avatar(name: g.shownName, size: 32, photoUrl: g.photoUrl, type: g.userType, badge: 14),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(mine ? t('Your update') : g.shownName,
-                                maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-                          ),
-                          if (!mine && g.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: g.verification, size: 14)],
-                          const SizedBox(width: 8),
-                          Text(timeAgo(it.createdAt), style: TextStyle(color: Colors.white.withValues(alpha: .7), fontSize: 12)),
+                          const WIcon(WI.repost, size: 14, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text('${t('Reposted from')} ${it.repostedFrom!['name']}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
                         ]),
                       ),
                     ),
-                  ),
-                ),
-                if (mine && widget.onDelete != null)
-                  Semantics(
-                    button: true,
-                    label: t('Delete update'),
-                    child: GestureDetector(
-                      onTap: () async {
-                        _progress.stop();
-                        await widget.onDelete!(it.id);
-                        if (context.mounted) Navigator.of(context).pop(true);
-                      },
-                      behavior: HitTestBehavior.opaque,
-                      child: const SizedBox(width: 40, height: 40, child: Center(child: WIcon(WI.trash, size: 20, color: Colors.white))),
-                    ),
-                  ),
-                Semantics(
-                  button: true,
-                  label: t('Close'),
-                  // 48 pt wide: centred on the same column as the react / repost / share buttons below
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => Navigator.of(context).pop(),
-                    child: const SizedBox(width: 48, height: 40, child: Center(child: WIcon(WI.close, size: 24, color: Colors.white))),
-                  ),
-                ),
-              ]),
-              if (it.repostedFrom != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: .15), borderRadius: BorderRadius.circular(20)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const WIcon(WI.repost, size: 14, color: Colors.white),
-                      const SizedBox(width: 4),
-                      Text('${t('Reposted from')} ${it.repostedFrom!['name']}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
-                    ]),
-                  ),
-                ),
-            ]),
-          ),
-        ),
-        // right rail: react, repost, share
-        Positioned(
-          right: 12,
-          bottom: 112 + bottomInset,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            if (!mine)
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                if (_picker)
-                  Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: .2), borderRadius: BorderRadius.circular(30)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      for (final r in kReactions)
-                        GestureDetector(
-                          onTap: () => _react(it.myReaction == r ? null : r),
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            margin: const EdgeInsets.symmetric(horizontal: 2),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(shape: BoxShape.circle, color: it.myReaction == r ? Colors.white.withValues(alpha: .3) : Colors.transparent),
-                            child: ReactionGlyph(r, size: 24),
-                          ),
-                        ),
-                    ]),
-                  ),
-                _railBtn(
-                  label: t('React'),
-                  onTap: () {
-                    if (it.myReaction == null) {
-                      // first tap gives the default reaction and offers the others
-                      _react('heart', close: false);
-                      _openPicker();
-                    } else if (_picker) {
-                      _closePicker();
-                    } else {
-                      _openPicker();
-                    }
-                  },
-                  child: it.myReaction != null ? ReactionGlyph(it.myReaction!, size: 24) : const WIcon(WI.heart, size: 28, color: Colors.white),
-                ),
-              ]),
-            if (!mine) ...[
-              const SizedBox(height: 12),
-              _railBtn(
-                label: t('Repost'),
-                onTap: _repost,
-                child: _reposted.contains(it.id) ? const WIcon(WI.checkCircle, size: 28, color: Color(0xFF34D399)) : const WIcon(WI.repost, size: 28, color: Colors.white),
-              ),
-              const SizedBox(height: 12),
-            ],
-            _railBtn(label: t('Share'), onTap: _share, child: const WIcon(WI.share, size: 28, color: Colors.white)),
-          ]),
-        ),
-        // bottom: message field (others) or insights (own)
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: Container(
-            padding: EdgeInsets.fromLTRB(12, 32, 12, 36 + bottomInset),
-            decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [kInk.withValues(alpha: .8), kInk.withValues(alpha: 0)])),
-            child: mine
-                ? GestureDetector(
-                    onTap: _showInsights,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: .15), borderRadius: BorderRadius.circular(30)),
-                      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        const WIcon(WI.eye, size: 20, color: Colors.white),
-                        const SizedBox(width: 8),
-                        Text(
-                          _insights == null ? t('Insights') : '${_insights!['views']} ${t((_insights!['views'] as num?) == 1 ? 'view' : 'views')}',
-                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
-                        ),
-                        if (it.reactionsCount > 0) Text('  · ${it.reactionsCount} ❤️', style: TextStyle(color: Colors.white.withValues(alpha: .8), fontSize: 14, fontWeight: FontWeight.w700)),
-                      ]),
-                    ),
-                  )
-                : Container(
-                    padding: const EdgeInsets.only(left: 16, right: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .1),
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: Colors.white.withValues(alpha: .4)),
-                    ),
-                    child: Row(children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _draft,
-                          focusNode: _focus,
-                          maxLength: 500,
-                          onChanged: (_) => setState(() {}),
-                          onSubmitted: (_) => _sendReply(),
-                          textInputAction: TextInputAction.send,
-                          cursorColor: Colors.white,
-                          style: const TextStyle(color: Colors.white, fontSize: 16),
-                          decoration: InputDecoration(
-                            hintText: t('Send message'),
-                            hintStyle: TextStyle(color: Colors.white.withValues(alpha: .7)),
-                            counterText: '',
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            filled: false,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: _busy || _draft.text.trim().isEmpty ? null : _sendReply,
-                        child: Opacity(
-                          opacity: _busy || _draft.text.trim().isEmpty ? .4 : 1,
-                          child: const SizedBox(width: 36, height: 36, child: Center(child: WIcon(WI.send, size: 20, color: Colors.white))),
-                        ),
-                      ),
-                    ]),
-                  ),
-          ),
-        ),
-        if (_note != null)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 6 + bottomInset,
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                decoration: BoxDecoration(color: Colors.white.withValues(alpha: .9), borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6)]),
-                child: Text(_note!, style: const TextStyle(color: kInk, fontSize: 12, fontWeight: FontWeight.w700)),
+                ]),
               ),
             ),
-          ),
-      ]),
+            // right rail: react, repost, share
+            Positioned(
+              right: 12,
+              bottom: 112 + bottomInset,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                if (!mine)
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (_picker)
+                      Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: .2), borderRadius: BorderRadius.circular(30)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          for (final r in kReactions)
+                            GestureDetector(
+                              onTap: () => _react(it.myReaction == r ? null : r),
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                margin: const EdgeInsets.symmetric(horizontal: 2),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(shape: BoxShape.circle, color: it.myReaction == r ? Colors.white.withValues(alpha: .3) : Colors.transparent),
+                                child: ReactionGlyph(r, size: 24),
+                              ),
+                            ),
+                        ]),
+                      ),
+                    _railBtn(
+                      label: t('React'),
+                      onTap: () {
+                        if (it.myReaction == null) {
+                          // first tap gives the default reaction and offers the others
+                          _react('heart', close: false);
+                          _openPicker();
+                        } else if (_picker) {
+                          _closePicker();
+                        } else {
+                          _openPicker();
+                        }
+                      },
+                      child: it.myReaction != null ? ReactionGlyph(it.myReaction!, size: 24) : const WIcon(WI.heart, size: 28, color: Colors.white),
+                    ),
+                  ]),
+                if (!mine) ...[
+                  const SizedBox(height: 12),
+                  _railBtn(
+                    label: t('Repost'),
+                    onTap: _repost,
+                    child: _reposted.contains(it.id) ? const WIcon(WI.checkCircle, size: 28, color: Color(0xFF34D399)) : const WIcon(WI.repost, size: 28, color: Colors.white),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                _railBtn(label: t('Share'), onTap: _share, child: const WIcon(WI.share, size: 28, color: Colors.white)),
+              ]),
+            ),
+            // bottom: message field (others) or insights (own)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: EdgeInsets.fromLTRB(12, 32, 12, 36 + bottomInset),
+                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [kInk.withValues(alpha: .8), kInk.withValues(alpha: 0)])),
+                child: mine
+                    ? GestureDetector(
+                        onTap: _showInsights,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: .15), borderRadius: BorderRadius.circular(30)),
+                          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            const WIcon(WI.eye, size: 20, color: Colors.white),
+                            const SizedBox(width: 8),
+                            Text(
+                              _insights == null ? t('Insights') : '${_insights!['views']} ${t((_insights!['views'] as num?) == 1 ? 'view' : 'views')}',
+                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
+                            ),
+                            if (it.reactionsCount > 0) Text('  · ${it.reactionsCount} ❤️', style: TextStyle(color: Colors.white.withValues(alpha: .8), fontSize: 14, fontWeight: FontWeight.w700)),
+                          ]),
+                        ),
+                      )
+                    : Container(
+                        padding: const EdgeInsets.only(left: 16, right: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: .1),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(color: Colors.white.withValues(alpha: .4)),
+                        ),
+                        child: Row(children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _draft,
+                              focusNode: _focus,
+                              maxLength: 500,
+                              onChanged: (_) => setState(() {}),
+                              onSubmitted: (_) => _sendReply(),
+                              textInputAction: TextInputAction.send,
+                              cursorColor: Colors.white,
+                              style: const TextStyle(color: Colors.white, fontSize: 16),
+                              decoration: InputDecoration(
+                                hintText: t('Send message'),
+                                hintStyle: TextStyle(color: Colors.white.withValues(alpha: .7)),
+                                counterText: '',
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                filled: false,
+                                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: _busy || _draft.text.trim().isEmpty ? null : _sendReply,
+                            child: Opacity(
+                              opacity: _busy || _draft.text.trim().isEmpty ? .4 : 1,
+                              child: const SizedBox(width: 36, height: 36, child: Center(child: WIcon(WI.send, size: 20, color: Colors.white))),
+                            ),
+                          ),
+                        ]),
+                      ),
+              ),
+            ),
+            if (_note != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 6 + bottomInset,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    decoration:
+                        BoxDecoration(color: Colors.white.withValues(alpha: .9), borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6)]),
+                    child: Text(_note!, style: const TextStyle(color: kInk, fontSize: 12, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ),
+          ]),
+        ),
+      ),
     );
   }
 }

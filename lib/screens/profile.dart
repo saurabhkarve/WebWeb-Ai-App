@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
@@ -20,6 +19,7 @@ import 'edit_profile.dart';
 import 'find.dart';
 import 'post_detail.dart';
 import 'talk.dart';
+import '../share_log.dart';
 
 /// One profile for everyone (web profile-view.tsx): your own page ([handle] == null) and any member's.
 /// Cover band with the back arrow, picture, one quiet stats line, name, tags, then the actions and
@@ -158,7 +158,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _shareTalkLink() async {
     final url = '$siteUrl/@${_u!.handle}/talk';
     try {
-      await SharePlus.instance.share(ShareParams(text: url, subject: '${t('Talk')}: ${_u!.name}'));
+      await shareAndLog(context.read<AuthProvider>().api, entity: 'profile', ref: _u!.handle, text: url, subject: '${t('Talk')}: ${_u!.name}');
     } catch (_) {
       await Clipboard.setData(ClipboardData(text: url));
       if (mounted) toast(context, t('Link copied!'));
@@ -1395,13 +1395,14 @@ class _ShareProfileSheetState extends State<_ShareProfileSheet> {
             row(WIcon(WI.clip, size: 20, color: p.text), t('Copy link'), _url.replaceFirst(RegExp(r'^https?://'), ''), () async {
               await Clipboard.setData(ClipboardData(text: _url));
               if (context.mounted) {
+                logShare(context.read<AuthProvider>().api, 'profile', _p.handle, channel: 'copy');
                 Navigator.pop(context);
                 toast(context, t('Link copied'));
               }
             }),
             row(WIcon(WI.share, size: 20, color: p.text), t('More apps'), t('WhatsApp, email and others'), () async {
               try {
-                await SharePlus.instance.share(ShareParams(text: _url, subject: widget.isSelf ? t('My WEBWEB AI page') : _title));
+                await shareAndLog(context.read<AuthProvider>().api, entity: 'profile', ref: _p.handle, text: _url, subject: widget.isSelf ? t('My WEBWEB AI page') : _title);
               } catch (_) {}
             }),
           ] else ...[

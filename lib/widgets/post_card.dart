@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
@@ -18,6 +17,7 @@ import 'image_grid.dart';
 import 'reaction_picker.dart';
 import 'response_sheet.dart';
 import 'tour.dart';
+import '../share_log.dart';
 
 /// Feed row, same layout as the web PostCard (post-card.tsx): avatar on the left; who + why you see it;
 /// the category chip, title and two lines of description; photos; location / budget / timing chips;
@@ -26,11 +26,14 @@ import 'tour.dart';
 class PostCard extends StatefulWidget {
   final Post post;
   final VoidCallback? onChanged;
+
   /// Detail page mode: full text, no navigation on tap, and Reply calls [onReply].
   final bool detail;
   final VoidCallback? onReply;
+
   /// Called after the author was blocked from this card's menu (the list drops their posts).
   final VoidCallback? onBlocked;
+
   /// The card the Connect tour points at (its chips, Reply and Refer carry the tour keys).
   final bool tourTarget;
   const PostCard({super.key, required this.post, this.onChanged, this.detail = false, this.onReply, this.onBlocked, this.tourTarget = false});
@@ -107,12 +110,38 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
   }
 
   static Post _withShares(Post p, int n) => Post(
-        id: p.id, kind: p.kind, authorUid: p.authorUid, authorName: p.authorName, authorCompany: p.authorCompany, authorHandle: p.authorHandle,
-        authorPhotoUrl: p.authorPhotoUrl, title: p.title, description: p.description, category: p.category, locationPref: p.locationPref,
-        budget: p.budget, urgency: p.urgency, matchReason: p.matchReason, slug: p.slug, categoryLabel: p.categoryLabel, authorType: p.authorType,
-        authorVerification: p.authorVerification, distanceM: p.distanceM, radiusM: p.radiusM, images: p.images, sharesCount: n, authorHasUpdate: p.authorHasUpdate,
-        createdAt: p.createdAt, recentResponses: p.recentResponses, reactionsCount: p.reactionsCount, repostsCount: p.repostsCount,
-        referralsCount: p.referralsCount, reacted: p.reacted, reposted: p.reposted, bookmarked: p.bookmarked, myReaction: p.myReaction,
+        id: p.id,
+        kind: p.kind,
+        authorUid: p.authorUid,
+        authorName: p.authorName,
+        authorCompany: p.authorCompany,
+        authorHandle: p.authorHandle,
+        authorPhotoUrl: p.authorPhotoUrl,
+        title: p.title,
+        description: p.description,
+        category: p.category,
+        locationPref: p.locationPref,
+        budget: p.budget,
+        urgency: p.urgency,
+        matchReason: p.matchReason,
+        slug: p.slug,
+        categoryLabel: p.categoryLabel,
+        authorType: p.authorType,
+        authorVerification: p.authorVerification,
+        distanceM: p.distanceM,
+        radiusM: p.radiusM,
+        images: p.images,
+        sharesCount: n,
+        authorHasUpdate: p.authorHasUpdate,
+        createdAt: p.createdAt,
+        recentResponses: p.recentResponses,
+        reactionsCount: p.reactionsCount,
+        repostsCount: p.repostsCount,
+        referralsCount: p.referralsCount,
+        reacted: p.reacted,
+        reposted: p.reposted,
+        bookmarked: p.bookmarked,
+        myReaction: p.myReaction,
       );
 
   @override
@@ -139,7 +168,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
             style: TextStyle(fontSize: 15, height: 1.375, color: isAsk ? p.text.withValues(alpha: .75) : p.text),
           ),
         ),
-      ImageGrid(post.images, shareUrl: post.webUrl),
+      ImageGrid(post.images, shareUrl: post.webUrl, shareRef: post.id),
     ]);
 
     return Container(
@@ -165,8 +194,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                       const SizedBox(width: 6),
                       Text(timeAgo(post.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
                     ]),
-                    Text(isBusiness ? post.authorName : post.authorCompany,
-                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted, height: 1.3)),
+                    Text(isBusiness ? post.authorName : post.authorCompany, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted, height: 1.3)),
                   ]),
                 ),
               ),
@@ -231,18 +259,20 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   clipBehavior: Clip.none,
-                  child: Row(children: [
-                  InfoPill(small: true, wi: categoryIcon(post.category), text: t(post.categoryText)),
-                  if ((post.locationPref ?? '').isNotEmpty)
-                    InfoPill(small: true, 
-                      wi: WI.pin,
-                      text: '${t(post.locationPref!)}${post.distanceM == null ? '' : ' · ${formatDistance(post.distanceM!)}'}',
-                      onTap: () => _openFind(location: post.locationPref),
-                    ),
-                  if ((post.budget ?? '').isNotEmpty) InfoPill(small: true, wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
-                  if (urgency != null) InfoPill(small: true, wi: WI.clock, text: t(urgency), onTap: () => _openFind(urgency: post.urgency)),
-                  if ((post.radiusM ?? 0) > 0) InfoPill(small: true, wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)})),
-                  if (post.images.isNotEmpty) InfoPill(small: true, wi: WI.camera, text: t(post.images.length == 1 ? '1 photo' : '{n} photos', {'n': post.images.length})),
+                  child: Row(
+                      children: [
+                    InfoPill(small: true, wi: categoryIcon(post.category), text: t(post.categoryText)),
+                    if ((post.locationPref ?? '').isNotEmpty)
+                      InfoPill(
+                        small: true,
+                        wi: WI.pin,
+                        text: '${t(post.locationPref!)}${post.distanceM == null ? '' : ' · ${formatDistance(post.distanceM!)}'}',
+                        onTap: () => _openFind(location: post.locationPref),
+                      ),
+                    if ((post.budget ?? '').isNotEmpty) InfoPill(small: true, wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
+                    if (urgency != null) InfoPill(small: true, wi: WI.clock, text: t(urgency), onTap: () => _openFind(urgency: post.urgency)),
+                    if ((post.radiusM ?? 0) > 0) InfoPill(small: true, wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)})),
+                    if (post.images.isNotEmpty) InfoPill(small: true, wi: WI.camera, text: t(post.images.length == 1 ? '1 photo' : '{n} photos', {'n': post.images.length})),
                   ].expand((w) => [w, const SizedBox(width: 6)]).toList()),
                 ),
               ),
@@ -278,14 +308,14 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               ),
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Transform.translate(offset: const Offset(-6, 0), child: PostActions(key: _actionsKey, post: post, onReply: _reply, onChanged: () => setState(() {}), tourTarget: widget.tourTarget)),
+              child:
+                  Transform.translate(offset: const Offset(-6, 0), child: PostActions(key: _actionsKey, post: post, onReply: _reply, onChanged: () => setState(() {}), tourTarget: widget.tourTarget)),
             ),
           ]),
         ),
       ]),
     );
   }
-
 }
 
 /// React · Refer · Repost · Reply · Share · Save under an ask or update (web post-actions.tsx). Counts sit in
@@ -293,6 +323,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
 class PostActions extends StatefulWidget {
   final Post post;
   final VoidCallback onReply;
+
   /// after a count changed (the card redraws its response log)
   final VoidCallback? onChanged;
   final bool tourTarget;
@@ -395,7 +426,7 @@ class PostActionsState extends State<PostActions> {
 
   Future<void> _share() async {
     try {
-      await SharePlus.instance.share(ShareParams(text: post.webUrl, subject: post.title ?? (post.isRequirement ? 'WebWeb AI ask' : 'WebWeb AI update')));
+      await shareAndLog(_api, entity: 'post', ref: post.id, text: post.webUrl, subject: post.title ?? (post.isRequirement ? 'WebWeb AI ask' : 'WebWeb AI update'));
     } catch (_) {}
   }
 
@@ -431,9 +462,7 @@ class PostActionsState extends State<PostActions> {
         value: post.myReaction,
         onChange: react,
         trigger: (_) => btn(
-          icon: reacted
-              ? SizedBox(width: 20, height: 20, child: Center(child: ReactionGlyph(post.myReaction!, size: 15)))
-              : WIcon(WI.heart, size: 20, color: p.muted),
+          icon: reacted ? SizedBox(width: 20, height: 20, child: Center(child: ReactionGlyph(post.myReaction!, size: 15))) : WIcon(WI.heart, size: 20, color: p.muted),
           count: post.reactionsCount,
           label: 'React',
           color: reacted ? p.text : p.muted,
@@ -527,31 +556,40 @@ class ResponseActivity extends StatelessWidget {
           decoration: BoxDecoration(border: Border(left: BorderSide(color: p.border, width: 2))),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             for (final r in items)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(children: [
-                  Avatar(name: displayName(r.userType, r.name, r.company), size: 20, photoUrl: r.photoUrl),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text.rich(
-                      TextSpan(children: [
-                        TextSpan(text: displayName(r.userType, r.name, r.company), style: const TextStyle(fontWeight: FontWeight.w700)),
-                        if (r.verification > 0) WidgetSpan(alignment: PlaceholderAlignment.middle, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 2), child: VerifiedBadge(level: r.verification, size: 13))),
-                        TextSpan(text: ' ${t(_verb[r.kind] ?? 'responded')}', style: TextStyle(color: p.muted)),
-                      ]),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12),
+              // who responded: tapping the row opens their page
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: r.handle.isEmpty ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: r.handle))),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(children: [
+                    Avatar(name: displayName(r.userType, r.name, r.company), size: 20, photoUrl: r.photoUrl),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(children: [
+                          TextSpan(text: displayName(r.userType, r.name, r.company), style: const TextStyle(fontWeight: FontWeight.w700)),
+                          if (r.verification > 0)
+                            WidgetSpan(
+                                alignment: PlaceholderAlignment.middle, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 2), child: VerifiedBadge(level: r.verification, size: 13))),
+                          TextSpan(text: ' ${t(_verb[r.kind] ?? 'responded')}', style: TextStyle(color: p.muted)),
+                        ]),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12),
+                      ),
                     ),
-                  ),
-                  if (r.rating != null || r.reaction != null)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 6),
-                      child: Text('${r.rating == 1 ? '👍' : r.rating == -1 ? '👎' : ''}${r.reaction == null ? '' : kReactionEmoji[r.reaction] ?? ''}', style: const TextStyle(fontSize: 12)),
-                    ),
-                  const SizedBox(width: 6),
-                  Text(timeAgo(r.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
-                ]),
+                    if (r.rating != null || r.reaction != null)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: Text(
+                            '${r.rating == 1 ? '👍' : r.rating == -1 ? '👎' : ''}${r.reaction == null ? '' : kReactionEmoji[r.reaction] ?? ''}',
+                            style: const TextStyle(fontSize: 12)),
+                      ),
+                    const SizedBox(width: 6),
+                    Text(timeAgo(r.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
+                  ]),
+                ),
               ),
             if (more > 0)
               GestureDetector(
