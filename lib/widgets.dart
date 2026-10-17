@@ -284,16 +284,22 @@ class InfoPill extends StatelessWidget {
   final WI? wi;
   final String text;
   final VoidCallback? onTap;
-  const InfoPill({super.key, this.wi, required this.text, this.onTap});
+  /// compact, for the feed card's chip row
+  final bool small;
+  const InfoPill({super.key, this.wi, required this.text, this.onTap, this.small = false});
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final chip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: small ? 8 : 10, vertical: small ? 3 : 4),
       decoration: BoxDecoration(color: p.field, borderRadius: BorderRadius.circular(20)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        if (wi != null) ...[WIcon(wi!, size: 14, color: p.muted), const SizedBox(width: 4)],
-        Flexible(child: Text(text, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .8)))),
+        if (wi != null) ...[WIcon(wi!, size: small ? 12 : 14, color: p.muted), const SizedBox(width: 4)],
+        // compact chips sit in a sideways-scrolling row (unbounded width), so no Flexible there
+        if (small)
+          Text(text, maxLines: 1, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .8)))
+        else
+          Flexible(child: Text(text, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .8)))),
       ]),
     );
     return onTap == null ? chip : GestureDetector(onTap: onTap, child: chip);

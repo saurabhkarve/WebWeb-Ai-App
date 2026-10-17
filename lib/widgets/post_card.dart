@@ -222,20 +222,25 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
             // the essentials as chips: what, where (and how far), budget, timing, reach, photos
             if (isAsk)
               Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Wrap(spacing: 6, runSpacing: 6, children: [
-                  InfoPill(wi: categoryIcon(post.category), text: t(post.categoryText)),
+                padding: const EdgeInsets.only(top: 8),
+                // one line that scrolls sideways
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  clipBehavior: Clip.none,
+                  child: Row(children: [
+                  InfoPill(small: true, wi: categoryIcon(post.category), text: t(post.categoryText)),
                   if ((post.locationPref ?? '').isNotEmpty)
-                    InfoPill(
+                    InfoPill(small: true, 
                       wi: WI.pin,
                       text: '${t(post.locationPref!)}${post.distanceM == null ? '' : ' · ${formatDistance(post.distanceM!)}'}',
                       onTap: () => _openFind(location: post.locationPref),
                     ),
-                  if ((post.budget ?? '').isNotEmpty) InfoPill(wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
-                  if (urgency != null) InfoPill(wi: WI.clock, text: t(urgency), onTap: () => _openFind(urgency: post.urgency)),
-                  if ((post.radiusM ?? 0) > 0) InfoPill(wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)})),
-                  if (post.images.isNotEmpty) InfoPill(wi: WI.camera, text: t(post.images.length == 1 ? '1 photo' : '{n} photos', {'n': post.images.length})),
-                ]),
+                  if ((post.budget ?? '').isNotEmpty) InfoPill(small: true, wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
+                  if (urgency != null) InfoPill(small: true, wi: WI.clock, text: t(urgency), onTap: () => _openFind(urgency: post.urgency)),
+                  if ((post.radiusM ?? 0) > 0) InfoPill(small: true, wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)})),
+                  if (post.images.isNotEmpty) InfoPill(small: true, wi: WI.camera, text: t(post.images.length == 1 ? '1 photo' : '{n} photos', {'n': post.images.length})),
+                  ].expand((w) => [w, const SizedBox(width: 6)]).toList()),
+                ),
               ),
             if (mine && isAsk)
               GestureDetector(
@@ -440,7 +445,7 @@ class PostActionsState extends State<PostActions> {
         color: post.reposted ? const Color(0xFF059669) : p.muted,
         onTap: _toggleRepost,
       ),
-      btn(icon: WIcon(WI.reply, size: 20, color: p.muted), count: isAsk ? post.sharesCount : null, label: 'Reply', color: p.muted, onTap: widget.onReply),
+      btn(icon: WIcon(WI.talk, size: 20, color: p.muted), count: isAsk ? post.sharesCount : null, label: 'Reply', color: p.muted, onTap: widget.onReply),
       btn(icon: WIcon(WI.share, size: 20, color: p.muted), label: 'Share', color: p.muted, onTap: _share),
       btn(
         icon: WIcon(WI.bookmark, size: 20, color: post.bookmarked ? p.link : p.muted, fill: post.bookmarked),
