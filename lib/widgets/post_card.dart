@@ -122,6 +122,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     final mine = _isOwner;
     final urgency = post.urgency == null || post.urgency!.isEmpty ? null : labelOf(kUrgencies, post.urgency);
     final isBusiness = post.authorType == 'entrepreneur';
+    // phones: a smaller author photo leaves more width for the ask
+    final small = MediaQuery.sizeOf(context).width < 600;
     final match = (post.matchReason ?? '').isEmpty ? null : '${post.matchReason}${post.distanceM == null ? '' : ' · ${formatDistance(post.distanceM!)}'}';
 
     final body = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -157,9 +159,9 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         GestureDetector(
           onTap: _openAuthor,
-          child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: 44, ring: post.authorHasUpdate, type: post.authorType, badge: 18),
+          child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: small ? 36 : 44, ring: post.authorHasUpdate, type: post.authorType, badge: small ? 15 : 18),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: small ? 10 : 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
