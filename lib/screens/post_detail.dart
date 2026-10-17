@@ -30,6 +30,8 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   Post? _post;
+  // the full response log, once "+N more" is tapped
+  List<ResponseLog>? _allResponses;
   bool _missing = false;
   MyResponse? _mine;
   List<ContactShare> _shares = [];
@@ -45,6 +47,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  Future<void> _loadAllResponses() async {
+    try {
+      final list = ((await _api.get('/posts/${_post!.id}/activity')) as List).map((e) => ResponseLog.fromJson(e as Map)).toList();
+      if (mounted) setState(() => _allResponses = list);
+    } catch (_) {}
   }
 
   Future<void> _load() async {
@@ -259,7 +268,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 Text(ResponseActivity.countLabel(post.sharesCount, post.referralsCount), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
               ]),
               if (!owner)
-                ResponseActivity(hideHeader: true, items: post.recentResponses, total: post.sharesCount + post.referralsCount, referrals: post.referralsCount),
+                ResponseActivity(
+                  hideHeader: true,
+                  items: _allResponses ?? post.recentResponses,
+                  total: post.sharesCount + post.referralsCount,
+                  referrals: post.referralsCount,
+                  onMore: _loadAllResponses,
+                ),
             ],
             const SizedBox(height: 20),
             Container(
