@@ -77,7 +77,19 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
     _syncPause();
   }
 
-  bool get _paused => _insightsOpen || _focus.hasFocus || _picker;
+  bool _away = false; // the author's page is open on top
+  bool get _paused => _insightsOpen || _focus.hasFocus || _picker || _away;
+
+  /// Tapping the author opens their page; the update waits and carries on when you come back.
+  Future<void> _openAuthor(String handle) async {
+    if (handle.isEmpty) return;
+    setState(() => _away = true);
+    _syncPause();
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
+    if (!mounted) return;
+    _away = false;
+    _syncPause();
+  }
 
   void _syncPause() {
     if (_paused) {
@@ -323,7 +335,7 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
           ),
         // tap zones (previous = left third)
         Positioned(
-          top: top + 64,
+          top: top + 72,
           bottom: 96 + bottomInset,
           left: 0,
           right: 0,
@@ -368,15 +380,31 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
               ),
               const SizedBox(height: 12),
               Row(children: [
-                Avatar(name: g.shownName, size: 32, photoUrl: g.photoUrl, type: g.userType, badge: 14),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(mine ? t('Your update') : g.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                // author: opens their page
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Semantics(
+                      button: true,
+                      label: g.shownName,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _openAuthor(g.handle),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Avatar(name: g.shownName, size: 32, photoUrl: g.photoUrl, type: g.userType, badge: 14),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(mine ? t('Your update') : g.shownName,
+                                maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                          ),
+                          if (!mine && g.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: g.verification, size: 14)],
+                          const SizedBox(width: 8),
+                          Text(timeAgo(it.createdAt), style: TextStyle(color: Colors.white.withValues(alpha: .7), fontSize: 12)),
+                        ]),
+                      ),
+                    ),
+                  ),
                 ),
-                if (!mine && g.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: g.verification, size: 14)],
-                const SizedBox(width: 8),
-                Text(timeAgo(it.createdAt), style: TextStyle(color: Colors.white.withValues(alpha: .7), fontSize: 12)),
-                const Spacer(),
                 if (mine && widget.onDelete != null)
                   Semantics(
                     button: true,
@@ -387,13 +415,19 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
                         await widget.onDelete!(it.id);
                         if (context.mounted) Navigator.of(context).pop(true);
                       },
-                      child: const Padding(padding: EdgeInsets.all(6), child: WIcon(WI.trash, size: 20, color: Colors.white)),
+                      behavior: HitTestBehavior.opaque,
+                      child: const SizedBox(width: 40, height: 40, child: Center(child: WIcon(WI.trash, size: 20, color: Colors.white))),
                     ),
                   ),
                 Semantics(
                   button: true,
                   label: t('Close'),
-                  child: GestureDetector(onTap: () => Navigator.of(context).pop(), child: const Padding(padding: EdgeInsets.all(4), child: WIcon(WI.close, size: 24, color: Colors.white))),
+                  // 48 pt wide: centred on the same column as the react / repost / share buttons below
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const SizedBox(width: 48, height: 40, child: Center(child: WIcon(WI.close, size: 24, color: Colors.white))),
+                  ),
                 ),
               ]),
               if (it.repostedFrom != null)
@@ -485,9 +519,7 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
                         const WIcon(WI.eye, size: 20, color: Colors.white),
                         const SizedBox(width: 8),
                         Text(
-                          _insights == null
-                              ? t('Insights')
-                              : '${_insights!['views']} ${t((_insights!['views'] as num?) == 1 ? 'view' : 'views')}',
+                          _insights == null ? t('Insights') : '${_insights!['views']} ${t((_insights!['views'] as num?) == 1 ? 'view' : 'views')}',
                           style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
                         ),
                         if (it.reactionsCount > 0) Text('  · ${it.reactionsCount} ❤️', style: TextStyle(color: Colors.white.withValues(alpha: .8), fontSize: 14, fontWeight: FontWeight.w700)),
