@@ -58,9 +58,9 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     if (post.authorHandle.isNotEmpty) Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.authorHandle)));
   }
 
-  Future<void> _openDetail() async {
+  Future<void> _openDetail({bool expandResponses = false}) async {
     if (widget.detail) return;
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: post.id)));
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: post.id, expandResponses: expandResponses)));
     widget.onChanged?.call();
   }
 
@@ -270,7 +270,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                 total: post.sharesCount + post.referralsCount,
                 referrals: post.referralsCount,
                 hideHeader: mine,
-                onMore: _openDetail,
+                onMore: () => _openDetail(expandResponses: true),
               ),
             Padding(
               padding: const EdgeInsets.only(top: 6),

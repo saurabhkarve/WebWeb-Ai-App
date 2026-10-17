@@ -22,7 +22,9 @@ const _kindWord = {'contact': 'your contact', 'media': 'a photo', 'info': 'some 
 class PostDetailScreen extends StatefulWidget {
   final String postId;
   final bool openReply;
-  const PostDetailScreen({super.key, required this.postId, this.openReply = false});
+  /// "+N more" from the feed: open with the whole response log shown
+  final bool expandResponses;
+  const PostDetailScreen({super.key, required this.postId, this.openReply = false, this.expandResponses = false});
   @override
   State<PostDetailScreen> createState() => _PostDetailScreenState();
 }
@@ -77,6 +79,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         _shares = shares;
         _referrals = refs;
       });
+      if (widget.expandResponses && _allResponses == null && p.isRequirement && p.authorUid != _me) _loadAllResponses();
       if (widget.openReply && !_openedReply && p.isRequirement && p.authorUid != _me && mine != null && !mine.shared) {
         _openedReply = true;
         WidgetsBinding.instance.addPostFrameCallback((_) => _respond());
