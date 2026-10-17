@@ -480,7 +480,7 @@ Future<void> initFirebase() async {
         apiKey: String.fromEnvironment('FIREBASE_IOS_API_KEY'),
         appId: iosAppId,
         messagingSenderId: String.fromEnvironment('FIREBASE_SENDER_ID'),
-        projectId: String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: 'webweb-ai'),
+        projectId: String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: 'webweb-ai-app'),
         iosBundleId: 'ai.webweb.app',
       ),
     );
