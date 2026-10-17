@@ -12,6 +12,7 @@ import '../location.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../widgets/tour.dart';
 import 'post_detail.dart';
 
 const _maxAskImages = 10;
@@ -159,7 +160,9 @@ Widget _caps(Pal p, String s, {WI? icon}) => Row(children: [
 /// Ask tab (web post/new): Ask or Update.
 class AskScreen extends StatefulWidget {
   final VoidCallback onPosted;
-  const AskScreen({super.key, required this.onPosted});
+  /// the Ask tab is on screen (it stays mounted behind the others)
+  final bool active;
+  const AskScreen({super.key, required this.onPosted, this.active = true});
   @override
   State<AskScreen> createState() => _AskScreenState();
 }
@@ -192,14 +195,15 @@ class _AskScreenState extends State<AskScreen> {
             ),
         ]),
       ),
-      Expanded(child: _tab == 0 ? _AskForm(onPosted: widget.onPosted) : _UpdateForm(onPosted: widget.onPosted)),
+      Expanded(child: _tab == 0 ? _AskForm(onPosted: widget.onPosted, active: widget.active) : _UpdateForm(onPosted: widget.onPosted)),
     ]);
   }
 }
 
 class _AskForm extends StatefulWidget {
   final VoidCallback onPosted;
-  const _AskForm({required this.onPosted});
+  final bool active;
+  const _AskForm({required this.onPosted, this.active = true});
   @override
   State<_AskForm> createState() => _AskFormState();
 }
@@ -230,7 +234,8 @@ class _AskFormState extends State<_AskForm> {
   int? _reach;
   bool _more = false;
   bool _dismissed = false;
-  bool _restored = false;
+  /// an unfinished ask from last time: offered, never filled in on its own
+  Map? _savedDraft;
   bool _busy = false;
   String? _error;
   final List<_Photo> _photos = [];
@@ -259,6 +264,21 @@ class _AskFormState extends State<_AskForm> {
     }).catchError((_) {});
     _title.addListener(_changed);
     _desc.addListener(_changed);
+    _maybeTour();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AskForm old) {
+    super.didUpdateWidget(old);
+    if (widget.active && !old.active) _maybeTour();
+  }
+
+  /// first visit to Ask: a short walk through the form
+  void _maybeTour() {
+    if (!widget.active) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.active) Tours.maybeShow(context, 'ask', kAskTour);
+    });
   }
 
   void _changed() {
@@ -274,9 +294,26 @@ class _AskFormState extends State<_AskForm> {
       draft = jsonDecode((await SharedPreferences.getInstance()).getString(_draftKey) ?? 'null') as Map?;
     } catch (_) {}
     if (!mounted) return;
-    if (draft != null && ('${draft['title'] ?? ''}'.isNotEmpty || '${draft['description'] ?? ''}'.isNotEmpty)) {
+    // the form always opens empty; an unfinished ask is offered with Continue
+    if (draft != null && ('${draft['title'] ?? ''}'.isNotEmpty || '${draft['description'] ?? ''}'.isNotEmpty)) _savedDraft = draft;
+    if ((profile?.location ?? '').isNotEmpty) {
+      final c = kNodeCoords[profile!.location];
       setState(() {
-        _category = (draft!['category'] as String?) ?? _category;
+        _location = profile.location;
+        if (c != null) _geo = (lat: c[0], lng: c[1], radiusM: 10000);
+      });
+    } else {
+      setState(() {});
+    }
+    _loadReach();
+  }
+
+  /// Continue the unfinished ask from last time.
+  void _continueDraft() {
+    final draft = _savedDraft;
+    if (draft == null) return;
+    setState(() {
+        _category = (draft['category'] as String?) ?? _category;
         _title.text = '${draft['title'] ?? ''}';
         _desc.text = '${draft['description'] ?? ''}';
         _location = '${draft['locationPref'] ?? ''}';
@@ -288,15 +325,8 @@ class _AskFormState extends State<_AskForm> {
           final r = (g['radiusM'] as num).toInt();
           _geo = (lat: (g['lat'] as num).toDouble(), lng: (g['lng'] as num).toDouble(), radiusM: _radii.contains(r) ? r : 10000);
         }
-        _restored = true;
-      });
-    } else if ((profile?.location ?? '').isNotEmpty) {
-      final c = kNodeCoords[profile!.location];
-      setState(() {
-        _location = profile.location;
-        if (c != null) _geo = (lat: c[0], lng: c[1], radiusM: 10000);
-      });
-    }
+        _savedDraft = null;
+    });
     _loadReach();
   }
 
@@ -320,7 +350,7 @@ class _AskFormState extends State<_AskForm> {
       _budget = '';
       _budgetKey++;
       _urgency = '7_days';
-      _restored = false;
+      _savedDraft = null;
     });
   }
 
@@ -458,7 +488,7 @@ class _AskFormState extends State<_AskForm> {
         _budget = '';
         _budgetKey++;
         _urgency = '7_days';
-        _restored = false;
+        _savedDraft = null;
         _undoTpl = null;
       });
       widget.onPosted();
@@ -647,7 +677,7 @@ class _AskFormState extends State<_AskForm> {
     final form = ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
-        hScroll(height: 40, [
+        KeyedSubtree(key: Tours.key('ask-category'), child: hScroll(height: 40, [
           for (final o in kPostCategories)
             GestureDetector(
               onTap: () => setState(() {
@@ -671,7 +701,7 @@ class _AskFormState extends State<_AskForm> {
                 ]),
               ),
             ),
-        ]),
+        ])),
         if (_category == 'other') ...[
           const SizedBox(height: 6),
           TextField(controller: _other, maxLength: 40, onChanged: (_) => setState(() {}), decoration: _input(p, t('What is this about? e.g. Event stall, Legal help, Insurance'))),
@@ -696,21 +726,32 @@ class _AskFormState extends State<_AskForm> {
             ]),
           ),
         ],
-        if (_restored) ...[
+        // an unfinished ask from last time, until the member starts a new one
+        if (_savedDraft != null && title.isEmpty && desc.isEmpty) ...[
           const SizedBox(height: 12),
           DashedBox(
             radius: 8,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(children: [
-              Expanded(child: Text(t('Draft restored from last time'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted))),
-              GestureDetector(onTap: _discardDraft, child: Text(t('Discard'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
+              Expanded(
+                child: Text(
+                  '${t('Unfinished ask')}: ${'${_savedDraft!['title'] ?? ''}'.isNotEmpty ? '“${_savedDraft!['title']}”' : t('from last time')}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(onTap: _continueDraft, child: Text(t('Continue'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
+              const SizedBox(width: 12),
+              GestureDetector(onTap: _discardDraft, child: Text(t('Discard'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted))),
             ]),
           ),
         ],
         // quick starts, only while nothing is written yet (or to undo one)
         if (samples.isNotEmpty && ((title.trim().isEmpty && desc.trim().isEmpty) || _undoTpl != null)) ...[
           const SizedBox(height: 4),
-          hScroll(height: 36, [
+          KeyedSubtree(key: Tours.key('ask-templates'), child: hScroll(height: 36, [
             for (final s in samples)
               GestureDetector(
                 onTap: () => _applyTemplate(s.$2, s.$3),
@@ -733,12 +774,13 @@ class _AskFormState extends State<_AskForm> {
                 }),
                 child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Text(t('Undo'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.muted))),
               ),
-          ]),
+          ])),
         ],
         if (_aiError != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_aiError!, style: TextStyle(fontSize: 12, color: p.danger))),
         const SizedBox(height: 12),
         _fieldActions(p, 'title'),
         TextField(
+          key: Tours.key('ask-title'),
           controller: _title,
           focusNode: _titleFocus,
           maxLength: 100,
@@ -767,6 +809,7 @@ class _AskFormState extends State<_AskForm> {
         const SizedBox(height: 12),
         _fieldActions(p, 'description'),
         TextField(
+          key: Tours.key('ask-description'),
           controller: _desc,
           focusNode: _descFocus,
           minLines: 3,
@@ -833,6 +876,7 @@ class _AskFormState extends State<_AskForm> {
         const SizedBox(height: 12),
         // optional details behind one tidy row that always shows what is set
         Container(
+          key: Tours.key('ask-details'),
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             InkWell(
@@ -951,6 +995,7 @@ class _AskFormState extends State<_AskForm> {
       Expanded(child: form),
       // Publish stays within thumb reach, above the island
       Container(
+        key: Tours.key('ask-publish'),
         padding: EdgeInsets.fromLTRB(16, 8, 16, islandSpace(context) - 4),
         decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [p.canvas, p.canvas.withValues(alpha: .95), p.canvas.withValues(alpha: 0)], stops: const [0, .7, 1])),
         child: Column(mainAxisSize: MainAxisSize.min, children: [

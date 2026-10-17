@@ -17,6 +17,7 @@ import '../widgets.dart';
 import 'image_grid.dart';
 import 'reaction_picker.dart';
 import 'response_sheet.dart';
+import 'tour.dart';
 
 /// Feed row, same layout as the web PostCard (post-card.tsx): avatar on the left; who + why you see it;
 /// the category chip, title and two lines of description; photos; location / budget / timing chips;
@@ -30,7 +31,9 @@ class PostCard extends StatefulWidget {
   final VoidCallback? onReply;
   /// Called after the author was blocked from this card's menu (the list drops their posts).
   final VoidCallback? onBlocked;
-  const PostCard({super.key, required this.post, this.onChanged, this.detail = false, this.onReply, this.onBlocked});
+  /// The card the Connect tour points at (its chips, Reply and Refer carry the tour keys).
+  final bool tourTarget;
+  const PostCard({super.key, required this.post, this.onChanged, this.detail = false, this.onReply, this.onBlocked, this.tourTarget = false});
   @override
   State<PostCard> createState() => _PostCardState();
 }
@@ -222,6 +225,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
             // the essentials as chips: what, where (and how far), budget, timing, reach, photos
             if (isAsk)
               Padding(
+                key: widget.tourTarget ? Tours.key('chips') : null,
                 padding: const EdgeInsets.only(top: 8),
                 // one line that scrolls sideways
                 child: SingleChildScrollView(
@@ -274,7 +278,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               ),
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Transform.translate(offset: const Offset(-6, 0), child: PostActions(key: _actionsKey, post: post, onReply: _reply, onChanged: () => setState(() {}))),
+              child: Transform.translate(offset: const Offset(-6, 0), child: PostActions(key: _actionsKey, post: post, onReply: _reply, onChanged: () => setState(() {}), tourTarget: widget.tourTarget)),
             ),
           ]),
         ),
@@ -291,7 +295,8 @@ class PostActions extends StatefulWidget {
   final VoidCallback onReply;
   /// after a count changed (the card redraws its response log)
   final VoidCallback? onChanged;
-  const PostActions({super.key, required this.post, required this.onReply, this.onChanged});
+  final bool tourTarget;
+  const PostActions({super.key, required this.post, required this.onReply, this.onChanged, this.tourTarget = false});
   @override
   State<PostActions> createState() => PostActionsState();
 }
@@ -418,6 +423,7 @@ class PostActionsState extends State<PostActions> {
       return wrap ? InkWell(onTap: onTap, borderRadius: BorderRadius.circular(10), child: content) : content;
     }
 
+    Widget tour(String target, Widget child) => widget.tourTarget ? KeyedSubtree(key: Tours.key(target), child: child) : child;
     final reacted = post.myReaction != null;
     return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       ReactionPicker(
@@ -435,7 +441,7 @@ class PostActionsState extends State<PostActions> {
           wrap: false,
         ),
       ),
-      if (isAsk && !mine) btn(icon: WIcon(WI.refer, size: 20, color: p.muted), count: post.referralsCount, label: 'Refer', color: p.muted, onTap: _refer),
+      if (isAsk && !mine) tour('refer', btn(icon: WIcon(WI.refer, size: 20, color: p.muted), count: post.referralsCount, label: 'Refer', color: p.muted, onTap: _refer)),
       btn(
         icon: WIcon(WI.repost, size: 20, color: post.reposted ? const Color(0xFF059669) : p.muted),
         count: post.repostsCount,
@@ -445,7 +451,7 @@ class PostActionsState extends State<PostActions> {
         color: post.reposted ? const Color(0xFF059669) : p.muted,
         onTap: _toggleRepost,
       ),
-      btn(icon: WIcon(WI.talk, size: 20, color: p.muted), count: isAsk ? post.sharesCount : null, label: 'Reply', color: p.muted, onTap: widget.onReply),
+      tour('reply', btn(icon: WIcon(WI.talk, size: 20, color: p.muted), count: isAsk ? post.sharesCount : null, label: 'Reply', color: p.muted, onTap: widget.onReply)),
       btn(icon: WIcon(WI.share, size: 20, color: p.muted), label: 'Share', color: p.muted, onTap: _share),
       btn(
         icon: WIcon(WI.bookmark, size: 20, color: post.bookmarked ? p.link : p.muted, fill: post.bookmarked),

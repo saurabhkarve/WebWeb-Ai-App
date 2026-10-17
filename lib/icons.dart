@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-enum WI { refresh, check, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, imageAdd, info, job, jobWork, logout, machinery, mentor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, website }
+enum WI { refresh, check, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, logout, machinery, mentor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, website }
 
 /// SVG body per icon. {C} = colour, {SW/x} = stroke width divided by x (scaled groups).
 const Map<WI, (String, double?)> _body = {
@@ -54,6 +54,7 @@ const Map<WI, (String, double?)> _body = {
   WI.grid: (r'<rect x="4" y="4" width="6.5" height="6.5" rx="1.8" /> <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8" /> <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8" /> <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8" />', null),
   WI.heart: (r'<path d="M12 20s-8.2-4.9-8.2-10.7A4.5 4.5 0 0 1 12 6.8a4.5 4.5 0 0 1 8.2 2.5C20.2 15.1 12 20 12 20z" />', null),
   WI.imageAdd: (r'<path d="M13 4.2H7.2A3.4 3.4 0 0 0 3.8 7.6v9.2a3.4 3.4 0 0 0 3.4 3.4h9.6a3.4 3.4 0 0 0 3.4-3.4V11" /> <circle cx="9" cy="10" r="1.6" /> <path d="M4.2 17.6l4.6-4.2 3.4 2.9 2.6-2.3 5 4.2" /> <path d="M18.5 3v5M16 5.5h5" />', null),
+  WI.help: (r'<circle cx="12" cy="12" r="8.5" /> <path d="M9.6 9.6a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6" /> <path d="M12 16.9h.01" stroke-width="2.6" />', null),
   WI.info: (r'<circle cx="12" cy="12" r="8.5" /> <path d="M12 11v5.5" /> <path d="M12 7.8h.01" stroke-width="2.6" />', null),
   WI.job: (r'<rect x="3.5" y="7.5" width="17" height="12" rx="2.2" /> <path d="M9 7.5V6a1.8 1.8 0 0 1 1.8-1.8h2.4A1.8 1.8 0 0 1 15 6v1.5M3.5 13h17" />', null),
   WI.jobWork: (r'<path d="M3.5 19.5v-8l5 3v-3l5 3v-3l5 3V6.5h2.5v13h-17.5z" /> <path d="M7 17h.01M11 17h.01M15 17h.01" stroke-width="2.4" />', null),

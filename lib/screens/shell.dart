@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../auth_provider.dart';
+import '../config.dart';
 import '../i18n.dart';
 import '../models.dart';
 import '../notifications.dart';
@@ -12,6 +14,7 @@ import '../safety.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/active_call_banner.dart';
+import '../widgets/tour.dart';
 import 'ask.dart';
 import 'connect.dart';
 import 'edit_profile.dart';
@@ -124,7 +127,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                       ConnectScreen(refreshTick: _feedTick, topTick: _topTick, onGoAsk: () => _go(3)),
                       const FindScreen(),
                       if (_i == 2) const TalkScreen() else const SizedBox.shrink(), // reload conversations each time it opens
-                      AskScreen(onPosted: () => setState(() {
+                      AskScreen(active: _i == 3, onPosted: () => setState(() {
                             _feedTick++;
                             _i = 0;
                           })),
@@ -181,7 +184,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         builder: (_, __) => Row(mainAxisSize: MainAxisSize.min, children: [
           for (var k = 0; k < _items.length; k++) ...[
             if (k > 0) const SizedBox(width: 4),
-            _islandItem(p, k, badge: k == 0 ? _notes.unseen : (k == 2 ? _unread : 0)),
+            k == 3
+                ? KeyedSubtree(key: Tours.key('nav-ask'), child: _islandItem(p, k))
+                : _islandItem(p, k, badge: k == 0 ? _notes.unseen : (k == 2 ? _unread : 0)),
           ],
         ]),
       ),
@@ -315,7 +320,7 @@ void _openAccountMenu(BuildContext context) {
 }
 
 /// The account menu from the web (account-menu.tsx): account card, View / Edit profile, Saved asks,
-/// Dark mode switch, language pills, Log out.
+/// Help & Support (opens the website), Dark mode switch, language pills, Log out.
 class _AccountMenu extends StatelessWidget {
   const _AccountMenu();
 
@@ -386,6 +391,11 @@ class _AccountMenu extends StatelessWidget {
               item(WI.user, 'View profile', () => push(const ProfileScreen())),
               item(WI.edit, 'Edit profile', () => push(EditProfileScreen(profile: me))),
               item(WI.bookmark, 'Saved asks', () => push(const SavedPostsScreen())),
+              // help lives on the website so articles stay current without an app update
+              item(WI.help, 'Help & Support', () {
+                Navigator.of(context).pop();
+                launchUrl(Uri.parse('$siteUrl/help?lang=${i18n.lang}'), mode: LaunchMode.externalApplication);
+              }),
               // dark mode switch
               InkWell(
                 onTap: () => themeCtl.set(dark ? ThemeMode.light : ThemeMode.dark),

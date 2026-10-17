@@ -15,6 +15,7 @@ import '../widgets.dart';
 import '../widgets/catalog_strip.dart';
 import '../widgets/post_card.dart';
 import '../widgets/story_viewer.dart';
+import '../widgets/tour.dart';
 import 'edit_profile.dart';
 import 'find.dart';
 
@@ -44,6 +45,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
   final _scroll = ScrollController();
   final _updatesKey = GlobalKey<_UpdatesBarState>();
   Timer? _poll;
+  bool _tourTried = false;
 
   Api get _api => context.read<AuthProvider>().api;
 
@@ -91,6 +93,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
         _error = null;
         _fresh = [];
       });
+      // first visit: walk through the feed once it has something to point at
+      if (!_tourTried) {
+        _tourTried = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) Tours.maybeShow(context, 'connect', kConnectTour);
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => _error = t('Could not load posts. Please try again.'));
     }
@@ -155,12 +164,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final posts = _posts;
+    final firstAsk = posts?.indexWhere((x) => x.isRequirement) ?? -1;
     final children = <Widget>[
       const _StrengthNudge(),
       const SizedBox(height: 12),
       RuleHeading(WI.updates, t('Updates')),
       const SizedBox(height: 6),
-      _UpdatesBar(key: _updatesKey),
+      KeyedSubtree(key: Tours.key('updates'), child: _UpdatesBar(key: _updatesKey)),
       const SizedBox(height: 12),
       RuleHeading(WI.ask, t('Asks')),
       if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
@@ -168,7 +178,10 @@ class _ConnectScreenState extends State<ConnectScreen> {
       if (posts != null && posts.isEmpty) _empty(p),
       if (posts != null)
         for (var i = 0; i < posts.length; i++) ...[
-          PostCard(key: ValueKey(posts[i].id), post: posts[i], onBlocked: _load),
+          if (i == firstAsk)
+            KeyedSubtree(key: Tours.key('first-ask'), child: PostCard(key: ValueKey(posts[i].id), post: posts[i], onBlocked: _load, tourTarget: true))
+          else
+            PostCard(key: ValueKey(posts[i].id), post: posts[i], onBlocked: _load),
           if (_catalogAt(i, posts.length) case final g?) CatalogStrip(key: ValueKey('cat-${g.owner.uid}'), group: g),
         ],
       if (posts != null && posts.isNotEmpty)
