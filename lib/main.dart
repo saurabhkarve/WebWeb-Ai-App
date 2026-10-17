@@ -20,7 +20,7 @@ void main() {
   if (NotificationService.supported) FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
   final auth = AuthProvider();
   final realtime = RealtimeService();
-  final calls = CallManager(realtime, navKey);
+  final calls = CallManager(realtime, navKey, auth.api);
   final notifications = NotificationService(auth, realtime, navKey);
   final i18n = I18n()..init();
   auth.beforeLogout = notifications.unregister;

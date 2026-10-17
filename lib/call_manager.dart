@@ -4,10 +4,12 @@ import 'dart:math' as math;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import 'api.dart';
+import 'native_calls.dart';
 import 'realtime.dart';
 import 'screens/call_screen.dart';
 
@@ -22,6 +24,10 @@ class ActiveCall {
   String? note;
   DateTime? connectedAt;
   bool muted = false, camOff = false, speaker;
+  /// the other side's connection dropped; the API gives it 15 s to come back
+  bool peerAway = false;
+  /// ringing through CallKit / the Android call screen (not the in-app screen)
+  bool native = false;
   Json? offerSdp;
   ActiveCall({
     required this.id,
@@ -33,25 +39,58 @@ class ActiveCall {
   }) : speaker = video;
 }
 
-/// WebRTC voice/video calls. Signalling goes through [RealtimeService]
-/// (the backend relays offer/ringing/answer/ICE).
-/// Reference implementation based on AirMsg with ringtones, ringback,
-/// call states, camera switching, audio routing, and graceful cleanup.
-class CallManager extends ChangeNotifier {
+/// WebRTC voice/video calls. Signalling goes through [RealtimeService] (the API relays
+/// offer/ringing/answer/ICE, the same protocol as the website, so app and web can call each other).
+/// ICE servers (STUN + our TURN relay) come from the API. In the foreground a call rings on the in-app
+/// screen; in the background or when the app was closed it rings through the phone's own call UI
+/// ([NativeCalls]: CallKit / Android full-screen), and answering there opens the call here.
+class CallManager extends ChangeNotifier with WidgetsBindingObserver {
   final RealtimeService rt;
   final GlobalKey<NavigatorState> nav;
+  final Api api;
 
-  CallManager(this.rt, this.nav) {
+  CallManager(this.rt, this.nav, this.api) {
     rt.events.listen(_onEvent);
+    WidgetsBinding.instance.addObserver(this);
+    NativeCalls.events.listen(_onNative);
+    _adoptNativeAccepted();
+    rt.addListener(() {
+      if (rt.connected) _adoptNativeAccepted();
+    });
   }
 
-  static const _iceServers = {
-    'iceServers': [
-      {'urls': 'stun:stun.l.google.com:19302'},
-      {'urls': 'stun:stun1.l.google.com:19302'},
-    ],
-    'sdpSemantics': 'unified-plan',
-  };
+  bool _foreground = true;
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) => _foreground = state == AppLifecycleState.resumed;
+
+  /// Calls answered on the lock screen before their offer reached the app (the API re-sends it on connect).
+  final Set<String> _nativeAccepted = {};
+
+  Future<void> _adoptNativeAccepted() async {
+    for (final c in await NativeCalls.active()) {
+      if (c.isAccepted && current?.id != c.id) _nativeAccepted.add(c.id);
+    }
+  }
+
+  static const _fallbackIce = [
+    {'urls': ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302']},
+  ];
+  List<dynamic>? _ice;
+  DateTime _iceAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// STUN + TURN (short-lived credentials) from the API, reused for an hour.
+  Future<Map<String, dynamic>> _iceConfig() async {
+    if (_ice == null || DateTime.now().difference(_iceAt) > const Duration(hours: 1)) {
+      try {
+        final r = await api.get('/app/ice') as Map;
+        _ice = List<dynamic>.from(r['iceServers'] as List);
+        _iceAt = DateTime.now();
+      } catch (_) {
+        _ice ??= _fallbackIce;
+      }
+    }
+    return {'iceServers': _ice, 'sdpSemantics': 'unified-plan'};
+  }
 
   ActiveCall? current;
   final localR = RTCVideoRenderer();
@@ -184,7 +223,7 @@ class CallManager extends ChangeNotifier {
     if (!await _permissions(video)) {
       throw 'Microphone${video ? ' / camera' : ''} permission is needed for calls';
     }
-    final id = '${DateTime.now().microsecondsSinceEpoch}-${user['uid']}';
+    final id = NativeCalls.newCallId();
     current = ActiveCall(
       id: id,
       user: user,
@@ -254,7 +293,7 @@ class CallManager extends ChangeNotifier {
     final c = current;
     if (c == null) return;
     _stopSounds();
-    rt.send({'type': 'call_reject', 'callId': c.id});
+    _signalEnd(c.id, decline: true);
     _finish('Declined');
   }
 
@@ -263,8 +302,41 @@ class CallManager extends ChangeNotifier {
     if (c == null) return;
     _stopSounds();
     _timeoutTimer?.cancel();
-    rt.send({'type': 'call_end', 'callId': c.id});
+    _signalEnd(c.id, decline: false);
     _finish(note ?? 'Call ended');
+  }
+
+  /// Over the socket, or over REST when it is down (e.g. declined on the lock screen right after waking).
+  void _signalEnd(String id, {required bool decline}) {
+    if (rt.send({'type': decline ? 'call_reject' : 'call_end', 'callId': id})) return;
+    api.post('/app/calls/$id/${decline ? 'decline' : 'end'}', {}).catchError((_) => null);
+  }
+
+  // ---------- the phone's own call UI ----------
+  void _onNative(CallEvent? ev) {
+    switch (ev) {
+      case CallEventActionCallAccept(:final callKitParams):
+        final id = callKitParams.id;
+        if (current?.id == id) {
+          openScreen();
+          if (current!.state == CallState.ringing) accept();
+        } else {
+          _nativeAccepted.add(id); // the offer arrives once the socket is up
+        }
+      case CallEventActionCallDecline(:final callKitParams):
+        final id = callKitParams.id;
+        if (current?.id == id) {
+          reject();
+        } else {
+          _signalEnd(id, decline: true);
+        }
+      case CallEventActionCallEnded(:final callKitParams):
+        if (current?.id == callKitParams.id && current!.state != CallState.ended) hangUp();
+      case CallEventActionCallToggleMute(:final isMuted):
+        if (current != null && current!.muted != isMuted) toggleMute();
+      default:
+        break;
+    }
   }
 
   // ---------- Media & Controls ----------
@@ -305,7 +377,7 @@ class CallManager extends ChangeNotifier {
   Future<void> _createPc(bool video) async {
     _remoteSet = false;
     _pendingIce.clear();
-    final pc = await createPeerConnection(_iceServers);
+    final pc = await createPeerConnection(await _iceConfig());
     _pc = pc;
 
     _local = await navigator.mediaDevices.getUserMedia({
@@ -344,6 +416,7 @@ class CallManager extends ChangeNotifier {
       if (c.state != CallState.connected) {
         c.state = CallState.connected;
         c.connectedAt = DateTime.now();
+        if (c.native) NativeCalls.connected(c.id);
         if (!kIsWeb) Helper.setSpeakerphoneOn(c.speaker);
         notifyListeners();
       }
@@ -381,6 +454,7 @@ class CallManager extends ChangeNotifier {
     switch (e['type']) {
       case 'call_offer':
         if (current != null) {
+          if (current!.id == e['callId']) return; // the same offer, re-sent after a reconnect
           rt.send({'type': 'call_reject', 'callId': e['callId']}); // busy
           return;
         }
@@ -398,9 +472,32 @@ class CallManager extends ChangeNotifier {
         _pendingIce.clear();
         // Acknowledge to caller that our device received the call and is ringing
         rt.send({'type': 'call_ringing', 'callId': e['callId']});
-        _playIncomingRingtone();
-        notifyListeners();
-        openScreen();
+        final c = current!;
+        // answered on the lock screen while the app was starting? (the event may not have reached Dart yet)
+        final answered = _nativeAccepted.remove(c.id) || (await NativeCalls.active()).any((x) => x.id == c.id && x.isAccepted);
+        if (current != c) return;
+        if (answered) {
+          // answered on the lock screen / CallKit while the app was starting
+          c.native = true;
+          notifyListeners();
+          openScreen();
+          accept();
+        } else if (_foreground) {
+          _playIncomingRingtone();
+          notifyListeners();
+          openScreen();
+        } else {
+          c.native = true;
+          notifyListeners();
+          NativeCalls.showIncoming(
+            id: c.id,
+            name: '${c.user['userType'] == 'entrepreneur' && '${c.user['company'] ?? ''}'.isNotEmpty ? c.user['company'] : c.user['name'] ?? 'Someone'}',
+            video: c.video,
+            from: '${e['from']}',
+            handle: '${c.user['handle'] ?? ''}',
+            photo: c.user['photoURL'] as String?,
+          );
+        }
         break;
 
       case 'call_ringing':
@@ -454,6 +551,13 @@ class CallManager extends ChangeNotifier {
             'Call ended');
         break;
 
+      case 'call_peer_away':
+      case 'call_peer_back':
+        if (current?.id != e['callId']) return;
+        current!.peerAway = e['type'] == 'call_peer_away';
+        notifyListeners();
+        break;
+
       case 'call_unavailable':
         if (current?.id != e['callId']) return;
         _stopSounds();
@@ -471,6 +575,7 @@ class CallManager extends ChangeNotifier {
     c.state = CallState.ended;
     c.note = note;
     notifyListeners();
+    NativeCalls.end(c.id);
     _teardown();
     Timer(const Duration(milliseconds: 1400), () {
       if (current == c) {
@@ -498,6 +603,7 @@ class CallManager extends ChangeNotifier {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _stopSounds();
     _timeoutTimer?.cancel();
     _ringbackPlayer.dispose();

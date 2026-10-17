@@ -5,26 +5,29 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'api.dart';
 import 'auth_provider.dart';
 import 'models.dart';
+import 'native_calls.dart';
 import 'realtime.dart';
 import 'screens/post_detail.dart';
 import 'screens/profile.dart';
 import 'screens/talk.dart' show ChatThread;
 
-/// Push (FCM) + local notifications for chats, calls and activity on your asks.
+/// Push (FCM) + local notifications. What is sent, when and to whom is decided by the API's
+/// notification engine; this shows it and opens the right screen on a tap.
 ///
-/// - App open or in background with a live WebSocket: events come over [RealtimeService]
-///   and are shown as local notifications (unless that chat is already on screen).
-/// - App killed / socket gone: the backend sends an FCM push. Messages carry a
-///   `notification` payload (shown by Android itself); incoming calls are data-only and
-///   are turned into a full-screen call notification by [firebaseBackgroundHandler].
-/// - iOS: the server sends calls as a visible alert (iOS does not wake a killed app for
-///   data-only pushes); tapping it opens the app and the socket picks up the pending offer.
-/// - Tapping any notification opens what it is about: the chat, the ask, or the profile.
+/// - App open or in background with a live WebSocket: the API sends `notify` / `msg` events instead
+///   of pushes, shown here as local notifications (unless that chat is already on screen).
+/// - App killed / socket gone: FCM. Everything but calls carries a `notification` payload that the
+///   OS shows itself (channel `quiet` during the member's quiet hours).
+/// - Calls: iPhones get a VoIP push that rings through CallKit (AppDelegate); Android gets a data-only
+///   push that [firebaseBackgroundHandler] turns into the full-screen call UI ([NativeCalls]).
+/// - Every push carries `path` (what to open) and `nid` / `sig`: a tap opens it and tells the API,
+///   which learns what this member cares about.
 class NotificationService with WidgetsBindingObserver {
   NotificationService(this.auth, this.rt, this.nav);
 
@@ -72,6 +75,9 @@ class NotificationService with WidgetsBindingObserver {
     });
 
     rt.events.listen(_onRealtime);
+    NativeCalls.events.listen((ev) {
+      if (ev is CallEventActionDidUpdateDevicePushTokenVoip) _registerVoip();
+    });
 
     // Cold start from a tapped notification.
     final initial = await fm.getInitialMessage();
@@ -137,17 +143,36 @@ class NotificationService with WidgetsBindingObserver {
       if (_fcmToken == null) return;
       await auth.api.post('/app/push/token', {'token': _fcmToken, 'platform': _ios ? 'ios' : 'android'});
       _registeredFor = auth.token;
+      await _registerVoip();
+      await NativeCalls.requestPermissions();
     } catch (e) {
       debugPrint('push token register failed: $e');
     }
   }
 
+  /// iPhone: the PushKit token that lets calls ring through CallKit when the app is closed.
+  String? _voipToken;
+  Future<void> _registerVoip([String? token]) async {
+    final t = token ?? await NativeCalls.voipToken();
+    if (t == null || auth.token == null) return;
+    try {
+      await auth.api.post('/app/push/token', {'token': t, 'platform': 'ios', 'kind': 'voip'});
+      _voipToken = t;
+    } catch (e) {
+      debugPrint('voip token register failed: $e');
+    }
+  }
+
   /// Called before logout so this phone stops getting the old account's pushes.
   Future<void> unregister() async {
-    if (!_ready || _fcmToken == null || auth.token == null) return;
-    try {
-      await auth.api.post('/app/push/token/remove', {'token': _fcmToken});
-    } catch (_) {}
+    if (!_ready || auth.token == null) return;
+    for (final t in [_fcmToken, _voipToken]) {
+      if (t == null) continue;
+      try {
+        await auth.api.post('/app/push/token/remove', {'token': t});
+      } catch (_) {}
+    }
+    _voipToken = null;
     _registeredFor = null;
   }
 
@@ -165,17 +190,12 @@ class NotificationService with WidgetsBindingObserver {
         final text = '${m['text'] ?? ''}';
         await showMessage(chatId: chatId, name: name, body: text.isNotEmpty ? text : (hasImage ? '📷 Photo' : 'New message'));
         break;
-      case 'call_offer':
-        // In the foreground the call screen is enough; in the background, ring through a notification.
-        if (_foreground) return;
-        final caller = Map<String, dynamic>.from(e['caller'] ?? {});
-        await showIncomingCall(
-          callId: '${e['callId']}',
-          from: '${e['from']}',
-          name: '${caller['name'] ?? 'Someone'}',
-          video: e['video'] == true,
-        );
+      case 'notify':
+        // the API decided this is worth showing; it chose the socket because the app is connected
+        final data = Map<String, dynamic>.from(e['data'] ?? {});
+        await showActivity(data, title: '${e['title'] ?? ''}', body: '${e['body'] ?? ''}');
         break;
+      // incoming calls ring through CallManager (in-app screen, or the phone's call UI in the background)
       case 'call_end':
       case 'call_unavailable':
         await _local.cancel(id: _callNotifId('${e['callId']}'));
@@ -201,27 +221,16 @@ class NotificationService with WidgetsBindingObserver {
         if (_foreground && activeChat == d['chatId']) return;
         await showMessage(chatId: '${d['chatId']}', name: title ?? '${d['name']}', body: body ?? '');
         break;
-      case 'ask_response':
-      case 'item_referral':
-        await _local.show(
-          id: '${d['postId'] ?? d['productId']}'.hashCode & 0x7fffffff,
-          title: title ?? 'New activity',
-          body: body ?? '',
-          notificationDetails: _asksDetails,
-          payload: jsonEncode(d),
-        );
+      case 'call':
+        if (rt.connected) return; // the socket already brought the offer to CallManager
+        await handleCallData(d);
         break;
-      case 'missed_call':
-        await _local.show(
-          id: '${d['from']}missed'.hashCode,
-          title: title ?? 'Missed call',
-          body: body ?? '',
-          notificationDetails: _messageDetails,
-          payload: jsonEncode({'type': 'missed_call', 'from': d['from']}),
-        );
+      case 'call_cancel':
+        await handleCallData(d);
         break;
       default:
-        await handleCallData(d);
+        if (d['kind'] == null && d['path'] == null) return;
+        await showActivity(d, title: title ?? 'WEBWEB AI', body: body ?? '');
     }
   }
 
@@ -235,8 +244,10 @@ class NotificationService with WidgetsBindingObserver {
 
   Future<void> _openFromData(Map<String, dynamic> d) async {
     // Calls: nothing to do — opening the app reconnects the socket and the server hands over the offer.
-    const routable = {'msg', 'missed_call', 'ask_response', 'item_referral'};
-    if (!routable.contains(d['type'])) return;
+    if (d['type'] == 'call' || d['type'] == 'call_cancel') return;
+    if (d['nid'] != null && d['sig'] != null) {
+      auth.api.post('/notifications/opened', {'id': d['nid'], 'sig': d['sig']}).catchError((_) => null);
+    }
     // Wait until the user is logged in and the main shell is up.
     for (var i = 0; i < 40 && (auth.profile == null || nav.currentState == null); i++) {
       await Future.delayed(const Duration(milliseconds: 250));
@@ -244,17 +255,25 @@ class NotificationService with WidgetsBindingObserver {
     final nv = nav.currentState;
     if (nv == null || auth.profile == null) return;
     try {
-      if (d['type'] == 'ask_response' && d['postId'] != null) {
-        nv.push(MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${d['postId']}')));
-        return;
-      }
-      // other links carry the web path: /@handle opens that profile
-      final handle = RegExp(r'^/@([a-z0-9]+)').firstMatch('${d['path'] ?? ''}')?.group(1);
-      if (d['type'] == 'item_referral') {
+      final path = '${d['path'] ?? ''}';
+      final isChat = d['type'] == 'msg' || d['chatId'] != null || path.startsWith('/chat/') || d['kind'] == 'missed_call';
+      if (!isChat) {
+        if (d['postId'] != null) {
+          nv.push(MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${d['postId']}')));
+          return;
+        }
+        final post = RegExp(r'^/post/([0-9a-f-]{36})').firstMatch(path)?.group(1);
+        if (post != null) {
+          nv.push(MaterialPageRoute(builder: (_) => PostDetailScreen(postId: post)));
+          return;
+        }
+        // a page: /@handle (contact requests, catalog items)
+        final handle = RegExp(r'^/@([a-z0-9_.-]+)$').firstMatch(path)?.group(1);
         if (handle != null) nv.push(MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
-        return;
+        return; // anything else (catch-ups, feed) just opens the app
       }
       var chatId = '${d['chatId'] ?? ''}';
+      if (chatId.isEmpty && path.startsWith('/chat/')) chatId = path.substring(6);
       if (chatId.isEmpty && d['from'] != null) chatId = (await auth.api.post('/chats', {'userId': d['from']}) as Map)['id'] as String;
       if (chatId.isEmpty || activeChat == chatId) return;
       final c = ChatSummary.fromJson(await auth.api.get('/chats/$chatId') as Map, auth.profile!.uid);
@@ -278,6 +297,20 @@ const _asksChannel = AndroidNotificationChannel(
   'Asks',
   description: 'Responses and referrals on your asks and catalog',
   importance: Importance.high,
+);
+const _activityChannel = AndroidNotificationChannel(
+  'activity',
+  'Activity',
+  description: 'Reactions, reposts, ratings and new asks that fit your business',
+  importance: Importance.defaultImportance,
+);
+const _quietChannel = AndroidNotificationChannel(
+  'quiet',
+  'Quiet hours',
+  description: 'Delivered silently at night',
+  importance: Importance.low,
+  playSound: false,
+  enableVibration: false,
 );
 const _callsChannel = AndroidNotificationChannel(
   'calls',
@@ -323,6 +356,8 @@ Future<void> _initLocal({DidReceiveNotificationResponseCallback? onTap}) async {
   await android?.createNotificationChannel(_messagesChannel);
   await android?.createNotificationChannel(_asksChannel);
   await android?.createNotificationChannel(_callsChannel);
+  await android?.createNotificationChannel(_activityChannel);
+  await android?.createNotificationChannel(_quietChannel);
   _localReady = true;
 }
 
@@ -338,6 +373,38 @@ Future<void> showMessage({required String chatId, required String name, required
     payload: jsonEncode({'type': 'msg', 'chatId': chatId, 'name': name}),
   );
 }
+const _activityDetails = NotificationDetails(
+  android: AndroidNotificationDetails(
+    'activity',
+    'Activity',
+    channelDescription: 'Reactions, reposts, ratings and new asks that fit your business',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+  ),
+  iOS: DarwinNotificationDetails(threadIdentifier: 'activity'),
+);
+
+/// Any notification from the API's engine (asks, responses, activity, catch-ups). Notifications on the
+/// same subject replace each other (same id).
+Future<void> showActivity(Map<String, dynamic> d, {required String title, required String body}) async {
+  await _initLocal();
+  final kind = '${d['kind'] ?? d['type'] ?? ''}';
+  if (kind == 'message' || kind == 'msg') {
+    await showMessage(chatId: '${d['chatId']}', name: title, body: body);
+    return;
+  }
+  const asks = {'ask_response', 'ask_referral', 'share_asked', 'share_answered', 'contact_request', 'item_referral', 'ask_match'};
+  final details = kind == 'missed_call' ? _messageDetails : (asks.contains(kind) ? _asksDetails : _activityDetails);
+  final key = '${d['postId'] ?? d['productId'] ?? d['storyId'] ?? d['from'] ?? d['nid'] ?? title}$kind';
+  await _local.show(
+    id: key.hashCode & 0x7fffffff,
+    title: title,
+    body: body,
+    notificationDetails: details,
+    payload: jsonEncode(d),
+  );
+}
+
 Future<void> showIncomingCall({required String callId, required String from, required String name, required bool video}) async {
   await _initLocal();
   await _local.show(
@@ -365,18 +432,26 @@ Future<void> showIncomingCall({required String callId, required String from, req
   );
 }
 
-/// Data-only call pushes (works in both the main and the background isolate).
+/// Data-only call pushes (works in both the main and the background isolate): ring through the phone's
+/// own call UI, or stop it when the caller hung up / it was answered elsewhere.
 Future<void> handleCallData(Map<String, dynamic> d) async {
   switch (d['type']) {
     case 'call':
-      await showIncomingCall(
-        callId: '${d['callId']}',
-        from: '${d['from']}',
-        name: '${d['name'] ?? d['from']}',
-        video: d['video'] == 'true',
-      );
+      if (NativeCalls.supported) {
+        await NativeCalls.showIncoming(
+          id: '${d['callId']}',
+          name: '${d['name'] ?? 'Someone'}',
+          video: d['video'] == 'true',
+          from: '${d['from'] ?? ''}',
+          handle: '${d['handle'] ?? ''}',
+          photo: '${d['photo'] ?? ''}',
+        );
+      } else {
+        await showIncomingCall(callId: '${d['callId']}', from: '${d['from']}', name: '${d['name'] ?? d['from']}', video: d['video'] == 'true');
+      }
       break;
     case 'call_cancel':
+      await NativeCalls.end('${d['callId']}');
       await _initLocal();
       await _local.cancel(id: _callNotifId('${d['callId']}'));
       break;

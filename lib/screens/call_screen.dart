@@ -62,6 +62,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       case CallState.ended:
         return t(c.note ?? 'Call ended');
       case CallState.connected:
+        if (c.peerAway) return t('Reconnecting…');
         final d = DateTime.now().difference(c.connectedAt ?? DateTime.now());
         String two(int n) => n.toString().padLeft(2, '0');
         return d.inHours > 0 ? '${d.inHours}:${two(d.inMinutes % 60)}:${two(d.inSeconds % 60)}' : '${two(d.inMinutes)}:${two(d.inSeconds % 60)}';
