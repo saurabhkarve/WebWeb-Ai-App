@@ -7,6 +7,13 @@
 #   app_store     APP_STORE_APPLE_ID (the numeric Apple ID of the app in App Store Connect)
 # Code signing identities: Android keystore reference "webweb_upload"; iOS uses the
 # App Store Connect API key integration "WebWeb ASC" (automatic signing).
+#
+# One Codemagic account builds this app: the one whose "firebase" group holds the files of the Firebase
+# project below (webweb-ai-app). Any other account that has this repo added stops at the first step with
+# a clear error instead of shipping an app wired to the wrong Firebase (no push, no phone login).
+#
+# Versions: tag the commit v<version>, e.g. v0.2.0. The tag becomes the version name the stores and the
+# in-app update prompt (Admin > App updates) compare; the build number counts up on its own.
 
 definitions:
   env: &env
@@ -14,6 +21,9 @@ definitions:
     java: 17
     vars: &vars
       API_URL: https://biznetapi.webweb.ai
+      # the only Firebase project this app may be built with (see the header)
+      FIREBASE_PROJECT: webweb-ai-app
+      FIREBASE_PROJECT_NUMBER: "441974581550"
   email: &email
     email:
       recipients:
@@ -50,13 +60,19 @@ workflows:
             echo "$GOOGLE_SERVICES_JSON" | tr -d ' \n\r' | base64 --decode > android/app/google-services.json || { echo "ERROR: GOOGLE_SERVICES_JSON is not valid base64"; exit 1; }
           fi
           python3 - <<'PY'
-          import json, sys
+          import json, os, sys
           try:
               d = json.load(open("android/app/google-services.json"))
           except Exception as e:
               sys.exit(f"ERROR: google-services.json is not valid JSON ({e})")
           ids = [c["client_info"]["android_client_info"]["package_name"] for c in d.get("client", [])]
-          print("google-services.json project:", d.get("project_info", {}).get("project_id"), "apps:", ids)
+          info = d.get("project_info", {})
+          print("google-services.json project:", info.get("project_id"), info.get("project_number"), "apps:", ids)
+          want = os.environ["FIREBASE_PROJECT"]
+          if info.get("project_id") != want or str(info.get("project_number")) != os.environ["FIREBASE_PROJECT_NUMBER"]:
+              sys.exit(f"ERROR: this Codemagic account's google-services.json is for Firebase project '{info.get('project_id')}', "
+                       f"but this app must be built with '{want}'. Build from the account that owns that project, "
+                       "or replace GOOGLE_SERVICES_JSON in the 'firebase' group with that project's file.")
           if "ai.webweb.app" not in ids:
               sys.exit("ERROR: no Android app 'ai.webweb.app' in google-services.json. In Firebase add an Android app with package ai.webweb.app and download the file again.")
           PY
@@ -72,14 +88,23 @@ workflows:
         script: flutter pub get
       - name: Analyze
         script: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Version from the tag
+        script: |
+          # v0.2.0 -> 0.2.0; builds started without a tag keep the version in pubspec.yaml
+          NAME="${CM_TAG#v}"
+          [ -z "$CM_TAG" ] && NAME=$(grep '^version:' pubspec.yaml | sed -E 's/version: *([^+]+).*/\1/')
+          echo "BUILD_NAME=$NAME" >> $CM_ENV
+          echo "Version $NAME"
       - name: Build AAB
         script: |
           flutter build appbundle --release \
+            --build-name=$BUILD_NAME \
             --build-number=$PROJECT_BUILD_NUMBER \
             --dart-define=API_URL=$API_URL
       - name: Build APK (for direct install / testing)
         script: |
           flutter build apk --release \
+            --build-name=$BUILD_NAME \
             --build-number=$PROJECT_BUILD_NUMBER \
             --dart-define=API_URL=$API_URL
     artifacts:
@@ -116,11 +141,7 @@ workflows:
       tag_patterns:
         - pattern: "v*"
     scripts:
-      - name: Dependencies
-        script: flutter pub get
-      # (flutter build ipa runs CocoaPods itself for plugins that are not Swift packages)
-      - name: Signing profiles
-        script: xcode-project use-profiles
+      # first, so a build from the wrong Codemagic account stops before signing anything
       - name: Firebase config (values passed to the app as --dart-define)
         script: |
           if [ -z "$GOOGLE_SERVICE_INFO_PLIST" ]; then
@@ -136,11 +157,29 @@ workflows:
           echo "FIREBASE_IOS_APP_ID=$(pb GOOGLE_APP_ID)" >> $CM_ENV
           echo "FIREBASE_SENDER_ID=$(pb GCM_SENDER_ID)" >> $CM_ENV
           echo "FIREBASE_PROJECT_ID=$(pb PROJECT_ID)" >> $CM_ENV
+          echo "GoogleService-Info.plist project: $(pb PROJECT_ID) $(pb GCM_SENDER_ID) bundle: $(pb BUNDLE_ID)"
+          if [ "$(pb PROJECT_ID)" != "$FIREBASE_PROJECT" ] || [ "$(pb GCM_SENDER_ID)" != "$FIREBASE_PROJECT_NUMBER" ]; then
+            echo "ERROR: this Codemagic account's GoogleService-Info.plist is for Firebase project '$(pb PROJECT_ID)', but this app must be built with '$FIREBASE_PROJECT'."
+            echo "Build from the account that owns that project, or replace GOOGLE_SERVICE_INFO_PLIST in the 'firebase' group with that project's file."
+            exit 1
+          fi
           test "$(pb BUNDLE_ID)" = "ai.webweb.app" || { echo "GoogleService-Info.plist is for $(pb BUNDLE_ID), expected ai.webweb.app"; exit 1; }
+      - name: Dependencies
+        script: flutter pub get
+      # (flutter build ipa runs CocoaPods itself for plugins that are not Swift packages)
+      - name: Signing profiles
+        script: xcode-project use-profiles
+      - name: Version from the tag
+        script: |
+          NAME="${CM_TAG#v}"
+          [ -z "$CM_TAG" ] && NAME=$(grep '^version:' pubspec.yaml | sed -E 's/version: *([^+]+).*/\1/')
+          echo "BUILD_NAME=$NAME" >> $CM_ENV
+          echo "Version $NAME"
       - name: Build IPA
         script: |
           BUILD_NUMBER=$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0) + 1))
           flutter build ipa --release \
+            --build-name=$BUILD_NAME \
             --build-number=$BUILD_NUMBER \
             --export-options-plist=/Users/builder/export_options.plist \
             --dart-define=API_URL=$API_URL \

@@ -115,3 +115,23 @@ Results:
   - notifications: right after signing in.
 
   The wording iOS shows is in `ios/Runner/Info.plist`.
+
+## One Codemagic account
+
+The app is built from one Codemagic account only: the one whose `firebase` group holds the files of the
+Firebase project **webweb-ai-app** (project number 441974581550). Push, phone login and calls only work in
+builds made with that project. `codemagic.yaml` checks this first in both workflows, so a build from any other
+account that has this repo added stops at once with "this app must be built with 'webweb-ai-app'".
+
+Builds of this repo have come from two Codemagic apps:
+
+- `6ad2701254e1cb7a3bf33013`
+- `6ad345b61af7abfd6c3855cf`
+
+Keep the one in the right account. In the other account remove the app (App settings > Delete app) or turn off
+its build triggers, so tags do not start builds there.
+
+## Versions
+
+Tag the commit `v<version>` (e.g. `v0.2.0`) and push the tag. The tag becomes the version name, which the stores
+and the in-app update prompt (Admin > App updates on the website) compare. Raise it for every release.
