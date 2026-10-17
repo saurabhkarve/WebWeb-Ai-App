@@ -107,7 +107,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         id: p.id, kind: p.kind, authorUid: p.authorUid, authorName: p.authorName, authorCompany: p.authorCompany, authorHandle: p.authorHandle,
         authorPhotoUrl: p.authorPhotoUrl, title: p.title, description: p.description, category: p.category, locationPref: p.locationPref,
         budget: p.budget, urgency: p.urgency, matchReason: p.matchReason, slug: p.slug, categoryLabel: p.categoryLabel, authorType: p.authorType,
-        authorVerification: p.authorVerification, distanceM: p.distanceM, images: p.images, sharesCount: n, authorHasUpdate: p.authorHasUpdate,
+        authorVerification: p.authorVerification, distanceM: p.distanceM, radiusM: p.radiusM, images: p.images, sharesCount: n, authorHasUpdate: p.authorHasUpdate,
         createdAt: p.createdAt, recentResponses: p.recentResponses, reactionsCount: p.reactionsCount, repostsCount: p.repostsCount,
         referralsCount: p.referralsCount, reacted: p.reacted, reposted: p.reposted, bookmarked: p.bookmarked, myReaction: p.myReaction,
       );
@@ -127,22 +127,11 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     final isBusiness = post.authorType == 'entrepreneur';
     // phones: a smaller author photo leaves more width for the ask
     final small = MediaQuery.sizeOf(context).width < 600;
-    final match = (post.matchReason ?? '').isEmpty ? null : '${post.matchReason}${post.distanceM == null ? '' : ' · ${formatDistance(post.distanceM!)}'}';
+    // the distance sits on the location chip
+    final match = (post.matchReason ?? '').isEmpty ? null : post.matchReason!;
 
     final body = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (isAsk) ...[
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(color: p.ink, borderRadius: BorderRadius.circular(10)),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            WIcon(categoryIcon(post.category), size: 12, color: p.onInk),
-            const SizedBox(width: 4),
-            Text(t(post.categoryText).toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0, color: p.onInk)),
-          ]),
-        ),
-        const SizedBox(height: 4),
-        Text(post.title ?? '', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.375)),
-      ],
+      if (isAsk) Text(post.title ?? '', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.375)),
       if ((post.description ?? '').isNotEmpty)
         Padding(
           padding: EdgeInsets.only(top: isAsk ? 4 : 0),
@@ -245,13 +234,22 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                 ),
               ]),
             ),
-            if (isAsk && ((post.locationPref ?? '').isNotEmpty || (post.budget ?? '').isNotEmpty || urgency != null))
+            // the essentials as chips: what, where (and how far), budget, timing, reach, photos
+            if (isAsk)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
                 child: Wrap(spacing: 6, runSpacing: 6, children: [
-                  if ((post.locationPref ?? '').isNotEmpty) InfoPill(wi: WI.pin, text: t(post.locationPref!), onTap: () => _openFind(location: post.locationPref)),
+                  InfoPill(wi: categoryIcon(post.category), text: t(post.categoryText)),
+                  if ((post.locationPref ?? '').isNotEmpty)
+                    InfoPill(
+                      wi: WI.pin,
+                      text: '${t(post.locationPref!)}${post.distanceM == null ? '' : ' · ${formatDistance(post.distanceM!)}'}',
+                      onTap: () => _openFind(location: post.locationPref),
+                    ),
                   if ((post.budget ?? '').isNotEmpty) InfoPill(wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
                   if (urgency != null) InfoPill(wi: WI.clock, text: t(urgency), onTap: () => _openFind(urgency: post.urgency)),
+                  if ((post.radiusM ?? 0) > 0) InfoPill(wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)})),
+                  if (post.images.isNotEmpty) InfoPill(wi: WI.camera, text: t(post.images.length == 1 ? '1 photo' : '{n} photos', {'n': post.images.length})),
                 ]),
               ),
             if (mine && isAsk)
