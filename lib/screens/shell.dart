@@ -315,12 +315,23 @@ BoxDecoration _panelDecoration(Pal p, {double radius = 14}) => BoxDecoration(
     );
 
 void _openAccountMenu(BuildContext context) {
-  final top = MediaQuery.of(context).padding.top + 56 + 8;
-  _showPanel(context, (ctx) => Stack(children: [Positioned(top: top, right: 12, width: 256, child: const _AccountMenu())]));
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Close',
+    barrierColor: const Color(0x8014120C),
+    transitionDuration: const Duration(milliseconds: 220),
+    pageBuilder: (ctx, _, __) => const Align(alignment: Alignment.centerRight, child: _AccountMenu()),
+    transitionBuilder: (_, a, __, child) => SlideTransition(
+      position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
+      child: child,
+    ),
+  );
 }
 
-/// The account menu from the web (account-menu.tsx): account card, View / Edit profile, Saved asks,
-/// Help & Support (opens the website), Dark mode switch, language pills, Log out.
+/// The account menu from the web (account-menu.tsx) as a full-height drawer from the right: account card,
+/// View / Edit profile, Saved asks, Help & Support (opens the website), Dark mode switch, language pills,
+/// Blocked people, Delete account, Log out.
 class _AccountMenu extends StatelessWidget {
   const _AccountMenu();
 
@@ -332,6 +343,7 @@ class _AccountMenu extends StatelessWidget {
     final themeCtl = context.watch<ThemeController>();
     final i18n = context.watch<I18n>();
     final dark = p.dark;
+    final mq = MediaQuery.of(context);
     if (me == null) return const SizedBox();
     void push(Widget page) {
       final nav = Navigator.of(context);
@@ -340,54 +352,68 @@ class _AccountMenu extends StatelessWidget {
     }
 
     Widget iconBox(WI icon, {Color? bg, Color? fg}) => Container(
-          width: 28,
-          height: 28,
+          width: 40,
+          height: 40,
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: bg ?? p.chip, borderRadius: BorderRadius.circular(10)),
-          child: WIcon(icon, size: 16, color: fg ?? p.muted, strokeWidth: 1.8),
+          decoration: BoxDecoration(color: bg ?? p.chip, borderRadius: BorderRadius.circular(12)),
+          child: WIcon(icon, size: 20, color: fg ?? p.muted, strokeWidth: 1.8),
         );
-    Widget item(WI icon, String label, VoidCallback onTap) => InkWell(
+    Widget row(WI icon, Widget label, VoidCallback? onTap, {Color? bg, Color? fg, Widget? trailing}) => InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(14),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(children: [iconBox(icon), const SizedBox(width: 12), Text(t(label), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))]),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(children: [iconBox(icon, bg: bg, fg: fg), const SizedBox(width: 16), Expanded(child: label), if (trailing != null) trailing]),
           ),
         );
+    Text label(String s, {Color? color}) => Text(s, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: color));
+    Widget item(WI icon, String text, VoidCallback onTap) => row(icon, label(t(text)), onTap);
+    final divider = Divider(height: 1, color: p.border.withValues(alpha: .6));
 
     return Material(
-      color: Colors.transparent,
-      child: Container(
-        decoration: _panelDecoration(p),
-        clipBehavior: Clip.antiAlias,
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      color: p.canvas,
+      elevation: 16,
+      borderRadius: const BorderRadius.horizontal(left: Radius.circular(24)),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        width: (mq.size.width * .88).clamp(0, 380).toDouble(),
+        height: mq.size.height,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          SizedBox(height: mq.padding.top),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 8, 4),
+            child: Row(children: [
+              Expanded(child: Text(t('Account').toUpperCase(), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 1.6, color: p.muted))),
+              IconButton(tooltip: t('Close'), onPressed: () => Navigator.of(context).pop(), icon: WIcon(WI.close, size: 22, color: p.text)),
+            ]),
+          ),
           // account card
           InkWell(
             onTap: () => push(const ProfileScreen()),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(color: p.chip.withValues(alpha: .5), border: Border(bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              decoration: BoxDecoration(color: p.chip.withValues(alpha: .5), border: Border(top: BorderSide(color: p.border.withValues(alpha: .6)), bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
               child: Row(children: [
-                Avatar(name: me.name, photoUrl: me.photoUrl, size: 40, ring: me.hasUpdate, type: me.userType, badge: 16),
-                const SizedBox(width: 12),
+                Avatar(name: me.name, photoUrl: me.photoUrl, size: 56, ring: me.hasUpdate, type: me.userType, badge: 18),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(me.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                    Text('@${me.handle}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: p.muted)),
+                    Text(me.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text('@${me.handle}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: p.muted)),
                     const SizedBox(height: 4),
                     Row(children: [
-                      VerifiedBadge(level: me.verification, size: 12),
+                      VerifiedBadge(level: me.verification, size: 14),
                       const SizedBox(width: 4),
-                      Flexible(child: Text(t(kVerificationLabel[me.verification] ?? ''), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: p.muted))),
+                      Flexible(child: Text(t(kVerificationLabel[me.verification] ?? ''), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: p.muted))),
                     ]),
                   ]),
                 ),
               ]),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(6),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Expanded(
+            child: ListView(padding: const EdgeInsets.all(8), children: [
               item(WI.user, 'View profile', () => push(const ProfileScreen())),
               item(WI.edit, 'Edit profile', () => push(EditProfileScreen(profile: me))),
               item(WI.bookmark, 'Saved asks', () => push(const SavedPostsScreen())),
@@ -396,96 +422,58 @@ class _AccountMenu extends StatelessWidget {
                 Navigator.of(context).pop();
                 launchUrl(Uri.parse('$siteUrl/help?lang=${i18n.lang}'), mode: LaunchMode.externalApplication);
               }),
-              // dark mode switch
-              InkWell(
-                onTap: () => themeCtl.set(dark ? ThemeMode.light : ThemeMode.dark),
-                borderRadius: BorderRadius.circular(14),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  child: Row(children: [
-                    iconBox(dark ? WI.sun : WI.moon),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text(t('Dark mode'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: 32,
-                      height: 18,
-                      padding: const EdgeInsets.all(2),
-                      alignment: dark ? Alignment.centerRight : Alignment.centerLeft,
-                      decoration: BoxDecoration(color: dark ? kGold : p.border, borderRadius: BorderRadius.circular(9)),
-                      child: Container(width: 14, height: 14, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Color(0x33000000), blurRadius: 2)])),
-                    ),
-                  ]),
+              row(
+                dark ? WI.sun : WI.moon,
+                label(t('Dark mode')),
+                () => themeCtl.set(dark ? ThemeMode.light : ThemeMode.dark),
+                trailing: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 44,
+                  height: 24,
+                  padding: const EdgeInsets.all(3),
+                  alignment: dark ? Alignment.centerRight : Alignment.centerLeft,
+                  decoration: BoxDecoration(color: dark ? kGold : p.border, borderRadius: BorderRadius.circular(12)),
+                  child: Container(width: 18, height: 18, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Color(0x33000000), blurRadius: 2)])),
                 ),
               ),
               // language
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                child: Row(children: [
-                  iconBox(WI.globe),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Wrap(spacing: 4, runSpacing: 4, children: [
-                      for (final l in kLangs)
-                        GestureDetector(
-                          onTap: () {
-                            if (i18n.lang == l.code) return;
-                            Navigator.of(context).pop();
-                            i18n.set(l.code);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(color: i18n.lang == l.code ? p.ink : p.chip, borderRadius: BorderRadius.circular(20)),
-                            child: Text(l.native, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: i18n.lang == l.code ? p.onInk : p.text)),
-                          ),
-                        ),
-                    ]),
-                  ),
+              row(
+                WI.globe,
+                Wrap(spacing: 6, runSpacing: 6, children: [
+                  for (final l in kLangs)
+                    GestureDetector(
+                      onTap: () {
+                        if (i18n.lang == l.code) return;
+                        Navigator.of(context).pop();
+                        i18n.set(l.code);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(color: i18n.lang == l.code ? p.ink : p.chip, borderRadius: BorderRadius.circular(20)),
+                        child: Text(l.native, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: i18n.lang == l.code ? p.onInk : p.text)),
+                      ),
+                    ),
                 ]),
+                null,
               ),
-            ]),
-          ),
-          Container(
-            decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border.withValues(alpha: .6)))),
-            padding: const EdgeInsets.all(6),
-            child: Column(children: [
+              const SizedBox(height: 8),
+              divider,
+              const SizedBox(height: 8),
               item(WI.user, 'Blocked people', () => push(const BlockedPeopleScreen())),
-              InkWell(
-                onTap: () {
-                  final nav = Navigator.of(context);
-                  nav.pop();
-                  deleteAccount(nav.context);
-                },
-                borderRadius: BorderRadius.circular(14),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  child: Row(children: [
-                    iconBox(WI.trash, bg: p.danger.withValues(alpha: .1), fg: p.danger),
-                    const SizedBox(width: 12),
-                    Text('Delete account', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: p.danger)),
-                  ]),
-                ),
-              ),
+              row(WI.trash, label(t('Delete account'), color: p.danger), () {
+                final nav = Navigator.of(context);
+                nav.pop();
+                deleteAccount(nav.context);
+              }, bg: p.danger.withValues(alpha: .1), fg: p.danger),
             ]),
           ),
-          Container(
-            decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border.withValues(alpha: .6)))),
-            padding: const EdgeInsets.all(6),
-            child: InkWell(
-              onTap: () {
-                Navigator.of(context).pop();
-                auth.logout();
-              },
-              borderRadius: BorderRadius.circular(14),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                child: Row(children: [
-                  iconBox(WI.logout, bg: p.danger.withValues(alpha: .1), fg: p.danger),
-                  const SizedBox(width: 12),
-                  Text(t('Log out'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: p.danger)),
-                ]),
-              ),
-            ),
+          divider,
+          Padding(
+            padding: EdgeInsets.fromLTRB(8, 8, 8, 8 + mq.padding.bottom),
+            child: row(WI.logout, label(t('Log out'), color: p.danger), () {
+              Navigator.of(context).pop();
+              auth.logout();
+            }, bg: p.danger.withValues(alpha: .1), fg: p.danger),
           ),
         ]),
       ),
