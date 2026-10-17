@@ -112,12 +112,6 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         referralsCount: p.referralsCount, reacted: p.reacted, reposted: p.reposted, bookmarked: p.bookmarked, myReaction: p.myReaction,
       );
 
-  Future<void> _share() async {
-    try {
-      await SharePlus.instance.share(ShareParams(text: post.webUrl, subject: post.title ?? 'WebWeb AI ask'));
-    } catch (_) {}
-  }
-
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
@@ -168,7 +162,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                       const SizedBox(width: 6),
                       Text(timeAgo(post.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
                     ]),
-                    Text('@${post.authorHandle} · ${isBusiness ? post.authorName : post.authorCompany}',
+                    Text(isBusiness ? post.authorName : post.authorCompany,
                         maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted, height: 1.3)),
                   ]),
                 ),
@@ -182,15 +176,6 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                     child: GoldTag(match),
                   ),
                 ),
-              Semantics(
-                button: true,
-                label: t('Share'),
-                child: InkResponse(
-                  onTap: _share,
-                  radius: 18,
-                  child: SizedBox(width: 32, height: 32, child: Center(child: WIcon(WI.share, size: 18, color: p.muted))),
-                ),
-              ),
               if (!mine)
                 Semantics(
                   button: true,
@@ -294,7 +279,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
 
 }
 
-/// React · Refer · Repost · Reply · Save under an ask or update (web post-actions.tsx). Counts sit in
+/// React · Refer · Repost · Reply · Share · Save under an ask or update (web post-actions.tsx). Counts sit in
 /// a small pill next to the icon; labels never shift when the state flips.
 class PostActions extends StatefulWidget {
   final Post post;
@@ -398,6 +383,12 @@ class PostActionsState extends State<PostActions> {
   @override
   Widget build(BuildContext context) => _actions(Pal.of(context), post.isRequirement, _isOwner);
 
+  Future<void> _share() async {
+    try {
+      await SharePlus.instance.share(ShareParams(text: post.webUrl, subject: post.title ?? (post.isRequirement ? 'WebWeb AI ask' : 'WebWeb AI update')));
+    } catch (_) {}
+  }
+
   Widget _actions(Pal p, bool isAsk, bool mine) {
     Widget num(int n) => Container(
           margin: const EdgeInsets.only(left: 2),
@@ -450,6 +441,7 @@ class PostActionsState extends State<PostActions> {
         onTap: _toggleRepost,
       ),
       btn(icon: WIcon(WI.reply, size: 20, color: p.muted), count: isAsk ? post.sharesCount : null, label: 'Reply', color: p.muted, onTap: widget.onReply),
+      btn(icon: WIcon(WI.share, size: 20, color: p.muted), label: 'Share', color: p.muted, onTap: _share),
       btn(
         icon: WIcon(WI.bookmark, size: 20, color: post.bookmarked ? p.link : p.muted, fill: post.bookmarked),
         label: 'Save',

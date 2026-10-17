@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
@@ -218,11 +217,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 iconBtn(WI.edit, t('Edit ask'), _editAsk),
                 iconBtn(WI.trash, t('Delete ask'), _removeAsk, color: p.danger),
               ],
-              iconBtn(WI.share, t('Share this ask'), () async {
-                try {
-                  await SharePlus.instance.share(ShareParams(text: post.webUrl, subject: post.title ?? 'WebWeb AI ask'));
-                } catch (_) {}
-              }),
             ]),
             const SizedBox(height: 20),
             if (isAsk) ...[

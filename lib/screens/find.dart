@@ -39,6 +39,14 @@ class _FindScreenState extends State<FindScreen> {
   List<Post>? _posts;
   List<Map<String, dynamic>>? _items;
   bool _loading = false;
+  // more asks on scroll: the query behind the current results, and whether another page exists
+  static const _page = 20;
+  Map<String, String>? _postQuery;
+  bool _postsMore = false, _loadingMore = false;
+  // under Explore: the latest asks (or jobs), paged the same way
+  List<Post>? _latest;
+  String? _latestFor;
+  bool _latestMore = false;
   Timer? _debounce;
   int _seq = 0;
   final _explore = GlobalKey<_ExploreState>();
@@ -71,7 +79,10 @@ class _FindScreenState extends State<FindScreen> {
         _users = _posts = null;
         _items = null;
         _loading = false;
+        _postQuery = null;
+        _postsMore = false;
       });
+      _loadLatest(reset: true);
       return;
     }
     setState(() => _loading = true);
@@ -80,6 +91,16 @@ class _FindScreenState extends State<FindScreen> {
     final wantPosts = _scope == 'all' || _scope == 'jobs' || _scope == 'asks';
     final wantItems = _scope == 'all' || _scope == 'catalog';
     final hasText = q.length >= 2;
+    final postQuery = <String, String>{
+      'kind': 'requirement',
+      if (hasText) 'search': q,
+      if (_askCat.isNotEmpty || _scope == 'jobs') 'category': _askCat.isNotEmpty ? _askCat : 'job',
+      if (_location.isNotEmpty) 'location': _location,
+      if (_budget.isNotEmpty) 'budget': _budget,
+      if (_urgency.isNotEmpty) 'urgency': _urgency,
+    };
+    _postQuery = wantPosts ? postQuery : null;
+    _postsMore = false;
     try {
       final res = await Future.wait([
         // a category narrows asks only, so members and items drop out while it is set
@@ -90,15 +111,7 @@ class _FindScreenState extends State<FindScreen> {
               })
             : Future.value(<Profile>[]),
         wantPosts
-            ? api.get('/posts', {
-                'kind': 'requirement',
-                'limit': '20',
-                if (hasText) 'search': q,
-                if (_askCat.isNotEmpty || _scope == 'jobs') 'category': _askCat.isNotEmpty ? _askCat : 'job',
-                if (_location.isNotEmpty) 'location': _location,
-                if (_budget.isNotEmpty) 'budget': _budget,
-                if (_urgency.isNotEmpty) 'urgency': _urgency,
-              }).then((d) => (d as List).map((e) => Post.fromJson(e as Map)).toList())
+            ? api.get('/posts', {...postQuery, 'limit': '$_page'}).then((d) => (d as List).map((e) => Post.fromJson(e as Map)).toList())
             : Future.value(<Post>[]),
         wantItems && hasText && _askCat.isEmpty && _location.isEmpty && _budget.isEmpty && _urgency.isEmpty
             ? api.get('/products/search', {'q': q}).then((d) => (d as List).map((e) => Map<String, dynamic>.from(e as Map)).toList())
@@ -109,6 +122,7 @@ class _FindScreenState extends State<FindScreen> {
         _users = res[0] as List<Profile>;
         _posts = res[1] as List<Post>;
         _items = res[2] as List<Map<String, dynamic>>;
+        _postsMore = wantPosts && _posts!.length == _page;
       });
     } catch (_) {
       if (!mounted || seq != _seq) return;
@@ -119,6 +133,62 @@ class _FindScreenState extends State<FindScreen> {
       });
     } finally {
       if (mounted && seq == _seq) setState(() => _loading = false);
+    }
+  }
+
+  /// Next page of search results.
+  Future<void> _morePosts() async {
+    final query = _postQuery, have = _posts;
+    if (query == null || have == null || !_postsMore || _loadingMore) return;
+    final seq = _seq;
+    setState(() => _loadingMore = true);
+    try {
+      final d = await context.read<AuthProvider>().api.get('/posts', {...query, 'limit': '$_page', 'offset': '${have.length}'});
+      final next = (d as List).map((e) => Post.fromJson(e as Map)).toList();
+      if (!mounted || seq != _seq) return; // the search changed meanwhile
+      final seen = {for (final x in have) x.id};
+      setState(() {
+        _posts = [...have, ...next.where((x) => !seen.contains(x.id))];
+        _postsMore = next.length == _page;
+      });
+    } catch (_) {
+      // the next scroll tries again
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  /// The latest asks (Jobs: latest jobs) under Explore, a page at a time.
+  Future<void> _loadLatest({bool reset = false}) async {
+    final want = _scope == 'all' || _scope == 'asks' || _scope == 'jobs';
+    final key = _scope == 'jobs' ? 'job' : 'all';
+    if (!want) {
+      if (_latest != null) setState(() => _latest = null);
+      return;
+    }
+    if (reset && _latestFor == key && _latest != null) return; // already showing this list
+    if (!reset && (!_latestMore || _loadingMore)) return;
+    final have = reset || _latestFor != key ? <Post>[] : (_latest ?? <Post>[]);
+    _latestFor = key;
+    setState(() => _loadingMore = true);
+    try {
+      final d = await context.read<AuthProvider>().api.get('/posts', {
+        'kind': 'requirement',
+        if (key == 'job') 'category': 'job',
+        'limit': '$_page',
+        'offset': '${have.length}',
+      });
+      final next = (d as List).map((e) => Post.fromJson(e as Map)).toList();
+      if (!mounted || _latestFor != key) return;
+      final seen = {for (final x in have) x.id};
+      setState(() {
+        _latest = [...have, ...next.where((x) => !seen.contains(x.id))];
+        _latestMore = next.length == _page;
+      });
+    } catch (_) {
+      // the next scroll tries again
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -236,8 +306,30 @@ class _FindScreenState extends State<FindScreen> {
         if (_posts?.isNotEmpty == true) ...[
           if (_scope == 'all') _sectionLabel(p, 'Asks & jobs'),
           for (final post in _posts!) PostCard(key: ValueKey(post.id), post: post),
+          if (_postsMore || _loadingMore) const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Center(child: LogoLoader(size: 32))),
+        ],
+        // under the discovery grid, the latest asks keep coming as you scroll
+        if (idle && _latest?.isNotEmpty == true) ...[
+          const SizedBox(height: 24),
+          Text(t(_latestFor == 'job' ? 'Latest jobs' : 'Latest asks'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          for (final post in _latest!) PostCard(key: ValueKey('latest-${post.id}'), post: post),
+          if (_latestMore || _loadingMore) const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Center(child: LogoLoader(size: 32))),
         ],
       ],
+    );
+    // near the end of the list, fetch the next page
+    final scrolling = NotificationListener<ScrollNotification>(
+      onNotification: (n) {
+        if (n.depth == 0 && n.metrics.axis == Axis.vertical && n.metrics.extentAfter < 600) {
+          if (idle) {
+            _loadLatest();
+          } else {
+            _morePosts();
+          }
+        }
+        return false;
+      },
+      child: list,
     );
 
     final body = LogoRefresh(
@@ -248,7 +340,7 @@ class _FindScreenState extends State<FindScreen> {
           await _run();
         }
       },
-      child: list,
+      child: scrolling,
     );
     if (!widget.standalone) return body;
     return SubPage(title: t('Find'), body: body);
