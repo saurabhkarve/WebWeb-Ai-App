@@ -365,7 +365,7 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
                         height: 20,
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
                           it.myReaction != null
-                              ? SizedBox(width: 20, height: 20, child: Center(child: Text(kReactionEmoji[it.myReaction] ?? '❤️', style: const TextStyle(fontSize: 14, height: 1))))
+                              ? SizedBox(width: 20, height: 20, child: Center(child: ReactionGlyph(it.myReaction!, size: 14)))
                               : WIcon(WI.heart, size: 20, color: p.muted),
                           if (it.reactionsCount > 0) ...[
                             const SizedBox(width: 4),

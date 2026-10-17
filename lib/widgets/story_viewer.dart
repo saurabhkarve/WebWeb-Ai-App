@@ -13,6 +13,7 @@ import '../models.dart';
 import '../screens/profile.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'reaction_picker.dart' show ReactionGlyph;
 
 /// Full-screen update player (web update-viewer.tsx): tap right / left to move, auto-advances every
 /// 5 s. Others' updates get a right rail (react, repost, share) and a message field that replies in
@@ -433,7 +434,7 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
                             margin: const EdgeInsets.symmetric(horizontal: 2),
                             alignment: Alignment.center,
                             decoration: BoxDecoration(shape: BoxShape.circle, color: it.myReaction == r ? Colors.white.withValues(alpha: .3) : Colors.transparent),
-                            child: Text(kReactionEmoji[r]!, style: const TextStyle(fontSize: 24)),
+                            child: ReactionGlyph(r, size: 24),
                           ),
                         ),
                     ]),
@@ -451,7 +452,7 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
                       _openPicker();
                     }
                   },
-                  child: it.myReaction != null ? Text(kReactionEmoji[it.myReaction] ?? '❤️', style: const TextStyle(fontSize: 24, height: 1)) : const WIcon(WI.heart, size: 28, color: Colors.white),
+                  child: it.myReaction != null ? ReactionGlyph(it.myReaction!, size: 24) : const WIcon(WI.heart, size: 28, color: Colors.white),
                 ),
               ]),
             if (!mine) ...[

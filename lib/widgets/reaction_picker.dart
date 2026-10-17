@@ -1,9 +1,24 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../icons.dart';
 import '../models.dart';
 import '../theme.dart';
+
+/// A reaction as the member sees it: the ❤️ 👍 🙏 emoji. On the web build ❤ is drawn as a red heart icon,
+/// because the web renderer takes that one character from a black-and-white symbols font.
+class ReactionGlyph extends StatelessWidget {
+  final String type;
+  final double size;
+  const ReactionGlyph(this.type, {super.key, this.size = 15});
+  @override
+  Widget build(BuildContext context) {
+    if (type == 'heart' && kIsWeb) return WIcon(WI.heart, size: size * 1.2, color: const Color(0xFFE5252A), fill: true);
+    return Text(kReactionEmoji[type] ?? '❤️', style: TextStyle(fontSize: size, height: 1));
+  }
+}
 
 /// The web's ReactionPicker: a pill with ❤️ 👍 🙏 that pops above the trigger. In [quick] mode the first
 /// tap reacts with ❤️ straight away and shows the options, which go away by themselves after 3 seconds.
@@ -94,7 +109,7 @@ class _ReactionPickerState extends State<ReactionPicker> with SingleTickerProvid
                             margin: const EdgeInsets.symmetric(horizontal: 1),
                             alignment: Alignment.center,
                             decoration: BoxDecoration(shape: BoxShape.circle, color: widget.value == r ? p.chip : Colors.transparent),
-                            child: Text(kReactionEmoji[r]!, style: const TextStyle(fontSize: 20)),
+                            child: ReactionGlyph(r, size: 20),
                           ),
                         ),
                     ]),

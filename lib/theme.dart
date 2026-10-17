@@ -61,12 +61,16 @@ class Pal {
   Color get onSelected => onInk;
 }
 
+/// Emoji in color everywhere (reactions ❤️ 👍 🙏, ratings, chat). Without naming them, the web renderer
+/// draws ❤ from a black-and-white symbols font.
+const kEmojiFonts = ['Apple Color Emoji', 'Noto Color Emoji'];
+
 ThemeData buildTheme(Brightness b) {
   final p = b == Brightness.dark ? Pal._dark : Pal._light;
-  final base = ThemeData(brightness: b, useMaterial3: true, fontFamily: kFont);
+  final base = ThemeData(brightness: b, useMaterial3: true, fontFamily: kFont, fontFamilyFallback: kEmojiFonts);
   // Akash has no kerning: the site tightens tracking by -0.022em and uses weight 500 for body text.
   TextStyle? tune(TextStyle? s, {FontWeight? w}) =>
-      s?.copyWith(fontFamily: kFont, color: p.text, fontWeight: w ?? s.fontWeight, letterSpacing: -0.022 * (s.fontSize ?? 14));
+      s?.copyWith(fontFamily: kFont, fontFamilyFallback: kEmojiFonts, color: p.text, fontWeight: w ?? s.fontWeight, letterSpacing: -0.022 * (s.fontSize ?? 14));
   final t = base.textTheme;
   final text = TextTheme(
     displayLarge: tune(t.displayLarge, w: FontWeight.w700),

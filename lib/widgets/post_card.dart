@@ -39,7 +39,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
   @override
   void didUpdateWidget(covariant PostCard old) {
     super.didUpdateWidget(old);
-    if (old.post.id != widget.post.id) post = widget.post;
+    // a refreshed feed hands in new data for the same post (e.g. my reaction from another device)
+    if (!identical(old.post, widget.post)) post = widget.post;
   }
 
   @override
@@ -178,6 +179,15 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                   ]),
                 ),
               ),
+              // the AI's "why you see this" sits top right, like the web on wide screens
+              if (match != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8, top: 6),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * .38),
+                    child: GoldTag(match),
+                  ),
+                ),
               Semantics(
                 button: true,
                 label: t('Share'),
@@ -188,7 +198,6 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                 ),
               ),
             ]),
-            if (match != null) Padding(padding: const EdgeInsets.only(top: 6), child: GoldTag(match)),
             if (mine && isAsk) Padding(padding: const EdgeInsets.only(top: 6), child: GoldTag(t('Your ask'))),
             const SizedBox(height: 8),
             GestureDetector(
@@ -406,7 +415,7 @@ class PostActionsState extends State<PostActions> {
         onChange: react,
         trigger: (_) => btn(
           icon: reacted
-              ? SizedBox(width: 20, height: 20, child: Center(child: Text(kReactionEmoji[post.myReaction] ?? '❤️', style: const TextStyle(fontSize: 15, height: 1))))
+              ? SizedBox(width: 20, height: 20, child: Center(child: ReactionGlyph(post.myReaction!, size: 15)))
               : WIcon(WI.heart, size: 20, color: p.muted),
           count: post.reactionsCount,
           label: 'React',
