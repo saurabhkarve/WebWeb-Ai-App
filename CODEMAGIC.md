@@ -15,7 +15,7 @@ Production API: `https://biznetapi.webweb.ai`, set as `API_URL` in the yaml.
 
 ## 0. Accounts you need
 - **Codemagic.** Sign in at https://codemagic.io with the GitHub account that can see `saurabhkarve/WebWeb-Ai-App`.
-- **Firebase.** Use the project `webweb-ai` in the Firebase console.
+- **Firebase.** Use the project `webweb-ai-app` (project number 441974581550) in the Firebase console. Builds stop if the files come from any other project.
 - **Apple Developer Program.** It costs $99 a year and is needed for iOS builds and TestFlight.
 - **Google Play Console.** It is a one-time $25 fee and is needed for the Play Store.
 
