@@ -8,6 +8,7 @@ import '../i18n.dart';
 import '../models.dart';
 import '../notifications.dart';
 import '../realtime.dart';
+import '../safety.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/active_call_banner.dart';
@@ -431,6 +432,29 @@ class _AccountMenu extends StatelessWidget {
                     ]),
                   ),
                 ]),
+              ),
+            ]),
+          ),
+          Container(
+            decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border.withValues(alpha: .6)))),
+            padding: const EdgeInsets.all(6),
+            child: Column(children: [
+              item(WI.user, 'Blocked people', () => push(const BlockedPeopleScreen())),
+              InkWell(
+                onTap: () {
+                  final nav = Navigator.of(context);
+                  nav.pop();
+                  deleteAccount(nav.context);
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  child: Row(children: [
+                    iconBox(WI.trash, bg: p.danger.withValues(alpha: .1), fg: p.danger),
+                    const SizedBox(width: 12),
+                    Text('Delete account', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: p.danger)),
+                  ]),
+                ),
               ),
             ]),
           ),

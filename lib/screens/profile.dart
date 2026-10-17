@@ -10,6 +10,7 @@ import '../auth_provider.dart';
 import '../config.dart';
 import '../i18n.dart';
 import '../models.dart';
+import '../safety.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/post_card.dart';
@@ -330,6 +331,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTap: () => themeCtl.set(dark ? ThemeMode.light : ThemeMode.dark),
               child: Padding(padding: const EdgeInsets.all(2), child: WIcon(dark ? WI.sun : WI.moon, size: 20, color: kInk)),
             ),
+            if (!own) ...[
+              const SizedBox(width: 4),
+              roundBtn(
+                label: 'Report or block',
+                onTap: () async {
+                  if (await showSafetySheet(context, uid: u.uid, name: displayName(u.userType, u.name, u.company)) && mounted) Navigator.maybePop(context);
+                },
+                child: const Padding(padding: EdgeInsets.all(2), child: Icon(Icons.more_vert, size: 22, color: kInk)),
+              ),
+            ],
           ]),
         ),
         if (own)

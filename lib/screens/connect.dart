@@ -9,6 +9,7 @@ import '../api.dart';
 import '../auth_provider.dart';
 import '../i18n.dart';
 import '../models.dart';
+import '../safety.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/catalog_strip.dart';
@@ -38,6 +39,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
   String? _error;
   bool _hasMore = true;
   bool _loadingMore = false;
+  Set<String> _blocked = {};
   int _offset = 0;
   final _scroll = ScrollController();
   final _updatesKey = GlobalKey<_UpdatesBarState>();
@@ -78,7 +80,9 @@ class _ConnectScreenState extends State<ConnectScreen> {
 
   Future<void> _load() async {
     try {
-      final d = (await _api.get('/posts', {'matched': 1, 'limit': _page}) as List).map((e) => Post.fromJson(e as Map)).toList();
+      final raw = (await _api.get('/posts', {'matched': 1, 'limit': _page}) as List).map((e) => Post.fromJson(e as Map)).toList();
+      _blocked = await loadBlocked(_api);
+      final d = raw.where((p) => !_blocked.contains(p.authorUid)).toList();
       if (!mounted) return;
       setState(() {
         _posts = d;
@@ -110,7 +114,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       _offset += d.length;
       setState(() {
         final seen = _posts!.map((p) => p.id).toSet();
-        _posts = [..._posts!, ...d.where((p) => !seen.contains(p.id))];
+        _posts = [..._posts!, ...d.where((p) => !seen.contains(p.id) && !_blocked.contains(p.authorUid))];
         _hasMore = d.length == _page;
       });
     } catch (_) {
@@ -164,7 +168,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       if (posts != null && posts.isEmpty) _empty(p),
       if (posts != null)
         for (var i = 0; i < posts.length; i++) ...[
-          PostCard(key: ValueKey(posts[i].id), post: posts[i]),
+          PostCard(key: ValueKey(posts[i].id), post: posts[i], onBlocked: _load),
           if (_catalogAt(i, posts.length) case final g?) CatalogStrip(key: ValueKey('cat-${g.owner.uid}'), group: g),
         ],
       if (posts != null && posts.isNotEmpty)

@@ -6,6 +6,7 @@ import '../api.dart';
 import '../auth_provider.dart';
 import '../i18n.dart';
 import '../models.dart';
+import '../safety.dart';
 import '../screens/contact_picker.dart';
 import '../screens/find.dart';
 import '../screens/post_detail.dart';
@@ -27,7 +28,9 @@ class PostCard extends StatefulWidget {
   /// Detail page mode: full text, no navigation on tap, and Reply calls [onReply].
   final bool detail;
   final VoidCallback? onReply;
-  const PostCard({super.key, required this.post, this.onChanged, this.detail = false, this.onReply});
+  /// Called after the author was blocked from this card's menu (the list drops their posts).
+  final VoidCallback? onBlocked;
+  const PostCard({super.key, required this.post, this.onChanged, this.detail = false, this.onReply, this.onBlocked});
   @override
   State<PostCard> createState() => _PostCardState();
 }
@@ -199,6 +202,18 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                   child: SizedBox(width: 32, height: 32, child: Center(child: WIcon(WI.share, size: 18, color: p.muted))),
                 ),
               ),
+              if (!mine)
+                Semantics(
+                  button: true,
+                  label: 'Report or block',
+                  child: InkResponse(
+                    onTap: () async {
+                      if (await showSafetySheet(context, uid: post.authorUid, name: post.shownName, postId: post.id) && mounted) widget.onBlocked?.call();
+                    },
+                    radius: 18,
+                    child: SizedBox(width: 28, height: 32, child: Center(child: Icon(Icons.more_vert, size: 18, color: p.muted))),
+                  ),
+                ),
             ]),
             if (mine && isAsk) Padding(padding: const EdgeInsets.only(top: 6), child: GoldTag(t('Your ask'))),
             const SizedBox(height: 8),

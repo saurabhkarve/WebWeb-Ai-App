@@ -16,6 +16,7 @@ import '../location.dart';
 import '../models.dart';
 import '../notifications.dart';
 import '../realtime.dart';
+import '../safety.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/active_call_banner.dart';
@@ -187,9 +188,10 @@ class _TalkScreenState extends State<TalkScreen> {
     try {
       final c = await _api.get('/chats') as List;
       final k = await _api.get('/app/calls') as List;
+      final blocked = await loadBlocked(_api);
       if (!mounted) return;
       setState(() {
-        _chats = c.map((e) => ChatSummary.fromJson(e as Map, _me)).toList();
+        _chats = c.map((e) => ChatSummary.fromJson(e as Map, _me)).where((x) => !blocked.contains(x.peer.uid)).toList();
         _calls = k.map((e) => CallLog.fromJson(e as Map)).toList();
       });
     } catch (_) {
@@ -793,8 +795,18 @@ class _ChatThreadState extends State<ChatThread> {
             PopupMenuButton<String>(
               tooltip: t('More'),
               icon: WIcon(WI.more, size: 24, color: p.text),
-              onSelected: (v) => v == 'delete' ? _deleteChat() : null,
+              onSelected: (v) async {
+                if (v == 'delete') {
+                  _deleteChat();
+                } else if (v == 'safety') {
+                  if (await showSafetySheet(context, uid: _peer.uid, name: _peer.name) && mounted) Navigator.pop(context);
+                }
+              },
               itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'safety',
+                  child: Row(children: [Icon(Icons.flag_outlined, size: 18, color: p.text), const SizedBox(width: 10), const Text('Report or block', style: TextStyle(fontWeight: FontWeight.w600))]),
+                ),
                 PopupMenuItem(
                   value: 'delete',
                   child: Row(children: [WIcon(WI.trash, size: 18, color: p.danger), const SizedBox(width: 10), Text(t('Delete chat'), style: TextStyle(color: p.danger, fontWeight: FontWeight.w600))]),
