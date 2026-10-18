@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../api.dart';
@@ -11,6 +11,7 @@ import '../location.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../widgets/image_cropper.dart';
 
 /// Handles the API will refuse; checked here too so the message shows while typing.
 const _reserved = {'admin', 'api', 'talk', 'ask', 'find', 'chat', 'post', 'profile', 'login', 'onboarding', 'update', 'u', 'me', 'saved', 'features', 'webweb', 'support', 'help'};
@@ -431,14 +432,20 @@ class _BoostStepState extends State<_BoostStep> {
 
   Future<void> _pickPhoto() async {
     final auth = context.read<AuthProvider>();
-    final f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1000, maxHeight: 1000, imageQuality: 82);
-    if (f == null) return;
+    final Uint8List? f;
+    try {
+      f = await pickAndCrop(context, kAvatarCrop);
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+      return;
+    }
+    if (f == null || !mounted) return;
     setState(() {
       _busy = 'photo';
       _error = null;
     });
     try {
-      final url = await auth.uploadAvatar(await f.readAsBytes(), f.name);
+      final url = await auth.uploadAvatar(f, 'avatar.png');
       if (!mounted) return;
       await _save('photo', {'photoURL': url}, t('Photo added'));
     } catch (e) {

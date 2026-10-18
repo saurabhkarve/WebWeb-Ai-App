@@ -178,9 +178,10 @@ class AuthProvider extends ChangeNotifier {
     await loadProfile();
   }
 
-  /// Uploads an avatar and returns its URL (to pass as `photoURL`).
-  Future<String> uploadAvatar(List<int> bytes, String filename) async =>
-      (await api.upload('/me/photo', bytes, filename, Api.mimeOf(filename)))['url'] as String;
+  /// Uploads a profile photo ([kind] avatar) or cover ([kind] cover) and returns its URL (to pass as
+  /// `photoURL` / `bannerURL`). The server crops it to the exact shape and keeps a large and a small size.
+  Future<String> uploadAvatar(List<int> bytes, String filename, {String kind = 'avatar'}) async =>
+      (await api.upload('/me/photo?kind=$kind', bytes, filename, Api.mimeOf(filename)))['url'] as String;
 
   Future<void> logout() async {
     if (_loggingOut) return; // a 401 inside beforeLogout calls logout again

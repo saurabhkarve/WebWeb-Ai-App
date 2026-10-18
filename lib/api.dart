@@ -126,3 +126,11 @@ String mediaUrl(String path) {
   if (path.startsWith('/uploads/')) return '$apiUrl$path';
   return '$siteUrl$path';
 }
+
+/// The small copy of a profile photo (160px) or cover (750px) that the server keeps next to the large one
+/// (av-x.jpg -> av-x_160.jpg); any other URL (older uploads, other sites) comes back unchanged.
+String smallImage(String url) {
+  final m = RegExp(r'/uploads/(av|cv)-[\w-]+\.jpg$').firstMatch(url);
+  if (m == null) return url;
+  return url.replaceFirst(RegExp(r'\.jpg$'), m.group(1) == 'av' ? '_160.jpg' : '_750.jpg');
+}

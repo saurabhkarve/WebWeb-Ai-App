@@ -223,7 +223,8 @@ class Avatar extends StatelessWidget {
       decoration: BoxDecoration(shape: BoxShape.circle, color: p.chip),
       clipBehavior: Clip.antiAlias,
       child: (photoUrl ?? '').isNotEmpty
-          ? NetImg(photoUrl!, width: size, height: size, fallback: ini)
+          // profile photos come in 640px and 160px: the small one is plenty for most avatars
+          ? NetImg(size * MediaQuery.devicePixelRatioOf(context) <= 160 ? smallImage(photoUrl!) : photoUrl!, width: size, height: size, fallback: ini)
           : ini,
     );
     if (ring) {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../api.dart' show smallImage;
 import '../auth_provider.dart';
 import '../i18n.dart';
 import '../models.dart';
@@ -726,7 +727,7 @@ class _BusinessCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
         child: Column(children: [
-          SizedBox(height: 56, width: double.infinity, child: (u.bannerUrl ?? '').isNotEmpty ? NetImg(u.bannerUrl!) : CoverPattern(seed: u.handle)),
+          SizedBox(height: 56, width: double.infinity, child: (u.bannerUrl ?? '').isNotEmpty ? NetImg(smallImage(u.bannerUrl!)) : CoverPattern(seed: u.handle)),
           Transform.translate(
             offset: const Offset(0, -24),
             child: Padding(

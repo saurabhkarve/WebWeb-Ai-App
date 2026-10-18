@@ -1,6 +1,8 @@
+import 'dart:ui' as ui;
+
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -23,6 +25,7 @@ import 'find.dart';
 import 'post_detail.dart';
 import 'talk.dart';
 import '../share_log.dart';
+import '../widgets/image_cropper.dart';
 
 /// One profile for everyone (web profile-view.tsx): your own page ([handle] == null) and any member's.
 /// Cover band with the back arrow, picture, one quiet stats line, name, tags, then the actions and
@@ -152,17 +155,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// New profile picture or cover (or remove the cover when [remove]).
   Future<void> _changeMedia(String kind, {bool remove = false}) async {
     final auth = context.read<AuthProvider>();
-    XFile? f;
+    Uint8List? cropped;
     if (!remove) {
-      f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: kind == 'banner' ? 1600 : 1000, imageQuality: 82);
-      if (f == null) return;
+      // cropped to its shape first (square photo, 3:1 cover)
+      try {
+        cropped = await pickAndCrop(context, kind == 'photo' ? kAvatarCrop : kCoverCrop);
+      } catch (e) {
+        if (mounted) toast(context, '$e', error: true);
+        return;
+      }
+      if (cropped == null || !mounted) return;
     }
     setState(() => _mediaBusy = kind);
     try {
       if (kind == 'photo') {
-        await auth.updateProfile({'photoURL': await auth.uploadAvatar(await f!.readAsBytes(), f.name)});
+        await auth.updateProfile({'photoURL': await auth.uploadAvatar(cropped!, 'avatar.png')});
       } else {
-        await auth.updateProfile({'bannerURL': remove ? null : await auth.uploadAvatar(await f!.readAsBytes(), f.name)});
+        await auth.updateProfile({'bannerURL': remove ? null : await auth.uploadAvatar(cropped!, 'cover.png', kind: 'cover')});
       }
       await _load();
     } catch (e) {
@@ -349,10 +358,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         );
+    // the cover is 3:1 (as it was cropped) below the status bar; behind the status bar, a blurred copy of it
+    final band = MediaQuery.sizeOf(context).width / 3;
     return SizedBox(
-      height: top + 112,
+      height: top + band,
       child: Stack(fit: StackFit.expand, children: [
-        hasBanner ? NetImg(u.bannerUrl!) : CoverPattern(seed: u.handle.isEmpty ? u.name : u.handle),
+        if (!hasBanner)
+          CoverPattern(seed: u.handle.isEmpty ? u.name : u.handle)
+        else ...[
+          if (top > 0) ClipRect(child: ImageFiltered(imageFilter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14), child: NetImg(u.bannerUrl!, alignment: Alignment.topCenter))),
+          Positioned(top: top, left: 0, right: 0, height: band, child: NetImg(u.bannerUrl!)),
+        ],
         Positioned(
           top: top,
           left: 8,

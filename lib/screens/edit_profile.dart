@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter, TextInputFormatter, TextEditingValue;
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../api.dart';
@@ -13,6 +13,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'catalog.dart';
+import '../widgets/image_cropper.dart';
 
 /// Edit profile (web profile/edit): cover, photo, name, organisation, sector, location, about, then
 /// services (business) or skills / experience / education (job seeker), GST verification and the catalog.
@@ -55,14 +56,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   AuthProvider get _auth => context.read<AuthProvider>();
 
   Future<void> _changePhoto() async {
-    final f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1000, maxHeight: 1000, imageQuality: 82);
-    if (f == null) return;
+    final Uint8List? f;
+    try {
+      f = await pickAndCrop(context, kAvatarCrop);
+    } catch (e) {
+      if (mounted) setState(() => _photoError = '$e');
+      return;
+    }
+    if (f == null || !mounted) return;
     setState(() {
       _photoBusy = true;
       _photoError = null;
     });
     try {
-      await _auth.updateProfile({'photoURL': await _auth.uploadAvatar(await f.readAsBytes(), f.name)});
+      await _auth.updateProfile({'photoURL': await _auth.uploadAvatar(f, 'avatar.png')});
       _changed = true;
     } catch (e) {
       if (mounted) setState(() => _photoError = e is ApiException ? e.message : t('Could not upload the photo. Please try again.'));
@@ -73,17 +80,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   /// A new cover, or null to go back to the yellow pattern.
   Future<void> _changeBanner({bool remove = false}) async {
-    XFile? f;
+    Uint8List? f;
     if (!remove) {
-      f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 82);
-      if (f == null) return;
+      try {
+        f = await pickAndCrop(context, kCoverCrop);
+      } catch (e) {
+        if (mounted) setState(() => _error = '$e');
+        return;
+      }
+      if (f == null || !mounted) return;
     }
     setState(() {
       _bannerBusy = true;
       _error = null;
     });
     try {
-      await _auth.updateProfile({'bannerURL': f == null ? null : await _auth.uploadAvatar(await f.readAsBytes(), f.name)});
+      await _auth.updateProfile({'bannerURL': f == null ? null : await _auth.uploadAvatar(f, 'cover.png', kind: 'cover')});
       _changed = true;
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -248,21 +260,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             // ---- cover ----
             Text(t('Cover'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
-            Container(
-              height: 112,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
-              child: Stack(fit: StackFit.expand, children: [
-                if ((banner ?? '').isNotEmpty) NetImg(banner!, fit: BoxFit.cover) else CoverPattern(seed: me.handle.isNotEmpty ? me.handle : me.name),
-                Positioned(
-                  right: 8,
-                  bottom: 8,
-                  child: Row(children: [
-                    if ((banner ?? '').isNotEmpty) ...[pill(t('Remove'), _bannerBusy ? null : () => _changeBanner(remove: true)), const SizedBox(width: 6)],
-                    pill(_bannerBusy ? t('Uploading…') : t((banner ?? '').isNotEmpty ? 'Change cover' : 'Add cover'), _bannerBusy ? null : _changeBanner),
-                  ]),
-                ),
-              ]),
+            AspectRatio(
+              aspectRatio: 3, // the shape the cover is cropped to
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
+                child: Stack(fit: StackFit.expand, children: [
+                  if ((banner ?? '').isNotEmpty) NetImg(banner!, fit: BoxFit.cover) else CoverPattern(seed: me.handle.isNotEmpty ? me.handle : me.name),
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: Row(children: [
+                      if ((banner ?? '').isNotEmpty) ...[pill(t('Remove'), _bannerBusy ? null : () => _changeBanner(remove: true)), const SizedBox(width: 6)],
+                      pill(_bannerBusy ? t('Uploading…') : t((banner ?? '').isNotEmpty ? 'Change cover' : 'Add cover'), _bannerBusy ? null : _changeBanner),
+                    ]),
+                  ),
+                ]),
+              ),
             ),
             const SizedBox(height: 4),
             Text(t('Wide pictures work best. Without one we show a yellow pattern.'), style: TextStyle(fontSize: 12, color: p.muted)),
