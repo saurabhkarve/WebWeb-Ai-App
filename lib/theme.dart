@@ -57,6 +57,9 @@ class Pal {
   Color get tagBg => kGold.withValues(alpha: .25);
   /// Type badge on avatars: ink in light mode, soft gold in dark (web: bg-ink, dark:bg-[hsl(44 58% 87%)]).
   Color get typeBadge => dark ? _hsl(44, 58, 87) : ink;
+  /// My chat messages (web --bubble): the soft gold pill colour in light mode, a deep warm gold in dark
+  Color get bubble => dark ? _hsl(43, 38, 24) : ink;
+  Color get onBubble => dark ? text : onInk;
   Color get selected => ink;
   Color get onSelected => onInk;
 }

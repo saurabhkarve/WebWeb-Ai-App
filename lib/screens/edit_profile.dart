@@ -14,6 +14,7 @@ import '../widgets.dart';
 import 'account_settings.dart';
 import 'catalog.dart';
 import '../widgets/picture_picker.dart';
+import '../widgets/resume.dart';
 
 /// Edit profile (web profile/edit): cover, photo, name, organisation, sector, location, about, then
 /// services (business) or skills / experience / education (job seeker), GST verification and the catalog.
@@ -390,9 +391,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       const SizedBox(height: 16),
                       AppField(controller: _skills, label: t('Skills'), helper: t('One per line or comma separated'), maxLines: 3),
                       const SizedBox(height: 16),
-                      AppField(controller: _experience, label: t('Experience'), helper: t('One per line: Role · Company · Years'), maxLines: 4),
-                      const SizedBox(height: 16),
-                      AppField(controller: _education, label: t('Education'), helper: t('One per line: Degree · Institute · Year'), maxLines: 3),
+                      // one entry at a time, as on the profile page; kept with the form until Save changes
+                      ResumeList(title: t('Experience'), text: _experience.text, icon: WI.business, kind: 'experience', editable: true, onSave: (v) async => setState(() => _experience.text = v)),
+                      const SizedBox(height: 20),
+                      ResumeList(title: t('Education'), text: _education.text, icon: WI.school, kind: 'education', editable: true, onSave: (v) async => setState(() => _education.text = v)),
                     ],
                     if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
                     const SizedBox(height: 16),

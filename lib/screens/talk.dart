@@ -1046,7 +1046,7 @@ class _ChatThreadState extends State<ChatThread> {
     final open = _selected == m.id;
     final maxW = MediaQuery.of(context).size.width * .75 - 32;
     final pad = m.imageUrl != null ? const EdgeInsets.all(4) : (m.attachment != null ? const EdgeInsets.all(6) : const EdgeInsets.symmetric(horizontal: 16, vertical: 8));
-    final fg = mine ? p.onInk : p.text;
+    final fg = mine ? p.onBubble : p.text;
     final bubble = GestureDetector(
       onTap: mine ? null : () => setState(() => _selected = open ? null : m.id),
       onLongPress: () {
@@ -1059,14 +1059,14 @@ class _ChatThreadState extends State<ChatThread> {
         constraints: BoxConstraints(maxWidth: maxW),
         padding: pad,
         clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(color: mine ? p.ink : p.chip, borderRadius: BorderRadius.circular(8)),
+        decoration: BoxDecoration(color: mine ? p.bubble : p.chip, borderRadius: BorderRadius.circular(8)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
           if (m.replyTo != null)
             Container(
               margin: EdgeInsets.fromLTRB(m.imageUrl != null || m.attachment != null ? 4 : 0, m.imageUrl != null || m.attachment != null ? 4 : 0, m.imageUrl != null || m.attachment != null ? 4 : 0, 6),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: mine ? kInk.withValues(alpha: .1) : p.canvas.withValues(alpha: .7),
+                color: mine ? fg.withValues(alpha: .1) : p.canvas.withValues(alpha: .7),
                 borderRadius: BorderRadius.circular(8),
                 border: Border(left: BorderSide(color: fg.withValues(alpha: .4), width: 4)),
               ),
@@ -1167,8 +1167,8 @@ class _ChatThreadState extends State<ChatThread> {
 
   /// Contact / location / document / post / profile / item / cart attachments (web AttachmentView).
   Widget _attachment(Map<String, dynamic> a, bool mine, Pal p) {
-    final fg = mine ? p.onInk : p.text;
-    final boxColor = mine ? kInk.withValues(alpha: .1) : p.canvas;
+    final fg = mine ? p.onBubble : p.text;
+    final boxColor = mine ? fg.withValues(alpha: .1) : p.canvas;
     TextStyle label() => TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg.withValues(alpha: .7), letterSpacing: 0);
     Widget box({required Widget child, VoidCallback? onTap, bool goldEdge = false, EdgeInsets padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 10)}) => GestureDetector(
           onTap: onTap,

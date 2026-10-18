@@ -27,7 +27,7 @@ import 'talk.dart';
 
 /// Signed-in chrome, same as the web on phones (app-frame.tsx): the slim header (logo, bell, your
 /// avatar with the account menu) and the floating island with Connect, Find, Talk and Ask.
-/// The header hides while scrolling down and comes back on scroll up.
+/// The header always stays in view (the web hides it on scroll only on small screens).
 class Shell extends StatefulWidget {
   const Shell({super.key});
   @override
@@ -40,8 +40,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int _topTick = 0; // scroll the feed to the top
   int _unread = 0;
   int _askSpin = 0;
-  bool _headerHidden = false;
-  StreamSubscription? _sub;
+  StreamSubscription? _sub, _pushSub;
   Timer? _poll;
   final _notes = NotificationsModel();
 
@@ -56,7 +55,10 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     _poll = Timer.periodic(const Duration(seconds: 30), (_) => _notes.refresh(context.read<AuthProvider>()));
     _sub = context.read<RealtimeService>().events.listen((e) {
       if (e['type'] == 'msg' || e['type'] == 'read') _loadUnread();
+      // a response or referral while the app is open: the bell's count updates at once, not at the next poll
+      if (e['type'] == 'notify') _refreshAll();
     });
+    _pushSub = NotificationService.activity.stream.listen((_) => _refreshAll());
   }
 
   @override
@@ -65,6 +67,12 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       _loadUnread();
       _notes.refresh(context.read<AuthProvider>());
     }
+  }
+
+  void _refreshAll() {
+    if (!mounted) return;
+    _notes.refresh(context.read<AuthProvider>());
+    _loadUnread();
   }
 
   Future<void> _loadUnread() async {
@@ -79,6 +87,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _sub?.cancel();
+    _pushSub?.cancel();
     _poll?.cancel();
     _notes.dispose();
     super.dispose();
@@ -87,76 +96,50 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   void _go(int k) {
     if (k == 3) _askSpin++;
     if (k == _i && k == 0) _topTick++; // tapping Connect again scrolls the feed to the top
-    setState(() {
-      _i = k;
-      _headerHidden = false;
-    });
-  }
-
-  /// Hide the header on scroll down (after 80 px), bring it back on scroll up (web: AppHeader).
-  bool _onScroll(ScrollNotification n) {
-    if (n.depth != 0 || n.metrics.axis != Axis.vertical || n is! ScrollUpdateNotification) return false;
-    final d = n.scrollDelta ?? 0;
-    if (d.abs() < 4) return false;
-    final hide = d > 0 && n.metrics.pixels > 80;
-    if (hide != _headerHidden) setState(() => _headerHidden = hide);
-    return false;
+    setState(() => _i = k);
   }
 
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final top = MediaQuery.of(context).padding.top;
-    final header = _headerHidden ? 0.0 : 56.0;
+    const header = 56.0;
     return Scaffold(
       body: Column(children: [
         const ActiveCallBanner(),
         Expanded(
           child: Stack(children: [
-            // pages, padded below the header (the padding animates as the header slides away)
+            // pages, below the header
             Positioned.fill(
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(end: top + header),
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-                builder: (_, pad, child) => Padding(padding: EdgeInsets.only(top: pad), child: child),
+              child: Padding(
+                padding: EdgeInsets.only(top: top + header),
                 child: MediaQuery.removePadding(
                   context: context,
                   removeTop: true,
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: _onScroll,
-                    child: IndexedStack(index: _i, children: [
-                      ConnectScreen(refreshTick: _feedTick, topTick: _topTick, onGoAsk: () => _go(3)),
-                      const FindScreen(),
-                      if (_i == 2) const TalkScreen() else const SizedBox.shrink(), // reload conversations each time it opens
-                      AskScreen(active: _i == 3, onPosted: () => setState(() {
-                            _feedTick++;
-                            _i = 0;
-                          })),
-                    ]),
-                  ),
+                  child: IndexedStack(index: _i, children: [
+                    ConnectScreen(refreshTick: _feedTick, topTick: _topTick, onGoAsk: () => _go(3)),
+                    const FindScreen(),
+                    if (_i == 2) const TalkScreen() else const SizedBox.shrink(), // reload conversations each time it opens
+                    AskScreen(active: _i == 3, onPosted: () => setState(() {
+                          _feedTick++;
+                          _i = 0;
+                        })),
+                  ]),
                 ),
               ),
             ),
-            // header (status bar band + 56 px bar), slides up while scrolling down
+            // header (status bar band + 56 px bar), always in view
             Positioned(
               top: 0,
               left: 0,
               right: 0,
-              child: AnimatedSlide(
-                offset: Offset(0, _headerHidden ? -1 : 0),
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-                child: _AppHeader(
-                  notes: _notes,
-                  onHome: () => _go(0),
-                ),
+              child: _AppHeader(
+                notes: _notes,
+                onHome: () => _go(0),
               ),
             ),
             // "Waiting for network…" / "Connecting…" under the header, WhatsApp-style
             Positioned(top: top + header + 8, left: 0, right: 0, child: const ConnectionPill()),
-            // the status bar keeps the page colour while the header is away
-            if (_headerHidden) Positioned(top: 0, left: 0, right: 0, height: top, child: ColoredBox(color: p.canvas)),
             // floating island
             Positioned(
               left: 0,

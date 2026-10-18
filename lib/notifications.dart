@@ -38,6 +38,9 @@ class NotificationService with WidgetsBindingObserver {
   /// Id of the chat currently on screen (set by ChatThread) — no notifications for it.
   static String? activeChat;
 
+  /// Fires when a push arrives while the app is open, so the header's bell updates at once.
+  static final activity = StreamController<void>.broadcast();
+
   static bool get supported => !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
   static bool get _ios => defaultTargetPlatform == TargetPlatform.iOS;
 
@@ -66,7 +69,10 @@ class NotificationService with WidgetsBindingObserver {
 
     // Foreground push: the WebSocket is probably down (otherwise the server would not push),
     // so show it ourselves.
-    FirebaseMessaging.onMessage.listen((m) => _handleData(m.data, title: m.notification?.title, body: m.notification?.body));
+    FirebaseMessaging.onMessage.listen((m) {
+      activity.add(null);
+      _handleData(m.data, title: m.notification?.title, body: m.notification?.body);
+    });
     FirebaseMessaging.onMessageOpenedApp.listen((m) => _openFromData(m.data));
     fm.onTokenRefresh.listen((t) {
       _fcmToken = t;
