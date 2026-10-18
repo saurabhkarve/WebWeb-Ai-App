@@ -6,6 +6,7 @@ import 'auth_provider.dart';
 import 'call_manager.dart';
 import 'i18n.dart';
 import 'notifications.dart';
+import 'outbox.dart';
 import 'realtime.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding.dart';
@@ -27,6 +28,7 @@ void main() {
   auth.beforeLogout = notifications.unregister;
   auth.init();
   notifications.init();
+  Outbox.start(auth.api, realtime); // messages written offline go out once the network is back
   runApp(MultiProvider(
     providers: [
       ChangeNotifierProvider.value(value: auth),

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 import 'config.dart';
+import 'offline_cache.dart';
 
 typedef Json = Map<String, dynamic>;
 
@@ -11,6 +12,8 @@ class ApiException implements Exception {
   final String message;
   final int status;
   ApiException(this.message, [this.status = 0]);
+  /// No answer from the server at all (no network, timeout): worth retrying later.
+  bool get isNetwork => status == 0;
   @override
   String toString() => message;
 }
@@ -62,7 +65,27 @@ class Api {
     }
   }
 
-  Future<dynamic> get(String path, [Map<String, dynamic>? q]) => _send(() => http.get(_u(path, q), headers: _headers()));
+  /// GET. Answers of the common screens are kept on the phone; with no network the last one is returned
+  /// instead of an error (see [OfflineCache]), so screens keep working offline.
+  Future<dynamic> get(String path, [Map<String, dynamic>? q]) async {
+    final keep = token() != null && OfflineCache.cacheable(path, q);
+    try {
+      return await _send(() async {
+        final r = await http.get(_u(path, q), headers: _headers());
+        if (keep && r.statusCode == 200) OfflineCache.put(path, q, utf8.decode(r.bodyBytes, allowMalformed: true));
+        return r;
+      });
+    } on ApiException catch (e) {
+      if (keep && e.isNetwork) {
+        final cached = await OfflineCache.get(path, q);
+        if (cached != null) return cached;
+      }
+      rethrow;
+    }
+  }
+
+  /// The last answer kept on the phone for a GET (null if none): screens show it at once, then refresh.
+  Future<dynamic> cached(String path, [Map<String, dynamic>? q]) => OfflineCache.get(path, q);
   Future<dynamic> post(String path, [Object? body]) =>
       _send(() => http.post(_u(path), headers: _headers(json: true), body: jsonEncode(body ?? {})));
   Future<dynamic> patch(String path, Object body) => _send(() => http.patch(_u(path), headers: _headers(json: true), body: jsonEncode(body)));

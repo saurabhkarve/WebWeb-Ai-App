@@ -3,12 +3,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-enum WI { refresh, check, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, logout, machinery, mentor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, website }
+enum WI { refresh, check, lock, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, logout, machinery, mentor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, website }
 
 /// SVG body per icon. {C} = colour, {SW/x} = stroke width divided by x (scaled groups).
 const Map<WI, (String, double?)> _body = {
   WI.refresh: (r'<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" /><path d="M19.5 4.5v4h-4" />', null),
   WI.check: (r'<path d="M5 12.5l4.5 4.5L19 7.5" />', null),
+  WI.lock: (r'<rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />', null),
   WI.callMissed: (r'<path d="M5.2 4h3l1.4 4-2 1.3a11 11 0 0 0 5.1 5.1l1.3-2 4 1.4v3a2 2 0 0 1-2.2 2A15.8 15.8 0 0 1 3.2 6.2 2 2 0 0 1 5.2 4z" /><path d="M15.5 3.5l5 5M20.5 3.5l-5 5" />', null),
   WI.callOut: (r'<path d="M5.2 4h3l1.4 4-2 1.3a11 11 0 0 0 5.1 5.1l1.3-2 4 1.4v3a2 2 0 0 1-2.2 2A15.8 15.8 0 0 1 3.2 6.2 2 2 0 0 1 5.2 4z" /><path d="M15.5 8.5l5-5M16.8 3.5h3.7v3.7" />', null),
   WI.callIn: (r'<path d="M5.2 4h3l1.4 4-2 1.3a11 11 0 0 0 5.1 5.1l1.3-2 4 1.4v3a2 2 0 0 1-2.2 2A15.8 15.8 0 0 1 3.2 6.2 2 2 0 0 1 5.2 4z" /><path d="M20.5 3.5l-5 5M15.5 4.8v3.7h3.7" />', null),

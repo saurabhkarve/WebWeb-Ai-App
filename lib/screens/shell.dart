@@ -14,6 +14,7 @@ import '../safety.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/active_call_banner.dart';
+import '../widgets/connection_pill.dart';
 import '../widgets/tour.dart';
 import 'ask.dart';
 import 'connect.dart';
@@ -151,6 +152,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                 ),
               ),
             ),
+            // "Waiting for network…" / "Connecting…" under the header, WhatsApp-style
+            Positioned(top: top + header + 8, left: 0, right: 0, child: const ConnectionPill()),
             // the status bar keeps the page colour while the header is away
             if (_headerHidden) Positioned(top: 0, left: 0, right: 0, height: top, child: ColoredBox(color: p.canvas)),
             // floating island

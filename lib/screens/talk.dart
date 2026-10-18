@@ -15,11 +15,13 @@ import '../i18n.dart';
 import '../location.dart';
 import '../models.dart';
 import '../notifications.dart';
+import '../outbox.dart';
 import '../realtime.dart';
 import '../safety.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/active_call_banner.dart';
+import '../widgets/connection_pill.dart';
 import '../widgets/image_grid.dart';
 import 'contact_picker.dart';
 import 'post_detail.dart';
@@ -534,7 +536,7 @@ class _ChatThreadState extends State<ChatThread> {
   Msg? _replyTo;
   late Map<String, dynamic>? _pending = widget.pending;
   Timer? _typingOff, _iTypingOff, _poll;
-  StreamSubscription? _sub;
+  StreamSubscription? _sub, _outboxSub;
   late final RealtimeService _rt = context.read<RealtimeService>();
   late final String _me = context.read<AuthProvider>().profile?.uid ?? '';
   Api get _api => context.read<AuthProvider>().api;
@@ -546,6 +548,7 @@ class _ChatThreadState extends State<ChatThread> {
     NotificationService.activeChat = widget.chatId;
     _load();
     _sub = _rt.events.listen(_onEvent);
+    _outboxSub = Outbox.results.listen(_onOutbox);
     // reactions are polled (like the web); messages too when the socket is down
     _poll = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!_rt.connected) _loadNew();
@@ -585,20 +588,82 @@ class _ChatThreadState extends State<ChatThread> {
 
   int get _lastId => _msgs.where((m) => !m.pending).fold(0, (a, m) => m.id > a ? m.id : a);
 
+  /// Messages still in the outbox for this chat, shown with a clock until they go out.
+  Future<List<Msg>> _queued() async => [
+        for (final it in await Outbox.pending(widget.chatId))
+          Msg(
+            id: -it.createdAt.microsecondsSinceEpoch,
+            senderUid: _me,
+            text: it.text,
+            imageUrl: it.imageUrl,
+            attachment: it.attachment,
+            replyTo: it.replyQuote == null ? null : MsgQuote.fromJson(it.replyQuote!),
+            createdAt: it.createdAt,
+            pending: true,
+            tmpId: it.tmp,
+          ),
+      ];
+
   Future<void> _load() async {
+    // what the phone kept from last time shows at once (and is all there is offline), then the server's answer
+    if (!_loaded) {
+      try {
+        final cached = await _api.cached('/chats/${widget.chatId}/messages');
+        if (cached is List && mounted && !_loaded) {
+          final q = await _queued();
+          setState(() {
+            _msgs = [...cached.map((e) => Msg.fromJson(e as Map)), ...q];
+            _loaded = true;
+          });
+          _toBottom(jump: true);
+        }
+      } catch (_) {}
+    }
     try {
       final d = (await _api.get('/chats/${widget.chatId}/messages') as List).map((e) => Msg.fromJson(e as Map)).toList();
-      final k = (await _api.get('/app/calls', {'peer': _peer.uid}) as List).map((e) => CallLog.fromJson(e as Map)).toList();
+      final q = await _queued();
       if (!mounted) return;
       setState(() {
-        _msgs = d;
-        _calls = k;
+        _msgs = [...d, ...q.where((m) => !_sent.containsKey(m.tmpId))];
         _loaded = true;
       });
       _toBottom(jump: true);
       _loadReactions();
     } catch (_) {
-      if (mounted) setState(() => _loaded = true);
+      final q = await _queued();
+      if (mounted) {
+        setState(() {
+          if (!_loaded) _msgs = q;
+          _loaded = true;
+        });
+      }
+    }
+    try {
+      final k = (await _api.get('/app/calls', {'peer': _peer.uid}) as List).map((e) => CallLog.fromJson(e as Map)).toList();
+      if (mounted) setState(() => _calls = k);
+    } catch (_) {}
+  }
+
+  /// tmp id -> message id, for queued messages the outbox has delivered
+  final Map<String, int> _sent = {};
+
+  void _onOutbox(OutboxResult r) {
+    if (r.chatId != widget.chatId || !mounted) return;
+    if (r.message != null) {
+      final sent = Msg.fromJson(r.message!);
+      _sent[r.tmp] = sent.id;
+      final early = _early.remove(sent.id);
+      if (early != null) _applyReceipt(sent, early);
+      setState(() {
+        final hasReal = _msgs.any((m) => m.id == sent.id);
+        _msgs = [
+          for (final m in _msgs)
+            if (m.tmpId == r.tmp) ...[if (!hasReal) sent] else m,
+        ];
+      });
+    } else {
+      setState(() => _msgs = _msgs.where((m) => m.tmpId != r.tmp).toList());
+      toast(context, t('Message not sent: {why}', {'why': r.error ?? ''}), error: true);
     }
   }
 
@@ -688,7 +753,7 @@ class _ChatThreadState extends State<ChatThread> {
     final att = attachment ?? (fromComposer ? _pending : null);
     if (body.isEmpty && imageUrl == null && att == null) return;
     final reply = _replyTo;
-    final tmp = 'tmp${DateTime.now().microsecondsSinceEpoch}';
+    final tmp = 'm${_me.hashCode.toRadixString(36)}${DateTime.now().microsecondsSinceEpoch}';
     final pending = Msg(
       id: -DateTime.now().microsecondsSinceEpoch, senderUid: _me, text: body, imageUrl: imageUrl, attachment: att,
       replyTo: reply == null ? null : MsgQuote(id: '${reply.id}', senderUid: reply.senderUid, text: reply.text, kind: reply.kind),
@@ -702,29 +767,18 @@ class _ChatThreadState extends State<ChatThread> {
       if (fromComposer) _pending = null;
     });
     _toBottom();
-    try {
-      final sent = Msg.fromJson(await _api.post('/chats/${widget.chatId}/messages', {
-        'text': body,
-        if (imageUrl != null) 'imageUrl': imageUrl,
-        if (att != null) 'attachment': att,
-        if (reply != null) 'replyToId': reply.id,
-      }) as Map);
-      if (!mounted) return;
-      final early = _early.remove(sent.id);
-      if (early != null) _applyReceipt(sent, early);
-      setState(() => _msgs = [for (final m in _msgs) m.tmpId == tmp ? sent : m]);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _msgs = _msgs.where((m) => m.tmpId != tmp).toList();
-        if (fromComposer) {
-          _input.text = body; // give everything back so nothing is lost
-          _pending = att;
-          _replyTo = reply;
-        }
-      });
-      toast(context, '$e', error: true);
-    }
+    // through the outbox: sent now when online, otherwise kept (clock) and sent by itself once the network
+    // is back, even if the app is closed in between
+    await Outbox.add(OutboxItem(
+      tmp: tmp,
+      chatId: widget.chatId,
+      text: body,
+      imageUrl: imageUrl,
+      attachment: att,
+      replyToId: reply?.id,
+      replyQuote: reply == null ? null : {'id': '${reply.id}', 'senderUid': reply.senderUid, 'text': reply.text, 'kind': reply.kind},
+      createdAt: pending.createdAt,
+    ));
   }
 
   Future<void> _react(Msg m, String emoji) async {
@@ -772,6 +826,7 @@ class _ChatThreadState extends State<ChatThread> {
     if (NotificationService.activeChat == widget.chatId) NotificationService.activeChat = null;
     _setTyping(false);
     _sub?.cancel();
+    _outboxSub?.cancel();
     _typingOff?.cancel();
     _iTypingOff?.cancel();
     _poll?.cancel();
@@ -813,12 +868,17 @@ class _ChatThreadState extends State<ChatThread> {
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(_peer.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25)),
-                      Text(
-                        _typing ? t('typing…') : (on ? t('online') : _peer.company),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, height: 1.25, color: _typing || on ? kGreen : p.muted, fontWeight: _typing || on ? FontWeight.w600 : FontWeight.w500),
-                      ),
+                      Builder(builder: (context) {
+                        // offline: say so where "online" would be (WhatsApp shows "Waiting for network")
+                        final status = connectionStatus(context.watch<RealtimeService>());
+                        final live = status == null && (_typing || on);
+                        return Text(
+                          status ?? (_typing ? t('typing…') : (on ? t('online') : _peer.company)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, height: 1.25, color: live ? kGreen : p.muted, fontWeight: live ? FontWeight.w600 : FontWeight.w500),
+                        );
+                      }),
                     ]),
                   ),
                 ]),

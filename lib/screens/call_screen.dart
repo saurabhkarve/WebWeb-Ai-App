@@ -62,7 +62,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       case CallState.ended:
         return t(c.note ?? 'Call ended');
       case CallState.connected:
-        if (c.peerAway) return t('Reconnecting…');
+        if (c.reconnecting || c.peerAway) return t('Reconnecting…');
         final d = DateTime.now().difference(c.connectedAt ?? DateTime.now());
         String two(int n) => n.toString().padLeft(2, '0');
         return d.inHours > 0 ? '${d.inHours}:${two(d.inMinutes % 60)}:${two(d.inSeconds % 60)}' : '${two(d.inMinutes)}:${two(d.inSeconds % 60)}';
@@ -156,6 +156,10 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                         ],
                         Flexible(child: Text(_status(c), textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: .7)))),
                       ]),
+                      if (!ended) ...[
+                        const SizedBox(height: 10),
+                        _privacyNote(),
+                      ],
                       const SizedBox(height: 24),
                       if (ended) _endedActions(c) else _controls(cm, c),
                     ]),
@@ -198,6 +202,28 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       ),
     );
   }
+
+  /// WebRTC media is encrypted end to end (DTLS-SRTP, also through our TURN relay, which only forwards
+  /// the encrypted packets) and calls are never recorded: the server only relays the call set-up.
+  Widget _privacyNote() => Semantics(
+        label: t('End-to-end encrypted. We never record calls.'),
+        excludeSemantics: true,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(color: Colors.white.withValues(alpha: .08), borderRadius: BorderRadius.circular(999)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            WIcon(WI.lock, size: 13, color: Colors.white.withValues(alpha: .7)),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                t('End-to-end encrypted. We never record calls.'),
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: .7)),
+              ),
+            ),
+          ]),
+        ),
+      );
 
   Widget _topButton(WI icon, String label, VoidCallback onTap) => Semantics(
         button: true,

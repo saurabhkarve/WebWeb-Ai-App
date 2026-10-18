@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
+import 'offline_cache.dart';
+import 'outbox.dart';
 import 'models.dart';
 
 /// Session + profile. Login is the same two calls the web uses (`/auth/send-otp`, `/auth/verify-otp`);
@@ -152,6 +154,8 @@ class AuthProvider extends ChangeNotifier {
     otpSent = false;
     error = null;
     (await SharedPreferences.getInstance()).remove('token');
+    await OfflineCache.clear(); // nothing of this account stays on the phone
+    await Outbox.clear();
     notifyListeners();
   }
 

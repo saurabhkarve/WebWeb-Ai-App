@@ -28,6 +28,19 @@ import flutter_callkit_incoming
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    // "webweb/call" (call_manager.dart): screen off at the ear on voice calls, screen kept on for video.
+    // The ongoing call itself (status bar, lock screen, background audio) is CallKit's.
+    let channel = FlutterMethodChannel(name: "webweb/call", binaryMessenger: engineBridge.applicationRegistrar.messenger())
+    channel.setMethodCallHandler { call, result in
+      let on = (call.arguments as? [String: Any])?["on"] as? Bool ?? false
+      switch call.method {
+      case "proximity": UIDevice.current.isProximityMonitoringEnabled = on
+      case "awake": UIApplication.shared.isIdleTimerDisabled = on
+      case "service": break // Android only
+      default: return result(FlutterMethodNotImplemented)
+      }
+      result(nil)
+    }
   }
 
   // MARK: PushKit

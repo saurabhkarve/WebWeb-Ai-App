@@ -1,14 +1,20 @@
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 
-/// The phone's own incoming-call UI, so a WEBWEB call rings like a phone call even when the app is closed:
-/// - iPhone: CallKit. The API sends a VoIP push; AppDelegate (PushKit) hands it to CallKit at once, as
-///   Apple requires. Calls that arrive over the socket while the app is in the background use it too.
-/// - Android: a full-screen call screen started from a high-priority data push (see notifications.dart).
-/// Answer / decline come back as events that [CallManager] handles. Safe to call from the background isolate.
+/// The phone's own call handling, so a WEBWEB call behaves like a phone call (as WhatsApp's do):
+/// - iPhone: CallKit for every call. Incoming: the API sends a VoIP push; AppDelegate (PushKit) hands it to
+///   CallKit at once, as Apple requires; calls that arrive over the socket ring through CallKit too, also in
+///   the foreground (the system banner). Outgoing calls are reported to CallKit ([startOutgoing]), so both show
+///   in the status bar, the lock screen and Recents, and the audio is managed by iOS (Bluetooth, interruptions).
+/// - Android: a full-screen call screen started from a high-priority data push (see notifications.dart), and
+///   during every call the app's own "Ongoing call" foreground service ([service], CallService.kt), which keeps
+///   the microphone and camera while the app is in the background.
+/// Answer / decline / end / mute come back as events that [CallManager] handles. Safe to call from the
+/// background isolate.
 class NativeCalls {
   static bool get supported =>
       !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
@@ -80,6 +86,75 @@ class NativeCalls {
     } catch (e) {
       debugPrint('native call UI failed: $e');
     }
+  }
+
+  /// iPhone: reports a call we place to CallKit (status bar, lock screen, Recents, audio routing).
+  static Future<void> startOutgoing({required String id, required String name, required bool video, String? handle}) async {
+    if (defaultTargetPlatform != TargetPlatform.iOS || kIsWeb) return;
+    try {
+      await FlutterCallkitIncoming.startCall(CallKitParams(
+        id: id,
+        nameCaller: name,
+        appName: 'WEBWEB AI',
+        handle: (handle ?? '').isNotEmpty ? '@$handle' : name,
+        type: video ? 1 : 0,
+        extra: {'video': video},
+        ios: const IOSParams(
+          handleType: 'generic',
+          supportsVideo: true,
+          maximumCallGroups: 1,
+          maximumCallsPerCallGroup: 1,
+          supportsDTMF: false,
+          supportsHolding: false,
+          supportsGrouping: false,
+          supportsUngrouping: false,
+          includesCallsInRecents: true,
+          configureAudioSession: true,
+          audioSessionMode: 'voiceChat',
+          audioSessionActive: true,
+        ),
+      ));
+    } catch (e) {
+      debugPrint('native outgoing call failed: $e');
+    }
+  }
+
+  /// Keeps CallKit's mute button in step with the app's.
+  static Future<void> muted(String id, bool on) async {
+    if (defaultTargetPlatform != TargetPlatform.iOS || kIsWeb) return;
+    try {
+      await FlutterCallkitIncoming.muteCall(id, isMuted: on);
+    } catch (_) {}
+  }
+
+  static const _channel = MethodChannel('webweb/call');
+
+  static Future<void> _invoke(String method, Map<String, Object?> args) async {
+    if (!supported) return;
+    try {
+      await _channel.invokeMethod(method, args);
+    } catch (_) {}
+  }
+
+  /// Android: the "Ongoing call" foreground service (keeps the microphone / camera in the background).
+  /// [status] and [hangUp] are the notification's (translated) texts.
+  static Future<void> service({required bool on, String name = '', bool video = false, bool connected = false, String status = '', String hangUp = ''}) async {
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    await _invoke('service', {'on': on, 'name': name, 'video': video, 'connected': connected, 'status': status, 'hangUp': hangUp});
+  }
+
+  /// Screen off while the phone is held to the ear (voice calls on the earpiece).
+  static Future<void> proximity(bool on) => _invoke('proximity', {'on': on});
+
+  /// Screen stays on (video calls).
+  static Future<void> keepAwake(bool on) => _invoke('awake', {'on': on});
+
+  /// "Hang up" tapped in the Android ongoing-call notification, or the app swiped away mid-call.
+  static void onHangUp(VoidCallback f) {
+    if (!supported) return;
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'hangUp') f();
+    });
   }
 
   /// Tells the OS the call is live (iOS shows it in the status bar / call list).
