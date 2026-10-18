@@ -24,7 +24,10 @@ class StoryViewer extends StatefulWidget {
   final String? meUid;
   final void Function(String updateId)? onSeen;
   final Future<void> Function(String updateId)? onDelete;
-  const StoryViewer({super.key, required this.groups, this.startGroup = 0, this.meUid, this.onSeen, this.onDelete});
+  /// Loads the next page of people into [groups] (the same list) when the last loaded one is passed;
+  /// resolves to how many were added (0: the end).
+  final Future<int> Function()? onLoadMore;
+  const StoryViewer({super.key, required this.groups, this.startGroup = 0, this.meUid, this.onSeen, this.onDelete, this.onLoadMore});
   @override
   State<StoryViewer> createState() => _StoryViewerState();
 }
@@ -109,12 +112,32 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
         _g++;
         _i = 0;
       });
+    } else if (widget.onLoadMore != null && !_loadingMore) {
+      // swiped past the last loaded person: fetch the next page and carry on
+      _loadingMore = true;
+      _progress.stop();
+      widget.onLoadMore!().then((added) {
+        _loadingMore = false;
+        if (!mounted) return;
+        if (added > 0 && _g < widget.groups.length - 1) {
+          setState(() {
+            _g++;
+            _i = 0;
+          });
+          _enter();
+        } else {
+          Navigator.of(context).maybePop();
+        }
+      });
+      return;
     } else {
-      Navigator.of(context).maybePop();
+      if (!_loadingMore) Navigator.of(context).maybePop();
       return;
     }
     _enter();
   }
+
+  bool _loadingMore = false;
 
   void _prev() {
     if (_i > 0) {

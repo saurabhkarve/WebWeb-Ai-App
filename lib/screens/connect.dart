@@ -319,9 +319,22 @@ class _UpdatesBar extends StatefulWidget {
   State<_UpdatesBar> createState() => _UpdatesBarState();
 }
 
+/// Paged: the first 12 people, then the next 12 as the row is swiped towards its end (and when the viewer
+/// passes the last loaded person).
+const _updatesPage = 12;
+
 class _UpdatesBarState extends State<_UpdatesBar> {
   List<StoryGroup> _groups = [];
   Set<String> _seen = {};
+  bool _hasMore = false;
+  Future<int>? _loadingMore;
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -332,16 +345,49 @@ class _UpdatesBarState extends State<_UpdatesBar> {
         if (mounted) setState(() => _seen = ids);
       } catch (_) {}
     });
+    _scroll.addListener(() {
+      // within about three tiles of the end: fetch the next page
+      if (_hasMore && _scroll.position.extentAfter < 300) _loadMore();
+    });
     load();
   }
 
   Future<void> load() async {
+    _loadingMore = null;
     try {
-      final d = await context.read<AuthProvider>().api.get('/updates') as List;
-      if (mounted) setState(() => _groups = d.map((e) => StoryGroup.fromJson(e as Map)).toList());
+      final d = await context.read<AuthProvider>().api.get('/updates?limit=$_updatesPage&offset=0') as List;
+      if (mounted) {
+        setState(() {
+          _groups = d.map((e) => StoryGroup.fromJson(e as Map)).toList();
+          _hasMore = d.length == _updatesPage;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _groups = []);
     }
+  }
+
+  /// The next page, added to the same list the viewer holds; resolves to how many people it added.
+  Future<int> _loadMore() {
+    if (!_hasMore) return Future.value(0);
+    return _loadingMore ??= () async {
+      try {
+        final d = await context.read<AuthProvider>().api.get('/updates?limit=$_updatesPage&offset=${_groups.length}') as List;
+        final known = {for (final g in _groups) g.uid};
+        final fresh = [for (final e in d) StoryGroup.fromJson(e as Map)].where((g) => !known.contains(g.uid)).toList();
+        if (mounted) {
+          setState(() {
+            _groups.addAll(fresh);
+            _hasMore = d.length == _updatesPage;
+          });
+        }
+        return fresh.length;
+      } catch (_) {
+        return 0;
+      } finally {
+        _loadingMore = null;
+      }
+    }();
   }
 
   Future<void> _markSeen(String id) async {
@@ -359,7 +405,14 @@ class _UpdatesBarState extends State<_UpdatesBar> {
       context,
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => StoryViewer(groups: _groups, startGroup: idx, meUid: me, onSeen: _markSeen, onDelete: (id) async => api.delete('/updates/$id')),
+        builder: (_) => StoryViewer(
+          groups: _groups,
+          startGroup: idx,
+          meUid: me,
+          onSeen: _markSeen,
+          onDelete: (id) async => api.delete('/updates/$id'),
+          onLoadMore: _loadMore,
+        ),
       ),
     );
     if (deleted == true) load();
@@ -380,6 +433,7 @@ class _UpdatesBarState extends State<_UpdatesBar> {
     return SizedBox(
       height: 100,
       child: ListView(
+        controller: _scroll,
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
         children: [
@@ -401,6 +455,8 @@ class _UpdatesBarState extends State<_UpdatesBar> {
               ring: _allSeen(_groups[i]) ? _Ring.seen : _Ring.unseen,
               onTap: () => _open(i),
             ),
+          if (_hasMore)
+            const SizedBox(width: 48, child: Align(alignment: Alignment(0, -.45), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))),
           if (others.isEmpty)
             Center(
               child: Padding(
