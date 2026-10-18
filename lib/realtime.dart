@@ -99,7 +99,9 @@ class RealtimeService extends ChangeNotifier with WidgetsBindingObserver {
     _retry?.cancel();
     _retry = null;
     try {
-      final ch = WebSocketChannel.connect(Uri.parse('$wsUrl?token=$token'));
+      // the session goes in the first message, never in the URL (URLs end up in access logs)
+      final ch = WebSocketChannel.connect(Uri.parse(wsUrl));
+      ch.sink.add(jsonEncode({'type': 'auth', 'token': token}));
       _ch = ch;
       ch.ready.then((_) {
         if (_ch != ch) return;

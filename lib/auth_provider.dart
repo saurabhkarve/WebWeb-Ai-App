@@ -30,6 +30,9 @@ class AuthProvider extends ChangeNotifier {
   String? twoStepTicket;
   /// recovery codes left after one was used to sign in (shown once, then cleared)
   int? recoveryCodesLeft;
+  /// after 2 wrong codes every try needs a captcha first ([captchaGate]: the last try was refused for lacking one)
+  bool captchaNeeded = false;
+  bool captchaGate = false;
 
   bool get isLoggedIn => token != null;
 
@@ -99,12 +102,14 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> verifyOtp(String code) async {
+  Future<bool> verifyOtp(String code, {String? captcha}) async {
     loading = true;
     error = null;
+    captchaGate = false;
     notifyListeners();
     try {
-      final d = await api.post('/auth/verify-otp', {if (email != null) 'email': email else 'phone': phone, 'code': code}) as Map;
+      final d = await api.post('/auth/verify-otp', {if (email != null) 'email': email else 'phone': phone, 'code': code, if (captcha != null) 'captcha': captcha}) as Map;
+      captchaNeeded = false;
       if (d['twoStep'] == true) {
         twoStepTicket = d['ticket'] as String;
         return true;
@@ -112,6 +117,7 @@ class AuthProvider extends ChangeNotifier {
       await _signedIn(d['token'] as String);
       return true;
     } catch (e) {
+      _noteCaptcha(e);
       error = _msg(e);
       return false;
     } finally {
@@ -120,18 +126,27 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  void _noteCaptcha(Object e) {
+    if (e is! ApiException) return;
+    if (e.status == 428) captchaGate = true;
+    if (e.status == 428 || e.captcha) captchaNeeded = true;
+  }
+
   /// Second step: a code from the authenticator app (or a recovery code) for [twoStepTicket].
-  Future<bool> verifyTwoStep(String code) async {
+  Future<bool> verifyTwoStep(String code, {String? captcha}) async {
     if (twoStepTicket == null) return false;
     loading = true;
     error = null;
+    captchaGate = false;
     notifyListeners();
     try {
-      final d = await api.post('/auth/two-step', {'ticket': twoStepTicket, 'code': code.trim()}) as Map;
+      final d = await api.post('/auth/two-step', {'ticket': twoStepTicket, 'code': code.trim(), if (captcha != null) 'captcha': captcha}) as Map;
+      captchaNeeded = false;
       recoveryCodesLeft = (d['recoveryCodesLeft'] as num?)?.toInt();
       await _signedIn(d['token'] as String);
       return true;
     } catch (e) {
+      _noteCaptcha(e);
       if (e is ApiException && e.status == 401) {
         // the ticket ran out (10 minutes): start again from the number
         twoStepTicket = null;

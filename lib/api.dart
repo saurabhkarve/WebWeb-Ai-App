@@ -11,7 +11,9 @@ typedef Json = Map<String, dynamic>;
 class ApiException implements Exception {
   final String message;
   final int status;
-  ApiException(this.message, [this.status = 0]);
+  /// the API wants a captcha with the next try (after 2 wrong sign-in codes); status 428 means this one needed it
+  final bool captcha;
+  ApiException(this.message, [this.status = 0, this.captcha = false]);
   /// No answer from the server at all (no network, timeout): worth retrying later.
   bool get isNetwork => status == 0;
   @override
@@ -50,7 +52,7 @@ class Api {
     }
     if (r.statusCode >= 400) {
       final msg = data is Map ? data['error'] : null;
-      throw ApiException('${msg ?? 'Something went wrong.'}', r.statusCode);
+      throw ApiException('${msg ?? 'Something went wrong.'}', r.statusCode, data is Map && data['captcha'] == true);
     }
     return data;
   }
@@ -130,7 +132,8 @@ String mediaUrl(String path) {
 /// The small copy of a profile photo (160px) or cover (750px) that the server keeps next to the large one
 /// (av-x.jpg -> av-x_160.jpg); any other URL (older uploads, other sites) comes back unchanged.
 String smallImage(String url) {
-  final m = RegExp(r'/uploads/(av|cv)-[\w-]+\.jpg$').firstMatch(url);
+  // our uploads (av- photo, cv- cover) and WEBWEB's cover designs (/covers/…)
+  final m = RegExp(r'(?:/uploads/(av|cv)-[\w-]+|^/covers/[\w-]+)\.jpg$').firstMatch(url);
   if (m == null) return url;
   return url.replaceFirst(RegExp(r'\.jpg$'), m.group(1) == 'av' ? '_160.jpg' : '_750.jpg');
 }

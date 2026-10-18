@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter, TextInputFormatter, TextEditingValue;
@@ -12,15 +11,18 @@ import '../location.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'account_settings.dart';
 import 'catalog.dart';
-import '../widgets/image_cropper.dart';
+import '../widgets/picture_picker.dart';
 
 /// Edit profile (web profile/edit): cover, photo, name, organisation, sector, location, about, then
 /// services (business) or skills / experience / education (job seeker), GST verification and the catalog.
 /// The photo and cover save at once; the rest saves with "Save changes".
 class EditProfileScreen extends StatefulWidget {
   final Profile profile;
-  const EditProfileScreen({super.key, required this.profile});
+  /// 'account' opens the Account and privacy tab
+  final String? tab;
+  const EditProfileScreen({super.key, required this.profile, this.tab});
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
@@ -43,9 +45,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   int _handleSeq = 0;
   late String _category = widget.profile.category;
   late String _location = widget.profile.location;
-  bool _photoBusy = false;
-  String? _photoError;
-  bool _bannerBusy = false;
   bool _gstBusy = false;
   String? _gstMsg;
   bool _locating = false;
@@ -55,53 +54,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   AuthProvider get _auth => context.read<AuthProvider>();
 
-  Future<void> _changePhoto() async {
-    final Uint8List? f;
-    try {
-      f = await pickAndCrop(context, kAvatarCrop);
-    } catch (e) {
-      if (mounted) setState(() => _photoError = '$e');
-      return;
-    }
-    if (f == null || !mounted) return;
-    setState(() {
-      _photoBusy = true;
-      _photoError = null;
-    });
-    try {
-      await _auth.updateProfile({'photoURL': await _auth.uploadAvatar(f, 'avatar.png')});
-      _changed = true;
-    } catch (e) {
-      if (mounted) setState(() => _photoError = e is ApiException ? e.message : t('Could not upload the photo. Please try again.'));
-    } finally {
-      if (mounted) setState(() => _photoBusy = false);
-    }
-  }
-
-  /// A new cover, or null to go back to the yellow pattern.
-  Future<void> _changeBanner({bool remove = false}) async {
-    Uint8List? f;
-    if (!remove) {
-      try {
-        f = await pickAndCrop(context, kCoverCrop);
-      } catch (e) {
-        if (mounted) setState(() => _error = '$e');
-        return;
-      }
-      if (f == null || !mounted) return;
-    }
-    setState(() {
-      _bannerBusy = true;
-      _error = null;
-    });
-    try {
-      await _auth.updateProfile({'bannerURL': f == null ? null : await _auth.uploadAvatar(f, 'cover.png', kind: 'cover')});
-      _changed = true;
-    } catch (e) {
-      if (mounted) setState(() => _error = '$e');
-    } finally {
-      if (mounted) setState(() => _bannerBusy = false);
-    }
+  /// The photo / cover picker: a new picture (cropped), an earlier one, or (covers) a WEBWEB design.
+  Future<void> _pick(String kind) async {
+    if (await showPicturePicker(context, kind)) _changed = true;
   }
 
   Future<void> _detect() async {
@@ -254,234 +209,250 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       },
       child: SubPage(
         title: t('Edit profile'),
-        body: ListView(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 32),
-          children: [
-            // ---- cover ----
-            Text(t('Cover'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            AspectRatio(
-              aspectRatio: 3, // the shape the cover is cropped to
-              child: Container(
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
-                child: Stack(fit: StackFit.expand, children: [
-                  if ((banner ?? '').isNotEmpty) NetImg(banner!, fit: BoxFit.cover) else CoverPattern(seed: me.handle.isNotEmpty ? me.handle : me.name),
-                  Positioned(
-                    right: 8,
-                    bottom: 8,
-                    child: Row(children: [
-                      if ((banner ?? '').isNotEmpty) ...[pill(t('Remove'), _bannerBusy ? null : () => _changeBanner(remove: true)), const SizedBox(width: 6)],
-                      pill(_bannerBusy ? t('Uploading…') : t((banner ?? '').isNotEmpty ? 'Change cover' : 'Add cover'), _bannerBusy ? null : _changeBanner),
-                    ]),
-                  ),
-                ]),
-              ),
+        body: DefaultTabController(
+          length: job ? 2 : 3,
+          initialIndex: widget.tab == 'account' ? (job ? 1 : 2) : 0,
+          child: Column(children: [
+            TabBar(
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              labelColor: p.text,
+              unselectedLabelColor: p.muted,
+              indicatorColor: p.text,
+              labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+              tabs: [Tab(text: t('Profile')), if (!job) Tab(text: t('Business')), Tab(text: t('Account and privacy'))],
             ),
-            const SizedBox(height: 4),
-            Text(t('Wide pictures work best. Without one we show a yellow pattern.'), style: TextStyle(fontSize: 12, color: p.muted)),
-            const SizedBox(height: 16),
-            // ---- photo ----
-            GestureDetector(
-              onTap: _photoBusy ? null : _changePhoto,
-              child: Row(children: [
-                SizedBox(
-                  width: 84,
-                  height: 84,
-                  child: Stack(clipBehavior: Clip.none, children: [
-                    Opacity(opacity: _photoBusy ? .6 : 1, child: Avatar(name: me.name, photoUrl: me.photoUrl, size: 80, ring: me.hasUpdate, type: me.userType, badge: 26)),
-                    if (_photoBusy) const Positioned.fill(child: Center(child: LogoLoader(size: 28))),
-                    Positioned(
-                      right: -2,
-                      bottom: -2,
+            Expanded(
+              child: TabBarView(children: [
+                ListView(
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 32),
+                  children: [
+                    // ---- cover ----
+                    Text(t('Cover'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    AspectRatio(
+                      aspectRatio: 3, // the shape the cover is cropped to
                       child: Container(
-                        width: 32,
-                        height: 32,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(shape: BoxShape.circle, color: p.ink, border: Border.all(color: p.canvas, width: 2)),
-                        child: WIcon(WI.camera, size: 16, strokeWidth: 2.1, color: p.onInk),
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
+                        child: Stack(fit: StackFit.expand, children: [
+                          if ((banner ?? '').isNotEmpty) NetImg(banner!, fit: BoxFit.cover) else CoverPattern(seed: me.handle.isNotEmpty ? me.handle : me.name),
+                          Positioned(
+                            right: 8,
+                            bottom: 8,
+                            child: Row(children: [
+                              pill(t((banner ?? '').isNotEmpty ? 'Change cover' : 'Add cover'), () => _pick('cover')),
+                            ]),
+                          ),
+                        ]),
                       ),
                     ),
-                  ]),
+                    const SizedBox(height: 4),
+                    Text(t('Upload one and crop it, or pick a WEBWEB design. Without one we show a yellow pattern.'), style: TextStyle(fontSize: 12, color: p.muted)),
+                    const SizedBox(height: 16),
+                    // ---- photo ----
+                    GestureDetector(
+                      onTap: () => _pick('avatar'),
+                      child: Row(children: [
+                        SizedBox(
+                          width: 84,
+                          height: 84,
+                          child: Stack(clipBehavior: Clip.none, children: [
+                            Avatar(name: me.name, photoUrl: me.photoUrl, size: 80, ring: me.hasUpdate, type: me.userType, badge: 26),
+                            Positioned(
+                              right: -2,
+                              bottom: -2,
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(shape: BoxShape.circle, color: p.ink, border: Border.all(color: p.canvas, width: 2)),
+                                child: WIcon(WI.camera, size: 16, strokeWidth: 2.1, color: p.onInk),
+                              ),
+                            ),
+                          ]),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(t((me.photoUrl ?? '').isNotEmpty ? 'Change photo' : 'Add profile photo'),
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link)),
+                            Text(t('A clear face or logo helps people trust you. JPG, PNG or WebP.'), style: TextStyle(fontSize: 12, color: p.muted)),
+                          ]),
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(height: 16),
+                    AppField(controller: _name, label: t('Your name'), caps: TextCapitalization.words, maxLength: 60, onChanged: (_) => setState(() {})),
+                    const SizedBox(height: 16),
+                    Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                      Expanded(
+                        child: AppField(
+                          controller: _handle,
+                          label: t('Page link'),
+                          prefixText: 'webweb.ai/@',
+                          maxLength: 20,
+                          keyboard: TextInputType.visiblePassword, // no autocorrect or capitals
+                          inputFormatters: [_LowerCase(), FilteringTextInputFormatter.allow(RegExp('[a-z0-9]'))],
+                          onChanged: _checkHandle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 22),
+                        child: SizedBox(
+                          width: 96,
+                          child: GoldButton(
+                            label: t('Change'),
+                            outlined: true,
+                            height: 48,
+                            loading: _handleBusy,
+                            onPressed: _handleState == 'free' || _handleState == 'yours' ? _saveHandle : null,
+                          ),
+                        ),
+                      ),
+                    ]),
+                    if (_handleMsg != null || _handleNote != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          _handleMsg?.$2 ?? _handleNote!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _handleMsg != null
+                                ? (_handleMsg!.$1 ? const Color(0xFF2F9E6E) : p.danger)
+                                : _handleState == 'free' || _handleState == 'yours'
+                                    ? const Color(0xFF2F9E6E)
+                                    : _handleState == 'checking'
+                                        ? p.muted
+                                        : p.danger,
+                          ),
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(t('5 to 20 small letters or numbers. You can change it once a day; the old link keeps opening your page.'),
+                          style: TextStyle(fontSize: 12, color: p.muted)),
+                    ),
+                    const SizedBox(height: 16),
+                    AppField(controller: _company, label: t('Organisation name'), caps: TextCapitalization.words, maxLength: 80),
+                    const SizedBox(height: 16),
+                    Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                          _label(t('Category')),
+                          SelectPill(
+                            value: _category,
+                            placeholder: t('Not set'),
+                            rounded: false,
+                            height: 44,
+                            options: [for (final o in kProfileCategories) Option(o.value, t(o.label))],
+                            onChanged: (v) => setState(() => _category = v),
+                          ),
+                        ]),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                          _label(t('Location')),
+                          SelectPill(
+                            value: _location,
+                            placeholder: t('Not set'),
+                            rounded: false,
+                            height: 44,
+                            options: [for (final o in kLocations) Option(o.value, t(o.label))],
+                            onChanged: (v) => setState(() => _location = v),
+                          ),
+                        ]),
+                      ),
+                    ]),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: GestureDetector(
+                        onTap: _locating ? null : _detect,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            if (_locating) const LogoLoader(size: 16) else WIcon(WI.locate, size: 16, color: p.link),
+                            const SizedBox(width: 4),
+                            Text(t('Use my location'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link)),
+                          ]),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    AppField(controller: _bio, label: t('About'), maxLines: 3, maxLength: 300, caps: TextCapitalization.sentences),
+                    if (!job) ...[
+                      const SizedBox(height: 16),
+                      AppField(controller: _services, label: t('Services'), helper: t('One per line'), maxLines: 4, caps: TextCapitalization.sentences),
+                    ] else ...[
+                      const SizedBox(height: 16),
+                      AppField(controller: _skills, label: t('Skills'), helper: t('One per line or comma separated'), maxLines: 3),
+                      const SizedBox(height: 16),
+                      AppField(controller: _experience, label: t('Experience'), helper: t('One per line: Role · Company · Years'), maxLines: 4),
+                      const SizedBox(height: 16),
+                      AppField(controller: _education, label: t('Education'), helper: t('One per line: Degree · Institute · Year'), maxLines: 3),
+                    ],
+                    if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
+                    const SizedBox(height: 16),
+                    GoldButton(label: t('Save changes'), loading: _saving, onPressed: _name.text.trim().length >= 2 ? _save : null),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(t(_photoBusy ? 'Uploading…' : ((me.photoUrl ?? '').isNotEmpty ? 'Change photo' : 'Add profile photo')),
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link)),
-                    Text(t('A clear face or logo helps people trust you. JPG, PNG or WebP.'), style: TextStyle(fontSize: 12, color: p.muted)),
-                    if (_photoError != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(_photoError!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.danger))),
-                  ]),
+                // ---- business: verification and catalog ----
+                if (!job)
+                ListView(
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 32),
+                  children: [
+                    Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        Row(children: [
+                          Text(t('Business verification'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                          const SizedBox(width: 8),
+                          VerifiedBadge(level: me.verification, premium: me.premium, size: 20),
+                        ]),
+                        const SizedBox(height: 12),
+                        Text.rich(
+                          TextSpan(children: [
+                            const TextSpan(text: 'Now: '),
+                            TextSpan(text: kVerificationLabel[me.verification] ?? '', style: TextStyle(fontWeight: FontWeight.w700, color: p.text)),
+                            const TextSpan(text: '. Add your GST number to get the blue '),
+                            TextSpan(text: t('Documents verified'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                            const TextSpan(text: ' seal. After 3 positive ratings from other members you become the gold '),
+                            TextSpan(text: t('Owner verified'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                            const TextSpan(text: '.'),
+                          ]),
+                          style: TextStyle(fontSize: 14, color: p.muted, height: 1.4),
+                        ),
+                        const SizedBox(height: 12),
+                        AppField(
+                          controller: _gst,
+                          label: t('GST number (GSTIN)'),
+                          helper: t('15 characters, e.g. 27ABCDE1234F1Z5'),
+                          maxLength: 15,
+                          caps: TextCapitalization.characters,
+                          onChanged: (_) => setState(() {}),
+                        ),
+                        if (_gstMsg != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_gstMsg!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+                        const SizedBox(height: 12),
+                        GoldButton(label: _gst.text.isNotEmpty ? 'Verify GST number' : 'Remove GST number', outlined: true, height: 40, loading: _gstBusy, onPressed: _saveGst),
+                    ]),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.only(top: 16),
+                      decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border))),
+                      child: GoldButton(
+                        label: t('Manage products & services'),
+                        outlined: true,
+                        height: 40,
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogScreen())),
+                      ),
+                    ),
+                  ],
                 ),
+                const AccountSettingsTab(),
               ]),
             ),
-            const SizedBox(height: 16),
-            AppField(controller: _name, label: t('Your name'), caps: TextCapitalization.words, maxLength: 60, onChanged: (_) => setState(() {})),
-            const SizedBox(height: 16),
-            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Expanded(
-                child: AppField(
-                  controller: _handle,
-                  label: t('Page link'),
-                  prefixText: 'webweb.ai/@',
-                  maxLength: 20,
-                  keyboard: TextInputType.visiblePassword, // no autocorrect or capitals
-                  inputFormatters: [_LowerCase(), FilteringTextInputFormatter.allow(RegExp('[a-z0-9]'))],
-                  onChanged: _checkHandle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 22),
-                child: SizedBox(
-                  width: 96,
-                  child: GoldButton(
-                    label: t('Change'),
-                    outlined: true,
-                    height: 48,
-                    loading: _handleBusy,
-                    onPressed: _handleState == 'free' || _handleState == 'yours' ? _saveHandle : null,
-                  ),
-                ),
-              ),
-            ]),
-            if (_handleMsg != null || _handleNote != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  _handleMsg?.$2 ?? _handleNote!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: _handleMsg != null
-                        ? (_handleMsg!.$1 ? const Color(0xFF2F9E6E) : p.danger)
-                        : _handleState == 'free' || _handleState == 'yours'
-                            ? const Color(0xFF2F9E6E)
-                            : _handleState == 'checking'
-                                ? p.muted
-                                : p.danger,
-                  ),
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(t('5 to 20 small letters or numbers. You can change it once a day; the old link keeps opening your page.'),
-                  style: TextStyle(fontSize: 12, color: p.muted)),
-            ),
-            const SizedBox(height: 16),
-            AppField(controller: _company, label: t('Organisation name'), caps: TextCapitalization.words, maxLength: 80),
-            const SizedBox(height: 16),
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  _label(t('Category')),
-                  SelectPill(
-                    value: _category,
-                    placeholder: t('Not set'),
-                    rounded: false,
-                    height: 44,
-                    options: [for (final o in kProfileCategories) Option(o.value, t(o.label))],
-                    onChanged: (v) => setState(() => _category = v),
-                  ),
-                ]),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  _label(t('Location')),
-                  SelectPill(
-                    value: _location,
-                    placeholder: t('Not set'),
-                    rounded: false,
-                    height: 44,
-                    options: [for (final o in kLocations) Option(o.value, t(o.label))],
-                    onChanged: (v) => setState(() => _location = v),
-                  ),
-                ]),
-              ),
-            ]),
-            Align(
-              alignment: Alignment.centerRight,
-              child: GestureDetector(
-                onTap: _locating ? null : _detect,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    if (_locating) const LogoLoader(size: 16) else WIcon(WI.locate, size: 16, color: p.link),
-                    const SizedBox(width: 4),
-                    Text(t('Use my location'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link)),
-                  ]),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            AppField(controller: _bio, label: t('About'), maxLines: 3, maxLength: 300, caps: TextCapitalization.sentences),
-            if (!job) ...[
-              const SizedBox(height: 16),
-              AppField(controller: _services, label: t('Services'), helper: t('One per line'), maxLines: 4, caps: TextCapitalization.sentences),
-            ] else ...[
-              const SizedBox(height: 16),
-              AppField(controller: _skills, label: t('Skills'), helper: t('One per line or comma separated'), maxLines: 3),
-              const SizedBox(height: 16),
-              AppField(controller: _experience, label: t('Experience'), helper: t('One per line: Role · Company · Years'), maxLines: 4),
-              const SizedBox(height: 16),
-              AppField(controller: _education, label: t('Education'), helper: t('One per line: Degree · Institute · Year'), maxLines: 3),
-            ],
-            if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
-            const SizedBox(height: 16),
-            GoldButton(label: t('Save changes'), loading: _saving, onPressed: _name.text.trim().length >= 2 ? _save : null),
-            // ---- business verification ----
-            if (!job) ...[
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.only(top: 16),
-                decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border))),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  Row(children: [
-                    Text(t('Business verification'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                    const SizedBox(width: 8),
-                    VerifiedBadge(level: me.verification, premium: me.premium, size: 20),
-                  ]),
-                  const SizedBox(height: 12),
-                  Text.rich(
-                    TextSpan(children: [
-                      const TextSpan(text: 'Now: '),
-                      TextSpan(text: kVerificationLabel[me.verification] ?? '', style: TextStyle(fontWeight: FontWeight.w700, color: p.text)),
-                      const TextSpan(text: '. Add your GST number to get the blue '),
-                      TextSpan(text: t('Documents verified'), style: const TextStyle(fontWeight: FontWeight.w700)),
-                      const TextSpan(text: ' seal. After 3 positive ratings from other members you become the gold '),
-                      TextSpan(text: t('Owner verified'), style: const TextStyle(fontWeight: FontWeight.w700)),
-                      const TextSpan(text: '.'),
-                    ]),
-                    style: TextStyle(fontSize: 14, color: p.muted, height: 1.4),
-                  ),
-                  const SizedBox(height: 12),
-                  AppField(
-                    controller: _gst,
-                    label: t('GST number (GSTIN)'),
-                    helper: t('15 characters, e.g. 27ABCDE1234F1Z5'),
-                    maxLength: 15,
-                    caps: TextCapitalization.characters,
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  if (_gstMsg != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_gstMsg!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
-                  const SizedBox(height: 12),
-                  GoldButton(label: _gst.text.isNotEmpty ? 'Verify GST number' : 'Remove GST number', outlined: true, height: 40, loading: _gstBusy, onPressed: _saveGst),
-                ]),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.only(top: 16),
-                decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border))),
-                child: GoldButton(
-                  label: t('Manage products & services'),
-                  outlined: true,
-                  height: 40,
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogScreen())),
-                ),
-              ),
-            ],
-          ],
+          ]),
         ),
       ),
     );

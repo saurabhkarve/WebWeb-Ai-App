@@ -25,7 +25,7 @@ import 'find.dart';
 import 'post_detail.dart';
 import 'talk.dart';
 import '../share_log.dart';
-import '../widgets/image_cropper.dart';
+import '../widgets/picture_picker.dart';
 
 /// One profile for everyone (web profile-view.tsx): your own page ([handle] == null) and any member's.
 /// Cover band with the back arrow, picture, one quiet stats line, name, tags, then the actions and
@@ -55,7 +55,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<StoryItem>? _updates;
   List<Product>? _products;
   List<Map<String, dynamic>>? _areas;
-  String? _mediaBusy;
   String _catFilter = 'all';
 
   Api get _api => context.read<AuthProvider>().api;
@@ -153,33 +152,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   /// New profile picture or cover (or remove the cover when [remove]).
-  Future<void> _changeMedia(String kind, {bool remove = false}) async {
-    final auth = context.read<AuthProvider>();
-    Uint8List? cropped;
-    if (!remove) {
-      // cropped to its shape first (square photo, 3:1 cover)
-      try {
-        cropped = await pickAndCrop(context, kind == 'photo' ? kAvatarCrop : kCoverCrop);
-      } catch (e) {
-        if (mounted) toast(context, '$e', error: true);
-        return;
-      }
-      if (cropped == null || !mounted) return;
-    }
-    setState(() => _mediaBusy = kind);
-    try {
-      if (kind == 'photo') {
-        await auth.updateProfile({'photoURL': await auth.uploadAvatar(cropped!, 'avatar.png')});
-      } else {
-        await auth.updateProfile({'bannerURL': remove ? null : await auth.uploadAvatar(cropped!, 'cover.png', kind: 'cover')});
-      }
-      await _load();
-    } catch (e) {
-      if (mounted) toast(context, '$e', error: true);
-    } finally {
-      if (mounted) setState(() => _mediaBusy = null);
-    }
+  /// My own page: the photo / cover picker (a new picture, cropped; an earlier one; or a WEBWEB cover design).
+  Future<void> _changeMedia(String kind) async {
+    if (await showPicturePicker(context, kind == 'photo' ? 'avatar' : 'cover')) await _load();
   }
+
 
   void _openPicture() {
     final u = _u!;
@@ -344,18 +321,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
     Widget chip(WI icon, String label, VoidCallback? onTap) => GestureDetector(
-          onTap: _mediaBusy != null ? null : onTap,
-          child: Opacity(
-            opacity: _mediaBusy != null ? .6 : 1,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: Colors.white.withValues(alpha: .8), borderRadius: BorderRadius.circular(20)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                WIcon(icon, size: 14, color: kInk, strokeWidth: 2.1),
-                const SizedBox(width: 4),
-                Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kInk)),
-              ]),
-            ),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: .8), borderRadius: BorderRadius.circular(20)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              WIcon(icon, size: 14, color: kInk, strokeWidth: 2.1),
+              const SizedBox(width: 4),
+              Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kInk)),
+            ]),
           ),
         );
     // the cover is 3:1 (as it was cropped) below the status bar; behind the status bar, a blurred copy of it
@@ -399,8 +373,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             right: 12,
             bottom: 8,
             child: Row(children: [
-              if (hasBanner) ...[chip(WI.trash, t('Remove'), () => _changeMedia('banner', remove: true)), const SizedBox(width: 6)],
-              chip(WI.camera, _mediaBusy == 'banner' ? t('Uploading…') : t(hasBanner ? 'Change cover' : 'Add cover'), () => _changeMedia('banner')),
+              chip(WI.camera, t(hasBanner ? 'Change cover' : 'Add cover'), () => _changeMedia('banner')),
             ]),
           ),
       ]),
@@ -432,12 +405,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   button: true,
                   label: t('Change profile picture'),
                   child: GestureDetector(
-                    onTap: _mediaBusy != null ? null : () => _changeMedia('photo'),
+                    onTap: () => _changeMedia('photo'),
                     child: Container(
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(color: p.ink, shape: BoxShape.circle, border: Border.all(color: p.canvas, width: 2)),
-                      child: Center(child: _mediaBusy == 'photo' ? const LogoLoader(size: 18) : WIcon(WI.camera, size: 15, color: p.onInk, strokeWidth: 2.1)),
+                      child: Center(child: WIcon(WI.camera, size: 15, color: p.onInk, strokeWidth: 2.1)),
                     ),
                   ),
                 ),

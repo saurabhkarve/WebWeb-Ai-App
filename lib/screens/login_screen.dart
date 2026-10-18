@@ -11,6 +11,7 @@ import '../config.dart';
 import '../i18n.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../widgets/captcha.dart';
 
 const _resendSeconds = 60; // the API refuses a new code within a minute of the last one
 const _emerald = Color(0xFF10B981);
@@ -103,8 +104,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     final code = _code.text;
     if (code.length != 6 || _auth.loading) return;
     setState(() => _error = null);
-    final ok = await _auth.verifyOtp(code);
+    final ok = await _guarded((pass) => _auth.verifyOtp(code, captcha: pass));
     if (!mounted) return;
+    if (ok == null) {
+      // the captcha was cancelled: nothing was sent
+      _code.clear();
+      _codeFocus.requestFocus();
+      return;
+    }
     if (ok) {
       if (_auth.twoStepTicket != null) {
         _timer?.cancel();
@@ -119,6 +126,26 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     _codeFocus.requestFocus();
   }
 
+  /// Sends a sign-in check ([call] gets the captcha pass): after 2 wrong codes the captcha opens first and the
+  /// code goes out only once it is solved; if the API asks for one, it opens and the code is sent again.
+  /// null: the captcha was cancelled and nothing was sent.
+  Future<bool?> _guarded(Future<bool> Function(String? pass) call) async {
+    final auth = _auth;
+    String? pass;
+    if (auth.captchaNeeded) {
+      pass = await askCaptcha(context, auth.api);
+      if (pass == null) return null;
+    }
+    var ok = await call(pass);
+    if (!ok && auth.captchaGate) {
+      if (!mounted) return null;
+      pass = await askCaptcha(context, auth.api);
+      if (pass == null) return null;
+      ok = await call(pass);
+    }
+    return ok;
+  }
+
   bool get _appCodeValid {
     final c = _appCode.text.trim();
     return _useRecovery ? RegExp(r'^[a-zA-Z0-9]{4}-?[a-zA-Z0-9]{4}$').hasMatch(c) : RegExp(r'^\d{6}$').hasMatch(c);
@@ -130,7 +157,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     final messenger = ScaffoldMessenger.of(context);
     final p = Pal.of(context);
     final auth = _auth; // this screen goes away once signed in
-    final ok = await auth.verifyTwoStep(_appCode.text);
+    final code = _appCode.text;
+    final ok = await _guarded((pass) => auth.verifyTwoStep(code, captcha: pass));
+    if (ok == null) return;
     if (ok) {
       final left = auth.recoveryCodesLeft;
       if (left != null) {
