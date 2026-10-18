@@ -85,7 +85,7 @@ class CatalogStrip extends StatelessWidget {
   }
 }
 
-/// A catalog item with the same controls an ask has (React, Refer, Repost, Reply, Save) plus Enquire now.
+/// A catalog item with the same controls an ask has (React, Refer, Repost, Reply, Share, Save) plus Enquire now.
 /// Tap opens the business; double tap gives the item a thumbs up.
 class _ItemCard extends StatefulWidget {
   final FeedProduct item;
@@ -388,6 +388,12 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
                 onTap: _toggleRepost,
               ),
               action(icon: WIcon(WI.reply, size: 20, color: p.muted), count: it.enquiriesCount, label: 'Reply', color: p.muted, onTap: _reply),
+              action(
+                icon: WIcon(WI.share, size: 20, color: p.muted),
+                label: 'Share',
+                color: p.muted,
+                onTap: () => showShareItemSheetFor(context, it, handle: widget.owner.handle, business: widget.ownerName),
+              ),
             ]),
           ]),
         ),

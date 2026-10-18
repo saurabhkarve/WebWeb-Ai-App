@@ -1428,9 +1428,12 @@ Future<void> showShareProfileSheet(BuildContext context, Profile profile, {requi
 }
 
 /// Share one catalog item (own or someone else's): in a chat as a card, or its short link (/@handle/item/<slug>).
-Future<void> showShareItemSheet(BuildContext context, Product item, Profile owner) {
-  final business = displayName(owner.userType, owner.name, owner.company);
-  final url = '$siteUrl${item.pathFor(owner.handle)}';
+Future<void> showShareItemSheet(BuildContext context, Product item, Profile owner) =>
+    showShareItemSheetFor(context, item, handle: owner.handle, business: displayName(owner.userType, owner.name, owner.company));
+
+/// The same, from places that only know the owner's handle and display name (the Connect feed's catalog strip).
+Future<void> showShareItemSheetFor(BuildContext context, Product item, {required String handle, required String business}) {
+  final url = '$siteUrl${item.pathFor(handle)}';
   final name = item.name.length > 80 ? item.name.substring(0, 80) : item.name;
   return _showShareSheet(
     context,
@@ -1449,9 +1452,9 @@ Future<void> showShareItemSheet(BuildContext context, Product item, Profile owne
         if ((item.price ?? '').isNotEmpty) 'price': item.price,
         if (item.imageUrl != null) 'imageUrl': item.imageUrl,
         'itemId': item.id,
-        'handle': owner.handle,
+        'handle': handle,
         'seller': business.length > 80 ? business.substring(0, 80) : business,
-        'path': item.pathFor(owner.handle),
+        'path': item.pathFor(handle),
       },
     ),
   );
