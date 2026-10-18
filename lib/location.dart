@@ -1,6 +1,12 @@
 import 'dart:math' as math;
 
+import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
+
+import 'auth_provider.dart';
+import 'i18n.dart';
+import 'permissions.dart';
 
 /// Same node centres as web/src/lib/constants.ts (NODE_COORDS).
 const kNodeCoords = <String, List<double>>{
@@ -37,19 +43,33 @@ class Here {
   const Here(this.lat, this.lng, this.node);
 }
 
-/// Asks for location permission (only when needed) and returns the current position.
-/// Throws a user-facing message when location is off or denied.
-Future<Here> currentLocation() async {
-  if (!await Geolocator.isLocationServiceEnabled()) throw 'Turn on location in your phone settings.';
-  var perm = await Geolocator.checkPermission();
-  if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
-  if (perm == LocationPermission.deniedForever) {
-    await Geolocator.openAppSettings();
-    throw 'Allow location for WebWeb Ai in Settings.';
+/// The person closed the permission pop-up without allowing it (the pop-up already said why);
+/// callers simply stop, without another error message.
+class PermissionNotGiven implements Exception {
+  const PermissionNotGiven();
+  @override
+  String toString() => '';
+}
+
+/// The current position, for a feature the person is using right now (never in the background).
+/// Checks the permission every time and explains it in a pop-up when it is off ([Permissions.ensure]),
+/// then saves the reading as the member's last known location (PUT /me/location, private).
+/// Throws [PermissionNotGiven] when not allowed, or a user-facing message when no fix could be had.
+Future<Here> currentLocation(BuildContext context, {required String reason, required String source}) async {
+  final api = context.read<AuthProvider>().api;
+  if (!await Permissions.ensure(context, Need.location, reason: reason)) throw const PermissionNotGiven();
+  Position p;
+  try {
+    p = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 12)),
+    );
+  } catch (_) {
+    final last = await Geolocator.getLastKnownPosition();
+    if (last == null) throw t('Could not get your location. Step outside or near a window and try again.');
+    p = last;
   }
-  if (perm == LocationPermission.denied) throw 'Location permission was not given.';
-  final p = await Geolocator.getCurrentPosition(
-    locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 10)),
-  ).catchError((_) async => await Geolocator.getLastKnownPosition() ?? (throw 'Could not get your location.'));
+  if (api.token() != null) {
+    api.put('/me/location', {'lat': p.latitude, 'lng': p.longitude, 'accuracy': p.accuracy, 'source': source}).catchError((_) => null);
+  }
   return Here(p.latitude, p.longitude, nearestLocation(p.latitude, p.longitude));
 }

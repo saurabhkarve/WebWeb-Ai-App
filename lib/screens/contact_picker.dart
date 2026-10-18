@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 
 import '../i18n.dart';
+import '../permissions.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -36,13 +37,25 @@ class _ContactPickerState extends State<ContactPicker> {
   @override
   void initState() {
     super.initState();
-    _load();
+    // after the first frame: the permission pop-up needs a mounted screen
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final status = await FlutterContacts.permissions.request(PermissionType.read);
-      if (!{'granted', 'limited'}.contains(status.name)) {
+      final ok = await Permissions.ensure(
+        context,
+        Need.contacts,
+        reason: widget.forChat
+            ? t('To pick a contact from your phone book and send it in this chat.')
+            : t('To pick people from your phone book and refer them on this ask.'),
+      );
+      if (!mounted) return;
+      if (!ok) {
         setState(() {
           _loading = false;
           _error = t('Contacts permission is needed to refer people from your phone book.');
@@ -179,7 +192,16 @@ class _ContactPickerState extends State<ContactPicker> {
           child: _loading
               ? const Center(child: LogoLoader())
               : _error != null
-                  ? EmptyState(title: _error!)
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          EmptyState(title: _error!),
+                          const SizedBox(height: 12),
+                          SizedBox(width: 200, child: GoldButton(label: t('Allow contacts'), wi: WI.contactCard, height: 44, onPressed: _load)),
+                        ]),
+                      ),
+                    )
                   : list.isEmpty
                       ? EmptyState(title: t(_all.isEmpty ? 'No contacts with phone numbers' : 'No match'))
                       : ListView.builder(

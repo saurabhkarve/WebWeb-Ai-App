@@ -27,6 +27,7 @@ dependencies:
   image_picker: ^1.2.4
   package_info_plus: ^10.2.2
   path_provider: ^2.1.6
+  permission_handler: ^13.0.2
   provider: ^6.1.2
   qr: ^4.0.0
   share_plus: ^13.3.1

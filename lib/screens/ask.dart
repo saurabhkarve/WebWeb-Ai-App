@@ -382,15 +382,17 @@ class _AskFormState extends State<_AskForm> {
       _locNote = null;
     });
     try {
-      final h = await currentLocation();
+      final h = await currentLocation(context, reason: t('To show your ask to members near you and count how many it will reach.'), source: 'ask');
       if (!mounted) return;
       setState(() {
         _geo = (lat: h.lat, lng: h.lng, radiusM: _geo?.radiusM ?? 100000);
         _location = h.node == 'Other' ? '' : h.node;
       });
       _loadReach();
-    } catch (_) {
-      if (mounted) setState(() => _locNote = t('Could not get your location. Allow location access or pick an area.'));
+    } on PermissionNotGiven {
+      if (mounted) setState(() => _locNote = t('Location is off for WEBWEB. Allow it, or pick an area below.'));
+    } catch (e) {
+      if (mounted) setState(() => _locNote = '$e'.isEmpty ? t('Could not get your location. Allow location access or pick an area.') : '$e');
     } finally {
       if (mounted) setState(() => _locating = false);
     }

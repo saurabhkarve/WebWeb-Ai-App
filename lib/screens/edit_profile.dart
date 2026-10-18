@@ -85,8 +85,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _detect() async {
     setState(() => _locating = true);
     try {
-      final h = await currentLocation();
+      final h = await currentLocation(context, reason: t('To set the area on your page, so nearby members and asks can find you.'), source: 'profile');
       if (mounted) setState(() => _location = h.node);
+    } on PermissionNotGiven {
+      // explained in the pop-up
     } catch (e) {
       if (mounted) toast(context, '$e', error: true);
     } finally {

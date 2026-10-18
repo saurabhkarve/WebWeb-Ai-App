@@ -361,16 +361,18 @@ class _BoostStep extends StatefulWidget {
 
 class _BoostStepState extends State<_BoostStep> {
   late Profile _profile = widget.initial;
-  String? _open = 'photo';
+  String? _open = 'location';
   String? _busy;
   String? _error;
   String? _justEarned;
   bool _locating = false;
+  /// WEBWEB is hyperlocal: the phone's location must be read once here before the feed opens
+  bool _gps = false;
   bool _finishing = false;
   final _company = TextEditingController();
   final _bio = TextEditingController();
 
-  static const _order = ['photo', 'company', 'category', 'location', 'bio'];
+  static const _order = ['location', 'photo', 'company', 'category', 'bio'];
 
   bool get _isJob => _profile.userType == 'job_seeker';
 
@@ -380,7 +382,7 @@ class _BoostStepState extends State<_BoostStep> {
       'photo' => (x.photoUrl ?? '').isNotEmpty,
       'company' => x.company.isNotEmpty,
       'category' => x.category.isNotEmpty,
-      'location' => x.location.isNotEmpty,
+      'location' => x.location.isNotEmpty && _gps,
       _ => (x.bio ?? '').isNotEmpty,
     };
   }
@@ -452,15 +454,30 @@ class _BoostStepState extends State<_BoostStep> {
   Future<void> _detect() async {
     setState(() => _locating = true);
     try {
-      final here = await currentLocation();
+      final here = await currentLocation(
+        context,
+        reason: t('WEBWEB is a local network: your location connects you with businesses, jobs and asks near you. It is needed to continue.'),
+        source: 'onboarding',
+      );
       if (!mounted) return;
-      setState(() => _locating = false);
-      await _save('location', {'location': here.node}, t('Location set'));
-    } catch (_) {
+      setState(() {
+        _locating = false;
+        _gps = true;
+      });
+      // "Other" (outside the listed areas) keeps an area already chosen, else is saved as is
+      await _save('location', {'location': here.node == 'Other' && _profile.location.isNotEmpty ? _profile.location : here.node}, t('Location set'));
+    } on PermissionNotGiven {
       if (mounted) {
         setState(() {
           _locating = false;
-          _error = t('Could not get your location. Pick one below.');
+          _error = t('Location is needed to continue. Tap "Use my location" and allow it.');
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _locating = false;
+          _error = '$e'.isEmpty ? t('Could not get your location. Please try again.') : '$e';
         });
       }
     }
@@ -478,10 +495,10 @@ class _BoostStepState extends State<_BoostStep> {
     final completion = _profile.completion ?? const Completion(0, [], []);
     final suggested = _suggestCategory('${_profile.name} ${_profile.company}');
     final tasks = [
+      ('location', 'Where you are', 'Required: matches you with nearby asks', _weight('location') == 0 ? 5 : _weight('location')),
       ('photo', 'Add a photo', 'People reply to faces', _weight('photo') == 0 ? 10 : _weight('photo')),
       ('company', _isJob ? 'Your current role' : 'Your business name', _isJob ? 'For example: CNC operator' : 'Shown on your page', _weight('company') == 0 ? 5 : _weight('company')),
       ('category', _isJob ? 'Field you work in' : 'Business sector', 'Helps the right people find you', _weight('category') == 0 ? 5 : _weight('category')),
-      ('location', 'Where you are', 'Matches you with nearby asks', _weight('location') == 0 ? 5 : _weight('location')),
       ('bio', 'One line about you', 'Up to 160 characters', _weight('bio') == 0 ? 10 : _weight('bio')),
     ];
     final anyAdded = _order.any(_done);
@@ -541,11 +558,10 @@ class _BoostStepState extends State<_BoostStep> {
               for (final c in kProfileCategories) chip(c.label, _busy == 'category' ? null : () => _save('category', {'category': c.value}, t('Sector added')), hint: suggested == c.value),
             ]),
           'location' => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              GoldButton(label: t('Use my location'), wi: WI.pin, outlined: true, height: 40, loading: _locating, onPressed: _detect),
-              const SizedBox(height: 12),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                for (final l in kLocations) chip(l.label, _busy == 'location' ? null : () => _save('location', {'location': l.value}, t('Location set'))),
-              ]),
+              GoldButton(label: t('Use my location'), wi: WI.pin, height: 44, loading: _locating, onPressed: _locating ? null : _detect),
+              const SizedBox(height: 8),
+              Text(t('Used only while you use the app, never in the background. Your exact location is never shown to other members.'),
+                  style: TextStyle(fontSize: 12, color: p.muted, height: 1.4)),
             ]),
           _ => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               inputBox(_bio, t('What you do, in one line'), lines: 2, max: 160),
@@ -571,7 +587,7 @@ class _BoostStepState extends State<_BoostStep> {
         child: ListView(padding: const EdgeInsets.fromLTRB(16, 24, 16, 16), children: [
           Text('${t('Your page is live')} 🎉', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1.25)),
           const SizedBox(height: 4),
-          Text('@${_profile.handle} · ${t('Add more to earn badges. Every step is optional.')}', style: TextStyle(fontSize: 14, color: p.muted)),
+          Text('@${_profile.handle} · ${t('Allow your location to continue. The rest is optional and earns badges.')}', style: TextStyle(fontSize: 14, color: p.muted)),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(14),
@@ -663,6 +679,19 @@ class _BoostStepState extends State<_BoostStep> {
                       ]),
                     ),
                   ),
+                  if (done && task.$1 == 'location')
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                      decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border))),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(t('Not quite right? Pick your area:'), style: TextStyle(fontSize: 12, color: p.muted)),
+                        const SizedBox(height: 8),
+                        Wrap(spacing: 8, runSpacing: 8, children: [
+                          for (final l in kLocations)
+                            chip(l.label, _busy == 'location' ? null : () => _save('location', {'location': l.value}), hint: _profile.location == l.value),
+                        ]),
+                      ]),
+                    ),
                   if (open)
                     Container(
                       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
@@ -681,8 +710,12 @@ class _BoostStepState extends State<_BoostStep> {
         padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 16),
         decoration: BoxDecoration(color: p.canvas.withValues(alpha: .95), border: Border(top: BorderSide(color: p.border))),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          GoldButton(label: t(anyAdded ? 'Done, take me to my feed' : 'Go to my feed'), loading: _finishing, onPressed: _finish),
-          if (!anyAdded) ...[
+          GoldButton(
+            label: t(!_done('location') ? 'Allow location to continue' : anyAdded ? 'Done, take me to my feed' : 'Go to my feed'),
+            loading: _finishing || _locating,
+            onPressed: !_done('location') ? (_locating ? null : _detect) : _finish,
+          ),
+          if (!anyAdded && _done('location')) ...[
             const SizedBox(height: 8),
             GestureDetector(
               onTap: _finishing ? null : _finish,

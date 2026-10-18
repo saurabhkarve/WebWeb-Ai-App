@@ -11,6 +11,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart' hide AndroidAudioMode;
 import 'api.dart';
 import 'i18n.dart';
 import 'native_calls.dart';
+import 'permissions.dart';
 import 'realtime.dart';
 import 'screens/call_screen.dart';
 
@@ -174,6 +175,18 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
     _renderersReady = true;
   }
 
+  /// Microphone (and camera for video) checked right before every call, with the explaining pop-up
+  /// when either was turned off ([Permissions.ensure]).
+  Future<bool> _mediaAllowed(bool video) async {
+    final ctx = nav.currentContext;
+    if (ctx == null) return true; // no screen yet (e.g. answered on the lock screen): getUserMedia reports it
+    if (!await Permissions.ensure(ctx, Need.microphone, reason: t('To talk on WEBWEB calls.'))) return false;
+    if (!video) return true;
+    final ctx2 = nav.currentContext;
+    if (ctx2 == null || !ctx2.mounted) return true;
+    return Permissions.ensure(ctx2, Need.camera, reason: t('To show your video in this call.'));
+  }
+
   /// A readable reason for a failed getUserMedia / call setup.
   static String _mediaError(Object e, bool video) {
     final m = '$e'.toLowerCase();
@@ -301,6 +314,8 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
       rt.reconnectNow();
       throw t('Connecting to WEBWEB… try again in a moment.');
     }
+    if (!await _mediaAllowed(video)) return;
+    if (current != null) return;
     final id = NativeCalls.newCallId();
     final c = current = ActiveCall(
       id: id,
@@ -348,6 +363,11 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
     final c = current;
     if (c == null || !c.incoming || c.offerSdp == null) return;
     _stopSounds();
+    if (!await _mediaAllowed(c.video)) {
+      if (current == c) hangUp(note: c.video ? 'Camera or microphone is off' : 'Microphone is off');
+      return;
+    }
+    if (current != c || c.state == CallState.ended) return;
     c.state = CallState.connecting;
     notifyListeners();
     _syncDevice();

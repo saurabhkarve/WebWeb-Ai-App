@@ -50,7 +50,7 @@
 	<key>NSContactsUsageDescription</key>
 	<string>Pick people from your phone book to refer them on an ask, or to share a contact in a chat. Only the contacts you select are shared.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Your location matches you with asks and members near you, and lets you share a pin in a chat.</string>
+	<string>WEBWEB is a local network: your location connects you with asks and members near you, sets the area of your asks and page, and lets you share a pin in a chat. It is used only while you use the app, never in the background.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take photos for your asks, updates and catalog, and make video calls.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

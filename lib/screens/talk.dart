@@ -12,6 +12,7 @@ import '../api.dart';
 import '../auth_provider.dart';
 import '../call_manager.dart';
 import '../i18n.dart';
+import '../permissions.dart';
 import '../location.dart';
 import '../models.dart';
 import '../notifications.dart';
@@ -1532,6 +1533,8 @@ class _AttachSheetState extends State<_AttachSheet> {
     try {
       await fn();
       if (mounted) Navigator.pop(context);
+    } on PermissionNotGiven {
+      // the pop-up already explained it; nothing more to say
     } catch (e) {
       if (mounted) setState(() => _error = '$e'.isEmpty ? t('Could not send.') : '$e');
     } finally {
@@ -1551,6 +1554,8 @@ class _AttachSheetState extends State<_AttachSheet> {
       ),
     );
     if (src == null || !mounted) return;
+    if (src == ImageSource.camera && !await Permissions.ensure(context, Need.camera, reason: t('To take a photo and send it in this chat.'))) return;
+    if (!mounted) return;
     final f = await ImagePicker().pickImage(source: src, imageQuality: 75, maxWidth: 1280);
     if (f == null || !mounted) return;
     final api = context.read<AuthProvider>().api;
@@ -1582,7 +1587,7 @@ class _AttachSheetState extends State<_AttachSheet> {
   }
 
   Future<void> _location() => _run('location', () async {
-        final h = await currentLocation();
+        final h = await currentLocation(context, reason: t('To share your current location in this chat.'), source: 'chat');
         await widget.onSend(attachment: {'type': 'location', 'lat': h.lat, 'lng': h.lng, if (h.node != 'Other') 'label': 'Near ${h.node}'});
       });
 
