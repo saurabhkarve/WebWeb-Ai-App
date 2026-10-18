@@ -1427,10 +1427,10 @@ Future<void> showShareProfileSheet(BuildContext context, Profile profile, {requi
   );
 }
 
-/// Share one catalog item (own or someone else's): in a chat as a card, or its link (/@handle?item=<id>).
+/// Share one catalog item (own or someone else's): in a chat as a card, or its short link (/@handle/item/<slug>).
 Future<void> showShareItemSheet(BuildContext context, Product item, Profile owner) {
   final business = displayName(owner.userType, owner.name, owner.company);
-  final url = '$siteUrl/@${owner.handle}?item=${Uri.encodeQueryComponent(item.id)}';
+  final url = '$siteUrl${item.pathFor(owner.handle)}';
   final name = item.name.length > 80 ? item.name.substring(0, 80) : item.name;
   return _showShareSheet(
     context,
@@ -1451,7 +1451,7 @@ Future<void> showShareItemSheet(BuildContext context, Product item, Profile owne
         'itemId': item.id,
         'handle': owner.handle,
         'seller': business.length > 80 ? business.substring(0, 80) : business,
-        'path': '/@${owner.handle}?item=${Uri.encodeQueryComponent(item.id)}',
+        'path': item.pathFor(owner.handle),
       },
     ),
   );

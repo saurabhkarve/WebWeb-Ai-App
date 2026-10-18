@@ -303,9 +303,13 @@ class Product {
   final String id, name, kind; // kind: product | service
   final bool available;
   final String? price, description, imageUrl, category;
-  Product({required this.id, required this.name, required this.kind, this.available = true, this.price, this.description, this.imageUrl, this.category});
+  /// short public id: /@handle/item/<slug>
+  final String? slug;
+  Product({required this.id, required this.name, required this.kind, this.available = true, this.price, this.description, this.imageUrl, this.category, this.slug});
+  /// Public link path, like an ask's (`/@handle/item/slug`); older items without a slug use `?item=<id>`.
+  String pathFor(String handle) => slug != null ? '/@$handle/item/$slug' : '/@$handle?item=${Uri.encodeQueryComponent(id)}';
   factory Product.fromJson(Map j) => Product(
-        id: '${j['id']}', name: '${j['name']}', kind: '${j['kind'] ?? 'product'}', available: j['available'] != false,
+        id: '${j['id']}', name: '${j['name']}', kind: '${j['kind'] ?? 'product'}', available: j['available'] != false, slug: j['slug'] as String?,
         price: j['price'] as String?, description: j['description'] as String?, imageUrl: j['imageUrl'] as String?,
         category: (j['category'] as String?)?.trim().isEmpty == true ? null : j['category'] as String?,
       );
@@ -317,12 +321,12 @@ class FeedProduct extends Product {
   String? myReaction;
   bool bookmarked, reposted;
   FeedProduct({
-    required super.id, required super.name, required super.kind, super.available, super.price, super.description, super.imageUrl,
+    required super.id, required super.name, required super.kind, super.available, super.price, super.description, super.imageUrl, super.slug,
     this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0, this.enquiriesCount = 0, this.myReaction,
     this.bookmarked = false, this.reposted = false,
   });
   factory FeedProduct.fromJson(Map j) => FeedProduct(
-        id: '${j['id']}', name: '${j['name']}', kind: '${j['kind'] ?? 'product'}', available: j['available'] != false,
+        id: '${j['id']}', name: '${j['name']}', kind: '${j['kind'] ?? 'product'}', available: j['available'] != false, slug: j['slug'] as String?,
         price: j['price'] as String?, description: j['description'] as String?, imageUrl: j['imageUrl'] as String?,
         reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, repostsCount: (j['repostsCount'] as num?)?.toInt() ?? 0,
         referralsCount: (j['referralsCount'] as num?)?.toInt() ?? 0, enquiriesCount: (j['enquiriesCount'] as num?)?.toInt() ?? 0,
