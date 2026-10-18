@@ -25,6 +25,11 @@ class AuthProvider extends ChangeNotifier {
   /// the signed-in account's email, when it has one (from /me)
   String? accountEmail;
   String? error;
+  /// Two-step verification is on for this account: the sign-in waits for an authenticator or recovery code
+  /// (POST /auth/two-step with this ticket) before there is a session.
+  String? twoStepTicket;
+  /// recovery codes left after one was used to sign in (shown once, then cleared)
+  int? recoveryCodesLeft;
 
   bool get isLoggedIn => token != null;
 
@@ -100,11 +105,11 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final d = await api.post('/auth/verify-otp', {if (email != null) 'email': email else 'phone': phone, 'code': code}) as Map;
-      token = d['token'] as String;
-      (await SharedPreferences.getInstance()).setString('token', token!);
-      otpSent = false;
-      profileLoaded = false;
-      await loadProfile(silent: true);
+      if (d['twoStep'] == true) {
+        twoStepTicket = d['ticket'] as String;
+        return true;
+      }
+      await _signedIn(d['token'] as String);
       return true;
     } catch (e) {
       error = _msg(e);
@@ -115,8 +120,45 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Second step: a code from the authenticator app (or a recovery code) for [twoStepTicket].
+  Future<bool> verifyTwoStep(String code) async {
+    if (twoStepTicket == null) return false;
+    loading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final d = await api.post('/auth/two-step', {'ticket': twoStepTicket, 'code': code.trim()}) as Map;
+      recoveryCodesLeft = (d['recoveryCodesLeft'] as num?)?.toInt();
+      await _signedIn(d['token'] as String);
+      return true;
+    } catch (e) {
+      if (e is ApiException && e.status == 401) {
+        // the ticket ran out (10 minutes): start again from the number
+        twoStepTicket = null;
+        otpSent = false;
+        error = 'This sign-in has expired. Please start again.';
+      } else {
+        error = _msg(e);
+      }
+      return false;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _signedIn(String t) async {
+    token = t;
+    twoStepTicket = null;
+    (await SharedPreferences.getInstance()).setString('token', t);
+    otpSent = false;
+    profileLoaded = false;
+    await loadProfile(silent: true);
+  }
+
   void backToLogin() {
     otpSent = false;
+    twoStepTicket = null;
     error = null;
     notifyListeners();
   }
@@ -155,6 +197,7 @@ class AuthProvider extends ChangeNotifier {
     profile = null;
     profileLoaded = false;
     otpSent = false;
+    twoStepTicket = null;
     error = null;
     (await SharedPreferences.getInstance()).remove('token');
     await OfflineCache.clear(); // nothing of this account stays on the phone

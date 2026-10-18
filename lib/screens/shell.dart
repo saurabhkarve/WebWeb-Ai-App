@@ -25,6 +25,7 @@ import 'post_detail.dart';
 import 'profile.dart';
 import 'support_sheet.dart';
 import 'talk.dart';
+import 'two_step.dart';
 
 /// Signed-in chrome, same as the web on phones (app-frame.tsx): the slim header (logo, bell, your
 /// avatar with the account menu) and the floating island with Connect, Find, Talk and Ask.
@@ -336,7 +337,7 @@ void _openAccountMenu(BuildContext context) {
 
 /// The account menu from the web (account-menu.tsx) as a full-height drawer from the right: account card,
 /// View / Edit profile, Saved asks, Help & Support (opens the website), Dark mode switch, language pills,
-/// Blocked people, Delete account, Log out.
+/// Two-step verification, Blocked people, Delete account, Log out.
 class _AccountMenu extends StatelessWidget {
   const _AccountMenu();
 
@@ -470,6 +471,7 @@ class _AccountMenu extends StatelessWidget {
               const SizedBox(height: 8),
               divider,
               const SizedBox(height: 8),
+              item(WI.lock, 'Two-step verification', () => push(const TwoStepScreen())),
               item(WI.user, 'Blocked people', () => push(const BlockedPeopleScreen())),
               row(WI.trash, label(t('Delete account'), color: p.danger), () {
                 final nav = Navigator.of(context);

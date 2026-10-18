@@ -20,7 +20,8 @@ const _pop = Cubic(0.34, 1.56, 0.64, 1);
 String _formatPhone(String d) => d.length > 5 ? '${d.substring(0, 5)} ${d.substring(5)}' : d;
 
 /// Sign in, as the web (auth)/login page on a phone: the stacked lockup, "Welcome", a +91 mobile number
-/// (or an email), then six code boxes with a resend countdown. The step follows [AuthProvider.otpSent].
+/// (or an email), then six code boxes with a resend countdown. The step follows [AuthProvider.otpSent]; with
+/// two-step verification on, a third step asks for the authenticator (or a recovery) code.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -33,6 +34,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   final _code = TextEditingController();
   final _codeFocus = FocusNode();
   final _contactFocus = FocusNode();
+  final _appCode = TextEditingController();
+  final _appCodeFocus = FocusNode();
+  bool _useRecovery = false;
   late final AnimationController _shake = AnimationController(vsync: this, duration: const Duration(milliseconds: 450));
   bool _byEmail = false;
   String? _error;
@@ -50,7 +54,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    for (final f in [_contactFocus, _codeFocus]) {
+    for (final f in [_contactFocus, _codeFocus, _appCodeFocus]) {
       f.addListener(() => setState(() {}));
     }
   }
@@ -64,6 +68,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     _code.dispose();
     _codeFocus.dispose();
     _contactFocus.dispose();
+    _appCode.dispose();
+    _appCodeFocus.dispose();
     super.dispose();
   }
 
@@ -98,10 +104,55 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     if (code.length != 6 || _auth.loading) return;
     setState(() => _error = null);
     final ok = await _auth.verifyOtp(code);
-    if (!mounted || ok) return;
+    if (!mounted) return;
+    if (ok) {
+      if (_auth.twoStepTicket != null) {
+        _timer?.cancel();
+        _appCode.clear();
+        setState(() => _useRecovery = false);
+        WidgetsBinding.instance.addPostFrameCallback((_) => _appCodeFocus.requestFocus());
+      }
+      return;
+    }
     _fail(_auth.error);
     _code.clear();
     _codeFocus.requestFocus();
+  }
+
+  bool get _appCodeValid {
+    final c = _appCode.text.trim();
+    return _useRecovery ? RegExp(r'^[a-zA-Z0-9]{4}-?[a-zA-Z0-9]{4}$').hasMatch(c) : RegExp(r'^\d{6}$').hasMatch(c);
+  }
+
+  Future<void> _verifyAppCode() async {
+    if (!_appCodeValid || _auth.loading) return;
+    setState(() => _error = null);
+    final messenger = ScaffoldMessenger.of(context);
+    final p = Pal.of(context);
+    final auth = _auth; // this screen goes away once signed in
+    final ok = await auth.verifyTwoStep(_appCode.text);
+    if (ok) {
+      final left = auth.recoveryCodesLeft;
+      if (left != null) {
+        auth.recoveryCodesLeft = null;
+        messenger.showSnackBar(SnackBar(
+          content: Text(t('You used a recovery code. {n} left. Make new ones in Two-step verification when you can.', {'n': left}),
+              style: TextStyle(color: p.onInk, fontWeight: FontWeight.w700, fontSize: 13)),
+          backgroundColor: p.ink,
+          duration: const Duration(seconds: 6),
+        ));
+      }
+      return;
+    }
+    if (!mounted) return;
+    if (_auth.twoStepTicket == null) {
+      // the sign-in expired: back to the number, with the reason
+      setState(() => _resendIn = 0);
+      return _fail(t('This sign-in has expired. Please start again.'));
+    }
+    _fail(_auth.error);
+    _appCode.clear();
+    _appCodeFocus.requestFocus();
   }
 
   Future<void> _resend() async {
@@ -129,6 +180,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     final auth = context.watch<AuthProvider>();
     final p = Pal.of(context);
     final otp = auth.otpSent;
+    final twoStep = auth.twoStepTicket != null;
     return Scaffold(
       backgroundColor: p.canvas,
       body: SafeArea(
@@ -145,7 +197,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                       const Center(child: LogoInline(size: 40, markSize: 60)),
                       const SizedBox(height: 24),
-                      _Rise(key: ValueKey(otp), child: otp ? _otpStep(auth, p) : _contactStep(auth, p)),
+                      _Rise(
+                        key: ValueKey(twoStep ? 2 : (otp ? 1 : 0)),
+                        child: twoStep ? _twoStepStep(auth, p) : (otp ? _otpStep(auth, p) : _contactStep(auth, p)),
+                      ),
                     ]),
                   ),
                 ),
@@ -372,6 +427,102 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                   ),
           ]),
           style: TextStyle(fontSize: 14, color: p.muted),
+        ),
+      ),
+    ]);
+  }
+
+  // ---------- step 3 (two-step verification on): authenticator or recovery code ----------
+  Widget _twoStepStep(AuthProvider auth, Pal p) {
+    final focused = _appCodeFocus.hasFocus;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: kGold.withValues(alpha: .15), borderRadius: BorderRadius.circular(12)),
+          child: const WIcon(WI.lock, size: 22, color: kGold),
+        ),
+      ),
+      const SizedBox(height: 16),
+      Text(t('Two-step verification'), style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700, height: 1.25)),
+      const SizedBox(height: 8),
+      Text(
+        t(_useRecovery
+            ? 'Enter one of the recovery codes you saved when you turned on two-step verification.'
+            : 'Open your authenticator app and enter the 6-digit code for WEBWEB AI.'),
+        style: TextStyle(fontSize: 16, color: p.muted),
+      ),
+      const SizedBox(height: 24),
+      _Shake(
+        controller: _shake,
+        child: TextField(
+          key: ValueKey(_useRecovery),
+          controller: _appCode,
+          focusNode: _appCodeFocus,
+          autofocus: true,
+          enabled: !auth.loading,
+          textAlign: TextAlign.center,
+          keyboardType: _useRecovery ? TextInputType.visiblePassword : TextInputType.number,
+          autocorrect: false,
+          enableSuggestions: false,
+          autofillHints: _useRecovery ? null : const [AutofillHints.oneTimeCode],
+          inputFormatters: _useRecovery
+              ? [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9-]')), LengthLimitingTextInputFormatter(9)]
+              : [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: 6, fontFeatures: [FontFeature.tabularFigures()]),
+          decoration: InputDecoration(
+            hintText: _useRecovery ? 'xxxx-xxxx' : '123456',
+            hintStyle: TextStyle(color: p.muted.withValues(alpha: .5)),
+            filled: true,
+            fillColor: p.canvas,
+            contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: _error != null ? p.danger : p.border)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: _error != null ? p.danger : kGold, width: focused ? 1.5 : 1)),
+            disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: p.border)),
+          ),
+          onChanged: (v) {
+            setState(() => _error = null);
+            if (!_useRecovery && v.length == 6) _verifyAppCode();
+          },
+          onSubmitted: (_) => _verifyAppCode(),
+        ),
+      ),
+      const SizedBox(height: 12),
+      ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 20),
+        child: _error != null
+            ? Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))
+            : auth.loading
+                ? Text(t('Verifying…'), style: TextStyle(fontSize: 14, color: p.muted))
+                : null,
+      ),
+      const SizedBox(height: 16),
+      _BigGoldButton(label: auth.loading ? t('Verifying…') : t('Verify & continue'), onPressed: _appCodeValid && !auth.loading ? _verifyAppCode : null),
+      const SizedBox(height: 16),
+      Center(
+        child: GestureDetector(
+          onTap: auth.loading
+              ? null
+              : () {
+                  _appCode.clear();
+                  setState(() {
+                    _error = null;
+                    _useRecovery = !_useRecovery;
+                  });
+                  WidgetsBinding.instance.addPostFrameCallback((_) => _appCodeFocus.requestFocus());
+                },
+          child: Text(t(_useRecovery ? 'Use the authenticator app instead' : 'Lost your phone? Use a recovery code'),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link)),
+        ),
+      ),
+      const SizedBox(height: 12),
+      Center(
+        child: GestureDetector(
+          onTap: auth.loading ? null : _changeContact,
+          child: Text(t(auth.email != null ? 'Change email' : 'Change number'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.muted)),
         ),
       ),
     ]);
