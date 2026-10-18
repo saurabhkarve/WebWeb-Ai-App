@@ -12,7 +12,7 @@ import '../i18n.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-const _resendSeconds = 30;
+const _resendSeconds = 60; // the API refuses a new code within a minute of the last one
 const _emerald = Color(0xFF10B981);
 const _rise = Cubic(0.22, 1, 0.36, 1);
 const _pop = Cubic(0.34, 1.56, 0.64, 1);
