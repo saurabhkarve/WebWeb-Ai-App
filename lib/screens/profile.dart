@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
@@ -13,6 +14,7 @@ import '../safety.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/post_card.dart';
+import '../widgets/qr_card.dart';
 import '../widgets/story_viewer.dart';
 import 'catalog.dart';
 import 'edit_profile.dart';
@@ -26,7 +28,9 @@ import '../share_log.dart';
 /// the Asks / Connects / Updates / Catalog (or Resume) tabs. Contact numbers are never shown in full.
 class ProfileScreen extends StatefulWidget {
   final String? handle;
-  const ProfileScreen({super.key, this.handle});
+  /// a shared catalog item to open once the catalog has loaded
+  final String? itemId;
+  const ProfileScreen({super.key, this.handle, this.itemId});
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
@@ -39,13 +43,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Profile? _u;
   String? _error;
   _Tab? _tabSel;
+  /// direction of the last tab change (1 = to the right), for the slide
+  int _tabDir = 1;
   List<Post>? _posts;
   List<Deal>? _deals;
   List<AskItem> _asks = [];
   List<StoryItem>? _updates;
   List<Product>? _products;
   List<Map<String, dynamic>>? _areas;
-  bool _requested = false;
   String? _mediaBusy;
   String _catFilter = 'all';
 
@@ -76,7 +81,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _loadTabs(Profile u) {
     final api = _api;
     api.get('/users/${u.uid}/products').then((d) {
-      if (mounted) setState(() => _products = (d as List).map((e) => Product.fromJson(e as Map)).toList());
+      if (!mounted) return;
+      setState(() => _products = (d as List).map((e) => Product.fromJson(e as Map)).toList());
+      _openLinkedItem(u);
     }).catchError((_) {
       if (mounted) setState(() => _products = []);
     });
@@ -111,16 +118,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _message() async => openChat(context, Peer.fromProfile(_u!));
+  bool _linkedItemDone = false;
 
-  Future<void> _askContact() async {
-    try {
-      await _api.post('/users/${_u!.uid}/contact-request');
-      if (mounted) setState(() => _requested = true);
-    } catch (e) {
-      if (mounted) toast(context, '$e', error: true);
+  /// Opened from a shared item card: show the catalog with that item open.
+  void _openLinkedItem(Profile u) {
+    if (_linkedItemDone || widget.itemId == null) return;
+    _linkedItemDone = true;
+    final hit = _products?.where((x) => x.id == widget.itemId).firstOrNull;
+    if (hit == null) {
+      toast(context, t('This item is no longer listed.'));
+      return;
     }
+    setState(() => _tabSel = _Tab.products);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _showItem(hit, u);
+    });
   }
+
+  Future<void> _message() async => openChat(context, Peer.fromProfile(_u!));
 
   Future<void> _edit() async {
     final u = _u;
@@ -152,16 +167,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) toast(context, '$e', error: true);
     } finally {
       if (mounted) setState(() => _mediaBusy = null);
-    }
-  }
-
-  Future<void> _shareTalkLink() async {
-    final url = '$siteUrl/@${_u!.handle}/talk';
-    try {
-      await shareAndLog(context.read<AuthProvider>().api, entity: 'profile', ref: _u!.handle, text: url, subject: '${t('Talk')}: ${_u!.name}');
-    } catch (_) {
-      await Clipboard.setData(ClipboardData(text: url));
-      if (mounted) toast(context, t('Link copied!'));
     }
   }
 
@@ -273,7 +278,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
             _tabBar(p, tabs, tab, isJob, own),
-            Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: _tabBody(tab, u, p)),
+            // swipe left / right anywhere below the tabs to move between them
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragEnd: (d) {
+                final v = d.primaryVelocity ?? 0;
+                if (v.abs() < 250) return;
+                final i = tabs.indexOf(tab) + (v < 0 ? 1 : -1);
+                if (i >= 0 && i < tabs.length) _goTab(tabs, tab, tabs[i]);
+              },
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                layoutBuilder: (current, previous) => Stack(alignment: Alignment.topCenter, children: [...previous, if (current != null) current]),
+                transitionBuilder: (child, anim) {
+                  final incoming = child.key == ValueKey(tab);
+                  final from = Offset((incoming ? .25 : -.25) * _tabDir, 0);
+                  return FadeTransition(
+                    opacity: anim,
+                    child: SlideTransition(position: Tween(begin: from, end: Offset.zero).animate(anim), child: child),
+                  );
+                },
+                child: Padding(
+                  key: ValueKey(tab),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: _tabBody(tab, u, p),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -472,22 +505,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Own page: edit, share, and the QR card one tap away.
   Widget _ownActions(Pal p) => Row(children: [
         Expanded(child: _ActionBtn(label: t('Edit profile'), wi: WI.edit, gold: true, onTap: _edit)),
         const SizedBox(width: 8),
-        Expanded(child: _ActionBtn(label: t('Share profile'), onTap: () => showShareProfileSheet(context, _u!, isSelf: true))),
+        Expanded(child: _ActionBtn(label: t('Share profile'), wi: WI.share, onTap: () => showShareProfileSheet(context, _u!, isSelf: true))),
         const SizedBox(width: 8),
-        Expanded(child: _ActionBtn(label: t('Talk link'), wi: WI.talk, onTap: _shareTalkLink)),
+        SizedBox(width: 44, child: _ActionBtn(wi: WI.qr, label: '', semantic: t('QR code'), onTap: () => showShareProfileSheet(context, _u!, isSelf: true, openQr: true))),
       ]);
 
+  /// Someone else's page: talk, call, share.
   Widget _visitorActions(Pal p, Profile u) => Row(children: [
         Expanded(child: _ActionBtn(label: t('Talk'), wi: WI.talk, gold: true, onTap: _message)),
         const SizedBox(width: 8),
         Expanded(child: _ActionBtn(label: t('Call'), wi: WI.phone, onTap: () => placeCall(context, Peer.fromProfile(u), false))),
         const SizedBox(width: 8),
-        Expanded(child: _ActionBtn(label: t(_requested ? 'Requested' : 'Ask contact'), wi: WI.ask, onTap: _requested ? null : _askContact)),
-        const SizedBox(width: 8),
-        SizedBox(width: 40, child: _ActionBtn(wi: WI.share, label: '', semantic: t('Share profile'), onTap: () => showShareProfileSheet(context, u, isSelf: false))),
+        SizedBox(width: 44, child: _ActionBtn(wi: WI.share, label: '', semantic: t('Share profile'), onTap: () => showShareProfileSheet(context, u, isSelf: false))),
       ]);
 
   // ---------- tabs ----------
@@ -512,7 +545,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           for (final x in tabs)
             Expanded(
               child: InkWell(
-                onTap: () => setState(() => _tabSel = x),
+                onTap: () => _goTab(tabs, tab, x),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(border: Border(bottom: BorderSide(color: tab == x ? p.text : Colors.transparent, width: 2))),
@@ -526,6 +559,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
         ]),
       );
+
+  void _goTab(List<_Tab> tabs, _Tab from, _Tab to) {
+    if (from == to) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _tabDir = tabs.indexOf(to) > tabs.indexOf(from) ? 1 : -1;
+      _tabSel = to;
+    });
+  }
 
   Widget _loading() => const Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: LogoLoader()));
 
@@ -742,7 +784,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           mainAxisSpacing: 10,
           crossAxisSpacing: 10,
           childAspectRatio: .66,
-          children: [for (final x in items) _CatalogTile(item: x, onTap: _own ? null : () => _showItem(x, u))],
+          children: [for (final x in items) _CatalogTile(item: x, onTap: () => _showItem(x, u), onLongPress: () => showShareItemSheet(context, x, u))],
         ),
       if (showPlain && u.services.isNotEmpty) ...[
         const SizedBox(height: 16),
@@ -789,6 +831,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: ListView(shrinkWrap: true, padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(ctx).padding.bottom + 24), children: [
           Row(children: [
             Expanded(child: Text(x.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+            Semantics(
+              button: true,
+              label: t('Share'),
+              child: GestureDetector(
+                onTap: () => showShareItemSheet(ctx, x, u),
+                child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: WIcon(WI.share, size: 22, color: p.text)),
+              ),
+            ),
             GestureDetector(onTap: () => Navigator.pop(ctx), child: WIcon(WI.close, size: 24, color: p.text)),
           ]),
           const SizedBox(height: 12),
@@ -805,6 +855,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ]),
           if ((x.description ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(x.description!, style: const TextStyle(fontSize: 14, height: 1.43))),
           const SizedBox(height: 16),
+          if (_own) ...[
+            GoldButton(label: t(x.kind == 'service' ? 'Share service' : 'Share product'), wi: WI.share, onPressed: () => showShareItemSheet(ctx, x, u)),
+            const SizedBox(height: 8),
+            Text(t('Send it in a chat, or share its link on WhatsApp and other apps.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.muted)),
+          ] else ...[
           GoldButton(
             label: t('Enquire'),
             wi: WI.talk,
@@ -822,6 +877,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 8),
           Text(t('Opens a chat with {name}', {'name': business}), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.muted)),
+          const SizedBox(height: 4),
+          TextButton.icon(
+            onPressed: () => showShareItemSheet(ctx, x, u),
+            icon: WIcon(WI.share, size: 16, color: p.text),
+            label: Text(t('Share with someone'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.text)),
+          ),
+          ],
         ]),
       ),
     );
@@ -968,7 +1030,9 @@ class _StrengthCard extends StatelessWidget {
 class _CatalogTile extends StatelessWidget {
   final Product item;
   final VoidCallback? onTap;
-  const _CatalogTile({required this.item, this.onTap});
+  /// long press, or the share button in the corner
+  final VoidCallback? onLongPress;
+  const _CatalogTile({required this.item, this.onTap, this.onLongPress});
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
@@ -978,6 +1042,12 @@ class _CatalogTile extends StatelessWidget {
       opacity: item.available ? 1 : .6,
       child: GestureDetector(
         onTap: onTap,
+        onLongPress: onLongPress == null
+            ? null
+            : () {
+                HapticFeedback.mediumImpact();
+                onLongPress!();
+              },
         child: Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
@@ -986,6 +1056,28 @@ class _CatalogTile extends StatelessWidget {
               aspectRatio: 1,
               child: Stack(fit: StackFit.expand, children: [
                 if (item.imageUrl != null) NetImg(item.imageUrl!) else ColoredBox(color: p.chip, child: Center(child: WIcon(icon, size: 28, color: p.muted))),
+                if (onLongPress != null)
+                  Positioned(
+                    right: 2,
+                    top: 2,
+                    child: Semantics(
+                      button: true,
+                      label: t('Share'),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onLongPress,
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(color: p.ink.withValues(alpha: .55), shape: BoxShape.circle),
+                            child: Center(child: WIcon(WI.share, size: 14, color: p.onInk, strokeWidth: 2.2)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 Positioned(
                   left: 4,
                   bottom: 4,
@@ -1284,10 +1376,88 @@ class _ResumeEntrySheetState extends State<_ResumeEntrySheet> {
   }
 }
 
-// ======================= share profile (web share-profile-sheet.tsx) =======================
+// ======================= share sheet: profiles and catalog items (web share-profile-sheet.tsx) =======================
 
-/// Share a profile: send it in a chat, copy the link, or hand it to another app.
-Future<void> showShareProfileSheet(BuildContext context, Profile profile, {required bool isSelf}) {
+/// What a share sheet passes on: the link, the chat card and how the share is logged.
+class ShareTarget {
+  final String title; // sheet title
+  final String url;
+  final String subject; // for mail and other apps
+  final String text; // shared with other apps (the url is appended)
+  final Map<String, dynamic> attachment; // the card sent into a chat
+  final String entity, ref; // share log: profile/handle or item/id
+  /// own page: also offer the QR card
+  final ({String name, String label, String handle})? qr;
+  const ShareTarget({
+    required this.title,
+    required this.url,
+    required this.subject,
+    required this.text,
+    required this.attachment,
+    required this.entity,
+    required this.ref,
+    this.qr,
+  });
+}
+
+/// Share a profile: send it in a chat, copy the link, hand it to another app, or (own page) the QR card.
+Future<void> showShareProfileSheet(BuildContext context, Profile profile, {required bool isSelf, bool openQr = false}) {
+  final title = displayName(profile.userType, profile.name, profile.company);
+  final url = '$siteUrl/@${profile.handle}';
+  return _showShareSheet(
+    context,
+    ShareTarget(
+      title: t('Share profile'),
+      url: url,
+      subject: isSelf ? t('My WEBWEB AI page') : title,
+      text: '',
+      entity: 'profile',
+      ref: profile.handle,
+      attachment: {
+        'type': 'profile',
+        'handle': profile.handle,
+        'name': title,
+        'subtitle': [labelOf(kProfileCategories, profile.category), profile.location].where((e) => e.isNotEmpty).join(' · '),
+        if (profile.photoUrl != null) 'photoURL': profile.photoUrl,
+        'path': '/@${profile.handle}',
+      },
+      qr: isSelf ? (name: title, label: url.replaceFirst(RegExp(r'^https?://'), ''), handle: profile.handle) : null,
+    ),
+    openQr: openQr,
+  );
+}
+
+/// Share one catalog item (own or someone else's): in a chat as a card, or its link (/@handle?item=<id>).
+Future<void> showShareItemSheet(BuildContext context, Product item, Profile owner) {
+  final business = displayName(owner.userType, owner.name, owner.company);
+  final url = '$siteUrl/@${owner.handle}?item=${Uri.encodeQueryComponent(item.id)}';
+  final name = item.name.length > 80 ? item.name.substring(0, 80) : item.name;
+  return _showShareSheet(
+    context,
+    ShareTarget(
+      title: t(item.kind == 'service' ? 'Share service' : 'Share product'),
+      url: url,
+      subject: '$name — $business',
+      text: '$name${(item.price ?? '').isNotEmpty ? ' · ${item.price}' : ''} — $business',
+      entity: 'item',
+      ref: item.id,
+      attachment: {
+        'type': 'item',
+        'shared': true,
+        'name': name,
+        'kind': item.kind,
+        if ((item.price ?? '').isNotEmpty) 'price': item.price,
+        if (item.imageUrl != null) 'imageUrl': item.imageUrl,
+        'itemId': item.id,
+        'handle': owner.handle,
+        'seller': business.length > 80 ? business.substring(0, 80) : business,
+        'path': '/@${owner.handle}?item=${Uri.encodeQueryComponent(item.id)}',
+      },
+    ),
+  );
+}
+
+Future<void> _showShareSheet(BuildContext context, ShareTarget target, {bool openQr = false}) {
   final p = Pal.of(context);
   return showModalBottomSheet(
     context: context,
@@ -1295,28 +1465,30 @@ Future<void> showShareProfileSheet(BuildContext context, Profile profile, {requi
     backgroundColor: p.canvas,
     barrierColor: kInk.withValues(alpha: .6),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (_) => _ShareProfileSheet(profile: profile, isSelf: isSelf),
+    builder: (_) => _ShareSheet(target: target, openQr: openQr),
   );
 }
 
-class _ShareProfileSheet extends StatefulWidget {
-  final Profile profile;
-  final bool isSelf;
-  const _ShareProfileSheet({required this.profile, required this.isSelf});
+enum _ShareView { menu, chat, qr }
+
+class _ShareSheet extends StatefulWidget {
+  final ShareTarget target;
+  final bool openQr;
+  const _ShareSheet({required this.target, this.openQr = false});
   @override
-  State<_ShareProfileSheet> createState() => _ShareProfileSheetState();
+  State<_ShareSheet> createState() => _ShareSheetState();
 }
 
-class _ShareProfileSheetState extends State<_ShareProfileSheet> {
-  bool _chat = false;
+class _ShareSheetState extends State<_ShareSheet> {
+  late _ShareView _view = widget.openQr && widget.target.qr != null ? _ShareView.qr : _ShareView.menu;
   List<ChatSummary>? _chats;
   final _q = TextEditingController();
+  final _qrKey = GlobalKey();
+  bool _qrBusy = false;
   String? _sending;
   final Set<String> _sent = {};
 
-  Profile get _p => widget.profile;
-  String get _url => '$siteUrl/@${_p.handle}';
-  String get _title => displayName(_p.userType, _p.name, _p.company);
+  ShareTarget get _t => widget.target;
 
   @override
   void dispose() {
@@ -1325,7 +1497,7 @@ class _ShareProfileSheetState extends State<_ShareProfileSheet> {
   }
 
   Future<void> _openChats() async {
-    setState(() => _chat = true);
+    setState(() => _view = _ShareView.chat);
     final auth = context.read<AuthProvider>();
     try {
       final d = await auth.api.get('/chats') as List;
@@ -1336,25 +1508,47 @@ class _ShareProfileSheetState extends State<_ShareProfileSheet> {
   }
 
   Future<void> _send(ChatSummary c) async {
+    final api = context.read<AuthProvider>().api;
     setState(() => _sending = c.id);
     try {
-      await context.read<AuthProvider>().api.post('/chats/${c.id}/messages', {
-        'text': '',
-        'attachment': {
-          'type': 'profile',
-          'handle': _p.handle,
-          'name': _title,
-          'subtitle': [labelOf(kProfileCategories, _p.category), _p.location].where((e) => e.isNotEmpty).join(' · '),
-          if (_p.photoUrl != null) 'photoURL': _p.photoUrl,
-          'path': '/@${_p.handle}',
-        },
-      });
+      await api.post('/chats/${c.id}/messages', {'text': '', 'attachment': _t.attachment});
+      logShare(api, _t.entity, _t.ref, channel: 'chat');
       if (mounted) setState(() => _sent.add(c.id));
     } catch (e) {
       if (mounted) toast(context, t('Could not send'), error: true);
     } finally {
       if (mounted) setState(() => _sending = null);
     }
+  }
+
+  /// The QR card as a PNG, to the phone's share sheet (save to Photos / Files, WhatsApp, print…).
+  Future<void> _shareQr() async {
+    final qr = _t.qr!;
+    final api = context.read<AuthProvider>().api;
+    setState(() => _qrBusy = true);
+    try {
+      final png = await qrCardPng(_qrKey);
+      if (png == null) throw 'no image';
+      final r = await SharePlus.instance.share(ShareParams(
+        files: [XFile.fromData(Uint8List.fromList(png), mimeType: 'image/png', name: 'webweb-${qr.handle}-qr.png')],
+        fileNameOverrides: ['webweb-${qr.handle}-qr.png'],
+        text: _t.url,
+        subject: _t.subject,
+      ));
+      if (r.status != ShareResultStatus.dismissed) logShare(api, _t.entity, _t.ref, channel: 'qr');
+    } catch (_) {
+      if (mounted) toast(context, t('Could not create the QR code'), error: true);
+    } finally {
+      if (mounted) setState(() => _qrBusy = false);
+    }
+  }
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: _t.url));
+    if (!mounted) return;
+    logShare(context.read<AuthProvider>().api, _t.entity, _t.ref, channel: 'copy');
+    Navigator.pop(context);
+    toast(context, t('Link copied'));
   }
 
   @override
@@ -1379,32 +1573,56 @@ class _ShareProfileSheetState extends State<_ShareProfileSheet> {
         );
     final q = _q.text.trim().toLowerCase();
     final rows = (_chats ?? const <ChatSummary>[]).where((c) => q.isEmpty || '${c.peer.name} ${c.peer.company}'.toLowerCase().contains(q)).toList();
+    final heading = switch (_view) {
+      _ShareView.chat => t('Send in chat'),
+      _ShareView.qr => t('QR code'),
+      _ShareView.menu => _t.title,
+    };
     return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .85),
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .9),
       child: Padding(
         padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 16),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
-            if (_chat) GestureDetector(onTap: () => setState(() => _chat = false), child: Padding(padding: const EdgeInsets.only(right: 8), child: WIcon(WI.back, size: 20, color: p.text))),
-            Expanded(child: Text(t(_chat ? 'Send in chat' : 'Share profile'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+            if (_view != _ShareView.menu)
+              GestureDetector(onTap: () => setState(() => _view = _ShareView.menu), child: Padding(padding: const EdgeInsets.only(right: 8), child: WIcon(WI.back, size: 20, color: p.text))),
+            Expanded(child: Text(heading, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
             GestureDetector(onTap: () => Navigator.pop(context), child: WIcon(WI.close, size: 24, color: p.text)),
           ]),
           const SizedBox(height: 12),
-          if (!_chat) ...[
+          if (_view == _ShareView.menu) ...[
             row(WIcon(WI.talk, size: 20, color: p.text), t('Send in chat'), t('Pick a conversation'), _openChats),
-            row(WIcon(WI.clip, size: 20, color: p.text), t('Copy link'), _url.replaceFirst(RegExp(r'^https?://'), ''), () async {
-              await Clipboard.setData(ClipboardData(text: _url));
-              if (context.mounted) {
-                logShare(context.read<AuthProvider>().api, 'profile', _p.handle, channel: 'copy');
-                Navigator.pop(context);
-                toast(context, t('Link copied'));
-              }
-            }),
+            if (_t.qr != null) row(WIcon(WI.qr, size: 20, color: p.text), t('QR code'), t('Show, share or download'), () => setState(() => _view = _ShareView.qr)),
+            row(WIcon(WI.clip, size: 20, color: p.text), t('Copy link'), _t.url.replaceFirst(RegExp(r'^https?://'), ''), _copy),
             row(WIcon(WI.share, size: 20, color: p.text), t('More apps'), t('WhatsApp, email and others'), () async {
               try {
-                await shareAndLog(context.read<AuthProvider>().api, entity: 'profile', ref: _p.handle, text: _url, subject: widget.isSelf ? t('My WEBWEB AI page') : _title);
+                await shareAndLog(context.read<AuthProvider>().api, entity: _t.entity, ref: _t.ref, text: _t.text.isEmpty ? _t.url : '${_t.text}\n${_t.url}', subject: _t.subject);
               } catch (_) {}
             }),
+          ] else if (_view == _ShareView.qr) ...[
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(children: [
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 300),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: RepaintBoundary(key: _qrKey, child: QrCard(url: _t.url, name: _t.qr!.name, label: _t.qr!.label)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    Expanded(child: GoldButton(label: t('Share image'), wi: WI.share, height: 44, loading: _qrBusy, onPressed: _qrBusy ? null : _shareQr)),
+                    const SizedBox(width: 8),
+                    Expanded(child: GoldButton(label: t('Copy link'), wi: WI.clip, outlined: true, height: 44, onPressed: _copy)),
+                  ]),
+                  const SizedBox(height: 8),
+                  Text(t('Print it for your shop, visiting card or packaging. Anyone can scan it to open your page.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.muted)),
+                ]),
+              ),
+            ),
           ] else ...[
             Container(
               height: 40,
@@ -1459,10 +1677,10 @@ class _ShareProfileSheetState extends State<_ShareProfileSheet> {
                               ? const Text('…', style: TextStyle(fontWeight: FontWeight.w700, color: kInk))
                               : _sent.contains(c.id)
                                   ? WIcon(WI.checkCircle, size: 16, color: p.text)
-                                  : const Row(mainAxisSize: MainAxisSize.min, children: [
-                                      WIcon(WI.send, size: 13, color: kInk),
-                                      SizedBox(width: 4),
-                                      Text('Send', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kInk)),
+                                  : Row(mainAxisSize: MainAxisSize.min, children: [
+                                      const WIcon(WI.send, size: 13, color: kInk),
+                                      const SizedBox(width: 4),
+                                      Text(t('Send'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kInk)),
                                     ]),
                         ),
                       ),

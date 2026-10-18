@@ -8,6 +8,7 @@ import '../i18n.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'profile.dart' show showShareItemSheet;
 
 const _emerald = Color(0xFF047857);
 const _emeraldDark = Color(0xFF34D399);
@@ -339,6 +340,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
               arrow('▲', _filter == 'all' && index > 0, () => _move(it, -1)),
               arrow('▼', _filter == 'all' && index < items.length - 1, () => _move(it, 1)),
             ]),
+            InkResponse(
+              onTap: () {
+                final me = context.read<AuthProvider>().profile;
+                if (me != null) showShareItemSheet(context, it, me);
+              },
+              radius: 20,
+              child: Padding(padding: const EdgeInsets.all(8), child: Semantics(label: t('Share'), child: WIcon(WI.share, size: 20, color: pal.text))),
+            ),
             InkResponse(onTap: () => _openItem(it), radius: 20, child: Padding(padding: const EdgeInsets.all(8), child: WIcon(WI.edit, size: 20, color: pal.text))),
             InkResponse(onTap: () => setState(() => _confirmId = it.id), radius: 20, child: Padding(padding: const EdgeInsets.all(8), child: WIcon(WI.trash, size: 20, color: pal.danger))),
           ]),

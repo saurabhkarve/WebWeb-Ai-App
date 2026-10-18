@@ -1218,7 +1218,13 @@ class _ChatThreadState extends State<ChatThread> {
         );
       case 'item':
         final icon = a['kind'] == 'service' ? WI.service : WI.box;
+        // passed on by the sender (not an enquiry): opens the item on the seller's page
+        final shared = a['shared'] == true && '${a['handle'] ?? ''}'.isNotEmpty;
         return box(
+          goldEdge: shared,
+          onTap: shared
+              ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: '${a['handle']}', itemId: a['itemId'] as String?)))
+              : null,
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
@@ -1229,9 +1235,15 @@ class _ChatThreadState extends State<ChatThread> {
             const SizedBox(width: 12),
             Flexible(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Text(t(a['kind'] == 'service' ? 'Service enquiry' : 'Product enquiry').toUpperCase(), style: label()),
+                Text(t(shared ? (a['kind'] == 'service' ? 'Shared a service' : 'Shared a product') : (a['kind'] == 'service' ? 'Service enquiry' : 'Product enquiry')).toUpperCase(), style: label()),
                 Text('${a['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg)),
-                if (a['price'] != null) Text('${a['price']}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg.withValues(alpha: .8))),
+                if (a['price'] != null || (shared && a['seller'] != null))
+                  Text(
+                    [if (a['price'] != null) '${a['price']}', if (shared && a['seller'] != null) '${a['seller']}'].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg.withValues(alpha: .8)),
+                  ),
               ]),
             ),
           ]),

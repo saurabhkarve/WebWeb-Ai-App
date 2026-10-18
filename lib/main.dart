@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'auth_provider.dart';
 import 'call_manager.dart';
+import 'crash_reporter.dart';
 import 'i18n.dart';
 import 'notifications.dart';
 import 'outbox.dart';
@@ -21,6 +22,7 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   if (NotificationService.supported) FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
   final auth = AuthProvider();
+  CrashReporter.init(auth.api); // errors from here on are reported (Admin > Crashes)
   final realtime = RealtimeService();
   final calls = CallManager(realtime, navKey, auth.api);
   final notifications = NotificationService(auth, realtime, navKey);

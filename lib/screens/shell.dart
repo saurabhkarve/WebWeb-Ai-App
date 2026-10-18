@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -22,6 +23,7 @@ import 'edit_profile.dart';
 import 'find.dart';
 import 'post_detail.dart';
 import 'profile.dart';
+import 'support_sheet.dart';
 import 'talk.dart';
 
 /// Signed-in chrome, same as the web on phones (app-frame.tsx): the slim header (logo, bell, your
@@ -423,7 +425,13 @@ class _AccountMenu extends StatelessWidget {
               // help lives on the website so articles stay current without an app update
               item(WI.help, 'Help & Support', () {
                 Navigator.of(context).pop();
-                launchUrl(Uri.parse('$siteUrl/help?lang=${i18n.lang}'), mode: LaunchMode.externalApplication);
+                final from = defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+                launchUrl(Uri.parse('$siteUrl/help?lang=${i18n.lang}&from=$from'), mode: LaunchMode.externalApplication);
+              }),
+              // the Help page's form, in the app and signed in
+              item(WI.talk, 'Write to us', () {
+                Navigator.of(context).pop();
+                showSupportSheet(context);
               }),
               row(
                 dark ? WI.sun : WI.moon,
