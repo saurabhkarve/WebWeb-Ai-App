@@ -12,6 +12,7 @@ import '../widgets/image_grid.dart';
 import '../widgets/post_card.dart';
 import '../widgets/reaction_picker.dart';
 import '../widgets/response_sheet.dart';
+import 'find.dart';
 import 'profile.dart';
 import 'talk.dart' show openChat;
 
@@ -169,6 +170,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (saved == true) _load();
   }
 
+  /// A chip opens Find with every ask sharing that city / budget / timing (as on the feed card).
+  void _openFind({String? location, String? budget, String? urgency}) => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => FindScreen(standalone: true, initialLocation: location, initialBudget: budget, initialUrgency: urgency)),
+      );
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
@@ -232,30 +239,21 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             ],
             if ((post.description ?? '').isNotEmpty) SelectableText(post.description!, style: isAsk ? const TextStyle(fontSize: 16, height: 1.625) : const TextStyle(fontSize: 18, height: 1.375)),
             ImageGrid(post.images, shareUrl: post.webUrl, shareRef: post.id),
-            if (hasDetails) ...[
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
-                child: Column(children: [
-                  for (final (i, d) in [
-                    if ((post.locationPref ?? '').isNotEmpty) (WI.pin, 'Location', t(post.locationPref!)),
-                    if ((post.budget ?? '').isNotEmpty) (WI.rupee, 'Budget', post.budget!),
-                    if ((post.urgency ?? '').isNotEmpty) (WI.clock, 'Urgency', t(labelOf(kUrgencies, post.urgency))),
-                  ].indexed)
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: i == 0 ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border))),
-                      child: Row(children: [
-                        WIcon(d.$1, size: 20, color: p.muted),
-                        const SizedBox(width: 12),
-                        Text(t(d.$2), style: TextStyle(fontSize: 14, color: p.muted)),
-                        const Spacer(),
-                        Flexible(child: Text(d.$3, textAlign: TextAlign.right, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
-                      ]),
-                    ),
-                ]),
-              ),
+            // the essentials as chips, like the feed card (the category is the heading above)
+            if (hasDetails || (post.radiusM ?? 0) > 0) ...[
+              const SizedBox(height: 16),
+              Wrap(spacing: 6, runSpacing: 6, children: [
+                if ((post.locationPref ?? '').isNotEmpty)
+                  InfoPill(
+                    wi: WI.pin,
+                    text: '${t(post.locationPref!)}${post.distanceM == null ? '' : ' · ${formatDistance(post.distanceM!)}'}',
+                    onTap: () => _openFind(location: post.locationPref),
+                  ),
+                if ((post.budget ?? '').isNotEmpty) InfoPill(wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
+                if ((post.urgency ?? '').isNotEmpty)
+                  InfoPill(wi: WI.clock, text: t(labelOf(kUrgencies, post.urgency)), onTap: () => _openFind(urgency: post.urgency)),
+                if ((post.radiusM ?? 0) > 0) InfoPill(wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)})),
+              ]),
             ],
             if (isAsk) ...[
               const SizedBox(height: 20),

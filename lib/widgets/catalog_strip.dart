@@ -87,12 +87,25 @@ class CatalogStrip extends StatelessWidget {
 
 /// A catalog item with the same controls an ask has (React, Refer, Repost, Reply, Share, Save) plus Enquire now.
 /// Tap opens the business; double tap gives the item a thumbs up.
+/// Also used on a business page's catalog tab ([CatalogItemCard]: tap opens the item, full width).
+class CatalogItemCard extends StatelessWidget {
+  final FeedProduct item;
+  final Peer owner;
+  final String ownerName;
+  final VoidCallback onOpen;
+  const CatalogItemCard({super.key, required this.item, required this.owner, required this.ownerName, required this.onOpen});
+  @override
+  Widget build(BuildContext context) => _ItemCard(item: item, owner: owner, ownerName: ownerName, openOwner: onOpen, width: null);
+}
+
 class _ItemCard extends StatefulWidget {
   final FeedProduct item;
   final Peer owner;
   final String ownerName;
   final VoidCallback openOwner;
-  const _ItemCard({required this.item, required this.owner, required this.ownerName, required this.openOwner});
+  /// null: fill the parent (catalog tab); the Connect strip uses a fixed 240
+  final double? width;
+  const _ItemCard({required this.item, required this.owner, required this.ownerName, required this.openOwner, this.width = 240});
   @override
   State<_ItemCard> createState() => _ItemCardState();
 }
@@ -254,7 +267,7 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
         );
 
     return Container(
-      width: 240,
+      width: widget.width,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

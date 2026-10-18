@@ -321,12 +321,13 @@ class FeedProduct extends Product {
   String? myReaction;
   bool bookmarked, reposted;
   FeedProduct({
-    required super.id, required super.name, required super.kind, super.available, super.price, super.description, super.imageUrl, super.slug,
+    required super.id, required super.name, required super.kind, super.available, super.price, super.description, super.imageUrl, super.slug, super.category,
     this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0, this.enquiriesCount = 0, this.myReaction,
     this.bookmarked = false, this.reposted = false,
   });
   factory FeedProduct.fromJson(Map j) => FeedProduct(
         id: '${j['id']}', name: '${j['name']}', kind: '${j['kind'] ?? 'product'}', available: j['available'] != false, slug: j['slug'] as String?,
+        category: (j['category'] as String?)?.trim().isEmpty == true ? null : j['category'] as String?,
         price: j['price'] as String?, description: j['description'] as String?, imageUrl: j['imageUrl'] as String?,
         reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, repostsCount: (j['repostsCount'] as num?)?.toInt() ?? 0,
         referralsCount: (j['referralsCount'] as num?)?.toInt() ?? 0, enquiriesCount: (j['enquiriesCount'] as num?)?.toInt() ?? 0,

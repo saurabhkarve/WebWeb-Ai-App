@@ -15,6 +15,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/post_card.dart';
 import '../widgets/qr_card.dart';
+import '../widgets/catalog_strip.dart' show CatalogItemCard;
 import '../widgets/story_viewer.dart';
 import 'catalog.dart';
 import 'edit_profile.dart';
@@ -82,7 +83,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final api = _api;
     api.get('/users/${u.uid}/products').then((d) {
       if (!mounted) return;
-      setState(() => _products = (d as List).map((e) => Product.fromJson(e as Map)).toList());
+      // with the same counts and my reactions as the Connect feed (FeedProduct), for the item cards
+      setState(() => _products = (d as List).map((e) => FeedProduct.fromJson(e as Map)).toList());
       _openLinkedItem(u);
     }).catchError((_) {
       if (mounted) setState(() => _products = []);
@@ -775,7 +777,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(height: 16),
       ],
-      if (items.isNotEmpty)
+      // someone else's business: each item with the same controls as on Connect (react, refer, repost, reply, share, save)
+      if (items.isNotEmpty && !_own && context.read<AuthProvider>().profile != null)
+        LayoutBuilder(builder: (context, c) {
+          final two = c.maxWidth >= 560;
+          final w = two ? (c.maxWidth - 12) / 2 : c.maxWidth;
+          final owner = Peer(uid: u.uid, name: u.name, company: u.company, handle: u.handle, userType: u.userType, photoUrl: u.photoUrl, verification: u.verification);
+          return Wrap(spacing: 12, runSpacing: 12, children: [
+            for (final x in items)
+              if (x is FeedProduct)
+                SizedBox(
+                  width: w,
+                  child: Opacity(
+                    opacity: x.available ? 1 : .6,
+                    child: CatalogItemCard(
+                      key: ValueKey('item-${x.id}'),
+                      item: x,
+                      owner: owner,
+                      ownerName: displayName(u.userType, u.name, u.company),
+                      onOpen: () => _showItem(x, u),
+                    ),
+                  ),
+                ),
+          ]);
+        })
+      else if (items.isNotEmpty)
         GridView.count(
           crossAxisCount: cols,
           shrinkWrap: true,
