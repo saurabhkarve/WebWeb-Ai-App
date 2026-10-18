@@ -95,7 +95,7 @@ class CatalogItemCard extends StatelessWidget {
   final VoidCallback onOpen;
   const CatalogItemCard({super.key, required this.item, required this.owner, required this.ownerName, required this.onOpen});
   @override
-  Widget build(BuildContext context) => _ItemCard(item: item, owner: owner, ownerName: ownerName, openOwner: onOpen, width: null);
+  Widget build(BuildContext context) => _ItemCard(item: item, owner: owner, ownerName: ownerName, openOwner: onOpen, width: null, repost: false);
 }
 
 class _ItemCard extends StatefulWidget {
@@ -105,7 +105,9 @@ class _ItemCard extends StatefulWidget {
   final VoidCallback openOwner;
   /// null: fill the parent (catalog tab); the Connect strip uses a fixed 240
   final double? width;
-  const _ItemCard({required this.item, required this.owner, required this.ownerName, required this.openOwner, this.width = 240});
+  /// false on a business page's catalog tab
+  final bool repost;
+  const _ItemCard({required this.item, required this.owner, required this.ownerName, required this.openOwner, this.width = 240, this.repost = true});
   @override
   State<_ItemCard> createState() => _ItemCardState();
 }
@@ -393,13 +395,14 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
                 ),
               ),
               action(icon: WIcon(WI.refer, size: 20, color: p.muted), count: it.referralsCount, label: 'Refer', color: p.muted, onTap: _refer),
-              action(
-                icon: WIcon(WI.repost, size: 20, color: it.reposted ? emerald : p.muted),
-                count: it.repostsCount,
-                label: it.reposted ? 'Reposted' : 'Repost',
-                color: it.reposted ? emerald : p.muted,
-                onTap: _toggleRepost,
-              ),
+              if (widget.repost)
+                action(
+                  icon: WIcon(WI.repost, size: 20, color: it.reposted ? emerald : p.muted),
+                  count: it.repostsCount,
+                  label: it.reposted ? 'Reposted' : 'Repost',
+                  color: it.reposted ? emerald : p.muted,
+                  onTap: _toggleRepost,
+                ),
               action(icon: WIcon(WI.reply, size: 20, color: p.muted), count: it.enquiriesCount, label: 'Reply', color: p.muted, onTap: _reply),
               action(
                 icon: WIcon(WI.share, size: 20, color: p.muted),
