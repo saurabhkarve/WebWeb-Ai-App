@@ -381,7 +381,7 @@ class _MemberRow extends StatelessWidget {
               Row(children: [
                 Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
                 const SizedBox(width: 4),
-                VerifiedBadge(level: u.verification),
+                VerifiedBadge(level: u.verification, premium: u.premium),
               ]),
               Text('$sub · ${t(labelOf(kProfileCategories, u.category))} · ${u.location}',
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted)),
@@ -611,7 +611,7 @@ class _ExploreState extends State<_Explore> {
                         Row(children: [
                           Flexible(child: Text(u.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
                           const SizedBox(width: 4),
-                          VerifiedBadge(level: u.verification),
+                          VerifiedBadge(level: u.verification, premium: u.premium),
                         ]),
                         Text(
                           [u.skills.isEmpty ? t(labelOf(kProfileCategories, u.category)) : u.skills.take(3).join(' · '), u.location].where((e) => e.isNotEmpty).join(' · '),
@@ -737,7 +737,7 @@ class _BusinessCard extends StatelessWidget {
                 Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25))),
                   const SizedBox(width: 4),
-                  VerifiedBadge(level: u.verification, size: 14),
+                  VerifiedBadge(level: u.verification, premium: u.premium, size: 14),
                 ]),
                 Text([t(labelOf(kProfileCategories, u.category)), u.location].where((e) => e.isNotEmpty).join(' · '),
                     maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),

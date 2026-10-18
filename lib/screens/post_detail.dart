@@ -210,7 +210,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
                       Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.25))),
-                      if (post.authorVerification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: post.authorVerification)],
+                      if (post.authorVerification > 0 || post.authorPremium) ...[const SizedBox(width: 4), VerifiedBadge(level: post.authorVerification, premium: post.authorPremium)],
                     ]),
                     Text('${post.authorType == 'entrepreneur' ? post.authorName : post.authorCompany} · ${timeAgo(post.createdAt)}',
                         maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted, height: 1.25)),

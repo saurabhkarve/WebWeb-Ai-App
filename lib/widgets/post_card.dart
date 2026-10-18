@@ -190,7 +190,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
                       Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25))),
-                      if (post.authorVerification > 0) ...[const SizedBox(width: 6), VerifiedBadge(level: post.authorVerification)],
+                      if (post.authorVerification > 0 || post.authorPremium) ...[const SizedBox(width: 6), VerifiedBadge(level: post.authorVerification, premium: post.authorPremium)],
                       const SizedBox(width: 6),
                       Text(timeAgo(post.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
                     ]),

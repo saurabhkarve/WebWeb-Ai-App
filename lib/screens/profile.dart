@@ -254,7 +254,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text.rich(
                   TextSpan(children: [
                     TextSpan(text: displayName(u.userType, u.name, u.company)),
-                    if (u.verification > 0) WidgetSpan(alignment: PlaceholderAlignment.middle, child: Padding(padding: const EdgeInsets.only(left: 6), child: VerifiedBadge(level: u.verification, size: 20))),
+                    if (u.verification > 0 || u.premium) WidgetSpan(alignment: PlaceholderAlignment.middle, child: Padding(padding: const EdgeInsets.only(left: 6), child: VerifiedBadge(level: u.verification, premium: u.premium, size: 20))),
                   ]),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.375),
                 ),

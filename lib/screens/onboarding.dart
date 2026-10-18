@@ -163,7 +163,7 @@ class _CreateStepState extends State<_CreateStep> {
       try {
         final r = await context.read<AuthProvider>().api.get('/public/handle-check/$h') as Map;
         final st = '${r['status']}';
-        if (mounted && seq == _checkSeq) setState(() => _avail = st == 'free' || st == 'taken' || st == 'protected' ? st : 'reserved');
+        if (mounted && seq == _checkSeq) setState(() => _avail = st == 'yours' ? 'free' : st == 'free' || st == 'taken' || st == 'protected' ? st : 'reserved');
       } catch (_) {
         if (mounted && seq == _checkSeq) setState(() => _avail = 'idle'); // the server decides on submit
       }

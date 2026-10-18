@@ -70,7 +70,7 @@ String labelOf(List<Option> options, String? value) {
 }
 
 /// web verified-badge.tsx VERIFICATION_LABEL / VERIFICATION_HOW
-const kVerificationLabel = {0: 'Not verified', 1: 'Contact verified', 2: 'Documents verified', 3: 'Owner verified · Premium'};
+const kVerificationLabel = {0: 'Not verified', 1: 'Contact verified', 2: 'Documents verified', 3: 'Owner verified'};
 const kVerificationHow = {
   0: 'No verification badge yet.',
   1: 'Confirmed with a one-time code on their mobile number or email.',
@@ -121,8 +121,10 @@ class Profile {
   final List<String> services, skills;
   final int contributions;
   final int? statPosts, statShared;
-  /// 0 none, 1 mobile verified, 2 documents, 3 owner verified (premium)
+  /// 0 none, 1 mobile verified, 2 documents, 3 owner verified
   final int verification;
+  /// WEBWEB Premium: given only by an admin, shown next to the earned badge
+  final bool premium;
   /// has a live update (gold ring on the avatar)
   final bool hasUpdate;
   final DateTime createdAt;
@@ -131,7 +133,7 @@ class Profile {
     required this.uid, required this.handle, required this.name, required this.company, required this.userType,
     required this.category, required this.location, this.photoUrl, this.bannerUrl, this.gstin, this.completion, this.bio, this.experience, this.education,
     this.contactMasked, this.services = const [], this.skills = const [], this.contributions = 0,
-    this.statPosts, this.statShared, this.verification = 1, this.hasUpdate = false, required this.createdAt,
+    this.statPosts, this.statShared, this.verification = 1, this.premium = false, this.hasUpdate = false, required this.createdAt,
   });
 
   bool get isEntrepreneur => userType == 'entrepreneur';
@@ -150,7 +152,7 @@ class Profile {
       services: _strings(j['services']), skills: _strings(j['skills']),
       contributions: (j['contributions'] as num?)?.toInt() ?? (stats?['contributions'] as num?)?.toInt() ?? 0,
       statPosts: (stats?['posts'] as num?)?.toInt(), statShared: (stats?['shared'] as num?)?.toInt(),
-      verification: (j['verificationLevel'] as num?)?.toInt() ?? 1, hasUpdate: stats?['hasUpdate'] == true,
+      verification: (j['verificationLevel'] as num?)?.toInt() ?? 1, premium: j['premium'] == true, hasUpdate: stats?['hasUpdate'] == true,
       createdAt: _ms(j['createdAt']),
     );
   }
@@ -178,6 +180,7 @@ class Post {
   final String? authorPhotoUrl, title, description, category, locationPref, budget, urgency, matchReason, slug, categoryLabel;
   final String authorType;
   final int authorVerification;
+  final bool authorPremium;
   /// Metres from the viewer's area (matched feed only).
   final num? distanceM;
   /// Reach circle picked on the map, in metres.
@@ -195,7 +198,7 @@ class Post {
   Post({
     required this.id, required this.kind, required this.authorUid, required this.authorName, required this.authorCompany,
     required this.authorHandle, this.authorPhotoUrl, this.title, this.description, this.category, this.locationPref, this.budget,
-    this.urgency, this.matchReason, this.slug, this.categoryLabel, this.authorType = 'entrepreneur', this.authorVerification = 1, this.distanceM, this.radiusM, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
+    this.urgency, this.matchReason, this.slug, this.categoryLabel, this.authorType = 'entrepreneur', this.authorVerification = 1, this.authorPremium = false, this.distanceM, this.radiusM, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
     this.recentResponses = const [], this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0,
     this.reacted = false, this.reposted = false, this.bookmarked = false, this.myReaction,
   });
@@ -214,7 +217,7 @@ class Post {
         title: j['title'] as String?, description: j['description'] as String?, category: j['category'] as String?,
         locationPref: j['locationPref'] as String?, budget: j['budget'] as String?, urgency: j['urgency'] as String?,
         matchReason: j['matchReason'] as String?, slug: j['slug'] as String?, categoryLabel: j['categoryLabel'] as String?,
-        authorType: '${j['authorType'] ?? 'entrepreneur'}', authorVerification: (j['authorVerification'] as num?)?.toInt() ?? 1, distanceM: j['distanceM'] as num?, radiusM: j['radiusM'] as num?, images: _strings(j['images']), sharesCount: (j['sharesCount'] as num?)?.toInt() ?? 0,
+        authorType: '${j['authorType'] ?? 'entrepreneur'}', authorVerification: (j['authorVerification'] as num?)?.toInt() ?? 1, authorPremium: j['authorPremium'] == true, distanceM: j['distanceM'] as num?, radiusM: j['radiusM'] as num?, images: _strings(j['images']), sharesCount: (j['sharesCount'] as num?)?.toInt() ?? 0,
         authorHasUpdate: j['authorHasUpdate'] == true, createdAt: _ms(j['createdAt']),
         recentResponses: ((j['recentResponses'] as List?) ?? const []).map((e) => ResponseLog.fromJson(e as Map)).toList(),
         reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, repostsCount: (j['repostsCount'] as num?)?.toInt() ?? 0,

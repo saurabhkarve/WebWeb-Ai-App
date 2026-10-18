@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter, TextInputFormatter, TextEditingValue;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -30,6 +33,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final _experience = TextEditingController(text: widget.profile.experience ?? '');
   late final _education = TextEditingController(text: widget.profile.education ?? '');
   late final _gst = TextEditingController(text: widget.profile.gstin ?? '');
+  late final _handle = TextEditingController(text: widget.profile.handle);
+  /// idle, checking, free, yours, taken, invalid, protected, system
+  String _handleState = 'idle';
+  bool _handleBusy = false;
+  (bool, String)? _handleMsg;
+  Timer? _handleDebounce;
+  int _handleSeq = 0;
   late String _category = widget.profile.category;
   late String _location = widget.profile.location;
   bool _photoBusy = false;
@@ -122,6 +132,59 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  /// Live check of a new page link as it is typed (5 to 20 small letters or numbers).
+  void _checkHandle(String h) {
+    _handleDebounce?.cancel();
+    final seq = ++_handleSeq;
+    setState(() => _handleMsg = null);
+    final current = _auth.profile?.handle ?? widget.profile.handle;
+    if (h == current) return setState(() => _handleState = 'idle');
+    if (!RegExp(r'^[a-z0-9]{5,20}$').hasMatch(h)) return setState(() => _handleState = 'invalid');
+    setState(() => _handleState = 'checking');
+    _handleDebounce = Timer(const Duration(milliseconds: 350), () async {
+      try {
+        final r = await _auth.api.get('/public/handle-check/$h') as Map;
+        if (mounted && seq == _handleSeq) setState(() => _handleState = '${r['status']}');
+      } catch (_) {
+        if (mounted && seq == _handleSeq) setState(() => _handleState = 'idle');
+      }
+    });
+  }
+
+  /// Change the page link. The old one keeps opening the page; once a day.
+  Future<void> _saveHandle() async {
+    setState(() {
+      _handleBusy = true;
+      _handleMsg = null;
+    });
+    try {
+      await _auth.api.put('/me/handle', {'handle': _handle.text});
+      await _auth.loadProfile();
+      _changed = true;
+      if (mounted) {
+        setState(() {
+          _handleState = 'idle';
+          _handleMsg = (true, t('Your new link is webweb.ai/@{handle}. The old link keeps opening your page.', {'handle': _handle.text}));
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _handleMsg = (false, e is ApiException ? t(e.message) : '$e'));
+    } finally {
+      if (mounted) setState(() => _handleBusy = false);
+    }
+  }
+
+  String? get _handleNote => switch (_handleState) {
+        'checking' => t('Checking…'),
+        'free' => t('Available'),
+        'yours' => t('This was your earlier link. You can take it back.'),
+        'taken' => t('That link is already taken. Try another.'),
+        'invalid' => t('Use 5 to 20 letters or numbers'),
+        'protected' => t('That is a protected name (a place, an industry or an institution). Choose another.'),
+        'system' => t('That link is not available. Try another.'),
+        _ => null,
+      };
+
   Future<void> _saveGst() async {
     setState(() {
       _gstBusy = true;
@@ -143,7 +206,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   void dispose() {
-    for (final c in [_name, _company, _bio, _services, _skills, _experience, _education, _gst]) {
+    _handleDebounce?.cancel();
+    for (final c in [_name, _company, _bio, _services, _skills, _experience, _education, _gst, _handle]) {
       c.dispose();
     }
     super.dispose();
@@ -240,6 +304,57 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 16),
             AppField(controller: _name, label: t('Your name'), caps: TextCapitalization.words, maxLength: 60, onChanged: (_) => setState(() {})),
             const SizedBox(height: 16),
+            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Expanded(
+                child: AppField(
+                  controller: _handle,
+                  label: t('Page link'),
+                  prefixText: 'webweb.ai/@',
+                  maxLength: 20,
+                  keyboard: TextInputType.visiblePassword, // no autocorrect or capitals
+                  inputFormatters: [_LowerCase(), FilteringTextInputFormatter.allow(RegExp('[a-z0-9]'))],
+                  onChanged: _checkHandle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 22),
+                child: SizedBox(
+                  width: 96,
+                  child: GoldButton(
+                    label: t('Change'),
+                    outlined: true,
+                    height: 48,
+                    loading: _handleBusy,
+                    onPressed: _handleState == 'free' || _handleState == 'yours' ? _saveHandle : null,
+                  ),
+                ),
+              ),
+            ]),
+            if (_handleMsg != null || _handleNote != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  _handleMsg?.$2 ?? _handleNote!,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _handleMsg != null
+                        ? (_handleMsg!.$1 ? const Color(0xFF2F9E6E) : p.danger)
+                        : _handleState == 'free' || _handleState == 'yours'
+                            ? const Color(0xFF2F9E6E)
+                            : _handleState == 'checking'
+                                ? p.muted
+                                : p.danger,
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(t('5 to 20 small letters or numbers. You can change it once a day; the old link keeps opening your page.'),
+                  style: TextStyle(fontSize: 12, color: p.muted)),
+            ),
+            const SizedBox(height: 16),
             AppField(controller: _company, label: t('Organisation name'), caps: TextCapitalization.words, maxLength: 80),
             const SizedBox(height: 16),
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -311,7 +426,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   Row(children: [
                     Text(t('Business verification'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                     const SizedBox(width: 8),
-                    VerifiedBadge(level: me.verification, size: 20),
+                    VerifiedBadge(level: me.verification, premium: me.premium, size: 20),
                   ]),
                   const SizedBox(height: 12),
                   Text.rich(
@@ -321,7 +436,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       const TextSpan(text: '. Add your GST number to get the blue '),
                       TextSpan(text: t('Documents verified'), style: const TextStyle(fontWeight: FontWeight.w700)),
                       const TextSpan(text: ' seal. After 3 positive ratings from other members you become the gold '),
-                      TextSpan(text: t('Owner verified · Premium'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                      TextSpan(text: t('Owner verified'), style: const TextStyle(fontWeight: FontWeight.w700)),
                       const TextSpan(text: '.'),
                     ]),
                     style: TextStyle(fontSize: 14, color: p.muted, height: 1.4),
@@ -357,4 +472,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
     );
   }
+}
+
+class _LowerCase extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) => newValue.copyWith(text: newValue.text.toLowerCase());
 }

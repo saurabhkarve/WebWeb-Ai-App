@@ -5,6 +5,7 @@ import 'package:flutter/services.dart' show TextInputFormatter;
 import 'package:flutter_svg/flutter_svg.dart';
 
 import 'api.dart';
+import 'i18n.dart';
 import 'icons.dart';
 export 'icons.dart';
 import 'models.dart' show Option;
@@ -262,7 +263,13 @@ class Avatar extends StatelessWidget {
 class VerifiedBadge extends StatelessWidget {
   final int level;
   final double size;
-  const VerifiedBadge({super.key, this.level = 1, this.size = 16});
+  /// WEBWEB Premium (admin-given): its seal is shown next to the earned one
+  final bool premium;
+  const VerifiedBadge({super.key, this.level = 1, this.size = 16, this.premium = false});
+  static const _premium = '<defs><linearGradient id="p" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#fff1b0"/><stop offset=".45" stop-color="#ffc700"/><stop offset="1" stop-color="#b07f00"/></linearGradient></defs>'
+      '<path d="$_seal" fill="#1e1e1e" stroke="url(#p)" stroke-width="1.6"/>'
+      '<path d="M6.6 15.6l-1-6.6 3.7 2.9L12 6.7l2.7 5.2 3.7-2.9-1 6.6z" fill="url(#p)" stroke="url(#p)" stroke-width=".6" stroke-linejoin="round"/>'
+      '<rect x="6.6" y="16.6" width="10.8" height="1.6" rx=".8" fill="url(#p)"/>';
   static const _seal =
       'M12.00 0.85L12.72 0.97L13.41 1.32L14.03 1.80L14.59 2.32L15.13 2.77L15.69 3.08L16.31 3.26L17.01 3.32L17.78 3.35L18.56 3.45L19.29 3.69L19.88 4.12L20.31 4.71L20.55 5.44L20.65 6.22L20.68 6.99L20.74 7.69L20.92 8.31L21.23 8.87L21.68 9.41L22.20 9.97L22.68 10.59L23.03 11.28L23.15 12.00L23.03 12.72L22.68 13.41L22.20 14.03L21.68 14.59L21.23 15.13L20.92 15.69L20.74 16.31L20.68 17.01L20.65 17.78L20.55 18.56L20.31 19.29L19.88 19.88L19.29 20.31L18.56 20.55L17.78 20.65L17.01 20.68L16.31 20.74L15.69 20.92L15.13 21.23L14.59 21.68L14.03 22.20L13.41 22.68L12.72 23.03L12.00 23.15L11.28 23.03L10.59 22.68L9.97 22.20L9.41 21.68L8.87 21.23L8.31 20.92L7.69 20.74L6.99 20.68L6.22 20.65L5.44 20.55L4.71 20.31L4.12 19.88L3.69 19.29L3.45 18.56L3.35 17.78L3.32 17.01L3.26 16.31L3.08 15.69L2.77 15.13L2.32 14.59L1.80 14.03L1.32 13.41L0.97 12.72L0.85 12.00L0.97 11.28L1.32 10.59L1.80 9.97L2.32 9.41L2.77 8.87L3.08 8.31L3.26 7.69L3.32 6.99L3.35 6.22L3.45 5.44L3.69 4.71L4.12 4.12L4.71 3.69L5.44 3.45L6.22 3.35L6.99 3.32L7.69 3.26L8.31 3.08L8.87 2.77L9.41 2.32L9.97 1.80L10.59 1.32L11.28 0.97Z';
   @override
@@ -274,8 +281,14 @@ class VerifiedBadge extends StatelessWidget {
           '<path d="$_seal" fill="url(#g)" stroke="#b38600" stroke-width="0.8"/><path d="M12 6.6l1.5 3.2 3.5.4-2.6 2.4.7 3.5-3.1-1.8-3.1 1.8.7-3.5L7 10.2l3.5-.4L12 6.6z" fill="#fff" stroke="#fff" stroke-width="0.6" stroke-linejoin="round"/>',
       _ => null,
     };
+    Widget svg(String b) => SvgPicture.string('<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">$b</svg>', width: size, height: size);
+    if (premium) {
+      final seal = Tooltip(message: t('WEBWEB Premium'), child: svg(_premium));
+      if (body == null) return seal;
+      return Row(mainAxisSize: MainAxisSize.min, children: [svg(body), SizedBox(width: size * .18), seal]);
+    }
     if (body == null) return const SizedBox.shrink();
-    return SvgPicture.string('<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">$body</svg>', width: size, height: size);
+    return svg(body);
   }
 }
 
