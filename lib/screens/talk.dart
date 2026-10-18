@@ -550,7 +550,37 @@ class _ChatThreadState extends State<ChatThread> {
     _poll = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!_rt.connected) _loadNew();
       _loadReactions();
+      _syncReceipts();
     });
+  }
+
+  /// Receipts that arrived before the send request returned the message's real id.
+  final Map<int, String> _early = {};
+
+  /// Ticks of my sent messages from the server, for any delivered / read event this phone missed
+  /// (socket down, app in the background). Only while something of mine is not read yet.
+  Future<void> _syncReceipts() async {
+    if (!_msgs.any((m) => m.senderUid == _me && !m.pending && m.readAt == null)) return;
+    try {
+      final r = Map<String, dynamic>.from(await _api.get('/chats/${widget.chatId}/receipts') as Map);
+      if (!mounted) return;
+      DateTime? at(dynamic v) => v == null ? null : DateTime.fromMillisecondsSinceEpoch((v as num).toInt());
+      var changed = false;
+      for (final m in _msgs) {
+        final x = r['${m.id}'];
+        if (x is! Map) continue;
+        final d = at(x['deliveredAt']), rd = at(x['readAt']);
+        if (m.deliveredAt == null && d != null) {
+          m.deliveredAt = d;
+          changed = true;
+        }
+        if (m.readAt == null && rd != null) {
+          m.readAt = rd;
+          changed = true;
+        }
+      }
+      if (changed) setState(() {});
+    } catch (_) {}
   }
 
   int get _lastId => _msgs.where((m) => !m.pending).fold(0, (a, m) => m.id > a ? m.id : a);
@@ -612,26 +642,23 @@ class _ChatThreadState extends State<ChatThread> {
         if (m.senderUid != _me) _markRead();
         _toBottom();
         break;
-      case 'delivered':
-        if (e['chatId'] != widget.chatId) return;
-        final ids = ((e['ids'] as List?) ?? []).map((x) => (x as num).toInt()).toSet();
-        setState(() {
-          for (final m in _msgs) {
-            if (ids.contains(m.id)) m.deliveredAt ??= DateTime.now();
-          }
-        });
+      case 'hello':
+        // reconnected: catch up on ticks that changed while the socket was down
+        _syncReceipts();
         break;
+      case 'delivered':
       case 'read':
         if (e['chatId'] != widget.chatId) return;
         final ids = ((e['ids'] as List?) ?? []).map((x) => (x as num).toInt()).toSet();
         setState(() {
           for (final m in _msgs) {
-            if (ids.contains(m.id)) {
-              m.readAt ??= DateTime.now();
-              m.deliveredAt ??= DateTime.now();
-            }
+            if (ids.remove(m.id)) _applyReceipt(m, e['type'] as String);
           }
         });
+        // not on screen yet: the send request has not returned this message's id
+        for (final id in ids) {
+          if (_early[id] != 'read') _early[id] = e['type'] as String;
+        }
         break;
       case 'typing':
         if (e['from'] != _peer.uid) return;
@@ -647,6 +674,11 @@ class _ChatThreadState extends State<ChatThread> {
         _toBottom();
         break;
     }
+  }
+
+  void _applyReceipt(Msg m, String kind) {
+    m.deliveredAt ??= DateTime.now();
+    if (kind == 'read') m.readAt ??= DateTime.now();
   }
 
   /// Sends the composer text (with the waiting attachment), or a photo / attachment from the sheet.
@@ -678,6 +710,8 @@ class _ChatThreadState extends State<ChatThread> {
         if (reply != null) 'replyToId': reply.id,
       }) as Map);
       if (!mounted) return;
+      final early = _early.remove(sent.id);
+      if (early != null) _applyReceipt(sent, early);
       setState(() => _msgs = [for (final m in _msgs) m.tmpId == tmp ? sent : m]);
     } catch (e) {
       if (!mounted) return;

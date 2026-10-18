@@ -1,6 +1,7 @@
 import Flutter
 import PushKit
 import UIKit
+import UserNotifications
 import flutter_callkit_incoming
 
 @main
@@ -16,6 +17,12 @@ import flutter_callkit_incoming
     registry.delegate = self
     registry.desiredPushTypes = [.voIP]
     voipRegistry = registry
+    // With the implicit engine, plugins are registered after launch, so firebase_messaging and
+    // flutter_local_notifications miss this callback: claim the notification delegate (FlutterAppDelegate
+    // forwards it to them, so taps and foreground pushes reach Dart) and ask for the APNs token here,
+    // which Firebase needs before it hands out the FCM token used for message notifications.
+    UNUserNotificationCenter.current().delegate = self
+    application.registerForRemoteNotifications()
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 

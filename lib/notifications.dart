@@ -94,6 +94,8 @@ class NotificationService with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
+    // a registration that failed (no APNs token yet, offline) is retried whenever the app comes back
+    if (_foreground && _registeredFor == null) register();
   }
 
   /// Asks for notification permission once the person is signed in and has a profile
@@ -135,7 +137,7 @@ class NotificationService with WidgetsBindingObserver {
       await _askPermission();
       // iOS hands out an FCM token only after APNs has registered the device.
       if (_ios) {
-        for (var i = 0; i < 10 && await FirebaseMessaging.instance.getAPNSToken() == null; i++) {
+        for (var i = 0; i < 20 && await FirebaseMessaging.instance.getAPNSToken() == null; i++) {
           await Future.delayed(const Duration(milliseconds: 500));
         }
       }
