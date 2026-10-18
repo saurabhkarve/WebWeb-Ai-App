@@ -18,8 +18,7 @@ val keystoreProps = Properties().apply {
 
 android {
     namespace = "ai.webweb.app"
-    // permission_handler_android 14.1 is built against Android 37; target stays at Flutter's default
-    compileSdk = maxOf(flutter.compileSdkVersion, 37)
+    compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

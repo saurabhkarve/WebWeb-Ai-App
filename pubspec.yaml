@@ -27,7 +27,8 @@ dependencies:
   image_picker: ^1.2.4
   package_info_plus: ^10.2.2
   path_provider: ^2.1.6
-  permission_handler: ^13.0.2
+  # 12.x: 13.x pulls permission_handler_android 14.1, built against Android 37, which Codemagic cannot resolve yet
+  permission_handler: ^12.0.1
   provider: ^6.1.2
   qr: ^4.0.0
   share_plus: ^13.3.1
