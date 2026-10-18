@@ -135,3 +135,9 @@ its build triggers, so tags do not start builds there.
 
 Tag the commit `v<version>` (e.g. `v0.2.0`) and push the tag. The tag becomes the version name, which the stores
 and the in-app update prompt (Admin > App updates on the website) compare. Raise it for every release.
+
+## Crash reports (Crashlytics)
+The app reports crashes to Firebase Crashlytics (project `webweb-ai-app`), including native Android and iOS crashes, and Flutter errors also go to our own Admin > Crashes.
+- Android: the Crashlytics Gradle plugin adds what it needs at build time. Nothing to set up.
+- iOS: the **Crashlytics symbols (dSYMs)** step uploads the debug symbols after the IPA is built, so iOS crashes show file and line. If it cannot upload, the build still succeeds.
+- In the Firebase console, open **Crashlytics** once. Crashes show up there after the first crash from a release build. Debug builds never report.

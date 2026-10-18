@@ -4,6 +4,8 @@ plugins {
     id("com.android.application")
     // Reads google-services.json (Firebase project webweb-ai).
     id("com.google.gms.google-services")
+    // Crashlytics: adds the build id the SDK needs and uploads symbols for native crash stacks.
+    id("com.google.firebase.crashlytics")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }

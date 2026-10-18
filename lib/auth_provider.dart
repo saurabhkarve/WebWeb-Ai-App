@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
+import 'crash_reporter.dart';
 import 'offline_cache.dart';
 import 'outbox.dart';
 import 'models.dart';
@@ -45,6 +46,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final d = await api.get('/me') as Map;
       userId = d['user']?['id'] as String?;
+      CrashReporter.setUser(userId);
       final ph = '${d['user']?['phone'] ?? ''}'.replaceAll(RegExp(r'\D'), '');
       if (ph.length >= 10) phone = ph.substring(ph.length - 10);
       accountEmail = d['user']?['email'] as String?;
@@ -149,6 +151,7 @@ class AuthProvider extends ChangeNotifier {
     }
     token = null;
     userId = null;
+    CrashReporter.setUser(null);
     profile = null;
     profileLoaded = false;
     otpSent = false;

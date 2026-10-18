@@ -2,13 +2,17 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
+import 'notifications.dart' show initFirebase;
 
-/// Automatic crash and error reports, to our own API (POST /crash; Admin > Crashes groups them).
+/// Automatic crash and error reports, to two places:
+/// - Firebase Crashlytics (phones): also native Android / iOS crashes, symbolicated, with crash-free stats.
+/// - our own API (POST /crash; Admin > Crashes groups them), next to the website's errors.
 /// Catches what Flutter catches: build / layout / paint errors (FlutterError.onError) and every uncaught
 /// async error (PlatformDispatcher.onError). Reports are queued on the phone first, so a crash while
 /// offline, or one that closes the app, is sent on the next start. Each distinct error is sent once per
@@ -23,18 +27,34 @@ class CrashReporter {
   static Timer? _flushTimer;
   static bool _flushing = false;
 
+  static bool _crashlytics = false;
+  static bool get _phone => !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
+
+  /// Signed in: crashes in Crashlytics carry the member id (no name or number), so a report can be traced.
+  static void setUser(String? uid) {
+    if (_crashlytics) FirebaseCrashlytics.instance.setUserIdentifier(uid ?? '').catchError((_) {});
+  }
+
   static void init(Api api) {
     _api = api;
+    if (_phone) {
+      initFirebase().then((_) async {
+        await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
+        _crashlytics = true;
+      }).catchError((_) {});
+    }
     final previous = FlutterError.onError;
     FlutterError.onError = (details) {
       previous?.call(details);
       if (details.silent) return;
+      if (_crashlytics) FirebaseCrashlytics.instance.recordFlutterError(details).catchError((_) {});
       report(details.exception, details.stack, context: {
         if (details.library != null) 'library': details.library!,
         if (details.context != null) 'while': details.context.toString().replaceAll('\n', ' '),
       });
     };
     PlatformDispatcher.instance.onError = (error, stack) {
+      if (_crashlytics) FirebaseCrashlytics.instance.recordError(error, stack, fatal: true).catchError((_) {});
       report(error, stack, fatal: true);
       return true; // handled: logged and reported, the app keeps running where it can
     };

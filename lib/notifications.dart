@@ -473,7 +473,15 @@ Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
 /// Android reads android/app/google-services.json. iOS takes its Firebase app from build-time
 /// --dart-define values (set in Codemagic), so no GoogleService-Info.plist has to be added to Xcode;
 /// without them it falls back to a GoogleService-Info.plist in the Runner target.
-Future<void> initFirebase() async {
+Future<void>? _firebaseInit;
+
+/// Safe to call from several places at once (notifications, crash reporting): one initialisation.
+Future<void> initFirebase() => _firebaseInit ??= _initFirebase().catchError((Object e) {
+      _firebaseInit = null; // let a later call try again
+      throw e;
+    });
+
+Future<void> _initFirebase() async {
   if (Firebase.apps.isNotEmpty) return;
   const iosAppId = String.fromEnvironment('FIREBASE_IOS_APP_ID');
   if (defaultTargetPlatform == TargetPlatform.iOS && iosAppId.isNotEmpty) {

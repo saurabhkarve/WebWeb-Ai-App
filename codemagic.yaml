@@ -187,6 +187,14 @@ workflows:
             --dart-define=FIREBASE_IOS_APP_ID=$FIREBASE_IOS_APP_ID \
             --dart-define=FIREBASE_SENDER_ID=$FIREBASE_SENDER_ID \
             --dart-define=FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID
+      # Crashlytics needs the debug symbols to turn iOS crash addresses into file and line;
+      # a failed upload never fails the build (crashes still arrive, only without symbols)
+      - name: Crashlytics symbols (dSYMs)
+        script: |
+          UP=$(find ios/Pods -name upload-symbols -type f 2>/dev/null | head -1)
+          [ -z "$UP" ] && UP=$(find "$HOME/Library/Developer/Xcode/DerivedData" -path '*rashlytics*' -name upload-symbols -type f 2>/dev/null | head -1)
+          if [ -z "$UP" ]; then echo "upload-symbols not found, skipping"; exit 0; fi
+          "$UP" -gsp /tmp/gsi.plist -p ios build/ios/archive/Runner.xcarchive/dSYMs || echo "dSYM upload failed"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
