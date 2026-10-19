@@ -456,7 +456,8 @@ class _AskFormState extends State<_AskForm> {
     });
     try {
       final r = await context.read<AuthProvider>().api.post('/ai/polish-ask', {'title': _title.text.trim(), 'description': _desc.text.trim(), 'category': _category}) as Map;
-      if (mounted) setState(() => _aiDraft = {'title': '${r['title'] ?? ''}', 'description': '${r['description'] ?? ''}'});
+      // kept: an Indian language (never given to AI) or AI would have translated it; only spacing was tidied
+      if (mounted) setState(() => _aiDraft = {'title': '${r['title'] ?? ''}', 'description': '${r['description'] ?? ''}', if (r['kept'] == true) 'kept': '1'});
     } catch (e) {
       if (mounted) setState(() => _aiError = '$e'.isEmpty ? t('AI could not polish this right now. Try again.') : '$e');
     } finally {
@@ -591,8 +592,13 @@ class _AskFormState extends State<_AskForm> {
         Row(children: [
           WIcon(WI.sparkle, size: 14, color: p.tagText),
           const SizedBox(width: 6),
-          Text(t('AI suggestion').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.tagText)),
+          Text(t(d['kept'] != null ? 'Tidied' : 'AI suggestion').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.tagText)),
         ]),
+        if (d['kept'] != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(t('Your words are kept as you wrote them, in your language. Only spacing was tidied.'), style: TextStyle(fontSize: 12, color: p.muted)),
+          ),
         const SizedBox(height: 6),
         Text(d[field]!, style: field == 'title' ? const TextStyle(fontSize: 15, fontWeight: FontWeight.w700) : TextStyle(fontSize: 14, color: p.text.withValues(alpha: .8))),
         const SizedBox(height: 10),
@@ -799,6 +805,8 @@ class _AskFormState extends State<_AskForm> {
         ],
         if (_aiError != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_aiError!, style: TextStyle(fontSize: 12, color: p.danger))),
         const SizedBox(height: 12),
+        Text(t('Write in your own language: हिंदी, मराठी, ગુજરાતી, English or any other. It is posted as you write it.'), style: TextStyle(fontSize: 12, color: p.muted)),
+        const SizedBox(height: 4),
         _fieldActions(p, 'title'),
         TextField(
           key: Tours.key('ask-title'),

@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'api.dart';
 import 'i18n.dart';
 import 'icons.dart';
+import 'indic.dart';
 export 'icons.dart';
 import 'models.dart' show Option;
 import 'theme.dart';
@@ -162,8 +163,10 @@ double islandSpace(BuildContext context) => 100 + MediaQuery.of(context).padding
 String initials(String name) {
   final parts = name.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
   if (parts.isEmpty) return '?';
-  if (parts.length == 1) return parts[0].substring(0, math.min(2, parts[0].length)).toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
+  // a whole letter with its vowel sign in Indian scripts (रा, not र)
+  if (hasIndic(parts[0])) return parts.take(2).map(firstLetter).join();
+  if (parts.length == 1) return parts[0].characters.take(2).toString().toUpperCase();
+  return (firstLetter(parts[0]) + firstLetter(parts[1])).toUpperCase();
 }
 
 /// "5m ago", "3h ago", "2d ago". Accepts a DateTime or an ISO-8601 string.

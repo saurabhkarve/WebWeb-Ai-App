@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../api.dart';
 import '../auth_provider.dart';
 import '../i18n.dart';
+import '../indic.dart';
 import '../location.dart';
 import '../models.dart';
 import '../theme.dart';
@@ -17,9 +18,13 @@ import '../widgets/picture_picker.dart';
 
 /// Handles the API will refuse; checked here too so the message shows while typing.
 const _reserved = {'admin', 'api', 'talk', 'ask', 'find', 'chat', 'post', 'profile', 'login', 'onboarding', 'update', 'u', 'me', 'saved', 'features', 'webweb', 'support', 'help'};
-String _slug(String s) {
-  final out = s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '');
-  return out.length > 20 ? out.substring(0, 20) : out;
+/// Letters and digits for the page link; a name in an Indian script is spelled in Latin letters.
+String _slug(String s) => linkSlug(s);
+
+/// The link made from a name ("राम" → "rambiz"): at least 5 letters, as links need.
+String _linkFromName(String s) {
+  final l = linkSlug(s);
+  return l.isNotEmpty && l.length < 5 ? '${l}biz' : l;
 }
 
 const _green = Color(0xFF2F9E6B);
@@ -149,7 +154,7 @@ class _CreateStepState extends State<_CreateStep> {
   }
 
   void _nameChanged(String v) {
-    if (!_handleTouched) _setHandle(_slug(v));
+    if (!_handleTouched) _setHandle(_linkFromName(v));
     setState(() {});
   }
 
@@ -276,6 +281,8 @@ class _CreateStepState extends State<_CreateStep> {
           decoration: deco(t('e.g. Rahul Sharma')).copyWith(counterText: ''),
         ),
       ),
+      const SizedBox(height: 6),
+      Text(t('In any language: हिंदी, मराठी, ગુજરાતી, English…'), style: TextStyle(fontSize: 12, color: Pal.of(context).muted)),
       const SizedBox(height: 20),
       Text(t('Your page link'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
       const SizedBox(height: 6),
