@@ -111,6 +111,17 @@ class Completion {
   }
 }
 
+/// A UPI ID on a member's page (web UpiId).
+class UpiId {
+  final String id, vpa;
+  final bool isDefault;
+  /// the account holder's name as the bank holds it, when the UPI ID was verified (Razorpay)
+  final String? verifiedName;
+  const UpiId({required this.id, required this.vpa, this.isDefault = false, this.verifiedName});
+  factory UpiId.fromJson(Map j) =>
+      UpiId(id: '${j['id']}', vpa: '${j['vpa']}', isDefault: j['isDefault'] == true, verifiedName: j['verifiedName'] as String?);
+}
+
 class Profile {
   final String uid, handle, name, company, userType, category, location;
   final String? photoUrl, bannerUrl, bio, experience, education, contactMasked;
@@ -127,13 +138,15 @@ class Profile {
   final bool premium;
   /// has a live update (gold ring on the avatar)
   final bool hasUpdate;
+  /// UPI IDs linked to the page, the default first
+  final List<UpiId> upi;
   final DateTime createdAt;
 
   const Profile({
     required this.uid, required this.handle, required this.name, required this.company, required this.userType,
     required this.category, required this.location, this.photoUrl, this.bannerUrl, this.gstin, this.completion, this.bio, this.experience, this.education,
     this.contactMasked, this.services = const [], this.skills = const [], this.contributions = 0,
-    this.statPosts, this.statShared, this.verification = 1, this.premium = false, this.hasUpdate = false, required this.createdAt,
+    this.statPosts, this.statShared, this.verification = 1, this.premium = false, this.hasUpdate = false, this.upi = const [], required this.createdAt,
   });
 
   bool get isEntrepreneur => userType == 'entrepreneur';
@@ -153,6 +166,7 @@ class Profile {
       contributions: (j['contributions'] as num?)?.toInt() ?? (stats?['contributions'] as num?)?.toInt() ?? 0,
       statPosts: (stats?['posts'] as num?)?.toInt(), statShared: (stats?['shared'] as num?)?.toInt(),
       verification: (j['verificationLevel'] as num?)?.toInt() ?? 1, premium: j['premium'] == true, hasUpdate: stats?['hasUpdate'] == true,
+      upi: [for (final u in (j['upi'] as List?) ?? const []) UpiId.fromJson(u as Map)],
       createdAt: _ms(j['createdAt']),
     );
   }

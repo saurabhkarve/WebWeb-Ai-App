@@ -27,6 +27,7 @@ import 'talk.dart';
 import '../share_log.dart';
 import '../widgets/picture_picker.dart';
 import '../widgets/resume.dart';
+import '../widgets/upi.dart';
 
 /// One profile for everyone (web profile-view.tsx): your own page ([handle] == null) and any member's.
 /// Cover band with the back arrow, picture, one quiet stats line, name, tags, then the actions and
@@ -468,6 +469,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
             bg: kGold.withValues(alpha: .15),
             fg: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00),
             onTap: () => launchUrl(Uri.parse('https://services.gst.gov.in/services/searchtp'), mode: LaunchMode.externalApplication),
+          ),
+        // UPI IDs: tap one for its QR and to pay in a UPI app
+        ...upiChips(context, u, displayName(u.userType, u.name, u.company)),
+        if (own && u.upi.isEmpty)
+          GestureDetector(
+            onTap: () async {
+              if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: u, tab: 'upi'))) == true && mounted) {
+                context.read<AuthProvider>().loadProfile();
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(border: Border.all(color: p.border), borderRadius: BorderRadius.circular(20)),
+              child: Text('+ ${t('Add UPI ID')}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
+            ),
           ),
       ]),
     );

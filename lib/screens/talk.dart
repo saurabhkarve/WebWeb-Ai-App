@@ -24,6 +24,7 @@ import '../widgets.dart';
 import '../widgets/active_call_banner.dart';
 import '../widgets/connection_pill.dart';
 import '../widgets/image_grid.dart';
+import '../widgets/upi.dart';
 import 'contact_picker.dart';
 import 'post_detail.dart';
 import 'profile.dart';
@@ -106,6 +107,7 @@ String quoteText(String text, String kind) {
     'post' => '↩ About a post',
     'item' => '🛍 Item enquiry',
     'cart' => '🛒 Cart',
+    'upi' => '₹ UPI payment',
     'image' => '📷 Photo',
     _ => '',
   };
@@ -1184,6 +1186,8 @@ class _ChatThreadState extends State<ChatThread> {
           ),
         );
     switch (a['type']) {
+      case 'upi':
+        return UpiCard(a: a, mine: mine, fg: fg, bg: boxColor);
       case 'post':
         return box(
           goldEdge: true,
@@ -1628,7 +1632,7 @@ class _AttachSheetState extends State<_AttachSheet> {
       padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 24),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Expanded(child: Text(t(_mode == 'menu' ? 'Share' : 'Share a contact'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+          Expanded(child: Text(t(_mode == 'menu' ? 'Share' : _mode == 'upi' ? 'Get paid by UPI' : 'Share a contact'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
           GestureDetector(onTap: () => Navigator.pop(context), child: WIcon(WI.close, size: 24, color: p.text)),
         ]),
         const SizedBox(height: 12),
@@ -1645,7 +1649,14 @@ class _AttachSheetState extends State<_AttachSheet> {
               const SizedBox(width: 12),
               Expanded(child: tile(WI.refer, 'Contact', 'contact', 'Sending…', () => setState(() => _mode = 'contact'))),
             ]),
+            const SizedBox(height: 12),
+            tile(WI.rupee, 'UPI payment', 'upi', 'Sending…', () => setState(() => _mode = 'upi')),
           ])
+        else if (_mode == 'upi')
+          UpiRequestForm(
+            onBack: () => setState(() => _mode = 'menu'),
+            onSend: (att) => _run('upi', () => widget.onSend(attachment: att)),
+          )
         else ...[
           if (auth.phone.length == 10 && auth.profile != null) ...[
             GoldButton(

@@ -15,6 +15,7 @@ import 'account_settings.dart';
 import 'catalog.dart';
 import '../widgets/picture_picker.dart';
 import '../widgets/resume.dart';
+import '../widgets/upi.dart';
 
 /// Edit profile (web profile/edit): cover, photo, name, organisation, sector, location, about, then
 /// services (business) or skills / experience / education (job seeker), GST verification and the catalog.
@@ -211,8 +212,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       child: SubPage(
         title: t('Edit profile'),
         body: DefaultTabController(
-          length: job ? 2 : 3,
-          initialIndex: widget.tab == 'account' ? (job ? 1 : 2) : 0,
+          length: job ? 3 : 4,
+          initialIndex: switch (widget.tab) { 'account' => job ? 2 : 3, 'upi' => job ? 1 : 2, _ => 0 },
           child: Column(children: [
             TabBar(
               isScrollable: true,
@@ -221,7 +222,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               unselectedLabelColor: p.muted,
               indicatorColor: p.text,
               labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-              tabs: [Tab(text: t('Profile')), if (!job) Tab(text: t('Business')), Tab(text: t('Account and privacy'))],
+              tabs: [Tab(text: t('Profile')), if (!job) Tab(text: t('Business')), Tab(text: t('UPI')), Tab(text: t('Account and privacy'))],
             ),
             Expanded(
               child: TabBarView(children: [
@@ -449,6 +450,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogScreen())),
                       ),
                     ),
+                  ],
+                ),
+                // ---- UPI IDs on the page ----
+                ListView(
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 32),
+                  children: [
+                    Text(t('UPI IDs'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    Text(t('Get paid straight to your bank. Add one or more UPI IDs and pick the one to show first.'), style: TextStyle(fontSize: 14, color: p.muted, height: 1.4)),
+                    const SizedBox(height: 12),
+                    UpiManager(onChanged: () => _changed = true),
                   ],
                 ),
                 const AccountSettingsTab(),
