@@ -30,7 +30,7 @@ class _PicturePicker extends StatefulWidget {
 }
 
 class _PicturePickerState extends State<_PicturePicker> {
-  Map? _data; // {current, mine: [{url, current}], presets: [{name, url, current}]}
+  Map? _data; // {current, mine: [{url, current}], suggested: [{url, current}], presets: [{name, url, current}]}
   String? _busy; // the url being applied, 'upload' or 'remove'
   String? _error;
 
@@ -155,6 +155,8 @@ class _PicturePickerState extends State<_PicturePicker> {
     final d = _data;
     final mine = ((d?['mine'] as List?) ?? const []).cast<Map>();
     final presets = ((d?['presets'] as List?) ?? const []).cast<Map>();
+    // the ten made for this member's role and category
+    final suggested = ((d?['suggested'] as List?) ?? const []).cast<Map>();
     Widget grid(List<Widget> tiles) => GridView.count(
           crossAxisCount: _cover ? 2 : 4,
           shrinkWrap: true,
@@ -182,6 +184,10 @@ class _PicturePickerState extends State<_PicturePicker> {
           if (mine.isNotEmpty) ...[
             heading(t(_cover ? 'Your earlier covers' : 'Your earlier photos')),
             grid([for (final m in mine) _tile(p, '${m['url']}', m['current'] == true, true)]),
+          ],
+          if (suggested.isNotEmpty) ...[
+            heading(t('Picked for you')),
+            grid([for (final m in suggested) _tile(p, '${m['url']}', m['current'] == true, false)]),
           ],
           if (_cover && presets.isNotEmpty) ...[
             heading(t('WEBWEB designs')),

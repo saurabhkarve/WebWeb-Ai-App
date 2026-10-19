@@ -12,6 +12,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/image_cropper.dart';
+import '../widgets/picture_picker.dart';
 
 /// Handles the API will refuse; checked here too so the message shows while typing.
 const _reserved = {'admin', 'api', 'talk', 'ask', 'find', 'chat', 'post', 'profile', 'login', 'onboarding', 'update', 'u', 'me', 'saved', 'features', 'webweb', 'support', 'help'};
@@ -377,15 +378,77 @@ class _BoostStepState extends State<_BoostStep> {
 
   bool get _isJob => _profile.userType == 'job_seeker';
 
+  /// A starter picture picked at sign-up for the member's role and category (not their own photo yet).
+  static bool _starter(String? url) => (url ?? '').startsWith('/defaults/');
+
   bool _done(String k, [Profile? pr]) {
     final x = pr ?? _profile;
     return switch (k) {
-      'photo' => (x.photoUrl ?? '').isNotEmpty,
+      'photo' => (x.photoUrl ?? '').isNotEmpty && !_starter(x.photoUrl),
       'company' => x.company.isNotEmpty,
       'category' => x.category.isNotEmpty,
       'location' => x.location.isNotEmpty && _gps,
       _ => (x.bio ?? '').isNotEmpty,
     };
+  }
+
+  /// Change the photo or cover in the picker, then show what was chosen (straight from GET /me: reloading the
+  /// account here would end onboarding).
+  Future<void> _change(String kind) async {
+    if (!await showPicturePicker(context, kind) || !mounted) return;
+    try {
+      final d = await context.read<AuthProvider>().api.get('/me') as Map;
+      if (mounted && d['profile'] != null) setState(() => _profile = Profile.fromJson(d['profile'] as Map));
+    } catch (_) {}
+  }
+
+  /// The photo and cover picked at sign-up: change either now, or keep them and carry on.
+  Widget _look(Pal p) {
+    final photo = _profile.photoUrl ?? '', cover = _profile.bannerUrl ?? '';
+    final starter = _starter(photo) || _starter(cover);
+    Widget btn(String label, String kind) => Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () => _change(kind),
+            icon: const Icon(Icons.photo_camera_outlined, size: 18),
+            label: Text(t(label), style: const TextStyle(fontWeight: FontWeight.w700)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: p.text,
+              side: BorderSide(color: p.border),
+              minimumSize: const Size.fromHeight(42),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+            ),
+          ),
+        );
+    return Container(
+      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Stack(clipBehavior: Clip.none, children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+            child: AspectRatio(aspectRatio: 3, child: cover.isEmpty ? ColoredBox(color: p.chip) : NetImg(smallImage(cover))),
+          ),
+          if (photo.isNotEmpty)
+            Positioned(
+              left: 14,
+              bottom: -30,
+              child: Container(
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: p.card, width: 4)),
+                child: ClipOval(child: SizedBox(width: 64, height: 64, child: NetImg(smallImage(photo)))),
+              ),
+            ),
+        ]),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 38, 14, 14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(t(starter ? 'We picked a photo and cover for you' : 'Your photo and cover'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 2),
+            Text(t('Change them now or keep them. You can change them any time from your page.'), style: TextStyle(fontSize: 13, color: p.muted)),
+            const SizedBox(height: 12),
+            Row(children: [btn('Change photo', 'avatar'), const SizedBox(width: 8), btn('Change cover', 'cover')]),
+          ]),
+        ),
+      ]),
+    );
   }
 
   int _weight(String k) {
@@ -596,6 +659,10 @@ class _BoostStepState extends State<_BoostStep> {
           const SizedBox(height: 4),
           Text('@${_profile.handle} · ${t('Allow your location to continue. The rest is optional and earns badges.')}', style: TextStyle(fontSize: 14, color: p.muted)),
           const SizedBox(height: 20),
+          if ((_profile.photoUrl ?? '').isNotEmpty || (_profile.bannerUrl ?? '').isNotEmpty) ...[
+            _look(p),
+            const SizedBox(height: 16),
+          ],
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),

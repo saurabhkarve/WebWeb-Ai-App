@@ -132,8 +132,8 @@ String mediaUrl(String path) {
 /// The small copy of a profile photo (160px) or cover (750px) that the server keeps next to the large one
 /// (av-x.jpg -> av-x_160.jpg); any other URL (older uploads, other sites) comes back unchanged.
 String smallImage(String url) {
-  // our uploads (av- photo, cv- cover) and WEBWEB's cover designs (/covers/…)
-  final m = RegExp(r'(?:/uploads/(av|cv)-[\w-]+|^/covers/[\w-]+)\.jpg$').firstMatch(url);
+  // our uploads (av- photo, cv- cover), the starter pictures (/defaults/av|cv/…) and WEBWEB's cover designs (/covers/…)
+  final m = RegExp(r'(?:/uploads/(av|cv)-[\w-]+|^/defaults/(av|cv)/[\w-]+|^/covers/[\w-]+)\.jpg$').firstMatch(url);
   if (m == null) return url;
-  return url.replaceFirst(RegExp(r'\.jpg$'), m.group(1) == 'av' ? '_160.jpg' : '_750.jpg');
+  return url.replaceFirst(RegExp(r'\.jpg$'), (m.group(1) ?? m.group(2)) == 'av' ? '_160.jpg' : '_750.jpg');
 }
