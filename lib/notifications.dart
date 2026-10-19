@@ -48,6 +48,7 @@ class NotificationService with WidgetsBindingObserver {
   bool _asked = false; // notification permission requested this run
   bool _foreground = true;
   String? _registeredFor; // auth token the FCM token was last sent with
+  DateTime? _registeredAt; // when it was last sent
   String? _fcmToken;
   final Map<String, String> _names = {};
 
@@ -100,8 +101,13 @@ class NotificationService with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
-    // a registration that failed (no APNs token yet, offline) is retried whenever the app comes back
-    if (_foreground && _registeredFor == null) register();
+    // a registration that failed (no APNs token yet, offline) is retried whenever the app comes back, and the token
+    // is sent again at most hourly so a server that lost it (a cleanup, a restore) gets it back on the next open
+    if (!_foreground) return;
+    if (_registeredFor != null && _registeredAt != null && DateTime.now().difference(_registeredAt!) > const Duration(hours: 1)) {
+      _registeredFor = null;
+    }
+    if (_registeredFor == null) register();
   }
 
   /// Asks for notification permission once the person is signed in and has a profile
@@ -151,6 +157,7 @@ class NotificationService with WidgetsBindingObserver {
       if (_fcmToken == null) return;
       await auth.api.post('/app/push/token', {'token': _fcmToken, 'platform': _ios ? 'ios' : 'android'});
       _registeredFor = auth.token;
+      _registeredAt = DateTime.now();
       await _registerVoip();
       await NativeCalls.requestPermissions();
     } catch (e) {
@@ -285,7 +292,7 @@ class NotificationService with WidgetsBindingObserver {
       }
       var chatId = '${d['chatId'] ?? ''}';
       if (chatId.isEmpty && path.startsWith('/chat/')) chatId = path.substring(6);
-      if (chatId.isEmpty && d['from'] != null) chatId = (await auth.api.post('/chats', {'userId': d['from']}) as Map)['id'] as String;
+      if (chatId.isEmpty && _sender(d) != null) chatId = (await auth.api.post('/chats', {'userId': _sender(d)}) as Map)['id'] as String;
       if (chatId.isEmpty || activeChat == chatId) return;
       final c = ChatSummary.fromJson(await auth.api.get('/chats/$chatId') as Map, auth.profile!.uid);
       nv.push(MaterialPageRoute(builder: (_) => ChatThread(chatId: chatId, peer: c.peer)));
@@ -406,7 +413,7 @@ Future<void> showActivity(Map<String, dynamic> d, {required String title, requir
   }
   const asks = {'ask_response', 'ask_referral', 'share_asked', 'share_answered', 'contact_request', 'item_referral', 'ask_match'};
   final details = kind == 'missed_call' ? _messageDetails : (asks.contains(kind) ? _asksDetails : _activityDetails);
-  final key = '${d['postId'] ?? d['productId'] ?? d['storyId'] ?? d['from'] ?? d['nid'] ?? title}$kind';
+  final key = '${d['postId'] ?? d['productId'] ?? d['storyId'] ?? _sender(d) ?? d['nid'] ?? title}$kind';
   await _local.show(
     id: key.hashCode & 0x7fffffff,
     title: title,
@@ -443,6 +450,9 @@ Future<void> showIncomingCall({required String callId, required String from, req
   );
 }
 
+/// The sender's id in a push: Firebase reserves the key `from`, so the API sends `fromUid` (older servers sent `from`).
+Object? _sender(Map<String, dynamic> d) => d['fromUid'] ?? d['from'];
+
 /// Data-only call pushes (works in both the main and the background isolate): ring through the phone's
 /// own call UI, or stop it when the caller hung up / it was answered elsewhere.
 Future<void> handleCallData(Map<String, dynamic> d) async {
@@ -453,12 +463,12 @@ Future<void> handleCallData(Map<String, dynamic> d) async {
           id: '${d['callId']}',
           name: '${d['name'] ?? 'Someone'}',
           video: d['video'] == 'true',
-          from: '${d['from'] ?? ''}',
+          from: '${_sender(d) ?? ''}',
           handle: '${d['handle'] ?? ''}',
           photo: '${d['photo'] ?? ''}',
         );
       } else {
-        await showIncomingCall(callId: '${d['callId']}', from: '${d['from']}', name: '${d['name'] ?? d['from']}', video: d['video'] == 'true');
+        await showIncomingCall(callId: '${d['callId']}', from: '${_sender(d)}', name: '${d['name'] ?? _sender(d)}', video: d['video'] == 'true');
       }
       break;
     case 'call_cancel':
