@@ -332,9 +332,9 @@ void _openAccountMenu(BuildContext context) {
   );
 }
 
-/// The account menu from the web (account-menu.tsx) as a full-height drawer from the right: account card,
-/// View / Edit profile, Saved asks, Help & Support (opens the website), Dark mode switch, language pills,
-/// Account and privacy (a tab of Edit profile), Log out.
+/// The account menu from the web (account-menu.tsx) as a full-height drawer from the right: ⋯ (Log out) and
+/// close at the top, account card, View / Edit profile, Saved asks, Help & Support (opens the website),
+/// Account and privacy (a tab of Edit profile); language pills and the dark mode switch share the foot.
 class _AccountMenu extends StatelessWidget {
   const _AccountMenu();
 
@@ -387,6 +387,27 @@ class _AccountMenu extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 4, 8, 4),
             child: Row(children: [
               Expanded(child: Text(t('Account').toUpperCase(), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 1.6, color: p.muted))),
+              PopupMenuButton<String>(
+                tooltip: t('More options'),
+                icon: WIcon(WI.more, size: 22, color: p.text),
+                color: p.canvas,
+                position: PopupMenuPosition.under,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: p.border.withValues(alpha: .6))),
+                onSelected: (_) {
+                  Navigator.of(context).pop();
+                  auth.logout();
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'logout',
+                    child: Row(children: [
+                      WIcon(WI.logout, size: 20, color: p.danger, strokeWidth: 1.8),
+                      const SizedBox(width: 12),
+                      Text(t('Log out'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: p.danger)),
+                    ]),
+                  ),
+                ],
+              ),
               IconButton(tooltip: t('Close'), onPressed: () => Navigator.of(context).pop(), icon: WIcon(WI.close, size: 22, color: p.text)),
             ]),
           ),
@@ -431,40 +452,6 @@ class _AccountMenu extends StatelessWidget {
                 Navigator.of(context).pop();
                 showSupportSheet(context);
               }),
-              row(
-                dark ? WI.sun : WI.moon,
-                label(t('Dark mode')),
-                () => themeCtl.set(dark ? ThemeMode.light : ThemeMode.dark),
-                trailing: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: 44,
-                  height: 24,
-                  padding: const EdgeInsets.all(3),
-                  alignment: dark ? Alignment.centerRight : Alignment.centerLeft,
-                  decoration: BoxDecoration(color: dark ? kGold : p.border, borderRadius: BorderRadius.circular(12)),
-                  child: Container(width: 18, height: 18, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Color(0x33000000), blurRadius: 2)])),
-                ),
-              ),
-              // language
-              row(
-                WI.globe,
-                Wrap(spacing: 6, runSpacing: 6, children: [
-                  for (final l in kLangs)
-                    GestureDetector(
-                      onTap: () {
-                        if (i18n.lang == l.code) return;
-                        Navigator.of(context).pop();
-                        i18n.set(l.code);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                        decoration: BoxDecoration(color: i18n.lang == l.code ? p.ink : p.chip, borderRadius: BorderRadius.circular(20)),
-                        child: Text(l.native, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: i18n.lang == l.code ? p.onInk : p.text)),
-                      ),
-                    ),
-                ]),
-                null,
-              ),
               const SizedBox(height: 8),
               divider,
               const SizedBox(height: 8),
@@ -477,11 +464,50 @@ class _AccountMenu extends StatelessWidget {
           Padding(
             padding: EdgeInsets.fromLTRB(8, 8, 8, 8 + mq.padding.bottom),
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              row(WI.logout, label(t('Log out'), color: p.danger), () {
-                Navigator.of(context).pop();
-                auth.logout();
-              }, bg: p.danger.withValues(alpha: .1), fg: p.danger),
-              const SizedBox(height: 6),
+              // language and theme in one row
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
+                child: Row(children: [
+                  WIcon(WI.globe, size: 20, color: p.muted, strokeWidth: 1.8),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Row(children: [
+                      for (final l in kLangs)
+                        Flexible(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Semantics(
+                              button: true,
+                              selected: i18n.lang == l.code,
+                              child: GestureDetector(
+                                onTap: () {
+                                  if (i18n.lang == l.code) return;
+                                  Navigator.of(context).pop();
+                                  i18n.set(l.code);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(color: i18n.lang == l.code ? p.ink : p.chip, borderRadius: BorderRadius.circular(20)),
+                                  child: Text(l.native,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: i18n.lang == l.code ? p.onInk : p.text)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ]),
+                  ),
+                  IconButton(
+                    tooltip: t('Dark mode'),
+                    onPressed: () => themeCtl.set(dark ? ThemeMode.light : ThemeMode.dark),
+                    style: IconButton.styleFrom(backgroundColor: p.chip, fixedSize: const Size(36, 36), minimumSize: const Size(36, 36), padding: EdgeInsets.zero),
+                    icon: WIcon(dark ? WI.sun : WI.moon, size: 18, color: p.text, strokeWidth: 1.8),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 8),
               const _AppVersion(),
             ]),
           ),
