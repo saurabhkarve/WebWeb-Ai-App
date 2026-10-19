@@ -468,36 +468,58 @@ class _AccountMenu extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
                 child: Row(children: [
-                  WIcon(WI.globe, size: 20, color: p.muted, strokeWidth: 1.8),
-                  const SizedBox(width: 8),
                   Expanded(
-                    child: Row(children: [
-                      for (final l in kLangs)
-                        Flexible(
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: Semantics(
-                              button: true,
-                              selected: i18n.lang == l.code,
-                              child: GestureDetector(
-                                onTap: () {
-                                  if (i18n.lang == l.code) return;
-                                  Navigator.of(context).pop();
-                                  i18n.set(l.code);
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(color: i18n.lang == l.code ? p.ink : p.chip, borderRadius: BorderRadius.circular(20)),
-                                  child: Text(l.native,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: i18n.lang == l.code ? p.onInk : p.text)),
-                                ),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      // the current language; tapping it lists all languages above it
+                      child: PopupMenuButton<String>(
+                        tooltip: t('Language'),
+                        color: p.canvas,
+                        position: PopupMenuPosition.over,
+                        offset: const Offset(0, -8),
+                        constraints: const BoxConstraints(minWidth: 200),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: p.border.withValues(alpha: .6))),
+                        onSelected: (code) {
+                          if (i18n.lang == code) return;
+                          Navigator.of(context).pop();
+                          i18n.set(code);
+                        },
+                        itemBuilder: (_) => [
+                          for (final l in kLangs)
+                            PopupMenuItem(
+                              value: l.code,
+                              child: Row(children: [
+                                Text(l.native, style: TextStyle(fontSize: 15, fontWeight: i18n.lang == l.code ? FontWeight.w700 : FontWeight.w500, color: p.text)),
+                                if (l.native != l.name) ...[
+                                  const SizedBox(width: 8),
+                                  Text(l.name, style: TextStyle(fontSize: 12, color: p.muted)),
+                                ],
+                                const Spacer(),
+                                if (i18n.lang == l.code) const WIcon(WI.check, size: 18, color: kGold, strokeWidth: 2.4),
+                              ]),
+                            ),
+                        ],
+                        child: Container(
+                          height: 40,
+                          padding: const EdgeInsets.only(left: 12, right: 10),
+                          decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20)),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            WIcon(WI.globe, size: 18, color: p.muted, strokeWidth: 1.8),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                kLangs.firstWhere((l) => l.code == i18n.lang, orElse: () => kLangs.first).native,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: p.text),
                               ),
                             ),
-                          ),
+                            const SizedBox(width: 6),
+                            WIcon(WI.chevronUp, size: 16, color: p.muted, strokeWidth: 2),
+                          ]),
                         ),
-                    ]),
+                      ),
+                    ),
                   ),
                   IconButton(
                     tooltip: t('Dark mode'),
