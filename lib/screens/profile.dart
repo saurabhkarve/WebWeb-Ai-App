@@ -786,10 +786,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // someone else's business: each item with the same controls as on Connect (react, refer, repost, reply, share, save)
       if (items.isNotEmpty && !_own && context.read<AuthProvider>().profile != null)
         LayoutBuilder(builder: (context, c) {
-          final two = c.maxWidth >= 560;
-          final w = two ? (c.maxWidth - 12) / 2 : c.maxWidth;
+          // two per row on phones, three on wide screens (web: grid-cols-2 lg:grid-cols-3)
+          final cols = c.maxWidth >= 560 ? 3 : 2;
+          final gap = cols == 2 ? 8.0 : 12.0;
+          final w = (c.maxWidth - gap * (cols - 1)) / cols;
           final owner = Peer(uid: u.uid, name: u.name, company: u.company, handle: u.handle, userType: u.userType, photoUrl: u.photoUrl, verification: u.verification);
-          return Wrap(spacing: 12, runSpacing: 12, children: [
+          return Wrap(spacing: gap, runSpacing: gap, children: [
             for (final x in items)
               if (x is FeedProduct)
                 SizedBox(

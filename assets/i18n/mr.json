@@ -1535,5 +1535,15 @@
   "This is how your ask will look on Connect. Fill in each part.": "'कनेक्ट' वर तुमची गरज अशी दिसेल. प्रत्येक भाग भरा.",
   "This is your ask as it will look on Connect. Fill in each part.": "'कनेक्ट' वर तुमची गरज अशीच दिसेल. प्रत्येक भाग भरा.",
   "Title: e.g. Need 5 CNC operators in Turbhe": "शीर्षक: उदा. तुर्भे येथे 5 CNC ऑपरेटर हवे आहेत",
-  "Write it as members will see it": "सदस्यांना दिसेल तसेच लिहा"
+  "Write it as members will see it": "सदस्यांना दिसेल तसेच लिहा",
+  "{n} days left": "{n} दिवस बाकी",
+  "Last day": "आज शेवटचा दिवस",
+  "Deadline passed": "मुदत संपली",
+  "Where this ask reaches": "ही गरज कुठपर्यंत पोहोचते",
+  "More asks in {area}": "{area} मधील आणखी गरजा",
+  "Edited {time}": "संपादित {time}",
+  "Editing your ask": "तुमच्या गरजेत बदल",
+  "Write a title first": "आधी शीर्षक लिहा",
+  "Could not save your changes. Please try again.": "बदल जतन करता आले नाहीत. पुन्हा प्रयत्न करा.",
+  "{name} reposted": "{name} यांनी रीपोस्ट केले"
 }

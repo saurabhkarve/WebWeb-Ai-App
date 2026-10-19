@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -167,26 +168,34 @@ class AskScreen extends StatelessWidget {
   final VoidCallback onPosted;
   /// the Ask tab is on screen (it stays mounted behind the others)
   final bool active;
-  const AskScreen({super.key, required this.onPosted, this.active = true});
+  /// one of your asks to change: the same card, filled in; saving pops with true
+  final Post? edit;
+  const AskScreen({super.key, required this.onPosted, this.active = true, this.edit});
   @override
-  Widget build(BuildContext context) => _AskForm(onPosted: onPosted, active: active);
+  Widget build(BuildContext context) => _AskForm(onPosted: onPosted, active: active, edit: edit);
 }
 
 class _AskForm extends StatefulWidget {
   final VoidCallback onPosted;
   final bool active;
-  const _AskForm({required this.onPosted, this.active = true});
+  final Post? edit;
+  const _AskForm({required this.onPosted, this.active = true, this.edit});
   @override
   State<_AskForm> createState() => _AskFormState();
 }
 
 class _Photo {
   final String id;
-  final XFile file;
+  /// null for a photo the ask already has (editing)
+  final XFile? file;
   String? url;
   bool failed = false;
   late final Future<String> job;
   _Photo(this.id, this.file);
+  _Photo.saved(this.id, String u) : file = null {
+    url = u;
+    job = Future.value(u);
+  }
 }
 
 class _AskFormState extends State<_AskForm> {
@@ -224,11 +233,20 @@ class _AskFormState extends State<_AskForm> {
   /// before an AI suggestion was used: title, details
   (String, String)? _aiUndo;
   Timer? _draftTimer;
+  /// editing: the stored pin is only sent again when the member moves it (the one we get back is rounded)
+  bool _geoMoved = false;
+  bool get _editing => widget.edit != null;
+  /// tour targets are global keys: only the Ask tab carries them, never the editor opened over it
+  GlobalKey? _tk(String target) => _editing ? null : Tours.key(target);
 
   @override
   void initState() {
     super.initState();
-    _restoreDraft();
+    if (_editing) {
+      _fillFromEdit(widget.edit!);
+    } else {
+      _restoreDraft();
+    }
     context.read<AuthProvider>().api.get('/ai/status').then((r) {
       if (mounted) {
         setState(() => _aiOn = (r as Map)['available'] == true);
@@ -247,7 +265,7 @@ class _AskFormState extends State<_AskForm> {
 
   /// first visit to Ask: a short walk through the form
   void _maybeTour() {
-    if (!widget.active) return;
+    if (!widget.active || _editing) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && widget.active) Tours.maybeShow(context, 'ask', kAskTour);
     });
@@ -285,6 +303,25 @@ class _AskFormState extends State<_AskForm> {
     _loadReach();
   }
 
+  /// Editing: the card starts as the ask is now.
+  void _fillFromEdit(Post e) {
+    _category = e.category ?? 'other';
+    _typeChosen = true;
+    _title.text = e.title ?? '';
+    _desc.text = e.description ?? '';
+    _other.text = e.categoryLabel ?? '';
+    _location = e.locationPref ?? '';
+    _urgency = e.urgency ?? '';
+    _budget = e.budget ?? '';
+    final c = findPlace(_location);
+    final lat = e.lat ?? c?.lat, lng = e.lng ?? c?.lng;
+    if (lat != null && lng != null) _geo = (lat: lat, lng: lng, radiusM: e.radiusM?.toInt() ?? (c == null ? 100000 : _cityRadius(c)));
+    for (final u in e.images) {
+      _photos.add(_Photo.saved(u, u));
+    }
+    _loadReach();
+  }
+
   /// Continue the unfinished ask from last time.
   void _continueDraft() {
     final draft = _savedDraft;
@@ -309,7 +346,7 @@ class _AskFormState extends State<_AskForm> {
   }
 
   Future<void> _saveDraft() async {
-    if (_title.text.isEmpty && _desc.text.isEmpty) return;
+    if (_editing || (_title.text.isEmpty && _desc.text.isEmpty)) return;
     try {
       (await SharedPreferences.getInstance()).setString(_draftKey, jsonEncode({
         'category': _category, 'title': _title.text, 'description': _desc.text, 'locationPref': _location, 'urgency': _urgency, 'budget': _budget,
@@ -344,11 +381,12 @@ class _AskFormState extends State<_AskForm> {
     }
   }
 
-  /// A city's reach as one of the radius steps (the smallest that covers it).
-  int _cityRadius(Place c) => _radii.firstWhere((r) => r >= c.radiusKm * 1000, orElse: () => 100000);
+  /// A city's reach as one of the radius steps (the smallest that covers it, at least 10 km).
+  int _cityRadius(Place c) => _radii.firstWhere((r) => r >= math.max(c.radiusKm * 1000, 10000), orElse: () => 100000);
 
   void _pickNode(PickedCity city) {
     final c = findPlace(city.name);
+    _geoMoved = true;
     setState(() {
       _location = city.name;
       if (c?.lat != null) {
@@ -371,6 +409,7 @@ class _AskFormState extends State<_AskForm> {
     try {
       final h = await currentLocation(context, reason: t('To show your ask to members near you and count how many it will reach.'), source: 'ask');
       if (!mounted) return;
+      _geoMoved = true;
       setState(() {
         _geo = (lat: h.lat, lng: h.lng, radiusM: _geo?.radiusM ?? 100000);
         _location = h.node;
@@ -467,6 +506,21 @@ class _AskFormState extends State<_AskForm> {
         images.add(await ph.job);
       }
       if (!mounted) return;
+      if (_editing) {
+        await context.read<AuthProvider>().api.patch('/posts/${widget.edit!.id}', {
+          'title': title,
+          'description': desc,
+          'category': _category,
+          'categoryLabel': _category == 'other' ? _other.text.trim() : '',
+          'locationPref': _location,
+          'budget': _budget,
+          'urgency': _urgency,
+          if (_geo != null) ...{'radiusM': _geo!.radiusM, if (_geoMoved) ...{'lat': _geo!.lat, 'lng': _geo!.lng}},
+          'images': images,
+        });
+        if (mounted) Navigator.pop(context, true);
+        return;
+      }
       final r = await context.read<AuthProvider>().api.post('/posts', {
         'title': title,
         'description': desc,
@@ -500,7 +554,7 @@ class _AskFormState extends State<_AskForm> {
       widget.onPosted();
       Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${r['id']}')));
     } catch (_) {
-      if (mounted) setState(() => _error = t('Could not publish your post. Please try again.'));
+      if (mounted) setState(() => _error = t(_editing ? 'Could not save your changes. Please try again.' : 'Could not publish your post. Please try again.'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -610,7 +664,8 @@ class _AskFormState extends State<_AskForm> {
                         : '';
     final score = [titleOk, desc.trim().length >= 60, _location.isNotEmpty, _urgency.isNotEmpty, _budget.isNotEmpty, _photos.isNotEmpty].where((x) => x).length;
     final strength = score >= 5 ? 'Strong ask' : (score >= 3 ? 'Good ask' : 'Basic ask');
-    final canAskAi = _aiOn && (title.trim().length >= 3 || desc.trim().length >= 10);
+    // Ask AI needs a few words of title to work from
+    final canAskAi = title.trim().length >= 3;
     final w = MediaQuery.of(context).size.width;
 
     Widget hScroll(List<Widget> children, {double height = 40}) => SizedBox(
@@ -736,7 +791,10 @@ class _AskFormState extends State<_AskForm> {
           ],
         ]);
       case 'when':
-        panel = Wrap(spacing: 6, runSpacing: 6, children: [for (final o in kUrgencies) pill(t(o.label), _urgency == o.value, () => setState(() => _urgency = _urgency == o.value ? '' : o.value))]);
+        panel = Wrap(spacing: 6, runSpacing: 6, children: [for (final o in kUrgencies) pill(t(o.label), _urgency == o.value, () => setState(() {
+                    _urgency = _urgency == o.value ? '' : o.value;
+                    _open = null;
+                  }))]);
       case 'budget':
         panel = _BudgetRange(
           key: ValueKey(_budgetKey),
@@ -754,7 +812,7 @@ class _AskFormState extends State<_AskForm> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       children: [
         // an unfinished ask from last time, until the member starts a new one
-        if (_savedDraft != null && empty) ...[
+        if (_savedDraft != null && empty && !_editing) ...[
           DashedBox(
             radius: 8,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -779,32 +837,60 @@ class _AskFormState extends State<_AskForm> {
         const SizedBox(height: 10),
         // the ask laid out like its row on Connect: photo, name and time, then the title, details and chips as fields
         KeyedSubtree(
-          key: Tours.key('ask-card'),
+          key: _tk('ask-card'),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (me != null) ...[Avatar(name: shownName, photoUrl: me.photoUrl, size: 40, type: me.userType, badge: 18), const SizedBox(width: 10)],
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 if (me != null) ...[
-                  Row(children: [
-                    Flexible(child: Text(shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
-                    if (me.verification > 0 || me.premium) ...[const SizedBox(width: 4), VerifiedBadge(level: me.verification, premium: me.premium)],
-                    const SizedBox(width: 6),
-                    Text(t('just now'), style: TextStyle(fontSize: 12, color: p.muted)),
-                  ]),
-                  Text(me.isEntrepreneur ? me.name : me.company, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
-                  const SizedBox(height: 6),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(color: p.tagBg, borderRadius: BorderRadius.circular(20)),
-                      child: Text('✦ ${t('Your ask')}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.tagText)),
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Flexible(child: Text(shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+                          if (me.verification > 0 || me.premium) ...[const SizedBox(width: 4), VerifiedBadge(level: me.verification, premium: me.premium)],
+                          const SizedBox(width: 6),
+                          Text(t('just now'), style: TextStyle(fontSize: 12, color: p.muted)),
+                        ]),
+                        Text(me.isEntrepreneur ? me.name : me.company, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(color: p.tagBg, borderRadius: BorderRadius.circular(20)),
+                          child: Text('✦ ${t(_editing ? 'Editing your ask' : 'Your ask')}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.tagText)),
+                        ),
+                      ]),
                     ),
-                  ),
+                    // Ask AI, top right: on once the title has a few words
+                    if (_aiOn)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Semantics(
+                          button: true,
+                          enabled: canAskAi && !_aiBusy,
+                          child: GestureDetector(
+                            onTap: canAskAi && !_aiBusy ? _askAi : () => toast(context, t('Write a title first')),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                gradient: canAskAi ? kGoldGradient : null,
+                                color: canAskAi ? null : p.chip,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                WIcon(WI.sparkle, size: 16, color: canAskAi ? kInk : p.muted),
+                                const SizedBox(width: 6),
+                                Text(_aiBusy ? t('Thinking…') : t('Ask AI'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: canAskAi ? kInk : p.muted)),
+                              ]),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ]),
                   const SizedBox(height: 8),
                 ],
                 TextField(
-                  key: Tours.key('ask-title'),
+                  key: _tk('ask-title'),
                   controller: _title,
                   focusNode: _titleFocus,
                   maxLength: 100,
@@ -832,7 +918,7 @@ class _AskFormState extends State<_AskForm> {
                   ),
                 const SizedBox(height: 8),
                 TextField(
-                  key: Tours.key('ask-description'),
+                  key: _tk('ask-description'),
                   controller: _desc,
                   focusNode: _descFocus,
                   minLines: 3,
@@ -855,7 +941,9 @@ class _AskFormState extends State<_AskForm> {
                         child: Stack(fit: StackFit.expand, children: [
                           Opacity(
                             opacity: ph.url == null && !ph.failed ? .6 : 1,
-                            child: FutureBuilder(future: ph.file.readAsBytes(), builder: (_, s) => s.hasData ? Image.memory(s.data!, fit: BoxFit.cover) : ColoredBox(color: p.chip)),
+                            child: ph.file == null
+                                ? Image.network(ph.url!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => ColoredBox(color: p.chip))
+                                : FutureBuilder(future: ph.file!.readAsBytes(), builder: (_, s) => s.hasData ? Image.memory(s.data!, fit: BoxFit.cover) : ColoredBox(color: p.chip)),
                           ),
                           if (ph.url == null && !ph.failed) const Positioned(left: 0, right: 0, bottom: 0, height: 4, child: DecoratedBox(decoration: BoxDecoration(gradient: kGoldGradient))),
                           if (ph.failed)
@@ -898,10 +986,10 @@ class _AskFormState extends State<_AskForm> {
                 const SizedBox(height: 10),
                 // the essentials as chips, as on Connect; each opens its choices
                 KeyedSubtree(
-                  key: Tours.key('ask-details'),
+                  key: _tk('ask-details'),
                   child: Wrap(spacing: 6, runSpacing: 6, children: [
                     KeyedSubtree(
-                      key: Tours.key('ask-category'),
+                      key: _tk('ask-category'),
                       child: chip(
                         'type',
                         categoryIcon(_category.isEmpty ? 'other' : _category),
@@ -917,18 +1005,25 @@ class _AskFormState extends State<_AskForm> {
                   ]),
                 ),
                 if (panel != null)
-                  Container(
+                  GestureDetector(
+                    // taps inside the choices never close them (a tap elsewhere on the page does)
+                    onTap: () {},
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
                     margin: const EdgeInsets.only(top: 8),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(12), border: Border.all(color: p.border)),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                       panel,
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: GestureDetector(onTap: () => setState(() => _open = null), child: Text(t('Done'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
-                      ),
+                      if (_open == 'where' || _open == 'budget') ...[
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: GestureDetector(onTap: () => setState(() => _open = null), child: Text(t('Done'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
+                        ),
+                      ],
                     ]),
+                  ),
                   ),
                 if (_category == 'other') ...[
                   const SizedBox(height: 8),
@@ -940,24 +1035,10 @@ class _AskFormState extends State<_AskForm> {
         ),
         _aiCard(p) ?? const SizedBox.shrink(),
         if (_aiError != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_aiError!, style: TextStyle(fontSize: 12, color: p.danger))),
-        if (canAskAi || _aiUndo != null || _undoTpl != null || !empty) ...[
+        if ((_aiUndo != null && !_aiBusy) || _undoTpl != null || (!empty && !_editing)) ...[
           const SizedBox(height: 12),
           Row(children: [
-            if (canAskAi)
-              GestureDetector(
-                onTap: _aiBusy ? null : _askAi,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 2, offset: Offset(0, 1))]),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    const WIcon(WI.sparkle, size: 16, color: kInk),
-                    const SizedBox(width: 6),
-                    Text(_aiBusy ? t('Thinking…') : t('Ask AI'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
-                  ]),
-                ),
-              ),
             if ((_aiUndo != null && !_aiBusy) || _undoTpl != null) ...[
-              const SizedBox(width: 12),
               GestureDetector(
                 onTap: () => setState(() {
                   if (_aiUndo != null) {
@@ -976,7 +1057,7 @@ class _AskFormState extends State<_AskForm> {
               ),
             ],
             const Spacer(),
-            if (!empty)
+            if (!empty && !_editing)
               GestureDetector(
                 onTap: () {
                   setState(() {
@@ -993,11 +1074,11 @@ class _AskFormState extends State<_AskForm> {
           ]),
         ],
         // examples: a starting point while the ask is empty, never filled in on their own
-        if (empty) ...[
+        if (empty && !_editing) ...[
           const SizedBox(height: 16),
           _caps(p, 'Or start from an example'),
           const SizedBox(height: 6),
-          KeyedSubtree(key: Tours.key('ask-templates'), child: hScroll(height: 36, [
+          KeyedSubtree(key: _tk('ask-templates'), child: hScroll(height: 36, [
             for (final s in examples)
               DashedBox(
                 radius: 20,
@@ -1018,11 +1099,12 @@ class _AskFormState extends State<_AskForm> {
     );
 
     return Column(children: [
-      Expanded(child: form),
+      // a tap anywhere outside an open chip's choices closes them
+      Expanded(child: _open == null ? form : GestureDetector(onTap: () => setState(() => _open = null), child: form)),
       // Publish stays within thumb reach, above the island
       Container(
-        key: Tours.key('ask-publish'),
-        padding: EdgeInsets.fromLTRB(16, 8, 16, islandSpace(context) - 4),
+        key: _tk('ask-publish'),
+        padding: EdgeInsets.fromLTRB(16, 8, 16, _editing ? MediaQuery.of(context).padding.bottom + 12 : islandSpace(context) - 4),
         decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [p.canvas, p.canvas.withValues(alpha: .95), p.canvas.withValues(alpha: 0)], stops: const [0, .7, 1])),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Row(children: [
@@ -1042,7 +1124,7 @@ class _AskFormState extends State<_AskForm> {
             ],
           ]),
           const SizedBox(height: 8),
-          SizedBox(width: double.infinity, child: GoldButton(label: t('Publish Ask'), wi: WI.askPlus, loading: _busy, onPressed: ready ? _publish : null)),
+          SizedBox(width: double.infinity, child: GoldButton(label: t(_editing ? 'Save changes' : 'Publish Ask'), wi: WI.askPlus, loading: _busy, onPressed: ready ? _publish : null)),
         ]),
       ),
     ]);

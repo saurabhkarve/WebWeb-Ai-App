@@ -9,10 +9,12 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/city_picker.dart';
+import '../widgets/area_map.dart';
 import '../widgets/image_grid.dart';
 import '../widgets/post_card.dart';
 import '../widgets/reaction_picker.dart';
 import '../widgets/response_sheet.dart';
+import 'ask.dart';
 import 'find.dart';
 import 'profile.dart';
 import 'talk.dart' show openChat;
@@ -160,6 +162,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       openChat(context, Peer(uid: uid, name: name, company: company, handle: handle, photoUrl: photo, userType: type ?? 'entrepreneur'));
 
   Future<void> _editAsk() async {
+    // an ask is edited in the full Ask editor; an update in the small sheet
+    if (_post!.isRequirement) {
+      final saved = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => SubPage(title: t('Edit ask'), body: AskScreen(onPosted: () {}, edit: _post))));
+      if (saved == true) _load();
+      return;
+    }
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -220,7 +228,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.25))),
                       if (post.authorVerification > 0 || post.authorPremium) ...[const SizedBox(width: 4), VerifiedBadge(level: post.authorVerification, premium: post.authorPremium)],
                     ]),
-                    Text('${post.authorType == 'entrepreneur' ? post.authorName : post.authorCompany} · ${timeAgo(post.createdAt)}',
+                    Text('${post.authorType == 'entrepreneur' ? post.authorName : post.authorCompany} · ${timeAgo(post.createdAt)}${post.editedAt != null ? ' · ${editedLabel(post.editedAt!)}' : ''}',
                         maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted, height: 1.25)),
                   ]),
                 ),
@@ -248,12 +256,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   InfoPill(
                     wi: WI.pin,
                     text: '${t(post.locationPref!)}${post.distanceM == null ? '' : ' · ${formatDistance(post.distanceM!)}'}',
-                    onTap: () => _openFind(location: post.locationPref),
+                    onTap: () => showAskAreaSheet(context, post),
                   ),
                 if ((post.budget ?? '').isNotEmpty) InfoPill(wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
                 if ((post.urgency ?? '').isNotEmpty)
-                  InfoPill(wi: WI.clock, text: t(labelOf(kUrgencies, post.urgency)), onTap: () => _openFind(urgency: post.urgency)),
-                if ((post.radiusM ?? 0) > 0) InfoPill(wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)})),
+                  InfoPill(wi: WI.clock, text: askTimeLeft(post)!, onTap: () => _openFind(urgency: post.urgency)),
+                if ((post.radiusM ?? 0) > 0) InfoPill(wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)}), onTap: () => showAskAreaSheet(context, post)),
               ]),
             ],
             if (isAsk) ...[

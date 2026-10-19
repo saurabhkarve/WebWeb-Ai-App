@@ -13,6 +13,7 @@ import '../screens/profile.dart';
 import '../screens/talk.dart' show openChat;
 import '../theme.dart';
 import '../widgets.dart';
+import 'area_map.dart';
 import 'image_grid.dart';
 import 'reaction_picker.dart';
 import 'response_sheet.dart';
@@ -130,6 +131,11 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         authorVerification: p.authorVerification,
         distanceM: p.distanceM,
         radiusM: p.radiusM,
+        lat: p.lat,
+        lng: p.lng,
+        editedAt: p.editedAt,
+        repostedByName: p.repostedByName,
+        repostedByHandle: p.repostedByHandle,
         images: p.images,
         sharesCount: n,
         authorHasUpdate: p.authorHasUpdate,
@@ -149,7 +155,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     final p = Pal.of(context);
     final isAsk = post.isRequirement;
     final mine = _isOwner;
-    final urgency = post.urgency == null || post.urgency!.isEmpty ? null : labelOf(kUrgencies, post.urgency);
+    final urgency = askTimeLeft(post);
     final isBusiness = post.authorType == 'entrepreneur';
     // phones: a smaller author photo leaves more width for the ask
     final small = MediaQuery.sizeOf(context).width < 600;
@@ -171,9 +177,11 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       ImageGrid(post.images, shareUrl: post.webUrl, shareRef: post.id),
     ]);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      foregroundDecoration: _HairlineDecoration(p.border),
+    final framed = post.repostedByName != null && !widget.detail;
+    final card = Container(
+      padding: framed ? const EdgeInsets.fromLTRB(12, 12, 12, 8) : const EdgeInsets.symmetric(vertical: 16),
+      foregroundDecoration: framed ? null : _HairlineDecoration(p.border),
+      decoration: framed ? BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)) : null,
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         GestureDetector(
           onTap: _openAuthor,
@@ -192,7 +200,10 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                       Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25))),
                       if (post.authorVerification > 0 || post.authorPremium) ...[const SizedBox(width: 6), VerifiedBadge(level: post.authorVerification, premium: post.authorPremium)],
                       const SizedBox(width: 6),
-                      Text(timeAgo(post.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
+                      Flexible(
+                        child: Text('${timeAgo(post.createdAt)}${post.editedAt != null ? ' · ${editedLabel(post.editedAt!)}' : ''}',
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+                      ),
                     ]),
                     Text(isBusiness ? post.authorName : post.authorCompany, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted, height: 1.3)),
                   ]),
@@ -267,11 +278,11 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                         small: true,
                         wi: WI.pin,
                         text: '${t(post.locationPref!)}${post.distanceM == null ? '' : ' · ${formatDistance(post.distanceM!)}'}',
-                        onTap: () => _openFind(location: post.locationPref),
+                        onTap: () => showAskAreaSheet(context, post),
                       ),
                     if ((post.budget ?? '').isNotEmpty) InfoPill(small: true, wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
-                    if (urgency != null) InfoPill(small: true, wi: WI.clock, text: t(urgency), onTap: () => _openFind(urgency: post.urgency)),
-                    if ((post.radiusM ?? 0) > 0) InfoPill(small: true, wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)})),
+                    if (urgency != null) InfoPill(small: true, wi: WI.clock, text: urgency, onTap: () => _openFind(urgency: post.urgency)),
+                    if ((post.radiusM ?? 0) > 0) InfoPill(small: true, wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)}), onTap: () => showAskAreaSheet(context, post)),
                     if (post.images.isNotEmpty) InfoPill(small: true, wi: WI.camera, text: t(post.images.length == 1 ? '1 photo' : '{n} photos', {'n': post.images.length})),
                   ].expand((w) => [w, const SizedBox(width: 6)]).toList()),
                 ),
@@ -313,6 +324,26 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
             ),
           ]),
         ),
+      ]),
+    );
+    if (!framed) return card;
+    // someone else's ask on this member's page because they reposted it: their line on top, the ask inside as its author's
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      foregroundDecoration: _HairlineDecoration(p.border),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        GestureDetector(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? ''))),
+          child: Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Row(children: [
+              WIcon(WI.repost, size: 16, color: p.muted),
+              const SizedBox(width: 6),
+              Flexible(child: Text(t('{name} reposted', {'name': post.repostedByName!}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted))),
+            ]),
+          ),
+        ),
+        card,
       ]),
     );
   }

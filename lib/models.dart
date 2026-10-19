@@ -192,6 +192,12 @@ class Post {
   final num? distanceM;
   /// Reach circle picked on the map, in metres.
   final num? radiusM;
+  /// Centre of the reach circle (rounded to about 1 km).
+  final double? lat, lng;
+  /// When the owner last changed the ask.
+  final DateTime? editedAt;
+  /// On a member's page: the member who reposted this ask (it is someone else's).
+  final String? repostedByName, repostedByHandle;
   final List<String> images;
   final int sharesCount;
   final bool authorHasUpdate;
@@ -205,7 +211,7 @@ class Post {
   Post({
     required this.id, required this.kind, required this.authorUid, required this.authorName, required this.authorCompany,
     required this.authorHandle, this.authorPhotoUrl, this.title, this.description, this.category, this.locationPref, this.budget,
-    this.urgency, this.matchReason, this.slug, this.categoryLabel, this.authorType = 'entrepreneur', this.authorVerification = 1, this.authorPremium = false, this.distanceM, this.radiusM, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
+    this.urgency, this.matchReason, this.slug, this.categoryLabel, this.authorType = 'entrepreneur', this.authorVerification = 1, this.authorPremium = false, this.distanceM, this.radiusM, this.lat, this.lng, this.editedAt, this.repostedByName, this.repostedByHandle, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
     this.recentResponses = const [], this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0,
     this.reacted = false, this.reposted = false, this.bookmarked = false, this.myReaction,
   });
@@ -224,7 +230,10 @@ class Post {
         title: j['title'] as String?, description: j['description'] as String?, category: j['category'] as String?,
         locationPref: j['locationPref'] as String?, budget: j['budget'] as String?, urgency: j['urgency'] as String?,
         matchReason: j['matchReason'] as String?, slug: j['slug'] as String?, categoryLabel: j['categoryLabel'] as String?,
-        authorType: '${j['authorType'] ?? 'entrepreneur'}', authorVerification: (j['authorVerification'] as num?)?.toInt() ?? 1, authorPremium: j['authorPremium'] == true, distanceM: j['distanceM'] as num?, radiusM: j['radiusM'] as num?, images: _strings(j['images']), sharesCount: (j['sharesCount'] as num?)?.toInt() ?? 0,
+        authorType: '${j['authorType'] ?? 'entrepreneur'}', authorVerification: (j['authorVerification'] as num?)?.toInt() ?? 1, authorPremium: j['authorPremium'] == true, distanceM: j['distanceM'] as num?, radiusM: j['radiusM'] as num?,
+        lat: (j['lat'] as num?)?.toDouble(), lng: (j['lng'] as num?)?.toDouble(), editedAt: j['editedAt'] == null ? null : _ms(j['editedAt']),
+        repostedByName: (j['repostedBy'] as Map?)?['name'] as String?, repostedByHandle: (j['repostedBy'] as Map?)?['handle'] as String?,
+        images: _strings(j['images']), sharesCount: (j['sharesCount'] as num?)?.toInt() ?? 0,
         authorHasUpdate: j['authorHasUpdate'] == true, createdAt: _ms(j['createdAt']),
         recentResponses: ((j['recentResponses'] as List?) ?? const []).map((e) => ResponseLog.fromJson(e as Map)).toList(),
         reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, repostsCount: (j['repostsCount'] as num?)?.toInt() ?? 0,
