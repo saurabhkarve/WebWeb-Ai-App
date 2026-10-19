@@ -1524,5 +1524,16 @@
   "Share plumbers, electricians, cabs…": "प्लंबर, इलेक्ट्रिशियन, कॅब… शेअर करा",
   "WebWeb AI": "WebWeb AI",
   "Version {v}": "आवृत्ती {v}",
-  "More options": "अधिक पर्याय"
+  "More options": "अधिक पर्याय",
+  "AI could not help with this right now. Try again.": "AI आत्ता यात मदत करू शकले नाही. पुन्हा प्रयत्न करा.",
+  "Ask AI": "AI ला विचारा",
+  "Choose a type": "प्रकार निवडा",
+  "Done": "झाले",
+  "It follows your words and decides who gets your ask: job seekers for jobs, suppliers for supplies. Tap it to change it.": "तो तुमच्या शब्दांवरून ठरतो आणि गरज कोणापर्यंत पोहोचेल ते ठरवतो: नोकरीसाठी नोकरी शोधणारे, मालासाठी पुरवठादार. बदलण्यासाठी त्यावर टॅप करा.",
+  "The type is picked for you": "प्रकार तुमच्यासाठी निवडला जातो",
+  "Thinking…": "विचार करत आहे…",
+  "This is how your ask will look on Connect. Fill in each part.": "'कनेक्ट' वर तुमची गरज अशी दिसेल. प्रत्येक भाग भरा.",
+  "This is your ask as it will look on Connect. Fill in each part.": "'कनेक्ट' वर तुमची गरज अशीच दिसेल. प्रत्येक भाग भरा.",
+  "Title: e.g. Need 5 CNC operators in Turbhe": "शीर्षक: उदा. तुर्भे येथे 5 CNC ऑपरेटर हवे आहेत",
+  "Write it as members will see it": "सदस्यांना दिसेल तसेच लिहा"
 }

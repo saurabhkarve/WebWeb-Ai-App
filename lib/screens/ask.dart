@@ -149,6 +149,9 @@ String? _detectCategory(String text) {
   return null;
 }
 
+/// The types whose first example is offered before a type is known: the asks members post most.
+const _starterCategories = ['job', 'supplier', 'buyer', 'logistics', 'space', 'jobwork', 'repair', 'machinery', 'compliance', 'digital'];
+
 /// Reach radius steps (web/src/lib/geo.ts RADIUS_STEPS); the last one covers all of India.
 const _radii = [5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 3000000];
 String _radiusLabel(int m) => m >= 3000000 ? t('Pan-India') : '${m ~/ 1000} km';
@@ -159,47 +162,14 @@ Widget _caps(Pal p, String s, {WI? icon}) => Row(children: [
       Text(t(s).toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
     ]);
 
-/// Ask tab (web post/new): Ask or Update.
-class AskScreen extends StatefulWidget {
+/// Ask tab (web post/new): the ask, laid out like its row on Connect.
+class AskScreen extends StatelessWidget {
   final VoidCallback onPosted;
   /// the Ask tab is on screen (it stays mounted behind the others)
   final bool active;
   const AskScreen({super.key, required this.onPosted, this.active = true});
   @override
-  State<AskScreen> createState() => _AskScreenState();
-}
-
-class _AskScreenState extends State<AskScreen> {
-  int _tab = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Pal.of(context);
-    return Column(children: [
-      Container(
-        margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border))),
-        child: Row(children: [
-          for (final e in [(0, WI.ask, 'Ask'), (1, WI.updates, 'Update')])
-            Expanded(
-              child: InkWell(
-                onTap: () => setState(() => _tab = e.$1),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(border: Border(bottom: BorderSide(color: _tab == e.$1 ? p.text : Colors.transparent, width: 2))),
-                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    WIcon(e.$2, size: 18, strokeWidth: 1.8, color: _tab == e.$1 ? p.text : p.muted),
-                    const SizedBox(width: 8),
-                    Text(t(e.$3), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _tab == e.$1 ? p.text : p.muted)),
-                  ]),
-                ),
-              ),
-            ),
-        ]),
-      ),
-      Expanded(child: _tab == 0 ? _AskForm(onPosted: widget.onPosted, active: widget.active) : _UpdateForm(onPosted: widget.onPosted)),
-    ]);
-  }
+  Widget build(BuildContext context) => _AskForm(onPosted: onPosted, active: active);
 }
 
 class _AskForm extends StatefulWidget {
@@ -220,7 +190,12 @@ class _Photo {
 }
 
 class _AskFormState extends State<_AskForm> {
-  String _category = kPostCategories.first.value;
+  /// empty until the words suggest a type or the member picks one
+  String _category = '';
+  /// the type follows the words until the member picks one
+  bool _typeChosen = false;
+  /// the chip whose choices are open under the ask
+  String? _open;
   final _title = TextEditingController();
   final _desc = TextEditingController();
   final _other = TextEditingController();
@@ -234,21 +209,19 @@ class _AskFormState extends State<_AskForm> {
   bool _locating = false;
   String? _locNote;
   int? _reach;
-  bool _more = false;
-  bool _dismissed = false;
   /// an unfinished ask from last time: offered, never filled in on its own
   Map? _savedDraft;
   bool _busy = false;
   String? _error;
   final List<_Photo> _photos = [];
-  (String, String)? _undoTpl;
-  // polish
+  /// before an example was used: title, details, type, whether the type was chosen
+  (String, String, String, bool)? _undoTpl;
+  // Ask AI
   bool _aiOn = false;
-  String _aiEngine = 'basic';
   bool _aiBusy = false;
   String? _aiError;
   Map<String, String>? _aiDraft;
-  String _aiField = 'title';
+  /// before an AI suggestion was used: title, details
   (String, String)? _aiUndo;
   Timer? _draftTimer;
 
@@ -258,10 +231,7 @@ class _AskFormState extends State<_AskForm> {
     _restoreDraft();
     context.read<AuthProvider>().api.get('/ai/status').then((r) {
       if (mounted) {
-        setState(() {
-          _aiOn = (r as Map)['available'] == true;
-          _aiEngine = r['engine'] == 'ai' ? 'ai' : 'basic';
-        });
+        setState(() => _aiOn = (r as Map)['available'] == true);
       }
     }).catchError((_) {});
     _title.addListener(_changed);
@@ -284,6 +254,11 @@ class _AskFormState extends State<_AskForm> {
   }
 
   void _changed() {
+    // until the member picks a type, it follows the words
+    if (!_typeChosen) {
+      final found = _detectCategory('${_title.text} ${_desc.text}');
+      if (found != null) _category = found;
+    }
     setState(() {});
     _draftTimer?.cancel();
     _draftTimer = Timer(const Duration(milliseconds: 600), _saveDraft);
@@ -316,6 +291,7 @@ class _AskFormState extends State<_AskForm> {
     if (draft == null) return;
     setState(() {
         _category = (draft['category'] as String?) ?? _category;
+        _typeChosen = _category.isNotEmpty;
         _title.text = '${draft['title'] ?? ''}';
         _desc.text = '${draft['description'] ?? ''}';
         _location = '${draft['locationPref'] ?? ''}';
@@ -417,9 +393,12 @@ class _AskFormState extends State<_AskForm> {
     }
   }
 
-  void _applyTemplate(String title, String desc) {
+  void _applyTemplate(String category, String title, String desc) {
     setState(() {
-      _undoTpl = (_title.text, _desc.text);
+      _undoTpl = (_title.text, _desc.text, _category, _typeChosen);
+      _aiUndo = null;
+      _category = category;
+      _typeChosen = true;
       _title.text = t(title);
       _desc.text = t(desc);
     });
@@ -447,31 +426,31 @@ class _AskFormState extends State<_AskForm> {
     }
   }
 
-  Future<void> _runPolish(String field) async {
+  Future<void> _askAi() async {
     setState(() {
       _aiBusy = true;
       _aiError = null;
       _aiDraft = null;
-      _aiField = field;
     });
     try {
-      final r = await context.read<AuthProvider>().api.post('/ai/polish-ask', {'title': _title.text.trim(), 'description': _desc.text.trim(), 'category': _category}) as Map;
+      final r = await context.read<AuthProvider>().api.post('/ai/polish-ask', {'title': _title.text.trim(), 'description': _desc.text.trim(), if (_category.isNotEmpty) 'category': _category}) as Map;
       // kept: an Indian language (never given to AI) or AI would have translated it; only spacing was tidied
       if (mounted) setState(() => _aiDraft = {'title': '${r['title'] ?? ''}', 'description': '${r['description'] ?? ''}', if (r['kept'] == true) 'kept': '1'});
     } catch (e) {
-      if (mounted) setState(() => _aiError = '$e'.isEmpty ? t('AI could not polish this right now. Try again.') : '$e');
+      if (mounted) setState(() => _aiError = '$e'.isEmpty ? t('AI could not help with this right now. Try again.') : '$e');
     } finally {
       if (mounted) setState(() => _aiBusy = false);
     }
   }
 
-  void _applyPolish() {
+  void _applyAi() {
     final d = _aiDraft;
     if (d == null) return;
-    final ctl = _aiField == 'title' ? _title : _desc;
     setState(() {
-      _aiUndo = (_aiField, ctl.text);
-      ctl.text = d[_aiField] ?? ctl.text;
+      _aiUndo = (_title.text, _desc.text);
+      _undoTpl = null;
+      if ((d['title'] ?? '').isNotEmpty) _title.text = d['title']!;
+      if ((d['description'] ?? '').isNotEmpty) _desc.text = d['description']!;
       _aiDraft = null;
     });
   }
@@ -480,6 +459,7 @@ class _AskFormState extends State<_AskForm> {
     final title = _title.text.trim(), desc = _desc.text.trim();
     setState(() => _error = null);
     if (_blank.hasMatch(title) || _blank.hasMatch(desc)) return setState(() => _error = t('Replace the [brackets] with your details'));
+    if (_category.isEmpty) return setState(() => _open = 'type');
     setState(() => _busy = true);
     try {
       final images = <String>[];
@@ -512,6 +492,10 @@ class _AskFormState extends State<_AskForm> {
         _urgency = '7_days';
         _savedDraft = null;
         _undoTpl = null;
+        _aiUndo = null;
+        _category = '';
+        _typeChosen = false;
+        _open = null;
       });
       widget.onPosted();
       Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${r['id']}')));
@@ -533,59 +517,12 @@ class _AskFormState extends State<_AskForm> {
     super.dispose();
   }
 
-  Widget _fieldActions(Pal p, String field) {
-    final ctl = field == 'title' ? _title : _desc;
-    final has = ctl.text.isNotEmpty;
-    final canPolish = _aiOn && (_title.text.trim().length >= 3 || _desc.text.trim().length >= 10);
-    if (!has && !canPolish) return const SizedBox.shrink();
-    // the placeholder names the field; this row only carries its actions
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(children: [
-        const Spacer(),
-        if (has)
-          GestureDetector(
-            onTap: () {
-              ctl.clear();
-              setState(() => _undoTpl = null);
-              (field == 'title' ? _titleFocus : _descFocus).requestFocus();
-            },
-            child: Row(children: [WIcon(WI.close, size: 14, color: p.muted), const SizedBox(width: 4), Text(t('Clear'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted))]),
-          ),
-        if (canPolish) ...[
-          if (_aiUndo?.$1 == field && !_aiBusy) ...[
-            const SizedBox(width: 10),
-            GestureDetector(
-              onTap: () => setState(() {
-                ctl.text = _aiUndo!.$2;
-                _aiUndo = null;
-              }),
-              child: Text(t('Undo'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted, decoration: TextDecoration.underline)),
-            ),
-          ],
-          const SizedBox(width: 10),
-          GestureDetector(
-            onTap: _aiBusy ? null : () => _runPolish(field),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 2, offset: Offset(0, 1))]),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const WIcon(WI.sparkle, size: 14, color: kInk),
-                const SizedBox(width: 4),
-                Text(_aiBusy && _aiField == field ? t('Polishing…') : t(_aiEngine == 'ai' ? 'Polish with AI' : 'Polish'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kInk)),
-              ]),
-            ),
-          ),
-        ],
-      ]),
-    );
-  }
-
-  Widget? _suggestion(Pal p, String field) {
+  /// Ask AI's suggestion for the title and details, shown before anything changes.
+  Widget? _aiCard(Pal p) {
     final d = _aiDraft;
-    if (d == null || _aiField != field || (d[field] ?? '').isEmpty) return null;
+    if (d == null) return null;
     return Container(
-      margin: const EdgeInsets.only(top: 8),
+      margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: kGold.withValues(alpha: .1), borderRadius: BorderRadius.circular(12), border: Border.all(color: kGold)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -599,12 +536,12 @@ class _AskFormState extends State<_AskForm> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(t('Your words are kept as you wrote them, in your language. Only spacing was tidied.'), style: TextStyle(fontSize: 12, color: p.muted)),
           ),
-        const SizedBox(height: 6),
-        Text(d[field]!, style: field == 'title' ? const TextStyle(fontSize: 15, fontWeight: FontWeight.w700) : TextStyle(fontSize: 14, color: p.text.withValues(alpha: .8))),
+        if ((d['title'] ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(d['title']!, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
+        if ((d['description'] ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(d['description']!, style: TextStyle(fontSize: 14, height: 1.5, color: p.text.withValues(alpha: .8)))),
         const SizedBox(height: 10),
         Row(children: [
           GestureDetector(
-            onTap: _applyPolish,
+            onTap: _applyAi,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(color: p.ink, borderRadius: BorderRadius.circular(20)),
@@ -624,12 +561,13 @@ class _AskFormState extends State<_AskForm> {
     OutlineInputBorder b(Color c) => OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: c));
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: p.muted),
+      hintStyle: TextStyle(color: p.muted, fontWeight: FontWeight.w500),
       counterText: '',
       filled: true,
       fillColor: p.card,
       errorText: error,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       border: b(p.border),
       enabledBorder: b(p.border),
       focusedBorder: b(p.text),
@@ -641,11 +579,14 @@ class _AskFormState extends State<_AskForm> {
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
+    final me = context.watch<AuthProvider>().profile;
     final title = _title.text, desc = _desc.text;
     final tip = _tips[_category];
-    final samples = _samples[_category] ?? const [];
-    final found = _detectCategory('$title $desc');
-    final suggestion = found != null && found != _category ? found : null;
+    final empty = title.trim().isEmpty && desc.trim().isEmpty;
+    // examples: the chosen type's, or one of each common type while none is known
+    final examples = _category.isNotEmpty && _samples[_category] != null
+        ? [for (final s in _samples[_category]!) (_category, s.$1, s.$2, s.$3)]
+        : [for (final c in _starterCategories) if (_samples[c] != null) (c, kCategoryShort[c] ?? c, _samples[c]!.first.$2, _samples[c]!.first.$3)];
     String? titleIdea;
     if (title.trim().isEmpty && desc.trim().length >= 20) {
       final first = desc.trim().split(RegExp(r'[.\n!?]')).first.trim();
@@ -653,20 +594,23 @@ class _AskFormState extends State<_AskForm> {
     }
     final titleOk = title.trim().length >= 5;
     final descOk = desc.trim().length >= 20;
-    final otherOk = _category != 'other' || _other.text.trim().length >= 2;
+    final typeOk = _category.isNotEmpty && (_category != 'other' || _other.text.trim().length >= 2);
     final titleBlank = _blank.hasMatch(title), descBlank = _blank.hasMatch(desc);
-    final ready = titleOk && descOk && otherOk && !titleBlank && !descBlank && !_photos.any((ph) => ph.failed);
+    final ready = titleOk && descOk && typeOk && !titleBlank && !descBlank && !_photos.any((ph) => ph.failed);
     final missing = !titleOk
         ? 'Add a title'
         : !descOk
             ? 'Add a little more detail'
             : titleBlank || descBlank
                 ? 'Replace the [brackets] with your details'
-                : !otherOk
-                    ? 'Say what this ask is about'
-                    : '';
+                : _category.isEmpty
+                    ? 'Choose a type'
+                    : !typeOk
+                        ? 'Say what this ask is about'
+                        : '';
     final score = [titleOk, desc.trim().length >= 60, _location.isNotEmpty, _urgency.isNotEmpty, _budget.isNotEmpty, _photos.isNotEmpty].where((x) => x).length;
     final strength = score >= 5 ? 'Strong ask' : (score >= 3 ? 'Good ask' : 'Basic ask');
+    final canAskAi = _aiOn && (title.trim().length >= 3 || desc.trim().length >= 10);
     final w = MediaQuery.of(context).size.width;
 
     Widget hScroll(List<Widget> children, {double height = 40}) => SizedBox(
@@ -682,44 +626,58 @@ class _AskFormState extends State<_AskForm> {
             ),
           ),
         );
-    Widget detail(WI icon, String value) => Flexible(
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            WIcon(icon, size: 16, color: p.muted),
-            const SizedBox(width: 4),
-            Flexible(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
-          ]),
-        );
-    Widget pill(String label, bool on, VoidCallback onTap, {double h = 40, double font = 14}) => GestureDetector(
+    Widget pill(String label, bool on, VoidCallback onTap, {double h = 36, double font = 14}) => GestureDetector(
           onTap: onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             height: h,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             alignment: Alignment.center,
             decoration: BoxDecoration(color: on ? p.ink : p.chip, borderRadius: BorderRadius.circular(h)),
             child: Text(label, style: TextStyle(fontSize: font, fontWeight: FontWeight.w700, color: on ? p.onInk : p.muted)),
           ),
         );
+    // an essential of the ask as a chip, as on Connect, that opens its choices; unset ones are dashed
+    Widget chip(String key, WI icon, String label, bool set, {bool auto = false}) {
+      final open = _open == key;
+      final inner = Row(mainAxisSize: MainAxisSize.min, children: [
+        WIcon(icon, size: 14, color: p.muted, still: true),
+        const SizedBox(width: 4),
+        Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: set || open ? p.text.withValues(alpha: .8) : p.muted))),
+        if (auto) ...[const SizedBox(width: 3), const WIcon(WI.sparkle, size: 12, color: kGold)],
+        const SizedBox(width: 2),
+        AnimatedRotation(turns: open ? .5 : 0, duration: const Duration(milliseconds: 150), child: WIcon(WI.chevronDown, size: 14, color: p.muted)),
+      ]);
+      void tap() => setState(() => _open = open ? null : key);
+      if (!set && !open) return DashedBox(radius: 20, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7), onTap: tap, child: inner);
+      return GestureDetector(
+        onTap: tap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20), border: Border.all(color: open ? p.text.withValues(alpha: .4) : Colors.transparent)),
+          child: inner,
+        ),
+      );
+    }
 
-    final form = ListView(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      children: [
-        KeyedSubtree(key: Tours.key('ask-category'), child: hScroll(height: 40, [
+    Widget? panel;
+    switch (_open) {
+      case 'type':
+        panel = Wrap(spacing: 6, runSpacing: 6, children: [
           for (final o in kPostCategories)
             GestureDetector(
               onTap: () => setState(() {
                 _category = o.value;
-                _dismissed = false;
+                _typeChosen = true;
+                _open = null;
               }),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
+              child: Container(
                 height: 32,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
                   color: _category == o.value ? p.ink : p.canvas,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: _category == o.value ? Colors.transparent : p.border.withValues(alpha: .7)),
-                  boxShadow: _category == o.value ? const [BoxShadow(color: Color(0x14000000), blurRadius: 2, offset: Offset(0, 1))] : null,
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   WIcon(categoryIcon(o.value), size: 14, color: _category == o.value ? p.onInk : p.muted, still: true),
@@ -728,34 +686,75 @@ class _AskFormState extends State<_AskForm> {
                 ]),
               ),
             ),
-        ])),
-        if (_category == 'other') ...[
-          const SizedBox(height: 6),
-          TextField(controller: _other, maxLength: 40, onChanged: (_) => setState(() {}), decoration: _input(p, t('What is this about? e.g. Event stall, Legal help, Insurance'))),
-        ],
-        if (suggestion != null && !_dismissed) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(8)),
-            child: Row(children: [
-              WIcon(WI.sparkle, size: 16, color: p.link),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text.rich(TextSpan(children: [
-                  TextSpan(text: '${t('Sounds like')} '),
-                  TextSpan(text: t(kCategoryShort[suggestion] ?? labelOf(kPostCategories, suggestion)), style: const TextStyle(fontWeight: FontWeight.w700)),
-                ]), style: const TextStyle(fontSize: 14)),
+        ]);
+      case 'where':
+        panel = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Expanded(child: CityPill(value: _location, placeholder: 'Choose a city', height: 38, rounded: true, near: _geo == null ? null : (lat: _geo!.lat, lng: _geo!.lng), onChanged: _pickNode)),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _locating ? null : _useMyLocation,
+              child: Opacity(
+                opacity: _locating ? .6 : 1,
+                child: DashedBox(
+                  radius: 20,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: SizedBox(
+                    height: 38,
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      WIcon(WI.locate, size: 16, color: p.link, strokeWidth: 1.9),
+                      const SizedBox(width: 6),
+                      Text(_locating ? t('Locating…') : t('My location'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link)),
+                    ]),
+                  ),
+                ),
               ),
-              GestureDetector(onTap: () => setState(() => _category = suggestion), child: Text(t('Use'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link))),
-              const SizedBox(width: 10),
-              GestureDetector(onTap: () => setState(() => _dismissed = true), child: WIcon(WI.close, size: 16, color: p.muted)),
+            ),
+          ]),
+          if (_locNote != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_locNote!, style: TextStyle(fontSize: 12, color: p.muted))),
+          if (_geo != null) ...[
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(child: Text(t('Reach radius').toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted))),
+              Text(_radiusLabel(_geo!.radiusM), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()])),
             ]),
-          ),
-        ],
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(activeTrackColor: const Color(0xFFE0AD00), thumbColor: const Color(0xFFE0AD00), inactiveTrackColor: p.border, overlayShape: SliderComponentShape.noOverlay, trackHeight: 4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Slider(
+                  value: _radii.indexOf(_geo!.radiusM).clamp(0, _radii.length - 1).toDouble(),
+                  min: 0,
+                  max: (_radii.length - 1).toDouble(),
+                  divisions: _radii.length - 1,
+                  onChanged: (v) => setState(() => _geo = (lat: _geo!.lat, lng: _geo!.lng, radiusM: _radii[v.round()])),
+                  onChangeEnd: (_) => _loadReach(),
+                ),
+              ),
+            ),
+            Text(t('Members inside the circle see this ask.'), style: TextStyle(fontSize: 12, color: p.muted)),
+          ],
+        ]);
+      case 'when':
+        panel = Wrap(spacing: 6, runSpacing: 6, children: [for (final o in kUrgencies) pill(t(o.label), _urgency == o.value, () => setState(() => _urgency = _urgency == o.value ? '' : o.value))]);
+      case 'budget':
+        panel = _BudgetRange(
+          key: ValueKey(_budgetKey),
+          value: _budget,
+          presets: tip?.$2 ?? const [],
+          onChanged: (v) {
+            setState(() => _budget = v);
+            _saveDraft();
+          },
+        );
+    }
+
+    final shownName = me == null ? '' : (me.isEntrepreneur && me.company.isNotEmpty ? me.company : me.name);
+    final form = ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      children: [
         // an unfinished ask from last time, until the member starts a new one
-        if (_savedDraft != null && title.isEmpty && desc.isEmpty) ...[
-          const SizedBox(height: 12),
+        if (_savedDraft != null && empty) ...[
           DashedBox(
             radius: 8,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -774,249 +773,246 @@ class _AskFormState extends State<_AskForm> {
               GestureDetector(onTap: _discardDraft, child: Text(t('Discard'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted))),
             ]),
           ),
+          const SizedBox(height: 12),
         ],
-        // quick starts, only while nothing is written yet (or to undo one)
-        if (samples.isNotEmpty && ((title.trim().isEmpty && desc.trim().isEmpty) || _undoTpl != null)) ...[
-          const SizedBox(height: 4),
-          KeyedSubtree(key: Tours.key('ask-templates'), child: hScroll(height: 36, [
-            for (final s in samples)
-              GestureDetector(
-                onTap: () => _applyTemplate(s.$2, s.$3),
-                child: DashedBox(
-                  radius: 20,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    WIcon(WI.sparkle, size: 13, color: p.link),
-                    const SizedBox(width: 4),
-                    Text(t(s.$1), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.link)),
+        Text(t('This is how your ask will look on Connect. Fill in each part.'), style: TextStyle(fontSize: 12, color: p.muted)),
+        const SizedBox(height: 10),
+        // the ask laid out like its row on Connect: photo, name and time, then the title, details and chips as fields
+        KeyedSubtree(
+          key: Tours.key('ask-card'),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (me != null) ...[Avatar(name: shownName, photoUrl: me.photoUrl, size: 40, type: me.userType, badge: 18), const SizedBox(width: 10)],
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                if (me != null) ...[
+                  Row(children: [
+                    Flexible(child: Text(shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+                    if (me.verification > 0 || me.premium) ...[const SizedBox(width: 4), VerifiedBadge(level: me.verification, premium: me.premium)],
+                    const SizedBox(width: 6),
+                    Text(t('just now'), style: TextStyle(fontSize: 12, color: p.muted)),
                   ]),
-                ),
-              ),
-            if (_undoTpl != null)
-              GestureDetector(
-                onTap: () => setState(() {
-                  _title.text = _undoTpl!.$1;
-                  _desc.text = _undoTpl!.$2;
-                  _undoTpl = null;
-                }),
-                child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Text(t('Undo'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.muted))),
-              ),
-          ])),
-        ],
-        if (_aiError != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_aiError!, style: TextStyle(fontSize: 12, color: p.danger))),
-        const SizedBox(height: 12),
-        Text(t('Write in your own language: हिंदी, मराठी, ગુજરાતી, English or any other. It is posted as you write it.'), style: TextStyle(fontSize: 12, color: p.muted)),
-        const SizedBox(height: 4),
-        _fieldActions(p, 'title'),
-        TextField(
-          key: Tours.key('ask-title'),
-          controller: _title,
-          focusNode: _titleFocus,
-          maxLength: 100,
-          textInputAction: TextInputAction.next,
-          textCapitalization: TextCapitalization.sentences,
-          onSubmitted: (_) => _descFocus.requestFocus(),
-          style: const TextStyle(fontSize: 16),
-          decoration: _input(p, t('e.g. Need 5 CNC operators in Turbhe'), error: titleBlank ? t('Replace the [brackets] with your details') : null),
-        ),
-        if (title.length > 80) Align(alignment: Alignment.centerRight, child: Text('${title.length}/100', style: TextStyle(fontSize: 12, color: p.muted))),
-        if (titleIdea != null)
-          GestureDetector(
-            onTap: () => _title.text = titleIdea!,
-            child: Container(
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(8)),
-              child: Row(children: [
-                WIcon(WI.sparkle, size: 16, color: p.link),
-                const SizedBox(width: 8),
-                Expanded(child: Text('${t('Use as title')}: “$titleIdea”', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14))),
-              ]),
-            ),
-          ),
-        _suggestion(p, 'title') ?? const SizedBox.shrink(),
-        const SizedBox(height: 12),
-        _fieldActions(p, 'description'),
-        TextField(
-          key: Tours.key('ask-description'),
-          controller: _desc,
-          focusNode: _descFocus,
-          minLines: 3,
-          maxLines: 12,
-          maxLength: 1000,
-          textCapitalization: TextCapitalization.sentences,
-          style: const TextStyle(fontSize: 16),
-          decoration: _input(p, t(tip?.$1 ?? 'Describe what you need: quantity, quality, area, timing'), error: descBlank ? t('Replace the [brackets] with your details') : null),
-        ),
-        _suggestion(p, 'description') ?? const SizedBox.shrink(),
-        if (desc.length > 800) Align(alignment: Alignment.centerRight, child: Text('${desc.length}/1000', style: TextStyle(fontSize: 12, color: p.muted))),
-        const SizedBox(height: 12),
-        hScroll(height: 56, [
-          for (final ph in _photos)
-            SizedBox(
-              width: 56,
-              height: 56,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Stack(fit: StackFit.expand, children: [
-                  Opacity(
-                    opacity: ph.url == null && !ph.failed ? .6 : 1,
-                    child: FutureBuilder(future: ph.file.readAsBytes(), builder: (_, s) => s.hasData ? Image.memory(s.data!, fit: BoxFit.cover) : ColoredBox(color: p.chip)),
-                  ),
-                  if (ph.url == null && !ph.failed) const Positioned(left: 0, right: 0, bottom: 0, height: 4, child: DecoratedBox(decoration: BoxDecoration(gradient: kGoldGradient))),
-                  if (ph.failed)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: Container(color: p.danger, padding: const EdgeInsets.symmetric(vertical: 2), child: Text(t('Failed'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white))),
-                    ),
-                  Positioned(
-                    right: 4,
-                    top: 4,
-                    child: GestureDetector(
-                      onTap: () => setState(() => _photos.remove(ph)),
-                      child: Container(padding: const EdgeInsets.all(2), decoration: BoxDecoration(color: kInk.withValues(alpha: .75), shape: BoxShape.circle), child: const WIcon(WI.close, size: 14, color: Colors.white)),
+                  Text(me.isEntrepreneur ? me.name : me.company, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: p.tagBg, borderRadius: BorderRadius.circular(20)),
+                      child: Text('✦ ${t('Your ask')}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.tagText)),
                     ),
                   ),
-                ]),
-              ),
-            ),
-          if (_photos.length < _maxAskImages)
-            GestureDetector(
-              onTap: _addPhotos,
-              child: DashedBox(
-                radius: 8,
-                padding: EdgeInsets.zero,
-                child: SizedBox(
-                  height: 56,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      WIcon(WI.imageAdd, size: 20, color: p.muted),
-                      const SizedBox(width: 8),
-                      Text(_photos.isEmpty ? t('Add photos') : '${_photos.length}/$_maxAskImages', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
-                    ]),
-                  ),
+                  const SizedBox(height: 8),
+                ],
+                TextField(
+                  key: Tours.key('ask-title'),
+                  controller: _title,
+                  focusNode: _titleFocus,
+                  maxLength: 100,
+                  minLines: 1,
+                  maxLines: 3,
+                  textInputAction: TextInputAction.next,
+                  textCapitalization: TextCapitalization.sentences,
+                  onSubmitted: (_) => _descFocus.requestFocus(),
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.3),
+                  decoration: _input(p, t('Title: e.g. Need 5 CNC operators in Turbhe')),
                 ),
-              ),
-            ),
-        ]),
-        const SizedBox(height: 12),
-        // optional details behind one tidy row that always shows what is set
-        Container(
-          key: Tours.key('ask-details'),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => setState(() => _more = !_more),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                child: Row(children: [
-                  Expanded(
-                    child: Semantics(
-                      label: t('Location, timing and budget'),
+                if (titleIdea != null)
+                  GestureDetector(
+                    onTap: () => _title.text = titleIdea!,
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(8)),
                       child: Row(children: [
-                        detail(WI.pin, _location.isEmpty ? t('Anywhere') : t(_location)),
-                        const SizedBox(width: 12),
-                        detail(WI.clock, _urgency.isEmpty ? t('Any time') : t(labelOf(kUrgencies, _urgency))),
-                        const SizedBox(width: 12),
-                        detail(WI.rupee, _budget.isEmpty ? t('Any') : _budget),
+                        WIcon(WI.sparkle, size: 16, color: p.link),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text('${t('Use as title')}: “$titleIdea”', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14))),
                       ]),
                     ),
                   ),
-                  AnimatedRotation(turns: _more ? .25 : 0, duration: const Duration(milliseconds: 150), child: WIcon(WI.chevronRight, size: 20, color: p.muted)),
-                ]),
-              ),
-            ),
-            if (_more)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border))),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  _caps(p, 'Where'),
-                  const SizedBox(height: 6),
-                  Row(children: [
-                    Expanded(child: CityPill(value: _location, placeholder: 'Choose a city', height: 38, rounded: true, near: _geo == null ? null : (lat: _geo!.lat, lng: _geo!.lng), onChanged: _pickNode)),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: _locating ? null : _useMyLocation,
-                      child: Opacity(
-                        opacity: _locating ? .6 : 1,
-                        child: DashedBox(
-                          radius: 20,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: SizedBox(
-                            height: 38,
-                            child: Row(mainAxisSize: MainAxisSize.min, children: [
-                              WIcon(WI.locate, size: 16, color: p.link, strokeWidth: 1.9),
-                              const SizedBox(width: 6),
-                              Text(_locating ? t('Locating…') : t('My location'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link)),
-                            ]),
+                const SizedBox(height: 8),
+                TextField(
+                  key: Tours.key('ask-description'),
+                  controller: _desc,
+                  focusNode: _descFocus,
+                  minLines: 3,
+                  maxLines: 12,
+                  maxLength: 1000,
+                  textCapitalization: TextCapitalization.sentences,
+                  style: const TextStyle(fontSize: 15, height: 1.4),
+                  decoration: _input(p, t(tip?.$1 ?? 'Describe what you need: quantity, quality, area, timing')),
+                ),
+                if (title.length > 80 || desc.length > 800)
+                  Align(alignment: Alignment.centerRight, child: Text(desc.length > 800 ? '${desc.length}/1000' : '${title.length}/100', style: TextStyle(fontSize: 12, color: p.muted))),
+                const SizedBox(height: 10),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  for (final ph in _photos)
+                    SizedBox(
+                      width: 72,
+                      height: 72,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Stack(fit: StackFit.expand, children: [
+                          Opacity(
+                            opacity: ph.url == null && !ph.failed ? .6 : 1,
+                            child: FutureBuilder(future: ph.file.readAsBytes(), builder: (_, s) => s.hasData ? Image.memory(s.data!, fit: BoxFit.cover) : ColoredBox(color: p.chip)),
                           ),
+                          if (ph.url == null && !ph.failed) const Positioned(left: 0, right: 0, bottom: 0, height: 4, child: DecoratedBox(decoration: BoxDecoration(gradient: kGoldGradient))),
+                          if (ph.failed)
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              child: Container(color: p.danger, padding: const EdgeInsets.symmetric(vertical: 2), child: Text(t('Failed'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white))),
+                            ),
+                          Positioned(
+                            right: 4,
+                            top: 4,
+                            child: GestureDetector(
+                              onTap: () => setState(() => _photos.remove(ph)),
+                              child: Container(padding: const EdgeInsets.all(2), decoration: BoxDecoration(color: kInk.withValues(alpha: .75), shape: BoxShape.circle), child: const WIcon(WI.close, size: 14, color: Colors.white)),
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ),
+                  if (_photos.length < _maxAskImages)
+                    DashedBox(
+                      radius: 8,
+                      padding: EdgeInsets.zero,
+                      onTap: _addPhotos,
+                      child: SizedBox(
+                        height: _photos.isEmpty ? 40 : 72,
+                        width: _photos.isEmpty ? null : 72,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
+                            WIcon(WI.imageAdd, size: 20, color: p.muted),
+                            const SizedBox(width: 8),
+                            Text(_photos.isEmpty ? t('Add photos') : '${_photos.length}/$_maxAskImages', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
+                          ]),
                         ),
                       ),
                     ),
+                ]),
+                const SizedBox(height: 10),
+                // the essentials as chips, as on Connect; each opens its choices
+                KeyedSubtree(
+                  key: Tours.key('ask-details'),
+                  child: Wrap(spacing: 6, runSpacing: 6, children: [
+                    KeyedSubtree(
+                      key: Tours.key('ask-category'),
+                      child: chip(
+                        'type',
+                        categoryIcon(_category.isEmpty ? 'other' : _category),
+                        _category.isEmpty ? t('Type') : (_category == 'other' && _other.text.trim().isNotEmpty ? _other.text.trim() : t(kCategoryShort[_category] ?? labelOf(kPostCategories, _category))),
+                        _category.isNotEmpty,
+                        auto: _category.isNotEmpty && !_typeChosen,
+                      ),
+                    ),
+                    chip('where', WI.pin, _location.isEmpty ? t('Where') : t(_location), _location.isNotEmpty),
+                    if (_geo != null) chip('where', WI.locate, t('{d} reach', {'d': _radiusLabel(_geo!.radiusM)}), true),
+                    chip('budget', WI.rupee, _budget.isEmpty ? t('Budget') : _budget, _budget.isNotEmpty),
+                    chip('when', WI.clock, _urgency.isEmpty ? t('When') : t(labelOf(kUrgencies, _urgency)), _urgency.isNotEmpty),
                   ]),
-                  if (_locNote != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_locNote!, style: TextStyle(fontSize: 12, color: p.muted))),
-                  if (_geo != null) ...[
-                    const SizedBox(height: 12),
-                    Row(children: [
-                      Expanded(child: Text(t('Reach radius').toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted))),
-                      Text(_radiusLabel(_geo!.radiusM), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()])),
-                    ]),
-                    SliderTheme(
-                      data: SliderTheme.of(context).copyWith(activeTrackColor: const Color(0xFFE0AD00), thumbColor: const Color(0xFFE0AD00), inactiveTrackColor: p.border, overlayShape: SliderComponentShape.noOverlay, trackHeight: 4),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Slider(
-                          value: _radii.indexOf(_geo!.radiusM).clamp(0, _radii.length - 1).toDouble(),
-                          min: 0,
-                          max: (_radii.length - 1).toDouble(),
-                          divisions: _radii.length - 1,
-                          onChanged: (v) => setState(() => _geo = (lat: _geo!.lat, lng: _geo!.lng, radiusM: _radii[v.round()])),
-                          onChangeEnd: (_) => _loadReach(),
-                        ),
+                ),
+                if (panel != null)
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(12), border: Border.all(color: p.border)),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      panel,
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(onTap: () => setState(() => _open = null), child: Text(t('Done'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
                       ),
-                    ),
-                    Wrap(spacing: 6, runSpacing: 6, children: [
-                      for (final r in _radii)
-                        GestureDetector(
-                          onTap: () {
-                            setState(() => _geo = (lat: _geo!.lat, lng: _geo!.lng, radiusM: r));
-                            _loadReach();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(color: _geo!.radiusM == r ? p.ink : p.chip, borderRadius: BorderRadius.circular(20)),
-                            child: Text(_radiusLabel(r), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _geo!.radiusM == r ? p.onInk : p.muted)),
-                          ),
-                        ),
                     ]),
-                    const SizedBox(height: 8),
-                    Text(t('Members inside the circle see this ask.'), style: TextStyle(fontSize: 12, color: p.muted)),
-                  ],
-                  const SizedBox(height: 16),
-                  _caps(p, 'When'),
-                  const SizedBox(height: 6),
-                  hScroll([for (final o in kUrgencies) pill(t(o.label), _urgency == o.value, () => setState(() => _urgency = _urgency == o.value ? '' : o.value))]),
-                  const SizedBox(height: 16),
-                  _caps(p, 'Budget'),
-                  const SizedBox(height: 6),
-                  _BudgetRange(
-                    key: ValueKey(_budgetKey),
-                    value: _budget,
-                    presets: tip?.$2 ?? const [],
-                    onChanged: (v) {
-                      setState(() => _budget = v);
-                      _saveDraft();
-                    },
                   ),
-                ]),
-              ),
+                if (_category == 'other') ...[
+                  const SizedBox(height: 8),
+                  TextField(controller: _other, maxLength: 40, onChanged: (_) => setState(() {}), decoration: _input(p, t('What is this about? e.g. Event stall, Legal help, Insurance'))),
+                ],
+              ]),
+            ),
           ]),
         ),
+        _aiCard(p) ?? const SizedBox.shrink(),
+        if (_aiError != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_aiError!, style: TextStyle(fontSize: 12, color: p.danger))),
+        if (canAskAi || _aiUndo != null || _undoTpl != null || !empty) ...[
+          const SizedBox(height: 12),
+          Row(children: [
+            if (canAskAi)
+              GestureDetector(
+                onTap: _aiBusy ? null : _askAi,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 2, offset: Offset(0, 1))]),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const WIcon(WI.sparkle, size: 16, color: kInk),
+                    const SizedBox(width: 6),
+                    Text(_aiBusy ? t('Thinking…') : t('Ask AI'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
+                  ]),
+                ),
+              ),
+            if ((_aiUndo != null && !_aiBusy) || _undoTpl != null) ...[
+              const SizedBox(width: 12),
+              GestureDetector(
+                onTap: () => setState(() {
+                  if (_aiUndo != null) {
+                    _title.text = _aiUndo!.$1;
+                    _desc.text = _aiUndo!.$2;
+                    _aiUndo = null;
+                  } else if (_undoTpl != null) {
+                    _typeChosen = _undoTpl!.$4;
+                    _category = _undoTpl!.$3;
+                    _title.text = _undoTpl!.$1;
+                    _desc.text = _undoTpl!.$2;
+                    _undoTpl = null;
+                  }
+                }),
+                child: Text(t('Undo'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted, decoration: TextDecoration.underline)),
+              ),
+            ],
+            const Spacer(),
+            if (!empty)
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _undoTpl = null;
+                    _aiDraft = null;
+                    if (!_typeChosen) _category = '';
+                  });
+                  _title.clear();
+                  _desc.clear();
+                  _titleFocus.requestFocus();
+                },
+                child: Row(children: [WIcon(WI.close, size: 14, color: p.muted), const SizedBox(width: 4), Text(t('Clear'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted))]),
+              ),
+          ]),
+        ],
+        // examples: a starting point while the ask is empty, never filled in on their own
+        if (empty) ...[
+          const SizedBox(height: 16),
+          _caps(p, 'Or start from an example'),
+          const SizedBox(height: 6),
+          KeyedSubtree(key: Tours.key('ask-templates'), child: hScroll(height: 36, [
+            for (final s in examples)
+              DashedBox(
+                radius: 20,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                onTap: () => _applyTemplate(s.$1, s.$3, s.$4),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  WIcon(categoryIcon(s.$1), size: 14, color: p.link, still: true),
+                  const SizedBox(width: 6),
+                  Text(t(s.$2), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.link)),
+                ]),
+              ),
+          ])),
+        ],
+        const SizedBox(height: 12),
+        Text(t('Write in your own language: हिंदी, मराठी, ગુજરાતી, English or any other. It is posted as you write it.'), style: TextStyle(fontSize: 12, color: p.muted)),
         if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
       ],
     );
@@ -1222,113 +1218,6 @@ class _BudgetRangeState extends State<_BudgetRange> {
           ]),
         ),
       ],
-    ]);
-  }
-}
-
-/// Update tab (web UpdateForm): a photo, a caption, or both; disappears from the feed after 24 hours.
-class _UpdateForm extends StatefulWidget {
-  final VoidCallback onPosted;
-  const _UpdateForm({required this.onPosted});
-  @override
-  State<_UpdateForm> createState() => _UpdateFormState();
-}
-
-class _UpdateFormState extends State<_UpdateForm> {
-  XFile? _file;
-  final _text = TextEditingController();
-  bool _busy = false;
-  String? _error;
-
-  Future<void> _pick() async {
-    final f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1280, imageQuality: 75);
-    if (f != null) setState(() => _file = f);
-  }
-
-  Future<void> _submit() async {
-    final api = context.read<AuthProvider>().api;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final url = _file == null ? null : await api.uploadImage(await _file!.readAsBytes(), _file!.name);
-      await api.post('/updates', {if (url != null) 'imageUrl': url, if (_text.text.trim().isNotEmpty) 'text': _text.text.trim()});
-      if (!mounted) return;
-      _text.clear();
-      setState(() => _file = null);
-      toast(context, t('Update added'));
-      widget.onPosted();
-    } catch (e) {
-      if (mounted) setState(() => _error = '$e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    _text.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Pal.of(context);
-    OutlineInputBorder b(Color c) => OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: c));
-    return ListView(padding: EdgeInsets.fromLTRB(16, 8, 16, islandSpace(context)), children: [
-      Text(t('Updates disappear from the feed after 24 hours and stay in your profile archive.'), style: TextStyle(fontSize: 14, color: p.muted)),
-      const SizedBox(height: 16),
-      if (_file != null)
-        GestureDetector(
-          onTap: _pick,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              constraints: const BoxConstraints(maxHeight: 320),
-              color: kInk,
-              child: FutureBuilder(future: _file!.readAsBytes(), builder: (_, s) => s.hasData ? Image.memory(s.data!, fit: BoxFit.contain, width: double.infinity) : const SizedBox(height: 160)),
-            ),
-          ),
-        )
-      else
-        DashedBox(
-          onTap: _pick,
-          radius: 8,
-          padding: EdgeInsets.zero,
-          child: SizedBox(
-            height: 160,
-            width: double.infinity,
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              WIcon(WI.imageAdd, size: 32, color: p.muted),
-              const SizedBox(height: 8),
-              Text(t('Choose a photo (optional)'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.muted)),
-            ]),
-          ),
-        ),
-      const SizedBox(height: 16),
-      TextField(
-        controller: _text,
-        minLines: 3,
-        maxLines: 6,
-        maxLength: 200,
-        onChanged: (_) => setState(() {}),
-        style: const TextStyle(fontSize: 16),
-        decoration: InputDecoration(
-          hintText: t('Say something…'),
-          hintStyle: TextStyle(color: p.muted),
-          counterText: '',
-          filled: true,
-          fillColor: p.card,
-          contentPadding: const EdgeInsets.all(14),
-          border: b(p.border),
-          enabledBorder: b(p.border),
-          focusedBorder: b(p.text),
-        ),
-      ),
-      if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
-      const SizedBox(height: 16),
-      GoldButton(label: t('Add update'), loading: _busy, onPressed: _file != null || _text.text.trim().isNotEmpty ? _submit : null),
     ]);
   }
 }
