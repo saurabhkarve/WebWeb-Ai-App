@@ -1506,5 +1506,22 @@
   "In any language: हिंदी, मराठी, ગુજરાતી, English…": "किसी भी भाषा में: हिंदी, मराठी, ગુજરાતી, English…",
   "Write in your own language: हिंदी, मराठी, ગુજરાતી, English or any other. It is posted as you write it.": "अपनी भाषा में लिखें: हिंदी, मराठी, ગુજરાતી, English या कोई और। जैसा लिखेंगे, वैसा ही पोस्ट होगा।",
   "Tidied": "व्यवस्थित किया",
-  "Your words are kept as you wrote them, in your language. Only spacing was tidied.": "आपके शब्द आपकी भाषा में वैसे ही रखे गए हैं जैसे आपने लिखे। सिर्फ़ स्पेसिंग ठीक की गई।"
+  "Your words are kept as you wrote them, in your language. Only spacing was tidied.": "आपके शब्द आपकी भाषा में वैसे ही रखे गए हैं जैसे आपने लिखे। सिर्फ़ स्पेसिंग ठीक की गई।",
+  "Only the contacts you pick are shared (and service contacts, if you turn that on). Your phone book is never uploaded.": "सिर्फ़ आपके चुने हुए संपर्क साझा होते हैं (और सर्विस संपर्क, अगर आपने चालू किया है)। आपकी पूरी फ़ोन बुक कभी अपलोड नहीं होती।",
+  "Turn off Service contacts?": "सर्विस संपर्क बंद करें?",
+  "The contacts you sent will be removed, and the app will stop looking.": "आपके भेजे संपर्क हटा दिए जाएँगे, और ऐप खोजना बंद कर देगा।",
+  "Service contacts is off": "सर्विस संपर्क बंद है",
+  "Service contacts is on": "सर्विस संपर्क चालू है",
+  "To find service providers saved in your phone book.": "आपकी फ़ोन बुक में सेव सर्विस देने वालों को खोजने के लिए।",
+  "Thank you! {n} service contacts shared.": "धन्यवाद! {n} सर्विस संपर्क साझा हुए।",
+  "Share service contacts": "सर्विस संपर्क साझा करें",
+  "Help build a trusted list of local service providers: the plumbers, electricians, cabs and carpenters people already call.": "स्थानीय सर्विस देने वालों की भरोसेमंद सूची बनाने में मदद करें: वही प्लंबर, इलेक्ट्रीशियन, कैब और बढ़ई जिन्हें लोग पहले से बुलाते हैं।",
+  "The app looks through your phone book on your phone for contacts saved with a service word, like plumber, electrician, cab or carpenter.": "ऐप आपके फ़ोन पर ही आपकी फ़ोन बुक में ऐसे संपर्क खोजता है जो किसी सर्विस शब्द के साथ सेव हैं, जैसे प्लंबर, इलेक्ट्रीशियन, कैब या कारपेंटर।",
+  "Only those contacts are sent: the name you saved, the mobile number and the word that matched.": "सिर्फ़ वही संपर्क भेजे जाते हैं: आपका सेव किया नाम, मोबाइल नंबर और मिला हुआ शब्द।",
+  "The rest of your phone book never leaves your phone. Our team reviews every contact before it is used.": "आपकी बाकी फ़ोन बुक कभी आपके फ़ोन से बाहर नहीं जाती। हर संपर्क इस्तेमाल से पहले हमारी टीम जाँचती है।",
+  "It checks for new ones at most once a day while you use the app. Turn it off any time from the account menu; what you sent is removed.": "ऐप इस्तेमाल करते समय यह दिन में ज़्यादा से ज़्यादा एक बार नए संपर्क देखता है। खाता मेन्यू से इसे कभी भी बंद करें; आपका भेजा हटा दिया जाएगा।",
+  "Service contacts": "सर्विस संपर्क",
+  "Share plumbers, electricians, cabs…": "प्लंबर, इलेक्ट्रीशियन, कैब… साझा करें",
+  "WebWeb AI": "WebWeb AI",
+  "Version {v}": "वर्ज़न {v}"
 }

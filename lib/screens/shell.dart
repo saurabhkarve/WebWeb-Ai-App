@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../auth_provider.dart';
 import '../config.dart';
+import '../contact_sync.dart';
 import '../i18n.dart';
 import '../models.dart';
 import '../notifications.dart';
@@ -22,6 +24,7 @@ import 'edit_profile.dart';
 import 'find.dart';
 import 'post_detail.dart';
 import 'profile.dart';
+import 'service_contacts_sheet.dart';
 import 'support_sheet.dart';
 import 'talk.dart';
 
@@ -41,7 +44,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int _unread = 0;
   int _askSpin = 0;
   StreamSubscription? _sub, _pushSub;
-  Timer? _poll;
+  Timer? _poll, _svcTimer;
   final _notes = NotificationsModel();
 
   static const _items = [(WI.connect, 'Connect'), (WI.search, 'Find'), (WI.talk, 'Talk'), (WI.askPlus, 'Ask')];
@@ -59,6 +62,17 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       if (e['type'] == 'notify') _refreshAll();
     });
     _pushSub = NotificationService.activity.stream.listen((_) => _refreshAll());
+    // service contacts: look quietly if the member turned it on; the one-time invitation from the third open
+    _svcTimer = Timer(const Duration(seconds: 12), () async {
+      if (!mounted) return;
+      final api = context.read<AuthProvider>().api;
+      if (await ContactSync.isOn(api).catchError((_) => true)) {
+        ContactSync.run(api);
+      } else if (await ContactSync.shouldInvite() && mounted && ModalRoute.of(context)?.isCurrent == true) {
+        await ContactSync.markInvited();
+        if (mounted) showServiceContactsSheet(context, invite: true);
+      }
+    });
   }
 
   @override
@@ -66,6 +80,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     if (s == AppLifecycleState.resumed) {
       _loadUnread();
       _notes.refresh(context.read<AuthProvider>());
+      ContactSync.run(context.read<AuthProvider>().api); // once a day at most, and only when it is on
     }
   }
 
@@ -89,6 +104,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     _sub?.cancel();
     _pushSub?.cancel();
     _poll?.cancel();
+    _svcTimer?.cancel();
     _notes.dispose();
     super.dispose();
   }
@@ -454,15 +470,105 @@ class _AccountMenu extends StatelessWidget {
               const SizedBox(height: 8),
               // two-step verification, blocked people, sign out everywhere, delete account: a tab of Edit profile
               item(WI.lock, 'Account and privacy', () => push(EditProfileScreen(profile: me, tab: 'account'))),
+              if (ContactSync.supported) const _ServiceContactsRow(),
             ]),
           ),
           divider,
           Padding(
             padding: EdgeInsets.fromLTRB(8, 8, 8, 8 + mq.padding.bottom),
-            child: row(WI.logout, label(t('Log out'), color: p.danger), () {
-              Navigator.of(context).pop();
-              auth.logout();
-            }, bg: p.danger.withValues(alpha: .1), fg: p.danger),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              row(WI.logout, label(t('Log out'), color: p.danger), () {
+                Navigator.of(context).pop();
+                auth.logout();
+              }, bg: p.danger.withValues(alpha: .1), fg: p.danger),
+              const SizedBox(height: 6),
+              const _AppVersion(),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// "WebWeb AI · Version 0.1.9 (42)" at the foot of the account menu.
+class _AppVersion extends StatelessWidget {
+  const _AppVersion();
+  static final _info = PackageInfo.fromPlatform();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return FutureBuilder<PackageInfo>(
+      future: _info,
+      builder: (_, s) {
+        final i = s.data;
+        return Text(
+          i == null ? ' ' : '${t('WebWeb AI')} · ${t('Version {v}', {'v': i.version})}${i.buildNumber.isEmpty ? '' : ' (${i.buildNumber})'}',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: p.muted, fontFeatures: const [FontFeature.tabularFigures()]),
+        );
+      },
+    );
+  }
+}
+
+/// Account menu row: Service contacts on or off (see [ContactSync]). Turning on opens the explanation first.
+class _ServiceContactsRow extends StatefulWidget {
+  const _ServiceContactsRow();
+  @override
+  State<_ServiceContactsRow> createState() => _ServiceContactsRowState();
+}
+
+class _ServiceContactsRowState extends State<_ServiceContactsRow> {
+  bool? _on;
+
+  @override
+  void initState() {
+    super.initState();
+    ContactSync.isOn(context.read<AuthProvider>().api).then((v) {
+      if (mounted) setState(() => _on = v);
+    }, onError: (_) {});
+  }
+
+  Future<void> _toggle() async {
+    if (_on == null) return;
+    final changed = _on! ? await turnOffServiceContacts(context) : await showServiceContactsSheet(context) == true;
+    if (changed && mounted) setState(() => _on = !_on!);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final on = _on == true;
+    return InkWell(
+      onTap: _toggle,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(children: [
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(12)),
+            child: WIcon(WI.contactCard, size: 20, color: p.muted, strokeWidth: 1.8),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(t('Service contacts'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+              Text(t('Share plumbers, electricians, cabs…'), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+            ]),
+          ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 44,
+            height: 24,
+            padding: const EdgeInsets.all(3),
+            alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+            decoration: BoxDecoration(color: on ? kGold : p.border, borderRadius: BorderRadius.circular(12)),
+            child: Container(width: 18, height: 18, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Color(0x33000000), blurRadius: 2)])),
           ),
         ]),
       ),
