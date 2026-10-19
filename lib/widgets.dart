@@ -56,7 +56,10 @@ class LogoInline extends StatefulWidget {
   final VoidCallback? onTap;
   /// AI pill under the wordmark (app header, sign-in); false puts it beside the wordmark (web Logo withText)
   final bool stacked;
-  const LogoInline({super.key, this.size = 36, this.markSize, this.onTap, this.stacked = true});
+  /// "BUSINESS NETWORK" under the wordmark, spread across its width in a quiet grey (the web site header);
+  /// puts the AI pill beside the wordmark
+  final bool tagline;
+  const LogoInline({super.key, this.size = 36, this.markSize, this.onTap, this.stacked = true, this.tagline = false});
   @override
   State<LogoInline> createState() => _LogoInlineState();
 }
@@ -83,8 +86,10 @@ class _LogoInlineState extends State<LogoInline> with SingleTickerProviderStateM
     final p = Pal.of(context);
     final size = widget.size;
     final word = (size * .5).roundToDouble();
-    final pillH = (size * (widget.stacked ? .36 : .5)).roundToDouble();
-    final pillFont = math.max(8, (size * (widget.stacked ? .24 : .28)).round()).toDouble();
+    final stacked = widget.stacked && !widget.tagline;
+    final pillH = (size * (stacked ? .36 : .5)).roundToDouble();
+    final pillFont = math.max(8, (size * (stacked ? .24 : .28)).round()).toDouble();
+    final tagFont = math.max(9, (size * .3).round()).toDouble();
     final goldWord = p.dark
         ? const LinearGradient(colors: [Color(0xFFFFD84A), Color(0xFFFFC700), Color(0xFFE0AD00)], stops: [0, .5, 1], begin: Alignment.topLeft, end: Alignment.bottomRight)
         : const LinearGradient(colors: [Color(0xFF7A5B00), Color(0xFFD9B53A), Color(0xFF9A7B00)], stops: [0, .45, 1], begin: Alignment.topLeft, end: Alignment.bottomRight);
@@ -98,7 +103,7 @@ class _LogoInlineState extends State<LogoInline> with SingleTickerProviderStateM
           child: AnimatedLogo(size: widget.markSize ?? size, playKey: _play),
         ),
         const SizedBox(width: 8),
-        Flex(direction: widget.stacked ? Axis.vertical : Axis.horizontal, mainAxisSize: MainAxisSize.min, crossAxisAlignment: widget.stacked ? CrossAxisAlignment.start : CrossAxisAlignment.center, children: [
+        _withTagline(p, tagFont, Flex(direction: stacked ? Axis.vertical : Axis.horizontal, mainAxisSize: MainAxisSize.min, crossAxisAlignment: stacked ? CrossAxisAlignment.start : CrossAxisAlignment.center, children: [
           Row(mainAxisSize: MainAxisSize.min, children: [
             Text('WEB', style: TextStyle(fontSize: word, fontWeight: FontWeight.w900, height: 1, letterSpacing: word * .02, color: p.text)),
             ShaderMask(
@@ -107,7 +112,7 @@ class _LogoInlineState extends State<LogoInline> with SingleTickerProviderStateM
               child: Text('WEB', style: TextStyle(fontSize: word, fontWeight: FontWeight.w900, height: 1, letterSpacing: word * .02, color: Colors.white)),
             ),
           ]),
-          SizedBox(height: widget.stacked ? 3 : 0, width: widget.stacked ? 0 : 4),
+          SizedBox(height: stacked ? 3 : 0, width: stacked ? 0 : 4),
           Container(
             height: pillH,
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -149,7 +154,29 @@ class _LogoInlineState extends State<LogoInline> with SingleTickerProviderStateM
               ),
             ]),
           ),
-        ]),
+        ])),
+      ]),
+    );
+  }
+
+  /// [word] with "BUSINESS NETWORK" under it, every letter spread across the exact width of the wordmark + pill.
+  Widget _withTagline(Pal p, double font, Widget word) {
+    if (!widget.tagline) return word;
+    const tag = 'BUSINESS NETWORK';
+    return IntrinsicWidth(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+        word,
+        const SizedBox(height: 6),
+        Semantics(
+          label: tag,
+          child: ExcludeSemantics(
+            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              for (final ch in tag.split(''))
+                Text(ch == ' ' ? '\u00A0' : ch,
+                    style: TextStyle(fontSize: font, fontWeight: FontWeight.w500, height: 1, color: p.dark ? const Color(0xFF9C9584) : const Color(0xFF8C8472))),
+            ]),
+          ),
+        ),
       ]),
     );
   }

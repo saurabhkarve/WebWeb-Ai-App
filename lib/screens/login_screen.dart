@@ -224,7 +224,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 384),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      const Center(child: LogoInline(size: 40, markSize: 60)),
+                      const Center(child: LogoInline(size: 36, markSize: 60, tagline: true)),
                       const SizedBox(height: 24),
                       _Rise(
                         key: ValueKey(twoStep ? 2 : (otp ? 1 : 0)),

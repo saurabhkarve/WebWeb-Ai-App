@@ -267,7 +267,7 @@ class _AppHeader extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(children: [
-            Padding(padding: const EdgeInsets.only(left: 4), child: LogoInline(size: 36, markSize: 44, onTap: onHome)),
+            Padding(padding: const EdgeInsets.only(left: 4), child: LogoInline(size: 30, markSize: 44, tagline: true, onTap: onHome)),
             const Spacer(),
             _Bell(notes: notes),
             const SizedBox(width: 8),
