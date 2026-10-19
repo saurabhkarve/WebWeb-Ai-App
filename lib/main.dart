@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'auth_provider.dart';
 import 'call_manager.dart';
 import 'crash_reporter.dart';
+import 'device.dart';
 import 'i18n.dart';
 import 'notifications.dart';
 import 'outbox.dart';
@@ -20,6 +21,8 @@ final navKey = GlobalKey<NavigatorState>();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // this install's id (sent with push tokens and the live connection), and sign-outs that were offline
+  Device.load().then((_) => Device.flushSignOuts());
   if (NotificationService.supported) FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
   final auth = AuthProvider();
   CrashReporter.init(auth.api); // errors from here on are reported (Admin > Crashes)

@@ -7,6 +7,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'api.dart';
 import 'config.dart';
+import 'device.dart';
 
 /// One WebSocket to the API (`/app/ws`): live chat events, typing, presence and call signalling.
 /// Chat messages themselves are sent over REST; this carries what happens around them.
@@ -103,7 +104,7 @@ class RealtimeService extends ChangeNotifier with WidgetsBindingObserver {
     try {
       // the session goes in the first message, never in the URL (URLs end up in access logs)
       final ch = WebSocketChannel.connect(Uri.parse(wsUrl));
-      ch.sink.add(jsonEncode({'type': 'auth', 'token': token}));
+      ch.sink.add(jsonEncode({'type': 'auth', 'token': token, if (Device.id != null) 'deviceId': Device.id}));
       _ch = ch;
       ch.ready.then((_) {
         if (_ch != ch) return;

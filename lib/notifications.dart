@@ -7,8 +7,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
+import 'device.dart';
 import 'auth_provider.dart';
 import 'models.dart';
 import 'native_calls.dart';
@@ -71,6 +73,7 @@ class NotificationService with WidgetsBindingObserver {
     // Foreground push: the WebSocket is probably down (otherwise the server would not push),
     // so show it ourselves.
     FirebaseMessaging.onMessage.listen((m) {
+      if (auth.token == null) return; // signed out on this phone: not for it any more
       activity.add(null);
       _handleData(m.data, title: m.notification?.title, body: m.notification?.body);
     });
@@ -104,6 +107,7 @@ class NotificationService with WidgetsBindingObserver {
     // a registration that failed (no APNs token yet, offline) is retried whenever the app comes back, and the token
     // is sent again at most hourly so a server that lost it (a cleanup, a restore) gets it back on the next open
     if (!_foreground) return;
+    Device.report(auth.api); // permissions may have changed in Settings meanwhile
     if (_registeredFor != null && _registeredAt != null && DateTime.now().difference(_registeredAt!) > const Duration(hours: 1)) {
       _registeredFor = null;
     }
@@ -155,11 +159,13 @@ class NotificationService with WidgetsBindingObserver {
       }
       _fcmToken ??= await FirebaseMessaging.instance.getToken();
       if (_fcmToken == null) return;
-      await auth.api.post('/app/push/token', {'token': _fcmToken, 'platform': _ios ? 'ios' : 'android'});
+      await Device.flushSignOuts(); // an earlier offline sign-out goes first
+      await auth.api.post('/app/push/token', {'token': _fcmToken, 'platform': _ios ? 'ios' : 'android', 'deviceId': await Device.load()});
       _registeredFor = auth.token;
       _registeredAt = DateTime.now();
       await _registerVoip();
       await NativeCalls.requestPermissions();
+      Device.report(auth.api, force: true);
     } catch (e) {
       debugPrint('push token register failed: $e');
     }
@@ -171,22 +177,35 @@ class NotificationService with WidgetsBindingObserver {
     final t = token ?? await NativeCalls.voipToken();
     if (t == null || auth.token == null) return;
     try {
-      await auth.api.post('/app/push/token', {'token': t, 'platform': 'ios', 'kind': 'voip'});
+      await auth.api.post('/app/push/token', {'token': t, 'platform': 'ios', 'kind': 'voip', 'deviceId': await Device.load()});
       _voipToken = t;
     } catch (e) {
       debugPrint('voip token register failed: $e');
     }
   }
 
-  /// Called before logout so this phone stops getting the old account's pushes.
+  /// Called before logout so this phone stops getting the account's pushes: the API forgets this device's
+  /// tokens (by device id, so also ones the app no longer knows; kept and sent later when offline), and the
+  /// phone's Firebase token itself is dropped, so anything still addressed to it fails and is cleaned up.
   Future<void> unregister() async {
-    if (!_ready || auth.token == null) return;
-    for (final t in [_fcmToken, _voipToken]) {
-      if (t == null) continue;
+    final tokens = <String>[];
+    if (_ready) {
       try {
-        await auth.api.post('/app/push/token/remove', {'token': t});
+        _fcmToken ??= await FirebaseMessaging.instance.getToken().timeout(const Duration(seconds: 5));
       } catch (_) {}
+      try {
+        _voipToken ??= _ios ? await NativeCalls.voipToken() : null;
+      } catch (_) {}
+      tokens.addAll([_fcmToken, _voipToken].whereType<String>());
     }
+    await Device.signOut(auth.api, tokens);
+    if (_ready) {
+      try {
+        await FirebaseMessaging.instance.deleteToken();
+      } catch (_) {}
+      await _local.cancelAll();
+    }
+    _fcmToken = null;
     _voipToken = null;
     _registeredFor = null;
   }
@@ -482,6 +501,8 @@ Future<void> handleCallData(Map<String, dynamic> d) async {
 /// Runs in its own isolate when a push arrives while the app is in the background or killed.
 @pragma('vm:entry-point')
 Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
+  // signed out on this phone: a push still on its way is not for it (no ringing for a call)
+  if (message.data['type'] == 'call' && (await SharedPreferences.getInstance()).getString('token') == null) return;
   await initFirebase();
   await handleCallData(message.data);
 }
