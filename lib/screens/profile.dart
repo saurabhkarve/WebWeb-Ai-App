@@ -458,7 +458,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       offset: const Offset(0, 0),
       child: Wrap(spacing: 6, runSpacing: 6, children: [
         tag(icon: u.isEntrepreneur ? WI.business : WI.user, text: t(labelOf(kUserTypes, u.userType))),
-        if (u.location.isNotEmpty) tag(icon: WI.pin, text: t(labelOf(kLocations, u.location))),
+        if (u.location.isNotEmpty) tag(icon: WI.pin, text: u.location == 'Other' ? t('Other') : u.location),
         if (u.category.isNotEmpty) tag(text: t(labelOf(kProfileCategories, u.category))),
         // a GSTIN is public record: tap to check it on the GST portal
         if ((gst ?? '').isNotEmpty)

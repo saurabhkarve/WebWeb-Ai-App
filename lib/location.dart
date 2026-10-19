@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
@@ -7,38 +5,20 @@ import 'package:provider/provider.dart';
 import 'auth_provider.dart';
 import 'i18n.dart';
 import 'permissions.dart';
+import 'places.dart';
 
-/// Same node centres as web/src/lib/constants.ts (NODE_COORDS).
-const kNodeCoords = <String, List<double>>{
-  'Vashi': [19.0771, 72.9986],
-  'Rabale': [19.1417, 73.001],
-  'Turbhe': [19.0723, 73.0156],
-  'Mahape': [19.113, 73.027],
-  'Pawane': [19.1170, 73.0100],
-  'Belapur': [19.023, 73.039],
-  'Kharghar': [19.047, 73.069],
-  'Panvel': [18.9894, 73.1175],
-  'Kalamboli': [19.03, 73.1],
+/// Centres of every city and area (places.dart), by name.
+final Map<String, List<double>> kNodeCoords = {
+  for (final p in kPlaces)
+    if (p.lat != null) p.name: [p.lat!, p.lng!],
 };
 
-/// Nearest node within ~20 km, else "Other" (same rule as the web's nearestLocation).
-String nearestLocation(double lat, double lng) {
-  var best = 'Other';
-  var bestKm = 20.0;
-  kNodeCoords.forEach((name, c) {
-    final dy = (c[0] - lat) * 111;
-    final dx = (c[1] - lng) * 111 * math.cos(lat * math.pi / 180);
-    final km = math.sqrt(dx * dx + dy * dy);
-    if (km < bestKm) {
-      bestKm = km;
-      best = name;
-    }
-  });
-  return best;
-}
+/// The city a point is in (places.dart placeAt), or '' when no city in the list is near (same as the web).
+String nearestLocation(double lat, double lng) => placeAt(lat, lng)?.name ?? '';
 
 class Here {
   final double lat, lng;
+  /// the city it is in, '' when none in the list is near
   final String node;
   const Here(this.lat, this.lng, this.node);
 }

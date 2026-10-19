@@ -8,6 +8,7 @@ import '../i18n.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../widgets/city_picker.dart';
 import '../widgets/image_grid.dart';
 import '../widgets/post_card.dart';
 import '../widgets/reaction_picker.dart';
@@ -693,13 +694,7 @@ class _EditAskSheetState extends State<_EditAskSheet> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(t('Location'), style: const TextStyle(fontSize: 14)),
                   const SizedBox(height: 6),
-                  SelectPill(
-                      value: _location,
-                      placeholder: t('Anywhere'),
-                      rounded: false,
-                      height: 44,
-                      options: [for (final o in kLocations) Option(o.value, t(o.label))],
-                      onChanged: (v) => setState(() => _location = v)),
+                  CityPill(value: _location, anyLabel: t('Anywhere'), onChanged: (c) => setState(() => _location = c.name)),
                 ]),
               ),
               const SizedBox(width: 12),

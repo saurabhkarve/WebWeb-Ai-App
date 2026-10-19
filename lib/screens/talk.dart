@@ -1592,7 +1592,7 @@ class _AttachSheetState extends State<_AttachSheet> {
 
   Future<void> _location() => _run('location', () async {
         final h = await currentLocation(context, reason: t('To share your current location in this chat.'), source: 'chat');
-        await widget.onSend(attachment: {'type': 'location', 'lat': h.lat, 'lng': h.lng, if (h.node != 'Other') 'label': 'Near ${h.node}'});
+        await widget.onSend(attachment: {'type': 'location', 'lat': h.lat, 'lng': h.lng, if (h.node.isNotEmpty) 'label': 'Near ${h.node}'});
       });
 
   Future<void> _pickContact() async {

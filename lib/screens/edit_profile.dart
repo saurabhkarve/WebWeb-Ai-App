@@ -11,6 +11,7 @@ import '../location.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../widgets/city_picker.dart';
 import 'account_settings.dart';
 import 'catalog.dart';
 import '../widgets/picture_picker.dart';
@@ -47,6 +48,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   int _handleSeq = 0;
   late String _category = widget.profile.category;
   late String _location = widget.profile.location;
+
+  /// where the member was when they chose a town not in the list (gives it a centre)
+  ({double lat, double lng})? _locAt;
   bool _gstBusy = false;
   String? _gstMsg;
   bool _locating = false;
@@ -65,7 +69,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => _locating = true);
     try {
       final h = await currentLocation(context, reason: t('To set the area on your page, so nearby members and asks can find you.'), source: 'profile');
-      if (mounted) setState(() => _location = h.node);
+      if (!mounted) return;
+      if (h.node.isNotEmpty) {
+        setState(() {
+          _location = h.node;
+          _locAt = null;
+        });
+      } else {
+        // a town not in our list: ask its name
+        final c = await showCitySheet(context, near: (lat: h.lat, lng: h.lng));
+        if (c != null && c.name.isNotEmpty && mounted) {
+          setState(() {
+            _location = c.name;
+            _locAt = (lat: h.lat, lng: h.lng);
+          });
+        }
+      }
     } on PermissionNotGiven {
       // explained in the pop-up
     } catch (e) {
@@ -87,6 +106,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         if (_company.text.trim().isNotEmpty) 'company': _company.text.trim(),
         if (_category.isNotEmpty) 'category': _category,
         if (_location.isNotEmpty) 'location': _location,
+        if (_location.isNotEmpty && _locAt != null) ...{'locationLat': _locAt!.lat, 'locationLng': _locAt!.lng},
         'bio': _bio.text.trim(),
         'services': _services.text.trim(),
         'skills': _skills.text.replaceAll(',', '\n').trim(),
@@ -358,13 +378,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                           _label(t('Location')),
-                          SelectPill(
+                          CityPill(
                             value: _location,
-                            placeholder: t('Not set'),
-                            rounded: false,
-                            height: 44,
-                            options: [for (final o in kLocations) Option(o.value, t(o.label))],
-                            onChanged: (v) => setState(() => _location = v),
+                            placeholder: 'Not set',
+                            onChanged: (c) => setState(() {
+                              _location = c.name;
+                              _locAt = c.lat == null ? null : (lat: c.lat!, lng: c.lng!);
+                            }),
                           ),
                         ]),
                       ),

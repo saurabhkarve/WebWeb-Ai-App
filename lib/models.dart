@@ -15,13 +15,6 @@ class Option {
 
 const kUserTypes = [Option('entrepreneur', 'Entrepreneur'), Option('job_seeker', 'Job Seeker')];
 
-/// Navi Mumbai nodes.
-const kLocations = [
-  Option('Vashi', 'Vashi'), Option('Rabale', 'Rabale'), Option('Turbhe', 'Turbhe'), Option('Mahape', 'Mahape'),
-  Option('Pawane', 'Pawane'), Option('Belapur', 'Belapur'), Option('Kharghar', 'Kharghar'), Option('Panvel', 'Panvel'),
-  Option('Kalamboli', 'Kalamboli'), Option('Other', 'Other'),
-];
-
 const kProfileCategories = [
   Option('Manufacturing', 'Manufacturing'), Option('Trading / Wholesale', 'Trading / Wholesale'), Option('Retail', 'Retail'),
   Option('IT & Software', 'IT & Software'), Option('Logistics & Transport', 'Logistics & Transport'),

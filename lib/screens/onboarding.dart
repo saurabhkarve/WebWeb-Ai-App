@@ -11,6 +11,7 @@ import '../location.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../widgets/city_picker.dart';
 import '../widgets/image_cropper.dart';
 import '../widgets/picture_picker.dart';
 
@@ -567,8 +568,18 @@ class _BoostStepState extends State<_BoostStep> {
         _locating = false;
         _gps = true;
       });
-      // "Other" (outside the listed areas) keeps an area already chosen, else is saved as is
-      await _save('location', {'location': here.node == 'Other' && _profile.location.isNotEmpty ? _profile.location : here.node}, t('Location set'));
+      if (here.node.isNotEmpty) {
+        await _save('location', {'location': here.node}, t('Location set'));
+      } else if (_profile.location.isNotEmpty) {
+        // outside the cities we know: a city already chosen stays
+        await _save('location', {'location': _profile.location}, t('Location set'));
+      } else {
+        // a town not in our list: ask its name; it is added with where they are
+        final c = await showCitySheet(context, near: (lat: here.lat, lng: here.lng));
+        if (c != null && c.name.isNotEmpty && mounted) {
+          await _save('location', {'location': c.name, 'locationLat': here.lat, 'locationLng': here.lng}, t('Location set'));
+        }
+      }
     } on PermissionNotGiven {
       if (mounted) {
         setState(() {
@@ -791,12 +802,15 @@ class _BoostStepState extends State<_BoostStep> {
                       padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
                       decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border))),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(t('Not quite right? Pick your area:'), style: TextStyle(fontSize: 12, color: p.muted)),
+                        Text(t('Not quite right? Pick your city:'), style: TextStyle(fontSize: 12, color: p.muted)),
                         const SizedBox(height: 8),
-                        Wrap(spacing: 8, runSpacing: 8, children: [
-                          for (final l in kLocations)
-                            chip(l.label, _busy == 'location' ? null : () => _save('location', {'location': l.value}), hint: _profile.location == l.value),
-                        ]),
+                        CityPill(
+                          value: _profile.location,
+                          onChanged: (c) {
+                            if (_busy == 'location' || c.name.isEmpty) return;
+                            _save('location', {'location': c.name, if (c.lat != null) ...{'locationLat': c.lat, 'locationLng': c.lng}});
+                          },
+                        ),
                       ]),
                     ),
                   if (open)

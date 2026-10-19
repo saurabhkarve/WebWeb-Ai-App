@@ -9,6 +9,7 @@ import '../i18n.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../widgets/city_picker.dart';
 import '../widgets/post_card.dart';
 import 'post_detail.dart';
 import 'profile.dart';
@@ -272,7 +273,7 @@ class _FindScreenState extends State<FindScreen> {
         ),
         const SizedBox(height: 16),
         Row(children: [
-          Expanded(child: SelectPill(value: _location, placeholder: t('Any location'), options: kLocations, onChanged: (v) => _set(() => _location = v))),
+          Expanded(child: CityPill(value: _location, anyLabel: t('Any location'), rounded: true, height: 40, onChanged: (c) => _set(() => _location = c.name))),
           const SizedBox(width: 8),
           Expanded(
             child: SelectPill(

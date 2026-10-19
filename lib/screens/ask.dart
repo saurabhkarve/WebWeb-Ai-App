@@ -10,8 +10,10 @@ import '../auth_provider.dart';
 import '../i18n.dart';
 import '../location.dart';
 import '../models.dart';
+import '../places.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../widgets/city_picker.dart';
 import '../widgets/tour.dart';
 import 'post_detail.dart';
 
@@ -297,10 +299,10 @@ class _AskFormState extends State<_AskForm> {
     // the form always opens empty; an unfinished ask is offered with Continue
     if (draft != null && ('${draft['title'] ?? ''}'.isNotEmpty || '${draft['description'] ?? ''}'.isNotEmpty)) _savedDraft = draft;
     if ((profile?.location ?? '').isNotEmpty) {
-      final c = kNodeCoords[profile!.location];
+      final c = findPlace(profile!.location);
       setState(() {
         _location = profile.location;
-        if (c != null) _geo = (lat: c[0], lng: c[1], radiusM: 100000);
+        if (c?.lat != null) _geo = (lat: c!.lat!, lng: c.lng!, radiusM: _cityRadius(c));
       });
     } else {
       setState(() {});
@@ -366,11 +368,20 @@ class _AskFormState extends State<_AskForm> {
     }
   }
 
-  void _pickNode(String name) {
-    final c = kNodeCoords[name];
+  /// A city's reach as one of the radius steps (the smallest that covers it).
+  int _cityRadius(Place c) => _radii.firstWhere((r) => r >= c.radiusKm * 1000, orElse: () => 100000);
+
+  void _pickNode(PickedCity city) {
+    final c = findPlace(city.name);
     setState(() {
-      _location = name;
-      if (c != null) _geo = (lat: c[0], lng: c[1], radiusM: _geo?.radiusM ?? 100000);
+      _location = city.name;
+      if (c?.lat != null) {
+        _geo = (lat: c!.lat!, lng: c.lng!, radiusM: _cityRadius(c));
+      } else if (city.lat != null) {
+        _geo = (lat: city.lat!, lng: city.lng!, radiusM: _geo?.radiusM ?? 100000); // a town not in the list: where the member is
+      } else {
+        _geo ??= (lat: 22.5, lng: 79.0, radiusM: 3000000); // no centre known: all of India until a pin is set
+      }
     });
     _saveDraft();
     _loadReach();
@@ -386,9 +397,17 @@ class _AskFormState extends State<_AskForm> {
       if (!mounted) return;
       setState(() {
         _geo = (lat: h.lat, lng: h.lng, radiusM: _geo?.radiusM ?? 100000);
-        _location = h.node == 'Other' ? '' : h.node;
+        _location = h.node;
       });
       _loadReach();
+      if (h.node.isEmpty && mounted) {
+        // a town not in our list: ask its name, keep the pin where they are
+        final c = await showCitySheet(context, near: (lat: h.lat, lng: h.lng));
+        if (c != null && c.name.isNotEmpty && mounted) {
+          setState(() => _location = c.name);
+          _saveDraft();
+        }
+      }
     } on PermissionNotGiven {
       if (mounted) setState(() => _locNote = t('Location is off for WEBWEB. Allow it, or pick an area below.'));
     } catch (e) {
@@ -910,7 +929,9 @@ class _AskFormState extends State<_AskForm> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   _caps(p, 'Where'),
                   const SizedBox(height: 6),
-                  hScroll([
+                  Row(children: [
+                    Expanded(child: CityPill(value: _location, placeholder: 'Choose a city', height: 38, rounded: true, near: _geo == null ? null : (lat: _geo!.lat, lng: _geo!.lng), onChanged: _pickNode)),
+                    const SizedBox(width: 8),
                     GestureDetector(
                       onTap: _locating ? null : _useMyLocation,
                       child: Opacity(
@@ -929,7 +950,6 @@ class _AskFormState extends State<_AskForm> {
                         ),
                       ),
                     ),
-                    for (final o in kLocations) pill(t(o.label), _location == o.value, () => _pickNode(o.value)),
                   ]),
                   if (_locNote != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_locNote!, style: TextStyle(fontSize: 12, color: p.muted))),
                   if (_geo != null) ...[
