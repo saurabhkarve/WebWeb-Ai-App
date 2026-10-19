@@ -633,8 +633,9 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
           offerSdp: Map<String, dynamic>.from(e['sdp']),
         );
         _pendingIce.clear();
-        // Acknowledge to caller that our device received the call and is ringing
-        rt.send({'type': 'call_ringing', 'callId': e['callId']});
+        // Acknowledge to caller that our device received the call and is ringing; from the background the
+        // in-app call screen is not seen, so fg: false lets the server ring the phone's call screen (VoIP / FCM)
+        rt.send({'type': 'call_ringing', 'callId': e['callId'], 'fg': rt.foreground});
         final c = current!;
         // answered on the lock screen while the app was starting? (the event may not have reached Dart yet)
         final answered = _nativeAccepted.remove(c.id) || (await NativeCalls.active()).any((x) => x.id == c.id && x.isAccepted);

@@ -37,11 +37,13 @@ const kAskTour = [
 ];
 
 /// First-visit guided tours. Shown once per member: the server keeps the log per tour (shared with the
-/// web), and a local list skips the round trip once a tour is finished or skipped.
+/// web), and a local list skips the round trip once a tour is finished or skipped. Both are per account, so a
+/// new member signing in on a phone someone else used still gets their tours.
 class Tours {
-  static const _doneKey = 'webweb_tours_done';
+  static String _doneKey(String uid) => 'webweb_tours_done_$uid';
   static final _keys = <String, GlobalKey>{};
   static Future<Map<String, dynamic>>? _log;
+  static String? _logFor; // the account [_log] belongs to
   static bool _showing = false;
 
   /// The key a tour target carries, e.g. `KeyedSubtree(key: Tours.key('updates'), child: ...)`.
@@ -61,17 +63,24 @@ class Tours {
   /// Show tour [id] if this member hasn't finished or skipped it yet.
   static Future<void> maybeShow(BuildContext context, String id, List<TourStep> steps) async {
     if (_showing) return;
-    final api = context.read<AuthProvider>().api;
+    final auth = context.read<AuthProvider>();
+    final api = auth.api;
+    final uid = auth.profile?.uid;
+    if (uid == null) return;
     final prefs = await SharedPreferences.getInstance();
-    final done = prefs.getStringList(_doneKey) ?? const <String>[];
+    final done = prefs.getStringList(_doneKey(uid)) ?? const <String>[];
     if (done.contains(id)) return;
+    if (_logFor != uid) {
+      _logFor = uid;
+      _log = null;
+    }
     _log ??= api.get('/me/tours').then((r) => Map<String, dynamic>.from(r as Map)).catchError((_) {
       _log = null;
       return <String, dynamic>{};
     });
     final log = await _log!;
     final seen = log[id];
-    void markDone() => prefs.setStringList(_doneKey, {...done, id}.toList());
+    void markDone() => prefs.setStringList(_doneKey(uid), {...done, id}.toList());
     if (seen is Map && seen['status'] != 'started') return markDone();
     await Future.delayed(const Duration(milliseconds: 900)); // let the page settle
     if (!context.mounted || _showing) return;

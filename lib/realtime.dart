@@ -33,6 +33,8 @@ class RealtimeService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   bool _foreground = true;
+  /// The app is on screen (not in the background).
+  bool get foreground => _foreground;
   StreamSubscription? _net;
   Timer? _beat;
   DateTime _lastData = DateTime.now();
