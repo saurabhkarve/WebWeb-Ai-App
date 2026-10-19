@@ -126,6 +126,8 @@ class _CreateStep extends StatefulWidget {
 
 class _CreateStepState extends State<_CreateStep> {
   String _type = 'entrepreneur';
+  /// business sector (or a job seeker's field): optional, it picks the starter photo and cover
+  String? _category;
   final _name = TextEditingController();
   final _handle = TextEditingController();
   bool _handleTouched = false;
@@ -179,7 +181,12 @@ class _CreateStepState extends State<_CreateStep> {
       _error = null;
     });
     try {
-      final pr = await context.read<AuthProvider>().createProfile({'name': _name.text.trim(), 'handle': _handle.text, 'userType': _type});
+      final pr = await context.read<AuthProvider>().createProfile({
+        'name': _name.text.trim(),
+        'handle': _handle.text,
+        'userType': _type,
+        if (_category != null) 'category': _category,
+      });
       widget.onCreated(pr);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -259,7 +266,6 @@ class _CreateStepState extends State<_CreateStep> {
         decoration: box(),
         child: TextField(
           controller: _name,
-          autofocus: true,
           maxLength: 60,
           textCapitalization: TextCapitalization.words,
           autofillHints: const [AutofillHints.name],
@@ -314,6 +320,33 @@ class _CreateStepState extends State<_CreateStep> {
           _ => Text(t(h.isNotEmpty && h.length < 5 ? 'At least 5 letters or numbers' : 'Letters and numbers only'), style: TextStyle(fontSize: 12, color: p.muted)),
         },
       ),
+      const SizedBox(height: 16),
+      // one tap: it picks a starter photo and cover made for that trade
+      Text.rich(
+        TextSpan(children: [
+          TextSpan(text: t(_type == 'job_seeker' ? 'Field you work in' : 'What does your business do?')),
+          TextSpan(text: ' (${t('optional')})', style: TextStyle(fontWeight: FontWeight.w400, color: p.muted)),
+        ]),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      ),
+      const SizedBox(height: 8),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        for (final c in kProfileCategories)
+          GestureDetector(
+            onTap: () => setState(() => _category = _category == c.value ? null : c.value),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              constraints: const BoxConstraints(minHeight: 40),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: _category == c.value ? kGold.withValues(alpha: .15) : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _category == c.value ? kGold : p.border),
+              ),
+              child: Text('${_category == c.value ? '✓ ' : ''}${t(c.label)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            ),
+          ),
+      ]),
       if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
       const SizedBox(height: 20),
       GoldButton(
