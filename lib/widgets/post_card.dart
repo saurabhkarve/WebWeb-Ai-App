@@ -729,7 +729,7 @@ class PostActionsState extends State<PostActions> {
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: p.border)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             icon,
-            if (count > 0) ...[const SizedBox(width: 4), Text('$count', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color ?? p.muted, fontFeatures: const [FontFeature.tabularFigures()]))],
+            if (count > 0) ...[const SizedBox(width: 4), Text(compactCount(count), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color ?? p.muted, fontFeatures: const [FontFeature.tabularFigures()]))],
           ]),
         );
         return Semantics(button: true, label: t(label), child: onTap == null ? c : InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: c));
@@ -764,20 +764,15 @@ class PostActionsState extends State<PostActions> {
           ),
         ),
         const SizedBox(width: 4),
-        // views, as on x.com: people who saw it (not a button)
-        if (post.viewsCount > 0)
+        // views, as on x.com: people who saw it, in the same bordered pill as React and Share (not a button)
+        if (post.viewsCount > 0) ...[
           Semantics(
             label: t(post.viewsCount == 1 ? '1 view' : '{n} views', {'n': post.viewsCount}),
             excludeSemantics: true,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                WIcon(WI.views, size: 18, color: p.muted),
-                const SizedBox(width: 3),
-                Text(compactCount(post.viewsCount), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted, fontFeatures: const [FontFeature.tabularFigures()])),
-              ]),
-            ),
+            child: pill(label: 'Views', icon: WIcon(WI.views, size: 18, color: p.muted), count: post.viewsCount),
           ),
+          const SizedBox(width: 4),
+        ],
         pill(
           label: post.reposted ? 'Reposted' : 'Share',
           icon: WIcon(post.reposted ? WI.repost : WI.share, size: 18, color: post.reposted ? green : p.muted),
