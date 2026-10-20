@@ -883,12 +883,16 @@ class LatestReplies extends StatelessWidget {
                     Text(timeAgo(r.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
                   ]),
                   const SizedBox(height: 3),
-                  if (r.kind == 'info' && (r.text ?? '').isNotEmpty)
+                  if (r.kind == 'info' && (r.text ?? '').isNotEmpty) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(color: p.chip, borderRadius: bubble),
                       child: Text(r.text!, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, height: 1.35)),
-                    )
+                    ),
+                    // a photo sent with the note
+                    if ((r.imageUrl ?? '').isNotEmpty)
+                      Padding(padding: const EdgeInsets.only(top: 4), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 112, height: 80))),
+                  ]
                   else if (r.kind == 'media' && (r.imageUrl ?? '').isNotEmpty)
                     ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 112, height: 80))
                   else

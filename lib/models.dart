@@ -278,17 +278,19 @@ class MyResponse {
 class ContactShare {
   final String id, sharerUid, sharerName, sharerCompany, kind;
   final String? sharerType, sharerHandle, sharerPhotoUrl, askStatus, ownerReaction, payload;
+  /// a photo sent with a note (kind info)
+  final String? imageUrl;
   final int? rating;
   final bool revealed;
   final DateTime createdAt;
   ContactShare({
     this.id = '', required this.sharerUid, required this.sharerName, required this.sharerCompany, required this.kind, this.sharerType, this.sharerHandle,
-    this.sharerPhotoUrl, this.askStatus, this.ownerReaction, this.payload, this.rating, required this.revealed, required this.createdAt,
+    this.sharerPhotoUrl, this.askStatus, this.ownerReaction, this.payload, this.imageUrl, this.rating, required this.revealed, required this.createdAt,
   });
   factory ContactShare.fromJson(Map j) => ContactShare(
         id: '${j['id'] ?? j['sharerUid']}', sharerUid: '${j['sharerUid']}', sharerName: '${j['sharerName']}', sharerCompany: '${j['sharerCompany'] ?? ''}', kind: '${j['kind']}',
         sharerType: j['sharerType'] as String?, sharerHandle: j['sharerHandle'] as String?, sharerPhotoUrl: j['sharerPhotoURL'] as String?, askStatus: j['askStatus'] as String?,
-        ownerReaction: j['ownerReaction'] as String?, payload: j['payload'] as String?, rating: (j['rating'] as num?)?.toInt(),
+        ownerReaction: j['ownerReaction'] as String?, payload: j['payload'] as String?, imageUrl: j['imageUrl'] as String?, rating: (j['rating'] as num?)?.toInt(),
         revealed: j['revealed'] == true, createdAt: _ms(j['createdAt']),
       );
 }

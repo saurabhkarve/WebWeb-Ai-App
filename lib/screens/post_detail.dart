@@ -594,7 +594,18 @@ class _ShareTileState extends State<_ShareTile> {
                         onTap: () => launchUrl(Uri(scheme: 'tel', path: s.payload!.replaceAll(' ', ''))),
                         child: Row(children: [WIcon(WI.phone, size: 16, color: p.text), const SizedBox(width: 8), Text(s.payload!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))]),
                       )
-                    : SelectableText(s.payload!, style: const TextStyle(fontSize: 14)),
+                    : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        SelectableText(s.payload!, style: const TextStyle(fontSize: 14)),
+                        // a photo sent with the note
+                        if ((s.imageUrl ?? '').isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: GestureDetector(
+                              onTap: () => openImageViewer(context, [s.imageUrl!], 0),
+                              child: ClipRRect(borderRadius: BorderRadius.circular(8), child: ConstrainedBox(constraints: const BoxConstraints(maxHeight: 256), child: NetImg(s.imageUrl!, fit: BoxFit.contain))),
+                            ),
+                          ),
+                      ]),
           )
         else
           Row(children: [

@@ -1566,5 +1566,8 @@
   "All {n}": "सभी {n}",
   "Shared a contact privately": "निजी तौर पर एक संपर्क शेयर किया",
   "referred {n} contacts": "ने {n} संपर्कों की सिफ़ारिश की",
-  "Review responses": "जवाब देखें"
+  "Review responses": "जवाब देखें",
+  "Reply to this ask": "इस ज़रूरत का जवाब दें",
+  "Edit your reply": "अपना जवाब बदलें",
+  "Your reply shows on the ask. To pass on someone's number, use Refer.": "आपका जवाब इस ज़रूरत पर दिखता है। किसी का नंबर देने के लिए 'सिफ़ारिश करें' इस्तेमाल करें।"
 }
