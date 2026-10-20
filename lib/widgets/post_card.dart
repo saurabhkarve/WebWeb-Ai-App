@@ -748,9 +748,9 @@ class PostActionsState extends State<PostActions> {
 
       // asks are answered by referring someone: Refer is the gold button, Reply the secondary one beside it
       // (the asker reviews responses instead)
-      // a phone puts space either side of React; a tablet spreads the five evenly across the row, as on x.com
-      final wide = MediaQuery.of(context).size.width >= 600;
-      final row = Row(mainAxisAlignment: wide ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start, children: [
+      // spread evenly at every size, as on x.com: each keeps its own width (Refer, with its label, the widest) and the
+      // space left over is shared equally; at least 4 apart when the row has to scroll
+      final row = Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, spacing: 4, children: [
         if (mine)
           pill(label: 'Review responses', text: t('Review responses'), icon: WIcon(WI.talk, size: 18, color: p.tagText), color: p.tagText, edge: kGold.withValues(alpha: .45), onTap: widget.onReview ?? widget.onReply)
         else ...[
@@ -771,11 +771,9 @@ class PostActionsState extends State<PostActions> {
                 onTap: _refer,
               ),
             ),
-          const SizedBox(width: 4),
           tour('reply', pill(label: 'Reply', icon: WIcon(WI.talk, size: 18, color: p.text), count: isAsk ? post.sharesCount : 0, color: p.text, onTap: widget.onReply)),
         ],
         // React in the middle, with space either side
-        if (!wide) const Spacer(),
         ReactionPicker(
           quick: true,
           value: post.myReaction,
@@ -789,7 +787,6 @@ class PostActionsState extends State<PostActions> {
             color: reacted ? p.text : p.muted,
           ),
         ),
-        if (!wide) const Spacer(),
         // views, as on x.com: people who saw it, in the same bordered pill as React and Share (not a button)
         if (post.viewsCount > 0) ...[
           Semantics(
@@ -797,7 +794,6 @@ class PostActionsState extends State<PostActions> {
             excludeSemantics: true,
             child: pill(label: 'Views', icon: WIcon(WI.views, size: 18, color: p.muted), count: post.viewsCount),
           ),
-          const SizedBox(width: 4),
         ],
         pill(
           label: post.reposted ? 'Reposted' : 'Share',
