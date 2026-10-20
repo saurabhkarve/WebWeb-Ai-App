@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-enum WI { refresh, check, lock, qr, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, consultant, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, link, logout, machinery, mentor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, website }
+enum WI { refresh, check, lock, qr, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, consultant, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, link, logout, machinery, mentor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, views, website }
 
 /// SVG body per icon. {C} = colour, {SW/x} = stroke width divided by x (scaled groups).
 const Map<WI, (String, double?)> _body = {
@@ -100,6 +100,8 @@ const Map<WI, (String, double?)> _body = {
   WI.updates: (r'<g transform="translate(0.4 3.4) scale(0.84)" stroke-width="{SW/0.84}"> <path d="M3.5 10.5v3a1 1 0 0 0 1 1H7l1.4 5h2.6l-1.4-5H10l9 4.2V6.3L10 10.5H4.5a1 1 0 0 0-1 1z" /> <path d="M22 9.8v4.4" /> </g> <path d="M19.6 1.4l.95 2.6 2.6.95-2.6.95-.95 2.6-.95-2.6-2.6-.95 2.6-.95z" fill="{C}" stroke-width="1.1" />', null),
   WI.user: (r'<circle cx="12" cy="8.5" r="3.6" /> <path d="M4.8 20c.6-3.6 3.5-5.8 7.2-5.8s6.6 2.2 7.2 5.8" />', null),
   WI.users: (r'<circle cx="9" cy="8.5" r="3.2" /> <path d="M3.4 19.5c.5-3.1 2.8-4.9 5.6-4.9s5.1 1.8 5.6 4.9" /> <path d="M15.6 5.6a3.1 3.1 0 0 1 0 5.8M17.6 14.9c1.7.7 2.8 2.2 3.1 4.2" />', null),
+  // views (as on x.com): three rising bars
+  WI.views: (r'<path d="M5 20V12.5M10 20V5.5M15 20v-9.5M20 20V8" />', null),
   WI.website: (r'<path d="M21 12a9 9 0 1 0-9 9" /> <path d="M3.6 9h16.8M3.6 15h8.4" /> <path d="M11.6 3a17 17 0 0 0 0 18" /> <path d="M12.5 3c1.7 2.8 2.5 5.9 2.5 9" /> <path d="M19 22v-6" /> <path d="M22 19l-3-3-3 3" />', null),
 };
 

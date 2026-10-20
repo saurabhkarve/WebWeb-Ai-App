@@ -1569,5 +1569,7 @@
   "Review responses": "प्रतिसाद पाहा",
   "Reply to this ask": "या गरजेला उत्तर द्या",
   "Edit your reply": "तुमचे उत्तर बदला",
-  "Your reply shows on the ask. To pass on someone's number, use Refer.": "तुमचे उत्तर या गरजेवर दिसते. कोणाचा नंबर द्यायचा असल्यास 'शिफारस करा' वापरा."
+  "Your reply shows on the ask. To pass on someone's number, use Refer.": "तुमचे उत्तर या गरजेवर दिसते. कोणाचा नंबर द्यायचा असल्यास 'शिफारस करा' वापरा.",
+  "{n} views": "{n} जणांनी पाहिले",
+  "1 view": "1 व्यक्तीने पाहिले"
 }

@@ -1569,5 +1569,7 @@
   "Review responses": "जवाब देखें",
   "Reply to this ask": "इस ज़रूरत का जवाब दें",
   "Edit your reply": "अपना जवाब बदलें",
-  "Your reply shows on the ask. To pass on someone's number, use Refer.": "आपका जवाब इस ज़रूरत पर दिखता है। किसी का नंबर देने के लिए 'सिफ़ारिश करें' इस्तेमाल करें।"
+  "Your reply shows on the ask. To pass on someone's number, use Refer.": "आपका जवाब इस ज़रूरत पर दिखता है। किसी का नंबर देने के लिए 'सिफ़ारिश करें' इस्तेमाल करें।",
+  "{n} views": "{n} लोगों ने देखा",
+  "1 view": "1 व्यक्ति ने देखा"
 }

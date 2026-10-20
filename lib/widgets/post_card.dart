@@ -23,6 +23,7 @@ import 'reaction_picker.dart';
 import 'response_sheet.dart';
 import 'tour.dart';
 import '../share_log.dart';
+import '../views.dart';
 
 /// Feed row, same layout as the web PostCard (post-card.tsx): avatar on the left; who + why you see it;
 /// the category chip, title and two lines of description; photos; location / budget / timing chips;
@@ -50,6 +51,15 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
   late Post post = widget.post;
   bool _gone = false; // deleted from its ⋯ menu
   late final AnimationController _burst = AnimationController(vsync: this, duration: const Duration(milliseconds: 750));
+
+  @override
+  void initState() {
+    super.initState();
+    // views: someone else's post counts as seen once its card is built on screen (the feed builds just ahead of it)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !widget.detail && !_isOwner) ViewTracker.record(context.read<AuthProvider>().api, post.id);
+    });
+  }
 
   @override
   void didUpdateWidget(covariant PostCard old) {
@@ -741,6 +751,20 @@ class PostActionsState extends State<PostActions> {
           tour('reply', GoldButton(label: isAsk && post.sharesCount > 0 ? '${t('Reply')} · ${post.sharesCount}' : t('Reply'), wi: WI.talk, height: 36, outlined: true, onPressed: widget.onReply)),
         ],
         const SizedBox(width: 4),
+        // views, as on x.com: people who saw it (not a button)
+        if (post.viewsCount > 0)
+          Semantics(
+            label: t(post.viewsCount == 1 ? '1 view' : '{n} views', {'n': post.viewsCount}),
+            excludeSemantics: true,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                WIcon(WI.views, size: 18, color: p.muted),
+                const SizedBox(width: 3),
+                Text(compactCount(post.viewsCount), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted, fontFeatures: const [FontFeature.tabularFigures()])),
+              ]),
+            ),
+          ),
         ReactionPicker(
           quick: true,
           value: post.myReaction,

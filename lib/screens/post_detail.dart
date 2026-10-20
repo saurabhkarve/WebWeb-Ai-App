@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../auth_provider.dart';
 import '../i18n.dart';
+import '../views.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -67,6 +68,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Future<void> _load() async {
     try {
       final p = Post.fromJson(await _api.get('/posts/${widget.postId}') as Map);
+      // opening someone else's post counts as seeing it
+      if (p.authorUid != _me) ViewTracker.record(_api, p.id);
       List<ContactShare> shares = [];
       List<Referral> refs = [];
       MyResponse? mine;

@@ -220,6 +220,8 @@ class Post {
   final List<Referrer> referrers;
   // viewer state (changes locally for optimistic updates)
   int reactionsCount, repostsCount, referralsCount;
+  /// members who have seen it (each once, never the author)
+  int viewsCount;
   bool reacted, reposted, bookmarked;
   String? myReaction;
 
@@ -227,7 +229,7 @@ class Post {
     required this.id, required this.kind, required this.authorUid, required this.authorName, required this.authorCompany,
     required this.authorHandle, this.authorPhotoUrl, this.title, this.description, this.category, this.locationPref, this.budget,
     this.urgency, this.matchReason, this.slug, this.categoryLabel, this.authorType = 'entrepreneur', this.authorVerification = 1, this.authorPremium = false, this.distanceM, this.radiusM, this.lat, this.lng, this.editedAt, this.repostedByName, this.repostedByHandle, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
-    this.recentResponses = const [], this.latestReplies = const [], this.referrers = const [], this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0,
+    this.recentResponses = const [], this.latestReplies = const [], this.referrers = const [], this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0, this.viewsCount = 0,
     this.reacted = false, this.reposted = false, this.bookmarked = false, this.myReaction,
   });
 
@@ -253,7 +255,7 @@ class Post {
         recentResponses: ((j['recentResponses'] as List?) ?? const []).map((e) => ResponseLog.fromJson(e as Map)).toList(),
         latestReplies: ((j['latestReplies'] as List?) ?? const []).map((e) => ResponseLog.fromJson(e as Map)).toList(),
         referrers: ((j['referrers'] as List?) ?? const []).map((e) => Referrer.fromJson(e as Map)).toList(),
-        reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, repostsCount: (j['repostsCount'] as num?)?.toInt() ?? 0,
+        reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, viewsCount: (j['viewsCount'] as num?)?.toInt() ?? 0, repostsCount: (j['repostsCount'] as num?)?.toInt() ?? 0,
         referralsCount: (j['referralsCount'] as num?)?.toInt() ?? 0, reacted: j['reacted'] == true, reposted: j['reposted'] == true,
         bookmarked: j['bookmarked'] == true, myReaction: j['myReaction'] as String? ?? (j['reacted'] == true ? 'heart' : null),
       );
