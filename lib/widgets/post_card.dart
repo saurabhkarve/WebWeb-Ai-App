@@ -511,66 +511,67 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     return _reposted(p, card, top: 16, gap: 8, bottom: 16);
   }
 
-  /// A reposted post, marked without touching its layout (web post-card.tsx): a green rail in the gutter, a green wash
-  /// fading down from the top and a green "X reposted" tag (repost's colour) with when on the right.
+  /// A reposted post, marked without touching its layout (web post-card.tsx): a green "X reposted" tag on top with when
+  /// on the right, then a green quote line in the gutter and a green wash fading down, both beside the ask alone.
   Widget _reposted(Pal p, Widget child, {required double top, required double gap, double bottom = 0}) {
     const green = Color(0xFF2F9E6E);
     final ink = Theme.of(context).brightness == Brightness.dark ? const Color(0xFF7FD6AD) : const Color(0xFF1F7A52);
     return Container(
       padding: EdgeInsets.only(top: top, bottom: bottom),
       foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
-      child: Stack(clipBehavior: Clip.none, children: [
-        Positioned(
-          left: -10,
-          right: -10,
-          top: -top,
-          height: 224,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [green.withValues(alpha: .09), green.withValues(alpha: 0)]),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          left: -10,
-          top: -top + 8,
-          bottom: 20,
-          width: 3,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(2),
-                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [green, green.withValues(alpha: .5), green.withValues(alpha: 0)]),
-              ),
-            ),
-          ),
-        ),
-        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Padding(
-            padding: EdgeInsets.only(bottom: gap),
-            child: Row(children: [
-              Flexible(
-                child: GestureDetector(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? ''))),
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(6, 2, 10, 2),
-                    decoration: BoxDecoration(color: green.withValues(alpha: .15), borderRadius: BorderRadius.circular(99)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      WIcon(WI.repost, size: 14, color: ink),
-                      const SizedBox(width: 5),
-                      Flexible(child: Text(t('{name} reposted', {'name': post.repostedByName!}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ink))),
-                    ]),
-                  ),
+      // the tag on top; the quote line and the wash cover the ask alone, from just under it
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: EdgeInsets.only(bottom: gap),
+          child: Row(children: [
+            Flexible(
+              child: GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? ''))),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(6, 2, 10, 2),
+                  decoration: BoxDecoration(color: green.withValues(alpha: .15), borderRadius: BorderRadius.circular(99)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    WIcon(WI.repost, size: 14, color: ink),
+                    const SizedBox(width: 5),
+                    Flexible(child: Text(t('{name} reposted', {'name': post.repostedByName!}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ink))),
+                  ]),
                 ),
               ),
-              if (post.repostedAt != null) ...[
-                const Spacer(),
-                Padding(padding: const EdgeInsets.only(right: 4), child: Text(timeAgo(post.repostedAt!), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: ink))),
-              ],
-            ]),
+            ),
+            if (post.repostedAt != null) ...[
+              const Spacer(),
+              Padding(padding: const EdgeInsets.only(right: 4), child: Text(timeAgo(post.repostedAt!), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: ink))),
+            ],
+          ]),
+        ),
+        Stack(clipBehavior: Clip.none, children: [
+          Positioned(
+            left: -10,
+            right: -10,
+            top: 0,
+            height: 224,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [green.withValues(alpha: .09), green.withValues(alpha: 0)]),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: -10,
+            top: 0,
+            bottom: 20,
+            width: 3,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(2),
+                  gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [green, green.withValues(alpha: .5), green.withValues(alpha: 0)]),
+                ),
+              ),
+            ),
           ),
           child,
         ]),
