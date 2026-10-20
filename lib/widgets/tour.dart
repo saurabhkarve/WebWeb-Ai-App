@@ -38,7 +38,7 @@ const kAskTour = [
   TourStep('Write it as members will see it', 'This is your ask as it will look on Connect. Fill in each part.', 'ask-card'),
   TourStep('Say it in one line', 'For example: Need 5 CNC operators in Turbhe.', 'ask-title'),
   TourStep('Add the details', 'Quantity, quality, timing. The more specific you are, the better the answers.', 'ask-description'),
-  TourStep('The type is picked for you', 'It follows your words and decides who gets your ask: job seekers for jobs, suppliers for supplies. Tap it to change it.', 'ask-category'),
+  TourStep('The category is picked for you', 'It follows your words and decides who gets your ask: job seekers for jobs, suppliers for supplies. Tap it to change it.', 'ask-category'),
   TourStep('Or start from an example', 'Tap one to fill in an example, then change the details to yours.', 'ask-templates'),
   TourStep('Where, when and budget', 'Set the area and how far your ask reaches, how soon you need it, and your budget. All optional.', 'ask-details'),
   TourStep('See who it reaches, then publish', 'This shows how many members your ask will reach. Responses appear on your ask and in your notifications.', 'ask-publish'),

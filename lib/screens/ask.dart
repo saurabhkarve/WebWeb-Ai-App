@@ -233,6 +233,9 @@ class _AskFormState extends State<_AskForm> {
   /// before an AI suggestion was used: title, details
   (String, String)? _aiUndo;
   Timer? _draftTimer;
+  /// the local AI's reading of the category (web: aiCategory), asked once the title is written and details typed
+  Timer? _aiCatTimer;
+  String? _aiCat;
   /// editing: the stored pin is only sent again when the member moves it (the one we get back is rounded)
   bool _geoMoved = false;
   bool get _editing => widget.edit != null;
@@ -272,14 +275,33 @@ class _AskFormState extends State<_AskForm> {
   }
 
   void _changed() {
-    // until the member picks a type, it follows the words
+    // until the member picks a category, it follows the words: a word match at once, then the local AI's
+    // reading once the title is written and the details are being typed (any language and phrasing)
     if (!_typeChosen) {
-      final found = _detectCategory('${_title.text} ${_desc.text}');
+      final title = _title.text.trim();
+      final found = (title.length >= 5 ? _aiCat : null) ?? _detectCategory('${_title.text} ${_desc.text}');
       if (found != null) _category = found;
+      _aiCatTimer?.cancel();
+      if (title.length >= 5 && _desc.text.trim().isNotEmpty) {
+        _aiCatTimer = Timer(const Duration(milliseconds: 700), () => _askAiCategory(title, _desc.text.trim()));
+      }
     }
     setState(() {});
     _draftTimer?.cancel();
     _draftTimer = Timer(const Duration(milliseconds: 600), _saveDraft);
+  }
+
+  Future<void> _askAiCategory(String title, String description) async {
+    try {
+      final r = await context.read<AuthProvider>().api.post('/ai/category', {'title': title, 'description': description}) as Map;
+      final c = r['category'] as String?;
+      // a newer edit or the member's own pick wins
+      if (!mounted || c == null || _typeChosen || _title.text.trim() != title || _desc.text.trim() != description) return;
+      setState(() {
+        _aiCat = c;
+        _category = c;
+      });
+    } catch (_) {}
   }
 
   Future<void> _restoreDraft() async {
@@ -381,8 +403,8 @@ class _AskFormState extends State<_AskForm> {
     }
   }
 
-  /// A city's reach as one of the radius steps (the smallest that covers it, at least 10 km).
-  int _cityRadius(Place c) => _radii.firstWhere((r) => r >= math.max(c.radiusKm * 1000, 10000), orElse: () => 100000);
+  /// A city's reach as one of the radius steps (the smallest that covers it, at least 25 km).
+  int _cityRadius(Place c) => _radii.firstWhere((r) => r >= math.max(c.radiusKm * 1000, 25000), orElse: () => 100000);
 
   void _pickNode(PickedCity city) {
     final c = findPlace(city.name);
@@ -563,6 +585,7 @@ class _AskFormState extends State<_AskForm> {
   @override
   void dispose() {
     _draftTimer?.cancel();
+    _aiCatTimer?.cancel();
     for (final c in [_title, _desc, _other]) {
       c.dispose();
     }
@@ -993,12 +1016,12 @@ class _AskFormState extends State<_AskForm> {
                       child: chip(
                         'type',
                         categoryIcon(_category.isEmpty ? 'other' : _category),
-                        _category.isEmpty ? t('Type') : (_category == 'other' && _other.text.trim().isNotEmpty ? _other.text.trim() : t(kCategoryShort[_category] ?? labelOf(kPostCategories, _category))),
+                        _category.isEmpty ? t('Category') : (_category == 'other' && _other.text.trim().isNotEmpty ? _other.text.trim() : t(kCategoryShort[_category] ?? labelOf(kPostCategories, _category))),
                         _category.isNotEmpty,
                         auto: _category.isNotEmpty && !_typeChosen,
                       ),
                     ),
-                    // where and how far, one chip: "Vashi · 10 km"
+                    // where and how far, one chip: "Vashi · 25 km"
                     chip('where', WI.pin, '${_location.isEmpty ? t('Where') : t(_location)}${_geo != null ? ' · ${_radiusLabel(_geo!.radiusM)}' : ''}', _location.isNotEmpty || _geo != null),
                     chip('budget', WI.rupee, _budget.isEmpty ? t('Budget') : _budget, _budget.isNotEmpty),
                     chip('when', WI.clock, _urgency.isEmpty ? t('When') : t(labelOf(kUrgencies, _urgency)), _urgency.isNotEmpty),
