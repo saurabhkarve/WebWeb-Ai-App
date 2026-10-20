@@ -5,13 +5,19 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Same i18n as the web (web/src/lib/i18n): English text is the key, so a missing translation shows
-/// English, never a blank. The dictionaries in assets/i18n are exported from the web's hi.ts / mr.ts.
+/// English, never a blank. The dictionaries in assets/i18n are exported from the web's hi.ts / mr.ts / gu.ts / kok.ts.
 class Lang {
   final String code, name, native;
   const Lang(this.code, this.name, this.native);
 }
 
-const kLangs = [Lang('en', 'English', 'English'), Lang('hi', 'Hindi', 'हिन्दी'), Lang('mr', 'Marathi', 'मराठी')];
+const kLangs = [
+  Lang('en', 'English', 'English'),
+  Lang('hi', 'Hindi', 'हिन्दी'),
+  Lang('mr', 'Marathi', 'मराठी'),
+  Lang('gu', 'Gujarati', 'ગુજરાતી'),
+  Lang('kok', 'Konkani', 'कोंकणी'),
+];
 
 Map<String, String> _dict = const {};
 String _lang = 'en';

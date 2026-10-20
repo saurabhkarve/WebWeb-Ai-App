@@ -608,7 +608,7 @@ class _BigGoldButton extends StatelessWidget {
   }
 }
 
-/// Globe + current language, opening English / Hindi / Marathi (web LanguageMenu with label).
+/// Globe + current language, opening English / Hindi / Marathi / Gujarati / Konkani (web LanguageMenu with label).
 class _LanguageMenu extends StatelessWidget {
   const _LanguageMenu();
   @override
