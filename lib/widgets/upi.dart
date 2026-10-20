@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr/qr.dart';
@@ -121,6 +122,9 @@ class _QrPainter extends CustomPainter {
   bool shouldRepaint(_QrPainter old) => old.data != data;
 }
 
+/// The UPI mark: its two arrowheads, green and orange, pointing right (as on the web).
+const upiMarkSvg = '<svg viewBox="0 0 16 18" xmlns="http://www.w3.org/2000/svg"><path d="M6.2 0 15 9l-8.8 9 3-9z" fill="#097939"/><path d="M1 0l8.8 9L1 18l3-9z" fill="#ed752e"/></svg>';
+
 /// A member's UPI IDs as chips (in the profile's tag row); tapping one opens its QR.
 List<Widget> upiChips(BuildContext context, Profile u, String payee) => [
       for (final x in u.upi)
@@ -133,14 +137,13 @@ List<Widget> upiChips(BuildContext context, Profile u, String payee) => [
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: .15), borderRadius: BorderRadius.circular(20)),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                WIcon(WI.rupee, size: 13, color: fg, strokeWidth: 2.2),
-                const SizedBox(width: 4),
-                Flexible(child: Text(x.vpa, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg))),
+                // the UPI mark, then "UPI QR" (the ID itself is in the QR popup)
+                SvgPicture.string(upiMarkSvg, height: 13),
+                const SizedBox(width: 5),
+                Text(t('UPI QR'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg)),
                 if (x.verifiedName != null) ...[
                   const SizedBox(width: 4),
                   WIcon(WI.checkCircle, size: 12, color: fg),
-                  const SizedBox(width: 2),
-                  Text(t('Verified'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg)),
                 ],
               ]),
             );

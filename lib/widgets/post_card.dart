@@ -153,6 +153,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         editedAt: p.editedAt,
         repostedByName: p.repostedByName,
         repostedByHandle: p.repostedByHandle,
+        repostedAt: p.repostedAt,
         images: p.images,
         sharesCount: n,
         authorHasUpdate: p.authorHasUpdate,
@@ -404,6 +405,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                 WIcon(WI.repost, size: 16, color: p.muted),
                 const SizedBox(width: 6),
                 Flexible(child: Text(t('{name} reposted', {'name': post.repostedByName!}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted))),
+                // when, on the right end
+                if (post.repostedAt != null) ...[const Spacer(), Padding(padding: const EdgeInsets.only(right: 4), child: Text(timeAgo(post.repostedAt!), style: TextStyle(fontSize: 12, color: p.muted)))],
               ]),
             ),
           ),
@@ -541,6 +544,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               WIcon(WI.repost, size: 16, color: p.muted),
               const SizedBox(width: 6),
               Flexible(child: Text(t('{name} reposted', {'name': post.repostedByName!}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted))),
+              if (post.repostedAt != null) ...[const Spacer(), Padding(padding: const EdgeInsets.only(right: 4), child: Text(timeAgo(post.repostedAt!), style: TextStyle(fontSize: 12, color: p.muted)))],
             ]),
           ),
         ),
@@ -760,8 +764,9 @@ class PostActionsState extends State<PostActions> {
             border: Border.all(color: edge ?? p.border),
             boxShadow: const [BoxShadow(color: Color(0x0D1E1E1E), blurRadius: 2, offset: Offset(0, 1))],
           ),
+          // centred in its share of the row (every control is the same width, count or not)
           child: wide
-              ? Row(mainAxisSize: MainAxisSize.min, children: [
+              ? Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
                   icon,
                   const SizedBox(width: 6),
                   title,
@@ -777,9 +782,9 @@ class PostActionsState extends State<PostActions> {
       }
 
       // React, Reply, Refer, Views, Share at every size (as on the web), so Refer sits in the middle: in gold, since asks
-      // are answered by referring someone (the asker reviews responses instead). Spread evenly, as on x.com: each keeps
-      // its own width and the space left over is shared equally; at least 4 apart when the row has to scroll
-      final row = Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, spacing: 4, children: [
+      // are answered by referring someone (the asker reviews responses instead). Equal widths, as on the web: each is as
+      // wide as the widest needs, count or not, so nothing shifts when a count appears; 6 apart
+      final kids = <Widget>[
         // React first
         ReactionPicker(
           quick: true,
@@ -830,7 +835,9 @@ class PostActionsState extends State<PostActions> {
           edge: post.reposted ? green.withValues(alpha: .4) : null,
           onTap: _share,
         ),
-      ]);
+      ];
+      // equal shares: every control is as wide as the widest needs (IntrinsicWidth), spread over the full width
+      final row = Row(spacing: 6, children: [for (final k in kids) Expanded(child: k)]);
       // scrolls sideways when it is wider than the screen (a narrow phone, a long translation); at least the full width,
       // so the spacing still spreads the buttons when they fit
       return LayoutBuilder(

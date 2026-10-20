@@ -28,6 +28,7 @@ import '../share_log.dart';
 import '../widgets/picture_picker.dart';
 import '../widgets/resume.dart';
 import '../widgets/upi.dart';
+import '../widgets/area_map.dart' show AreaMap;
 
 /// One profile for everyone (web profile-view.tsx): your own page ([handle] == null) and any member's.
 /// Cover band with the back arrow, picture, one quiet stats line, name, tags, then the actions and
@@ -57,6 +58,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<StoryItem>? _updates;
   List<Product>? _products;
   List<Map<String, dynamic>>? _areas;
+  /// the area whose map is open (a chip in the areas line)
+  int? _areaOpen;
   String _catFilter = 'all';
 
   Api get _api => context.read<AuthProvider>().api;
@@ -457,7 +460,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Transform.translate(
       offset: const Offset(0, 0),
       child: Wrap(spacing: 6, runSpacing: 6, children: [
-        tag(icon: u.isEntrepreneur ? WI.business : WI.user, text: t(labelOf(kUserTypes, u.userType))),
         if (u.location.isNotEmpty) tag(icon: WI.pin, text: u.location == 'Other' ? t('Other') : u.location),
         if (u.category.isNotEmpty) tag(text: t(labelOf(kProfileCategories, u.category))),
         // a GSTIN is public record: tap to check it on the GST portal
@@ -485,6 +487,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Text('+ ${t('Add UPI ID')}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
             ),
           ),
+        // the role closes the row (as on the web)
+        tag(icon: u.isEntrepreneur ? WI.business : WI.user, text: t(labelOf(kUserTypes, u.userType))),
       ]),
     );
   }
@@ -732,23 +736,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
     String radius(num m) => m >= 3000000 ? t('Pan-India') : (m >= 1000 ? '${m % 1000 == 0 ? m ~/ 1000 : (m / 1000).toStringAsFixed(1)} km' : '$m m');
+    final gold = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
+    final open = _areaOpen == null ? null : areas.elementAtOrNull(_areaOpen!);
+    // one line: the title and the areas as chips; a chip opens the map on that area, the open one closes it
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          WIcon(WI.pin, size: 16, color: p.muted),
-          const SizedBox(width: 6),
-          Text(t(biz ? 'Serviceable areas' : 'Preferred job locations'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-        ]),
-        const SizedBox(height: 8),
-        Wrap(spacing: 6, runSpacing: 6, children: [
-          for (final a in areas)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: p.field, borderRadius: BorderRadius.circular(20)),
-              child: Text('${a['label']} · ${radius((a['radiusM'] as num?) ?? 0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(spacing: 6, children: [
+            WIcon(WI.pin, size: 14, color: p.muted),
+            Text(t(biz ? 'Serviceable areas' : 'Preferred job locations'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
+            for (final (i, a) in areas.indexed)
+              GestureDetector(
+                onTap: () => setState(() => _areaOpen = _areaOpen == i ? null : i),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: _areaOpen == i ? kGold.withValues(alpha: .25) : p.field, borderRadius: BorderRadius.circular(20)),
+                  child: Text('${a['label']} · ${radius((a['radiusM'] as num?) ?? 0)}',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _areaOpen == i ? gold : null)),
+                ),
+              ),
+          ]),
+        ),
+        if (open != null && open['lat'] is num && open['lng'] is num) ...[
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              height: 220,
+              child: AreaMap(
+                lat: (open['lat'] as num).toDouble(),
+                lng: (open['lng'] as num).toDouble(),
+                radiusM: ((open['radiusM'] as num?) ?? 0).toDouble(),
+              ),
             ),
-        ]),
+          ),
+        ],
       ]),
     );
   }
