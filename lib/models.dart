@@ -37,6 +37,7 @@ const kPostCategories = [
   Option('training', 'Training / Skill Development'),
   Option('jobwork', 'Job Work / Contract Manufacturing'),
   Option('compliance', 'GST / Compliance / Legal Help'),
+  Option('consultant', 'Consultant / Advisor Needed'),
   Option('export', 'Export / Import Help'),
   Option('tender', 'Tender / Government Order'),
   Option('digital', 'Website / Digital Marketing'),
@@ -48,7 +49,7 @@ const kCategoryShort = {
   'job': 'Jobs / Manpower', 'supplier': 'Supplier / Vendor', 'buyer': 'Buyer / Customer', 'logistics': 'Logistics',
   'funding': 'Funding', 'advice': 'Advice', 'mentorship': 'Mentorship', 'partnership': 'Partnership',
   'machinery': 'Machinery', 'space': 'Space / Godown', 'training': 'Training', 'jobwork': 'Job work',
-  'compliance': 'GST / Legal', 'export': 'Export / Import', 'tender': 'Tenders', 'digital': 'Digital',
+  'compliance': 'GST / Legal', 'consultant': 'Consultant / Advisor', 'export': 'Export / Import', 'tender': 'Tenders', 'digital': 'Digital',
   'repair': 'Repair / AMC', 'other': 'Other',
 };
 

@@ -39,6 +39,7 @@ const _tips = <String, (String, List<String>)>{
   'training': ('Number of learners and timing help trainers respond.', ['₹5,000 - ₹10,000 / person', '₹10,000+ / person']),
   'jobwork': ('Process, quantity and drawing or sample let job workers quote quickly.', ['Per piece rate', 'Monthly contract']),
   'compliance': ('Say exactly what filing or registration you need and by when.', ['₹2,000 - ₹5,000', '₹5,000 - ₹10,000', 'Monthly retainer']),
+  'consultant': ('Say the goal, your business size and the deliverable so consultants can quote a clear fee.', ['₹10,000 - ₹25,000', '₹25,000 - ₹1 lakh', 'Monthly retainer']),
   'export': ('Product, country and whether you have an IEC help agents respond.', ['Per shipment fee', 'Commission']),
   'tender': ('Mention registrations (GeM, Udyam) and what you can supply.', []),
   'digital': ('Share your business type and what you want built or run.', ['₹5,000 - ₹15,000', '₹15,000 - ₹50,000', '₹10,000 / month']),
@@ -101,6 +102,12 @@ const _samples = <String, List<(String, String, String)>>{
     ('GST filing', 'Need a CA for monthly GST filing in [area]', 'Business type: [trader / manufacturer / service]\nTurnover: ₹[amount] per year\nHelp needed: [GSTR-1, GSTR-3B, annual return]\nStart: [date]'),
     ('Registration', 'Need help with [Udyam / FSSAI / trademark / Shop Act] registration', 'Registration needed: [Udyam / FSSAI / trademark / Shop Act]\nBusiness: [what you do]\nLocation: [area]\nNeeded by: [date]'),
   ],
+  'consultant': [
+    ('Business growth', 'Need a business consultant to grow [business] in [area]', 'Business: [what you do, years running]\nTurnover: ₹[amount] a year\nHelp needed: [sales, costing, systems, expansion]\nEngagement: [one-time plan / monthly]\nStart by: [date]'),
+    ('ISO / certification', 'Need an ISO [9001] certification consultant for my [factory]', 'Business: [product, number of staff]\nCertification: [ISO 9001 / 14001 / 45001, ZED, CE]\nLocation: [area]\nTarget date: [month]'),
+    ('Project report / subsidy', 'Need a project report (DPR) for a [₹ amount] loan / subsidy', 'Project: [new unit / expansion]\nLoan or scheme: [bank loan, PMEGP, CMEGP, state subsidy]\nProject cost: ₹[amount]\nNeeded by: [date]'),
+    ('Financial advisor', 'Looking for a financial advisor for [investments / insurance]', 'Goal: [retirement, child education, business surplus]\nAmount: ₹[amount]\nPreference: [mutual funds, insurance, FD]\nMeeting: [in person / call]'),
+  ],
   'export': [
     ('First export', 'Need guidance to export [product] to [country]', 'Product: [product, HS code if known]\nQuantity: [per month]\nTarget country: [country]\nIEC: [have / need]\nHelp needed: [documents, freight forwarder, buyers]'),
     ('Import', 'Looking for an agent to import [item] from [country]', 'Item: [item]\nQuantity: [quantity]\nSource country: [country]\nCustoms clearance: [needed]\nBudget: ₹[amount]'),
@@ -136,6 +143,7 @@ final _hints = <(String, RegExp)>[
   ('advice', RegExp(r'\b(advice|suggest|opinion|recommend|which is better|how to|should i)', caseSensitive: false)),
   ('jobwork', RegExp(r'\b(job ?work|contract manufactur|machining|fabrication|powder coat|sub-?contract)', caseSensitive: false)),
   ('compliance', RegExp(r'\b(gst|itr|tax|ca |chartered|udyam|msme|fssai|trademark|license|licence|legal|compliance|roc)\b', caseSensitive: false)),
+  ('consultant', RegExp(r'\b(consultant|consultancy|advisor|adviser|advisory|iso ?\d*|project report|dpr|subsidy|pmegp|business plan|financial plann)', caseSensitive: false)),
   ('export', RegExp(r'\b(export|import|iec|dgft|customs|freight forward)', caseSensitive: false)),
   ('tender', RegExp(r'\b(tender|gem|government order|psu|vendor registration)', caseSensitive: false)),
   ('digital', RegExp(r'\b(website|app development|seo|digital marketing|instagram|google ads|logo|branding)', caseSensitive: false)),
@@ -151,7 +159,7 @@ String? _detectCategory(String text) {
 }
 
 /// The types whose first example is offered before a type is known: the asks members post most.
-const _starterCategories = ['job', 'supplier', 'buyer', 'logistics', 'space', 'jobwork', 'repair', 'machinery', 'compliance', 'digital'];
+const _starterCategories = ['job', 'supplier', 'buyer', 'logistics', 'space', 'jobwork', 'repair', 'machinery', 'compliance', 'consultant', 'digital'];
 
 /// Reach radius steps (web/src/lib/geo.ts RADIUS_STEPS); the last one covers all of India.
 const _radii = [5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 3000000];

@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-enum WI { refresh, check, lock, qr, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, logout, machinery, mentor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, website }
+enum WI { refresh, check, lock, qr, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, consultant, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, logout, machinery, mentor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, website }
 
 /// SVG body per icon. {C} = colour, {SW/x} = stroke width divided by x (scaled groups).
 const Map<WI, (String, double?)> _body = {
@@ -42,6 +42,8 @@ const Map<WI, (String, double?)> _body = {
   WI.clip: (r'<path d="M18.5 11.5l-6.3 6.3a4.2 4.2 0 0 1-6-6l7-7a2.8 2.8 0 0 1 4 4l-7 7a1.4 1.4 0 0 1-2-2l6.3-6.3" />', null),
   WI.clock: (r'<circle cx="12" cy="12" r="8.6" /> <path d="M12 7.2V12l3.2 2" />', null),
   WI.close: (r'<path d="M6 6l12 12M18 6L6 18" />', null),
+  // a person with a tie: Consultant / Advisor
+  WI.consultant: (r'<circle cx="12" cy="7.2" r="3.2" /> <path d="M5.5 20c.6-3.8 3.1-6 6.5-6s5.9 2.2 6.5 6" /> <path d="M12 14l-1.1 1.8 1.1 3.7 1.1-3.7z" />', null),
   WI.compliance: (r'<path d="M6.5 3.5h8l4 4v13h-12v-17z" /> <path d="M14.5 3.5v4h4M9.5 14l2 2 3.5-4" />', null),
   WI.connect: (r'<circle cx="8.6" cy="12" r="5" /> <circle cx="15.4" cy="12" r="5" />', null),
   WI.contactCard: (r'<rect x="3" y="5" width="18" height="14" rx="2.6" /> <circle cx="9" cy="10.7" r="2.1" /> <path d="M5.6 16.4c.4-1.5 1.7-2.4 3.4-2.4s3 .9 3.4 2.4M14.6 9.8h3.4M14.6 13h3.4" />', null),
@@ -244,6 +246,7 @@ WI categoryIcon(String? category) => switch (category) {
       'training' => WI.school,
       'jobwork' => WI.jobWork,
       'compliance' => WI.compliance,
+      'consultant' => WI.consultant,
       'export' => WI.export,
       'tender' => WI.tender,
       'digital' => WI.digital,
