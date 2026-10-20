@@ -309,18 +309,31 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         foregroundDecoration: framed ? null : _HairlineDecoration(p.border),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (band != null || why != null)
-            Container(
-              // on a gold gradient that fades out to the right, as on the web
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.only(left: 10, top: 4, bottom: 4),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(99),
-                gradient: LinearGradient(colors: [kGold.withValues(alpha: .25), kGold.withValues(alpha: .08), kGold.withValues(alpha: 0)]),
-              ),
-              child: Row(children: [
-                if (band != null) ...[WIcon(WI.clock, size: 14, color: p.tagText), const SizedBox(width: 6)],
-                Expanded(child: Text(band ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: p.tagText))),
-                if (why != null) Flexible(child: GoldTag(why)),
+            // on a gold gradient from the feed's left edge (its 16 of padding), fading out to the right, as on the web;
+            // inside a repost's box it stays a rounded band
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Stack(clipBehavior: Clip.none, children: [
+                Positioned(
+                  left: framed ? 0 : -16,
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: framed ? BorderRadius.circular(99) : const BorderRadius.horizontal(right: Radius.circular(99)),
+                      gradient: LinearGradient(colors: [kGold.withValues(alpha: .25), kGold.withValues(alpha: .08), kGold.withValues(alpha: 0)]),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.only(left: framed ? 10 : 0, top: 4, bottom: 4),
+                  child: Row(children: [
+                    if (band != null) ...[WIcon(WI.clock, size: 14, color: p.tagText), const SizedBox(width: 6)],
+                    Expanded(child: Text(band ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: p.tagText))),
+                    if (why != null) Flexible(child: GoldTag(why)),
+                  ]),
+                ),
               ]),
             ),
           Padding(
