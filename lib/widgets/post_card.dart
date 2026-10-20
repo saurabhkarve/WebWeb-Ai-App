@@ -616,7 +616,7 @@ class PostActionsState extends State<PostActions> {
     }
   }
 
-  /// Save / remove from saved (from the ⋯ menu).
+  /// Save / remove from saved (from the ⋯ menu and the Share menu).
   Future<void> toggleBookmark() async {
     final on = !post.bookmarked;
     setState(() => post.bookmarked = on);
@@ -680,6 +680,12 @@ class PostActionsState extends State<PostActions> {
           ListTile(leading: SvgPicture.string(whatsAppSvg, width: 20, height: 20), title: const Text('WhatsApp'), onTap: () => Navigator.pop(ctx, 'whatsapp')),
           ListTile(leading: WIcon(WI.share, size: 20, color: p.text), title: Text(t('More ways to share')), onTap: () => Navigator.pop(ctx, 'native')),
           ListTile(leading: WIcon(WI.link, size: 20, color: p.text), title: Text(t('Copy link')), onTap: () => Navigator.pop(ctx, 'copy')),
+          // Save is here as well as in the ⋯ menu
+          ListTile(
+            leading: WIcon(WI.bookmark, size: 20, color: p.text, fill: post.bookmarked),
+            title: Text(t(post.bookmarked ? 'Remove from saved' : (post.isRequirement ? 'Save ask' : 'Save'))),
+            onTap: () => Navigator.pop(ctx, 'save'),
+          ),
         ]),
       ),
     );
@@ -694,6 +700,8 @@ class PostActionsState extends State<PostActions> {
         try {
           await shareAndLog(_api, entity: 'post', ref: post.id, text: post.webUrl, subject: _subject);
         } catch (_) {}
+      case 'save':
+        await toggleBookmark();
       case 'copy':
         await Clipboard.setData(ClipboardData(text: post.webUrl));
         logShare(_api, 'post', post.id, channel: 'copy');
@@ -807,14 +815,12 @@ class PostActionsState extends State<PostActions> {
               ),
             ),
         ],
-        // views, as on x.com: people who saw it (a count, not a button)
-        if (post.viewsCount > 0) ...[
-          Semantics(
-            label: t(post.viewsCount == 1 ? '1 view' : '{n} views', {'n': post.viewsCount}),
-            excludeSemantics: true,
-            child: pill(label: 'Views', icon: WIcon(WI.views, size: 18, color: p.muted), count: post.viewsCount),
-          ),
-        ],
+        // views, as on x.com: people who saw it (a count, not a button). Shown at 0 too, so every tile keeps its place
+        Semantics(
+          label: t(post.viewsCount == 1 ? '1 view' : '{n} views', {'n': post.viewsCount}),
+          excludeSemantics: true,
+          child: pill(label: 'Views', icon: WIcon(WI.views, size: 18, color: p.muted), count: post.viewsCount),
+        ),
         pill(
           label: post.reposted ? 'Reposted' : 'Share',
           icon: WIcon(post.reposted ? WI.repost : WI.share, size: 18, color: post.reposted ? green : p.muted),
