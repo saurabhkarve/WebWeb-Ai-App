@@ -835,21 +835,40 @@ class LatestReplies extends StatelessWidget {
     final referrers = post.referrers;
     final total = post.sharesCount + post.referralsCount;
     if (total == 0) {
-      return Padding(padding: const EdgeInsets.only(top: 12, left: 50), child: Text(t('Be the first to respond'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)));
+      return Padding(padding: const EdgeInsets.only(top: 12), child: Text(t('Be the first to respond'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)));
     }
     final shown = replies.length + referrers.fold<int>(0, (n, r) => n + r.n);
     const bubble = BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(14), bottomLeft: Radius.circular(14), bottomRight: Radius.circular(14));
     void openProfile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
-    // open on the card (no panel of its own): a small heading, then the replies as bubbles
-    // set in under the author's name as a thread (the author avatar's 40 plus its 10 gap), as on the web
+    // open on the card (no panel of its own): a heading at the card's edge (talk icon, label, count, a hairline that
+    // fades out, All n), then the replies as bubbles set in under the author's name as a thread (the author avatar's 40
+    // plus its 10 gap), as on the web
+    final any = replies.isNotEmpty || referrers.isNotEmpty;
     return Padding(
-      padding: const EdgeInsets.only(top: 12, left: 50),
+      padding: const EdgeInsets.only(top: 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Expanded(child: Text((replies.isNotEmpty || referrers.isNotEmpty ? t('Latest replies') : ResponseActivity.countLabel(post.sharesCount, post.referralsCount)).toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.muted))),
-          if (total > shown || post.sharesCount > replies.length)
-            GestureDetector(onTap: onMore, child: Text(t('All {n}', {'n': total}), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
+          const WIcon(WI.talk, size: 16, color: kGold),
+          const SizedBox(width: 8),
+          Text(any ? t('Latest replies') : ResponseActivity.countLabel(post.sharesCount, post.referralsCount), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          if (any) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(color: kGold.withValues(alpha: .15), borderRadius: BorderRadius.circular(99)),
+              child: Text('$total', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: p.tagText, fontFeatures: const [FontFeature.tabularFigures()])),
+            ),
+          ],
+          const SizedBox(width: 8),
+          Expanded(child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [kGold.withValues(alpha: .5), p.border, p.border.withValues(alpha: 0)])))),
+          if (total > shown || post.sharesCount > replies.length) ...[
+            const SizedBox(width: 8),
+            GestureDetector(onTap: onMore, child: Text('${t('All {n}', {'n': total})} →', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
+          ],
         ]),
+        Padding(
+          padding: const EdgeInsets.only(left: 50),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         for (final r in replies)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -905,6 +924,8 @@ class LatestReplies extends StatelessWidget {
               style: TextStyle(fontSize: 12, color: p.muted),
             ),
           ),
+          ]),
+        ),
       ]),
     );
   }
