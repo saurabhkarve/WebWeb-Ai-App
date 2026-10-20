@@ -726,7 +726,8 @@ class PostActionsState extends State<PostActions> {
         final c = Container(
           height: 36,
           padding: EdgeInsets.symmetric(horizontal: text != null ? 14 : 9),
-          decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(18), border: Border.all(color: edge ?? p.border)),
+          // plain, as on x.com: no border or fill unless asked for
+          decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(18), border: edge == null ? null : Border.all(color: edge)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             icon,
             if (text != null) ...[const SizedBox(width: 6), Text(text, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color ?? p.text))],
@@ -746,22 +747,20 @@ class PostActionsState extends State<PostActions> {
         else ...[
           // Refer keeps its own width; Reply is its icon and count (the web's phone row)
           if (isAsk)
-            // a light gold button like Reply's, so it leads without outweighing the ask (as on the web)
+            // plain like the rest, in deep gold so it still leads (as on the web)
             tour(
               'refer',
               pill(
                 label: 'Refer',
                 text: t('Refer'),
-                icon: WIcon(WI.refer, size: 18, color: p.text),
+                icon: WIcon(WI.refer, size: 18, color: p.tagText),
                 count: post.referralsCount,
-                color: p.text,
-                fill: kGold.withValues(alpha: .16),
-                edge: kGold.withValues(alpha: .45),
+                color: p.tagText,
                 onTap: _refer,
               ),
             ),
           const SizedBox(width: 4),
-          tour('reply', pill(label: 'Reply', icon: WIcon(WI.talk, size: 18, color: p.text), count: isAsk ? post.sharesCount : 0, color: p.text, fill: p.chip, onTap: widget.onReply)),
+          tour('reply', pill(label: 'Reply', icon: WIcon(WI.talk, size: 18, color: p.text), count: isAsk ? post.sharesCount : 0, color: p.text, onTap: widget.onReply)),
         ],
         // React in the middle, with space either side
         if (!wide) const Spacer(),
