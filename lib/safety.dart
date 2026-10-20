@@ -70,6 +70,8 @@ Future<bool> showSafetySheet(BuildContext context, {required String uid, require
             title: Text(t(saved == true ? 'Remove from saved' : 'Save ask')),
             onTap: () => Navigator.pop(ctx, 'save'),
           ),
+        // saving is for you; what follows reports or blocks
+        if (onToggleSave != null) Divider(height: 1, color: Pal.of(ctx).border),
         if (postId != null) ListTile(leading: const Icon(Icons.flag_outlined), title: const Text('Report this ask'), onTap: () => Navigator.pop(ctx, 'post')),
         ListTile(leading: const Icon(Icons.flag_outlined), title: Text('Report $name'), onTap: () => Navigator.pop(ctx, 'user')),
         ListTile(leading: const Icon(Icons.block, color: Colors.redAccent), title: Text('Block $name', style: const TextStyle(color: Colors.redAccent)), onTap: () => Navigator.pop(ctx, 'block')),

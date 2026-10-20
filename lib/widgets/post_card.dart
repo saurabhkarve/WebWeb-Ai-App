@@ -172,6 +172,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
             title: Text(t(post.bookmarked ? 'Remove from saved' : (isAsk ? 'Save ask' : 'Save'))),
             onTap: () => Navigator.pop(ctx, 'save'),
           ),
+          // saving is for you; what follows changes the ask
+          Divider(height: 1, color: p.border),
           if (isAsk) ListTile(leading: WIcon(WI.edit, size: 20, color: p.text), title: Text(t('Edit ask')), onTap: () => Navigator.pop(ctx, 'edit')),
           ListTile(
             leading: WIcon(WI.trash, size: 20, color: p.danger),
@@ -296,35 +298,27 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     );
 
     final framed = post.repostedByName != null && !widget.detail;
-    // asks: the Spotlight card (web post-card.tsx). A raised card with the time left and why you see it across the
-    // top, who asked, the category, the ask, chips for place, budget and reach, the latest replies in public, then
-    // one gold Reply with React, Refer and Share beside it.
+    // asks: the Spotlight layout (web post-card.tsx), open on the feed with the hairline between rows: the time left
+    // and why you see it on top, who asked, the category, the ask, chips for place, budget and reach, the latest
+    // replies in public, then Refer as the gold button with Reply beside it.
     if (isAsk && !widget.detail) {
       final band = post.urgency == 'immediate' ? t('Needed immediately') : urgency;
       final why = mine ? t('Your ask') : (match == null ? null : t(match));
       final spotlight = Container(
-        margin: const EdgeInsets.symmetric(vertical: 10),
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: p.card,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: p.border),
-          boxShadow: p.dark ? null : [BoxShadow(color: const Color(0xFF3C2D00).withValues(alpha: .14), blurRadius: 24, offset: const Offset(0, 10), spreadRadius: -14)],
-        ),
+        padding: EdgeInsets.symmetric(vertical: framed ? 12 : 16),
+        foregroundDecoration: framed ? null : _HairlineDecoration(p.border),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (band != null || why != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(gradient: LinearGradient(colors: [kGold.withValues(alpha: .25), kGold.withValues(alpha: 0)])),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
               child: Row(children: [
                 if (band != null) ...[WIcon(WI.clock, size: 14, color: p.tagText), const SizedBox(width: 6)],
                 Expanded(child: Text(band ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: p.tagText))),
-                if (why != null)
-                  Flexible(child: Text('✦ $why', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: p.tagText))),
+                if (why != null) Flexible(child: GoldTag(why)),
               ]),
             ),
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.zero,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 GestureDetector(
@@ -385,9 +379,10 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         ]),
       );
       if (!framed) return spotlight;
-      // reposted on a member's page: their line on top, the ask's own card under it
-      return Padding(
-        padding: const EdgeInsets.only(top: 12),
+      // reposted on a member's page: their line on top, the ask in a frame under it
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        foregroundDecoration: _HairlineDecoration(p.border),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           GestureDetector(
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? ''))),
@@ -400,7 +395,12 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               ]),
             ),
           ),
-          spotlight,
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)),
+            child: spotlight,
+          ),
         ]),
       );
     }
@@ -731,13 +731,22 @@ class PostActionsState extends State<PostActions> {
         return Semantics(button: true, label: t(label), child: onTap == null ? c : InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: c));
       }
 
+      // asks are answered by referring someone: Refer is the gold button, Reply the secondary one beside it
+      // (the asker reviews responses instead)
       return Row(children: [
-        Expanded(
-          child: tour(
-            'reply',
-            GoldButton(label: t(mine ? 'Review responses' : 'Reply'), wi: WI.talk, height: 40, onPressed: mine ? (widget.onReview ?? widget.onReply) : widget.onReply),
-          ),
-        ),
+        if (mine)
+          Expanded(child: GoldButton(label: t('Review responses'), wi: WI.talk, height: 40, onPressed: widget.onReview ?? widget.onReply))
+        else ...[
+          if (isAsk)
+            Expanded(
+              child: tour(
+                'refer',
+                GoldButton(label: post.referralsCount > 0 ? '${t('Refer')} · ${post.referralsCount}' : t('Refer'), wi: WI.refer, height: 40, onPressed: _refer),
+              ),
+            ),
+          const SizedBox(width: 6),
+          tour('reply', GoldButton(label: t('Reply'), wi: WI.talk, height: 40, outlined: true, onPressed: widget.onReply)),
+        ],
         const SizedBox(width: 6),
         ReactionPicker(
           quick: true,
@@ -750,7 +759,6 @@ class PostActionsState extends State<PostActions> {
             color: reacted ? p.text : p.muted,
           ),
         ),
-        if (isAsk && !mine) ...[const SizedBox(width: 6), tour('refer', pill(label: 'Refer', icon: WIcon(WI.refer, size: 20, color: p.muted), count: post.referralsCount, onTap: _refer))],
         const SizedBox(width: 6),
         pill(
           label: post.reposted ? 'Reposted' : 'Share',
@@ -832,13 +840,12 @@ class LatestReplies extends StatelessWidget {
     final shown = replies.length + referrers.fold<int>(0, (n, r) => n + r.n);
     const bubble = BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(14), bottomLeft: Radius.circular(14), bottomRight: Radius.circular(14));
     void openProfile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
-    return Container(
-      margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: p.chip.withValues(alpha: .7), borderRadius: BorderRadius.circular(12)),
+    // open on the card (no panel of its own): a small heading, then the replies as bubbles
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Expanded(child: Text(t('Latest replies').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.muted))),
+          Expanded(child: Text((replies.isNotEmpty || referrers.isNotEmpty ? t('Latest replies') : ResponseActivity.countLabel(post.sharesCount, post.referralsCount)).toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.muted))),
           if (total > shown || post.sharesCount > replies.length)
             GestureDetector(onTap: onMore, child: Text(t('All {n}', {'n': total}), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
         ]),
@@ -866,7 +873,7 @@ class LatestReplies extends StatelessWidget {
                   if (r.kind == 'info' && (r.text ?? '').isNotEmpty)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(color: p.card, borderRadius: bubble),
+                      decoration: BoxDecoration(color: p.chip, borderRadius: bubble),
                       child: Text(r.text!, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, height: 1.35)),
                     )
                   else if (r.kind == 'media' && (r.imageUrl ?? '').isNotEmpty)
