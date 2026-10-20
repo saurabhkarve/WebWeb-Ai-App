@@ -286,7 +286,9 @@ class Avatar extends StatelessWidget {
   final double badge;
   /// whose photo: the type badge turns green while they are online, gold when active in the last 2 hours
   final String? uid;
-  const Avatar({super.key, required this.name, this.size = 40, this.ring = false, this.type, this.photoUrl, this.badge = 16, this.uid});
+  /// names the role (and presence) in a tooltip when the type icon is tapped or hovered, e.g. on a profile
+  final String? tip;
+  const Avatar({super.key, required this.name, this.size = 40, this.ring = false, this.type, this.photoUrl, this.badge = 16, this.uid, this.tip});
 
   @override
   Widget build(BuildContext context) {
@@ -322,7 +324,7 @@ class Avatar extends StatelessWidget {
         Positioned(
           left: c - b / 2 - 2,
           top: c - b / 2 - 2,
-          child: _TypeBadge(uid: uid, business: type == 'entrepreneur', box: b + 4, icon: (badge * .62).roundToDouble()),
+          child: _TypeBadge(uid: uid, business: type == 'entrepreneur', box: b + 4, icon: (badge * .62).roundToDouble(), tip: tip),
         ),
       ]),
     );
@@ -335,7 +337,8 @@ class _TypeBadge extends StatefulWidget {
   final String? uid;
   final bool business;
   final double box, icon;
-  const _TypeBadge({required this.uid, required this.business, required this.box, required this.icon});
+  final String? tip;
+  const _TypeBadge({required this.uid, required this.business, required this.box, required this.icon, this.tip});
   @override
   State<_TypeBadge> createState() => _TypeBadgeState();
 }
@@ -380,7 +383,7 @@ class _TypeBadgeState extends State<_TypeBadge> {
           'recent' => (kGold, kInk),
           _ => (p.typeBadge, p.onInk),
         };
-        return AnimatedContainer(
+        final dot = AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           width: widget.box,
           height: widget.box,
@@ -388,6 +391,9 @@ class _TypeBadgeState extends State<_TypeBadge> {
           decoration: BoxDecoration(shape: BoxShape.circle, color: bg, border: Border.all(color: p.canvas, width: 2)),
           child: WIcon(widget.business ? WI.business : WI.user, size: widget.icon, color: fg, strokeWidth: 2.2),
         );
+        if (widget.tip == null) return dot;
+        final said = '${widget.tip}${presence == 'online' ? ' · ${t('Online')}' : presence == 'recent' ? ' · ${t('Active in the last 2 hours')}' : ''}';
+        return Tooltip(message: said, triggerMode: TooltipTriggerMode.tap, child: dot);
       },
     );
   }
@@ -400,7 +406,17 @@ class VerifiedBadge extends StatelessWidget {
   final double size;
   /// WEBWEB Premium (admin-given): its seal is shown next to the earned one
   final bool premium;
-  const VerifiedBadge({super.key, this.level = 1, this.size = 16, this.premium = false});
+  /// a paid plan below Premium ('pro' silver, 'plus' bronze); Premium outranks it, so one crown at most
+  final String? plan;
+  const VerifiedBadge({super.key, this.level = 1, this.size = 16, this.premium = false, this.plan});
+  /// the crown seal in a metal: gold Premium, silver Pro, bronze Plus (web verified-badge.tsx METAL)
+  static String crown(String tier) {
+    final m = switch (tier) { 'pro' => ['#ffffff', '#c9ced6', '#7d8590'], 'plus' => ['#ffe1c2', '#d08a4e', '#8a4f22'], _ => ['#fff1b0', '#ffc700', '#b07f00'] };
+    return '<defs><linearGradient id="p" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="${m[0]}"/><stop offset=".45" stop-color="${m[1]}"/><stop offset="1" stop-color="${m[2]}"/></linearGradient></defs>'
+        '<path d="$_seal" fill="#1e1e1e" stroke="url(#p)" stroke-width="1.6"/>'
+        '<path d="M6.6 15.6l-1-6.6 3.7 2.9L12 6.7l2.7 5.2 3.7-2.9-1 6.6z" fill="url(#p)" stroke="url(#p)" stroke-width=".6" stroke-linejoin="round"/>'
+        '<rect x="6.6" y="16.6" width="10.8" height="1.6" rx=".8" fill="url(#p)"/>';
+  }
   static const _premium = '<defs><linearGradient id="p" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#fff1b0"/><stop offset=".45" stop-color="#ffc700"/><stop offset="1" stop-color="#b07f00"/></linearGradient></defs>'
       '<path d="$_seal" fill="#1e1e1e" stroke="url(#p)" stroke-width="1.6"/>'
       '<path d="M6.6 15.6l-1-6.6 3.7 2.9L12 6.7l2.7 5.2 3.7-2.9-1 6.6z" fill="url(#p)" stroke="url(#p)" stroke-width=".6" stroke-linejoin="round"/>'
@@ -417,8 +433,12 @@ class VerifiedBadge extends StatelessWidget {
       _ => null,
     };
     Widget svg(String b) => SvgPicture.string('<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">$b</svg>', width: size, height: size);
-    if (premium) {
-      final seal = Tooltip(message: t('WEBWEB Premium'), child: svg(_premium));
+    final tier = premium ? 'premium' : (plan == 'pro' || plan == 'plus' ? plan! : null);
+    if (tier != null) {
+      final seal = Tooltip(
+        message: t(switch (tier) { 'pro' => 'WEBWEB Pro', 'plus' => 'WEBWEB Plus', _ => 'WEBWEB Premium' }),
+        child: svg(tier == 'premium' ? _premium : crown(tier)),
+      );
       if (body == null) return seal;
       return Row(mainAxisSize: MainAxisSize.min, children: [svg(body), SizedBox(width: size * .18), seal]);
     }

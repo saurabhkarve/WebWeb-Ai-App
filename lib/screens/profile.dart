@@ -247,7 +247,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text.rich(
                   TextSpan(children: [
                     TextSpan(text: displayName(u.userType, u.name, u.company)),
-                    if (u.verification > 0 || u.premium) WidgetSpan(alignment: PlaceholderAlignment.middle, child: Padding(padding: const EdgeInsets.only(left: 6), child: VerifiedBadge(level: u.verification, premium: u.premium, size: 20))),
+                    if (u.verification > 0 || u.premium || u.plan != null) WidgetSpan(alignment: PlaceholderAlignment.middle, child: Padding(padding: const EdgeInsets.only(left: 6), child: VerifiedBadge(level: u.verification, premium: u.premium, plan: u.plan, size: 20))),
                   ]),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.375),
                 ),
@@ -400,12 +400,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(color: p.canvas, shape: BoxShape.circle),
-              child: GestureDetector(onTap: _openPicture, child: Avatar(name: name, photoUrl: u.photoUrl, size: 56, ring: u.hasUpdate)),
+              // the role on the picture's edge, coloured by presence; tapping it names it
+              child: GestureDetector(
+                onTap: _openPicture,
+                child: Avatar(name: name, photoUrl: u.photoUrl, size: 56, ring: u.hasUpdate, type: u.userType, uid: u.uid, badge: 24, tip: t(labelOf(kUserTypes, u.userType))),
+              ),
             ),
             if (own)
               Positioned(
                 right: -4,
-                bottom: -4,
+                top: -4,
                 child: Semantics(
                   button: true,
                   label: t('Change profile picture'),
@@ -487,8 +491,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Text('+ ${t('Add UPI ID')}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
             ),
           ),
-        // the role closes the row (as on the web)
-        tag(icon: u.isEntrepreneur ? WI.business : WI.user, text: t(labelOf(kUserTypes, u.userType))),
       ]),
     );
   }
@@ -1468,7 +1470,13 @@ class _ShareSheetState extends State<_ShareSheet> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(c.peer.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                          Row(children: [
+                            Flexible(child: Text(c.peer.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+                            if (c.peer.verification > 0 || c.peer.premium || c.peer.plan != null) ...[
+                              const SizedBox(width: 4),
+                              VerifiedBadge(level: c.peer.verification, premium: c.peer.premium, plan: c.peer.plan, size: 14),
+                            ],
+                          ]),
                           if (c.peer.company.isNotEmpty) Text(c.peer.company, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
                         ]),
                       ),

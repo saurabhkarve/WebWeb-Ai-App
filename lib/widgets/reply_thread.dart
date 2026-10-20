@@ -190,10 +190,22 @@ class _ReplySocialState extends State<ReplySocial> {
     final p = Pal.of(context);
     final me = context.watch<AuthProvider>().profile;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        ...widget.meta,
-        if (me != null) ...[
-          const Spacer(),
+      // a chat bubble holding who and when on top and the reply under it; React and Reply beside it (as on the web)
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
+              decoration: BoxDecoration(color: p.chip, borderRadius: _bubble),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Row(mainAxisSize: MainAxisSize.min, children: widget.meta),
+                widget.child,
+              ]),
+            ),
+          ),
+        ),
+        if (me != null)
           Transform.translate(
             offset: const Offset(6, 0),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -201,9 +213,7 @@ class _ReplySocialState extends State<ReplySocial> {
               _textButton(context, t('Reply'), () => _write(widget.reply.handle), icon: WI.reply),
             ]),
           ),
-        ],
       ]),
-      widget.child,
       if (_total > 0)
         Transform.translate(
           offset: const Offset(-6, 0),
@@ -319,27 +329,32 @@ class _ThreadReplyState extends State<_ThreadReply> {
       GestureDetector(onTap: profile, child: Avatar(name: c.display, photoUrl: c.photoUrl, size: 24, uid: c.uid)),
       const SizedBox(width: 8),
       Expanded(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Flexible(child: GestureDetector(onTap: profile, child: Text(c.display, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)))),
-            if (c.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: c.verification, size: 13)],
-            const SizedBox(width: 6),
-            Text(timeAgo(c.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
-            const Spacer(),
-            Transform.translate(
-              offset: const Offset(6, 0),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                _ReactButton(value: _mine, count: _count, onChange: _react),
-                _textButton(context, t('Reply'), widget.onReply, icon: WI.reply),
-                if (widget.mine) _textButton(context, t('Delete'), widget.onDelete),
-              ]),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
+                decoration: BoxDecoration(color: p.chip, borderRadius: _bubble),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    Flexible(child: GestureDetector(onTap: profile, child: Text(c.display, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)))),
+                    if (c.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: c.verification, size: 12)],
+                    const SizedBox(width: 6),
+                    Text(timeAgo(c.createdAt), style: TextStyle(fontSize: 11, color: p.muted)),
+                  ]),
+                  HashtagText(c.text, style: const TextStyle(fontSize: 12, height: 1.35)),
+                ]),
+              ),
             ),
-          ]),
-          const SizedBox(height: 2),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(color: p.chip, borderRadius: _bubble),
-            child: HashtagText(c.text, style: const TextStyle(fontSize: 12, height: 1.35)),
+          ),
+          Transform.translate(
+            offset: const Offset(6, 0),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              _ReactButton(value: _mine, count: _count, onChange: _react),
+              _textButton(context, t('Reply'), widget.onReply, icon: WI.reply),
+              if (widget.mine) _textButton(context, t('Delete'), widget.onDelete),
+            ]),
           ),
         ]),
       ),

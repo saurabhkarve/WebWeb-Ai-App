@@ -414,6 +414,12 @@ class _TalkScreenState extends State<TalkScreen> {
   Widget _nameLine(Pal p, Peer u) => Text.rich(
         TextSpan(children: [
           TextSpan(text: u.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+          // their badges, as on their page
+          if (u.verification > 0 || u.premium || u.plan != null)
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Padding(padding: const EdgeInsets.only(left: 4), child: VerifiedBadge(level: u.verification, premium: u.premium, plan: u.plan, size: 14)),
+            ),
           if (u.company.isNotEmpty) TextSpan(text: ' · ${u.company}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: p.muted)),
         ]),
         maxLines: 1,
@@ -870,7 +876,13 @@ class _ChatThreadState extends State<ChatThread> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(_peer.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25)),
+                      Row(children: [
+                        Flexible(child: Text(_peer.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25))),
+                        if (_peer.verification > 0 || _peer.premium || _peer.plan != null) ...[
+                          const SizedBox(width: 4),
+                          VerifiedBadge(level: _peer.verification, premium: _peer.premium, plan: _peer.plan, size: 14),
+                        ],
+                      ]),
                       Builder(builder: (context) {
                         // offline: say so where "online" would be (WhatsApp shows "Waiting for network")
                         final status = connectionStatus(context.watch<RealtimeService>());

@@ -336,7 +336,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(children: [
                         Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25))),
-                        if (post.authorVerification > 0 || post.authorPremium) ...[const SizedBox(width: 6), VerifiedBadge(level: post.authorVerification, premium: post.authorPremium)],
+                        if (post.authorVerification > 0 || post.authorPremium || post.authorPlan != null) ...[const SizedBox(width: 6), VerifiedBadge(level: post.authorVerification, premium: post.authorPremium, plan: post.authorPlan)],
                       ]),
                       Text('${isBusiness ? post.authorName : post.authorCompany} · ${timeAgo(post.createdAt)}${post.editedAt != null ? ' · ${editedLabel(post.editedAt!)}' : ''}',
                           maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted, height: 1.3)),
@@ -436,7 +436,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
                       Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25))),
-                      if (post.authorVerification > 0 || post.authorPremium) ...[const SizedBox(width: 6), VerifiedBadge(level: post.authorVerification, premium: post.authorPremium)],
+                      if (post.authorVerification > 0 || post.authorPremium || post.authorPlan != null) ...[const SizedBox(width: 6), VerifiedBadge(level: post.authorVerification, premium: post.authorPremium, plan: post.authorPlan)],
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text('${timeAgo(post.createdAt)}${post.editedAt != null ? ' · ${editedLabel(post.editedAt!)}' : ''}',
@@ -959,22 +959,19 @@ class LatestReplies extends StatelessWidget {
                       child: GestureDetector(
                         onTap: () => openProfile(r.handle),
                         child: Text(r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name,
-                            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
                       ),
                     ),
-                    if (r.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: r.verification, size: 14)],
+                    if (r.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: r.verification, size: 12)],
                     const SizedBox(width: 6),
-                    Text(timeAgo(r.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
+                    Text(timeAgo(r.createdAt), style: TextStyle(fontSize: 11, color: p.muted)),
                   ],
                   child: Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: r.kind == 'info' && (r.text ?? '').isNotEmpty
                         ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(color: p.chip, borderRadius: bubble),
-                              child: HashtagText(r.text!, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, height: 1.35)),
-                            ),
+                            // the bubble is ReplySocial's, with the name and time on top
+                            HashtagText(r.text!, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, height: 1.35)),
                             // a photo sent with the note
                             if ((r.imageUrl ?? '').isNotEmpty)
                               Padding(padding: const EdgeInsets.only(top: 4), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 96, height: 64))),

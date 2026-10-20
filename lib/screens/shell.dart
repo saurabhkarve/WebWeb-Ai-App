@@ -447,7 +447,7 @@ class _AccountMenu extends StatelessWidget {
                     Text('@${me.handle}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: p.muted)),
                     const SizedBox(height: 4),
                     Row(children: [
-                      VerifiedBadge(level: me.verification, premium: me.premium, size: 14),
+                      VerifiedBadge(level: me.verification, premium: me.premium, plan: me.plan, size: 14),
                       const SizedBox(width: 4),
                       Flexible(child: Text(t(kVerificationLabel[me.verification] ?? ''), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: p.muted))),
                     ]),

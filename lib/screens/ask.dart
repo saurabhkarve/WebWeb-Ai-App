@@ -944,7 +944,7 @@ class _AskFormState extends State<_AskForm> {
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Row(children: [
                           Flexible(child: Text(shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
-                          if (me.verification > 0 || me.premium) ...[const SizedBox(width: 4), VerifiedBadge(level: me.verification, premium: me.premium)],
+                          if (me.verification > 0 || me.premium || me.plan != null) ...[const SizedBox(width: 4), VerifiedBadge(level: me.verification, premium: me.premium, plan: me.plan)],
                           const SizedBox(width: 6),
                           Text(t('just now'), style: TextStyle(fontSize: 12, color: p.muted)),
                         ]),

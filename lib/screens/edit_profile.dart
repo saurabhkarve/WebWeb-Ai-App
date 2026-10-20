@@ -431,7 +431,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         Row(children: [
                           Text(t('Business verification'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                           const SizedBox(width: 8),
-                          VerifiedBadge(level: me.verification, premium: me.premium, size: 20),
+                          VerifiedBadge(level: me.verification, premium: me.premium, plan: me.plan, size: 20),
                         ]),
                         const SizedBox(height: 12),
                         Text.rich(

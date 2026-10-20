@@ -130,6 +130,8 @@ class Profile {
   final int verification;
   /// WEBWEB Premium: given only by an admin, shown next to the earned badge
   final bool premium;
+  /// paid plan below Premium ('plus' < 'pro'), while it runs
+  final String? plan;
   /// has a live update (gold ring on the avatar)
   final bool hasUpdate;
   /// UPI IDs linked to the page, the default first
@@ -140,7 +142,7 @@ class Profile {
     required this.uid, required this.handle, required this.name, required this.company, required this.userType,
     required this.category, required this.location, this.photoUrl, this.bannerUrl, this.gstin, this.completion, this.bio, this.experience, this.education,
     this.contactMasked, this.services = const [], this.skills = const [], this.contributions = 0,
-    this.statPosts, this.statShared, this.verification = 1, this.premium = false, this.hasUpdate = false, this.upi = const [], required this.createdAt,
+    this.statPosts, this.statShared, this.verification = 1, this.premium = false, this.plan, this.hasUpdate = false, this.upi = const [], required this.createdAt,
   });
 
   bool get isEntrepreneur => userType == 'entrepreneur';
@@ -159,7 +161,7 @@ class Profile {
       services: _strings(j['services']), skills: _strings(j['skills']),
       contributions: (j['contributions'] as num?)?.toInt() ?? (stats?['contributions'] as num?)?.toInt() ?? 0,
       statPosts: (stats?['posts'] as num?)?.toInt(), statShared: (stats?['shared'] as num?)?.toInt(),
-      verification: (j['verificationLevel'] as num?)?.toInt() ?? 1, premium: j['premium'] == true, hasUpdate: stats?['hasUpdate'] == true,
+      verification: (j['verificationLevel'] as num?)?.toInt() ?? 1, premium: j['premium'] == true, plan: j['plan'] as String?, hasUpdate: stats?['hasUpdate'] == true,
       upi: [for (final u in (j['upi'] as List?) ?? const []) UpiId.fromJson(u as Map)],
       createdAt: _ms(j['createdAt']),
     );
@@ -222,6 +224,7 @@ class Post {
   final String authorType;
   final int authorVerification;
   final bool authorPremium;
+  final String? authorPlan;
   /// Metres from the viewer's area (matched feed only).
   final num? distanceM;
   /// Reach circle picked on the map, in metres.
@@ -252,7 +255,7 @@ class Post {
   Post({
     required this.id, required this.kind, required this.authorUid, required this.authorName, required this.authorCompany,
     required this.authorHandle, this.authorPhotoUrl, this.title, this.description, this.category, this.locationPref, this.budget,
-    this.urgency, this.matchReason, this.slug, this.categoryLabel, this.authorType = 'entrepreneur', this.authorVerification = 1, this.authorPremium = false, this.distanceM, this.radiusM, this.lat, this.lng, this.editedAt, this.repostedByName, this.repostedByHandle, this.repostedAt, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
+    this.urgency, this.matchReason, this.slug, this.categoryLabel, this.authorType = 'entrepreneur', this.authorVerification = 1, this.authorPremium = false, this.authorPlan, this.distanceM, this.radiusM, this.lat, this.lng, this.editedAt, this.repostedByName, this.repostedByHandle, this.repostedAt, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
     this.recentResponses = const [], this.latestReplies = const [], this.referrers = const [], this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0, this.viewsCount = 0,
     this.reacted = false, this.reposted = false, this.bookmarked = false, this.myReaction,
   });
@@ -271,7 +274,7 @@ class Post {
         title: j['title'] as String?, description: j['description'] as String?, category: j['category'] as String?,
         locationPref: j['locationPref'] as String?, budget: j['budget'] as String?, urgency: j['urgency'] as String?,
         matchReason: j['matchReason'] as String?, slug: j['slug'] as String?, categoryLabel: j['categoryLabel'] as String?,
-        authorType: '${j['authorType'] ?? 'entrepreneur'}', authorVerification: (j['authorVerification'] as num?)?.toInt() ?? 1, authorPremium: j['authorPremium'] == true, distanceM: j['distanceM'] as num?, radiusM: j['radiusM'] as num?,
+        authorType: '${j['authorType'] ?? 'entrepreneur'}', authorVerification: (j['authorVerification'] as num?)?.toInt() ?? 1, authorPremium: j['authorPremium'] == true, authorPlan: j['authorPlan'] as String?, distanceM: j['distanceM'] as num?, radiusM: j['radiusM'] as num?,
         lat: (j['lat'] as num?)?.toDouble(), lng: (j['lng'] as num?)?.toDouble(), editedAt: j['editedAt'] == null ? null : _ms(j['editedAt']),
         repostedByName: (j['repostedBy'] as Map?)?['name'] as String?, repostedByHandle: (j['repostedBy'] as Map?)?['handle'] as String?,
         repostedAt: j['repostedAt'] == null ? null : _ms(j['repostedAt']),
@@ -455,14 +458,17 @@ class Peer {
   final String uid, name, company, handle, userType;
   final String? photoUrl;
   final int verification;
-  const Peer({required this.uid, required this.name, this.company = '', this.handle = '', this.userType = 'entrepreneur', this.photoUrl, this.verification = 0});
+  final bool premium;
+  final String? plan;
+  const Peer({required this.uid, required this.name, this.company = '', this.handle = '', this.userType = 'entrepreneur', this.photoUrl, this.verification = 0, this.premium = false, this.plan});
   String get shownName => userType == 'entrepreneur' && company.isNotEmpty ? company : name;
   factory Peer.fromJson(Map j) => Peer(
         uid: '${j['uid']}', name: '${j['name'] ?? ''}', company: '${j['company'] ?? ''}', handle: '${j['handle'] ?? ''}',
         userType: '${j['userType'] ?? 'entrepreneur'}', photoUrl: j['photoURL'] as String?,
         verification: (j['verification'] ?? j['verificationLevel'] as num?)?.toInt() ?? 0,
+        premium: j['premium'] == true, plan: j['plan'] as String?,
       );
-  factory Peer.fromProfile(Profile p) => Peer(uid: p.uid, name: p.name, company: p.company, handle: p.handle, userType: p.userType, photoUrl: p.photoUrl, verification: p.verification);
+  factory Peer.fromProfile(Profile p) => Peer(uid: p.uid, name: p.name, company: p.company, handle: p.handle, userType: p.userType, photoUrl: p.photoUrl, verification: p.verification, premium: p.premium, plan: p.plan);
 }
 
 /// The message a reply quotes (web: Message.replyTo).
@@ -517,7 +523,8 @@ class ChatSummary {
     final p = Map<String, dynamic>.from((info[other] as Map?) ?? {});
     return ChatSummary(
       id: '${j['id']}',
-      peer: Peer(uid: other, name: '${p['name'] ?? ''}', company: '${p['company'] ?? ''}', handle: '${p['handle'] ?? ''}', userType: '${p['userType'] ?? 'entrepreneur'}', photoUrl: p['photoURL'] as String?),
+      peer: Peer(uid: other, name: '${p['name'] ?? ''}', company: '${p['company'] ?? ''}', handle: '${p['handle'] ?? ''}', userType: '${p['userType'] ?? 'entrepreneur'}', photoUrl: p['photoURL'] as String?,
+          verification: (p['verification'] as num?)?.toInt() ?? 0, premium: p['premium'] == true, plan: p['plan'] as String?),
       lastMessage: j['lastMessage'] as String?, lastMessageAt: _msOpt(j['lastMessageAt']), unread: j['unread'] == true,
     );
   }
