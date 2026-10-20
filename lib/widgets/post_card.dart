@@ -309,8 +309,14 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         foregroundDecoration: framed ? null : _HairlineDecoration(p.border),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (band != null || why != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+            Container(
+              // on a gold gradient that fades out to the right, as on the web
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.only(left: 10, top: 4, bottom: 4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(99),
+                gradient: LinearGradient(colors: [kGold.withValues(alpha: .25), kGold.withValues(alpha: .08), kGold.withValues(alpha: 0)]),
+              ),
               child: Row(children: [
                 if (band != null) ...[WIcon(WI.clock, size: 14, color: p.tagText), const SizedBox(width: 6)],
                 Expanded(child: Text(band ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: p.tagText))),
