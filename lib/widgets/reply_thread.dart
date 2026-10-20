@@ -339,7 +339,7 @@ class _ThreadReplyState extends State<_ThreadReply> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(color: p.chip, borderRadius: _bubble),
-            child: HashtagText(c.text, style: const TextStyle(fontSize: 13, height: 1.35)),
+            child: HashtagText(c.text, style: const TextStyle(fontSize: 12, height: 1.35)),
           ),
         ]),
       ),
@@ -388,9 +388,9 @@ class _RequestShareState extends State<RequestShare> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(8, 3, 10, 3),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              WIcon(WI.contactCard, size: 14, color: p.tagText),
+              WIcon(WI.contactCard, size: 12, color: p.tagText),
               const SizedBox(width: 4),
-              Text(t(_state == 'sent' ? 'Requested' : 'Request to share'), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.tagText)),
+              Text(t(_state == 'sent' ? 'Requested' : 'Request to share'), style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: p.tagText)),
             ]),
           ),
         ),

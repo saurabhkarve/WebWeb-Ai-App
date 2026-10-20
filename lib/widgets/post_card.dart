@@ -353,7 +353,15 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                   child: Text(t(post.categoryText).toUpperCase(),
                       maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.link)),
                 ),
-                if (why != null) ...[const SizedBox(width: 8), Flexible(child: GoldTag(why))],
+                // "Near you" opens the ask's area map, like its place chip
+                if (why != null) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: !mine && match != null && ((post.locationPref ?? '').isNotEmpty || post.lat != null)
+                        ? GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showAskAreaSheet(context, post), child: GoldTag(why))
+                        : GoldTag(why),
+                  ),
+                ],
               ]),
               const SizedBox(height: 4),
               tappable,
@@ -726,7 +734,7 @@ class PostActionsState extends State<PostActions> {
       final wide = MediaQuery.sizeOf(context).width >= 600;
       Widget pill({required Widget icon, int count = 0, Color? color, VoidCallback? onTap, required String label, Color? fill, Color? edge, String? text, Color? badge, Color? splash}) {
         final c0 = color ?? p.muted;
-        final title = Text(text ?? t(label), maxLines: 1, style: TextStyle(fontSize: wide ? 12 : 10, height: 1, fontWeight: FontWeight.w700, color: c0));
+        final title = Text(text ?? t(label), maxLines: 1, style: TextStyle(fontSize: wide ? 11.5 : 10, height: 1, fontWeight: FontWeight.w700, color: c0));
         final chip = count > 0
             ? Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -736,8 +744,8 @@ class PostActionsState extends State<PostActions> {
             : null;
         final radius = BorderRadius.circular(wide ? 18 : 12);
         final c = Container(
-          constraints: BoxConstraints(minWidth: wide ? 0 : 56, minHeight: wide ? 36 : 0),
-          padding: wide ? const EdgeInsets.symmetric(horizontal: 12) : const EdgeInsets.fromLTRB(10, 6, 10, 4),
+          constraints: BoxConstraints(minWidth: wide ? 0 : 56, minHeight: wide ? 32 : 0),
+          padding: wide ? const EdgeInsets.symmetric(horizontal: 10) : const EdgeInsets.fromLTRB(10, 6, 10, 4),
           decoration: BoxDecoration(
             color: fill ?? p.card,
             borderRadius: radius,
@@ -822,6 +830,8 @@ class PostActionsState extends State<PostActions> {
       return LayoutBuilder(
         builder: (_, box) => SingleChildScrollView(
           scrollDirection: Axis.horizontal,
+          // the tiles' shadow shows below the row
+          clipBehavior: Clip.none,
           child: ConstrainedBox(constraints: BoxConstraints(minWidth: box.maxWidth), child: IntrinsicWidth(child: row)),
         ),
       );
@@ -954,7 +964,7 @@ class LatestReplies extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(color: p.chip, borderRadius: bubble),
-                              child: HashtagText(r.text!, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, height: 1.35)),
+                              child: HashtagText(r.text!, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, height: 1.35)),
                             ),
                             // a photo sent with the note
                             if ((r.imageUrl ?? '').isNotEmpty)
@@ -969,7 +979,7 @@ class LatestReplies extends StatelessWidget {
                                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                                   WIcon(WI.lock, size: 13, color: p.muted),
                                   const SizedBox(width: 4),
-                                  Flexible(child: Text(t('Shared a contact privately'), style: TextStyle(fontSize: 12, color: p.muted))),
+                                  Flexible(child: Text(t('Shared a contact privately'), style: TextStyle(fontSize: 11, color: p.muted))),
                                 ]),
                               ),
                                 // the number went to the asker alone: anyone else can ask the replier for it
