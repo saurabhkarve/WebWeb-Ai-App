@@ -9,6 +9,7 @@ import '../screens/contact_picker.dart';
 import '../screens/profile.dart';
 import '../screens/talk.dart';
 import '../theme.dart';
+import '../views.dart' show compactCount;
 import '../widgets.dart';
 import 'reaction_picker.dart';
 
@@ -79,13 +80,17 @@ class CatalogStrip extends StatelessWidget {
           ),
         ),
         // border-b inside the feed's gutter
-        Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 0), child: Container(height: 1, color: p.border)),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [kGold.withValues(alpha: 0), kGold.withValues(alpha: .6), kGold.withValues(alpha: 0)]))),
+        ),
       ]),
     );
   }
 }
 
-/// A catalog item with the same controls an ask has (React, Refer, Repost, Reply, Share, Save) plus Enquire now.
+/// A catalog item with the same controls an ask has (React, Refer, Reply, Share with Repost in its menu, Save) plus
+/// Enquire now.
 /// Tap opens the business; double tap gives the item a thumbs up.
 /// Also used on a business page's catalog tab ([CatalogItemCard]: tap opens the item, full width).
 class CatalogItemCard extends StatelessWidget {
@@ -147,6 +152,30 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
   void _doubleTap() {
     _burst.forward(from: 0);
     if (it.myReaction == null) _react('thumbs');
+  }
+
+  /// Share: Repost to your page, or share the item's link (no Repost on a business page's own catalog tab).
+  Future<void> _shareMenu() async {
+    void share() => showShareItemSheetFor(context, it, handle: widget.owner.handle, business: widget.ownerName);
+    if (!widget.repost) return share();
+    final p = Pal.of(context);
+    const green = Color(0xFF059669);
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: p.canvas,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: WIcon(WI.repost, size: 20, color: it.reposted ? green : p.text),
+            title: Text('${t(it.reposted ? 'Undo repost' : 'Repost')}${it.repostsCount > 0 ? ' · ${it.repostsCount}' : ''}'),
+            onTap: () => Navigator.pop(ctx, 'repost'),
+          ),
+          ListTile(leading: WIcon(WI.share, size: 20, color: p.text), title: Text(t('Share this item')), onTap: () => Navigator.pop(ctx, 'share')),
+        ]),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    choice == 'repost' ? await _toggleRepost() : share();
   }
 
   Future<void> _toggleRepost() async {
@@ -239,23 +268,24 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
     final typeIcon = it.kind == 'service' ? WI.service : WI.box;
     const emerald = Color(0xFF059669);
 
-    Widget action({required Widget icon, int count = 0, required String label, required Color color, VoidCallback? onTap}) {
+    // as on an ask's row: plain icons with their counts in small badges (web ItemCard)
+    Widget action({required Widget icon, int count = 0, required String label, required Color color, Color? badge, VoidCallback? onTap}) {
       final content = Container(
-        constraints: const BoxConstraints(minHeight: 44),
-        alignment: Alignment.center,
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          SizedBox(
-            height: 20,
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              icon,
-              if (count > 0) ...[const SizedBox(width: 4), Text('$count', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color))],
-            ]),
-          ),
-          const SizedBox(height: 2),
-          Text(t(label), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, height: 1, color: color)),
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          icon,
+          if (count > 0) ...[
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(color: badge ?? p.chip, borderRadius: BorderRadius.circular(9)),
+              child: Text(compactCount(count), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+            ),
+          ],
         ]),
       );
-      return Expanded(child: onTap == null ? content : InkWell(borderRadius: BorderRadius.circular(8), onTap: onTap, child: content));
+      return Semantics(button: true, label: t(label), child: onTap == null ? content : InkWell(borderRadius: BorderRadius.circular(18), onTap: onTap, child: content));
     }
 
     Widget overlayPill(Widget child) => Container(
@@ -364,51 +394,51 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
               ]),
             ),
             const SizedBox(height: 8),
-            GoldButton(label: t('Enquire now'), height: 32, loading: _busy, onPressed: () => _send(_defaultText, true)),
-            const SizedBox(height: 8),
-            Row(children: [
-              Expanded(
-                child: ReactionPicker(
-                  quick: true,
-                  value: it.myReaction,
-                  onChange: _react,
-                  trigger: (_) => Container(
-                    constraints: const BoxConstraints(minHeight: 44),
-                    alignment: Alignment.center,
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      SizedBox(
-                        height: 20,
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          it.myReaction != null
-                              ? SizedBox(width: 20, height: 20, child: Center(child: ReactionGlyph(it.myReaction!, size: 14)))
-                              : WIcon(WI.heart, size: 20, color: p.muted),
-                          if (it.reactionsCount > 0) ...[
-                            const SizedBox(width: 4),
-                            Text('${it.reactionsCount}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: it.myReaction != null ? p.text : p.muted)),
-                          ],
-                        ]),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(t('React'), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, height: 1, color: it.myReaction != null ? p.text : p.muted)),
-                    ]),
+            // light gold, like Refer on an ask: it invites without outshining the item
+            Material(
+              color: kGold.withValues(alpha: .15),
+              shape: StadiumBorder(side: BorderSide(color: kGold.withValues(alpha: .5))),
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: _busy ? null : () => _send(_defaultText, true),
+                child: SizedBox(
+                  height: 34,
+                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    WIcon(WI.talk, size: 16, color: p.tagText),
+                    const SizedBox(width: 6),
+                    Text(t('Enquire now'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.tagText)),
+                  ]),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            // four actions, as on an ask: Repost lives in Share's menu
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              ReactionPicker(
+                quick: true,
+                value: it.myReaction,
+                onChange: _react,
+                trigger: (open) => Container(
+                  decoration: BoxDecoration(color: open ? const Color(0xFFF43F5E).withValues(alpha: .1) : null, borderRadius: BorderRadius.circular(18)),
+                  child: action(
+                    icon: it.myReaction != null
+                        ? SizedBox(width: 20, height: 20, child: Center(child: ReactionGlyph(it.myReaction!, size: 14)))
+                        : WIcon(WI.heart, size: 20, color: p.muted),
+                    count: it.reactionsCount,
+                    label: 'React',
+                    color: it.myReaction != null ? p.text : p.muted,
                   ),
                 ),
               ),
-              action(icon: WIcon(WI.refer, size: 20, color: p.muted), count: it.referralsCount, label: 'Refer', color: p.muted, onTap: _refer),
-              if (widget.repost)
-                action(
-                  icon: WIcon(WI.repost, size: 20, color: it.reposted ? emerald : p.muted),
-                  count: it.repostsCount,
-                  label: it.reposted ? 'Reposted' : 'Repost',
-                  color: it.reposted ? emerald : p.muted,
-                  onTap: _toggleRepost,
-                ),
+              action(icon: WIcon(WI.refer, size: 20, color: p.tagText), count: it.referralsCount, label: 'Refer', color: p.tagText, badge: p.tagBg, onTap: _refer),
               action(icon: WIcon(WI.reply, size: 20, color: p.muted), count: it.enquiriesCount, label: 'Reply', color: p.muted, onTap: _reply),
               action(
-                icon: WIcon(WI.share, size: 20, color: p.muted),
-                label: 'Share',
-                color: p.muted,
-                onTap: () => showShareItemSheetFor(context, it, handle: widget.owner.handle, business: widget.ownerName),
+                icon: WIcon(it.reposted ? WI.repost : WI.share, size: 20, color: it.reposted ? emerald : p.muted),
+                count: it.repostsCount,
+                label: it.reposted ? 'Reposted' : 'Share',
+                color: it.reposted ? emerald : p.muted,
+                badge: it.reposted ? emerald.withValues(alpha: .1) : null,
+                onTap: _shareMenu,
               ),
             ]),
           ]),

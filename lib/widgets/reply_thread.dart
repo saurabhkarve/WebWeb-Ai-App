@@ -60,12 +60,16 @@ Widget _textButton(BuildContext context, String label, VoidCallback onTap, {Colo
   );
 }
 
-/// Under a reply on an ask, as on x.com (and the web): react to it, reply to it, and open the replies to it (one level
-/// deep; replying to someone in the thread starts the text with their @handle).
+/// A reply on an ask, as on x.com (and the web): react to it and reply to it from its name line (no extra row, to keep
+/// the card short), and open the replies to it under the bubble (one level deep; replying to someone in the thread
+/// starts the text with their @handle).
 class ReplySocial extends StatefulWidget {
   final String postId;
   final ResponseLog reply;
-  const ReplySocial({super.key, required this.postId, required this.reply});
+  /// the name line (name, badge, time) and the reply itself (bubble, photo or the private-contact line)
+  final List<Widget> meta;
+  final Widget child;
+  const ReplySocial({super.key, required this.postId, required this.reply, required this.meta, required this.child});
   @override
   State<ReplySocial> createState() => _ReplySocialState();
 }
@@ -182,32 +186,41 @@ class _ReplySocialState extends State<ReplySocial> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final me = context.watch<AuthProvider>().profile;
-    if (me == null) return const SizedBox.shrink();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Transform.translate(
-        offset: const Offset(-6, 0),
-        child: Row(children: [
-          _ReactButton(value: _mine, count: _count, onChange: _react),
-          _textButton(context, t('Reply'), () => _write(widget.reply.handle)),
-          if (_total > 0)
-            _textButton(
-              context,
-              _open ? t('Hide replies') : t(_total == 1 ? 'View 1 reply' : 'View {n} replies', {'n': _total}),
-              () {
-                if (!_open && _thread == null) _load();
-                setState(() => _open = !_open);
-              },
-              color: p.link,
-            ),
-        ]),
-      ),
+      Row(children: [
+        ...widget.meta,
+        if (me != null) ...[
+          const Spacer(),
+          Transform.translate(
+            offset: const Offset(6, 0),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              _ReactButton(value: _mine, count: _count, onChange: _react),
+              _textButton(context, t('Reply'), () => _write(widget.reply.handle)),
+            ]),
+          ),
+        ],
+      ]),
+      widget.child,
+      if (_total > 0)
+        Transform.translate(
+          offset: const Offset(-6, 0),
+          child: _textButton(
+            context,
+            _open ? t('Hide replies') : t(_total == 1 ? 'View 1 reply' : 'View {n} replies', {'n': _total}),
+            () {
+              if (!_open && _thread == null) _load();
+              setState(() => _open = !_open);
+            },
+            color: p.link,
+          ),
+        ),
       if (_open && (_thread?.isNotEmpty ?? false))
         for (final c in _thread!)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: _ThreadReply(postId: widget.postId, replyUid: widget.reply.uid, c: c, mine: c.uid == me.uid, onReply: () => _write(c.handle), onDelete: () => _delete(c)),
+            child: _ThreadReply(postId: widget.postId, replyUid: widget.reply.uid, c: c, mine: c.uid == me?.uid, onReply: () => _write(c.handle), onDelete: () => _delete(c)),
           ),
-      if (_writing)
+      if (_writing && me != null)
         Padding(
           padding: const EdgeInsets.only(top: 6),
           child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -309,20 +322,21 @@ class _ThreadReplyState extends State<_ThreadReply> {
             if (c.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: c.verification, size: 13)],
             const SizedBox(width: 6),
             Text(timeAgo(c.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
+            const Spacer(),
+            Transform.translate(
+              offset: const Offset(6, 0),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                _ReactButton(value: _mine, count: _count, onChange: _react),
+                _textButton(context, t('Reply'), widget.onReply),
+                if (widget.mine) _textButton(context, t('Delete'), widget.onDelete),
+              ]),
+            ),
           ]),
-          const SizedBox(height: 3),
+          const SizedBox(height: 2),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(color: p.chip, borderRadius: _bubble),
             child: HashtagText(c.text, style: const TextStyle(fontSize: 13, height: 1.35)),
-          ),
-          Transform.translate(
-            offset: const Offset(-6, 0),
-            child: Row(children: [
-              _ReactButton(value: _mine, count: _count, onChange: _react),
-              _textButton(context, t('Reply'), widget.onReply),
-              if (widget.mine) _textButton(context, t('Delete'), widget.onDelete),
-            ]),
           ),
         ]),
       ),

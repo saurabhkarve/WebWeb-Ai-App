@@ -238,7 +238,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     final match = (post.matchReason ?? '').isEmpty ? null : post.matchReason!;
 
     final body = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (isAsk) HashtagText(post.title ?? '', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.375)),
+      if (isAsk) HashtagText(post.title ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.375, letterSpacing: -0.18)),
       if ((post.description ?? '').isNotEmpty)
         Padding(
           padding: EdgeInsets.only(top: isAsk ? 4 : 0),
@@ -246,7 +246,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
             post.description!,
             maxLines: isAsk && !widget.detail ? 2 : null,
             overflow: isAsk && !widget.detail ? TextOverflow.ellipsis : null,
-            style: TextStyle(fontSize: 15, height: 1.375, color: isAsk ? p.text.withValues(alpha: .75) : p.text),
+            style: TextStyle(fontSize: 15, height: isAsk ? 1.6 : 1.375, color: isAsk ? p.text.withValues(alpha: .7) : p.text),
           ),
         ),
       ImageGrid(post.images, shareUrl: post.webUrl, shareRef: post.id),
@@ -316,8 +316,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     if (isAsk && !widget.detail) {
       final why = mine ? t('Your ask') : (match == null ? null : t(match));
       final spotlight = Container(
-        padding: EdgeInsets.symmetric(vertical: framed ? 12 : 16),
-        foregroundDecoration: framed ? null : _HairlineDecoration(p.border),
+        padding: EdgeInsets.symmetric(vertical: framed ? 12 : 20),
+        foregroundDecoration: framed ? null : _HairlineDecoration(kGold.withValues(alpha: .6)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(
             padding: EdgeInsets.zero,
@@ -386,7 +386,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       // reposted on a member's page: their line on top, the ask in a frame under it
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
-        foregroundDecoration: _HairlineDecoration(p.border),
+        foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           GestureDetector(
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? ''))),
@@ -411,7 +411,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
 
     final card = Container(
       padding: framed ? const EdgeInsets.fromLTRB(12, 12, 12, 8) : const EdgeInsets.symmetric(vertical: 16),
-      foregroundDecoration: framed ? null : _HairlineDecoration(p.border),
+      foregroundDecoration: framed ? null : _HairlineDecoration(kGold.withValues(alpha: .6)),
       decoration: framed ? BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)) : null,
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         GestureDetector(
@@ -523,7 +523,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     // someone else's ask on this member's page because they reposted it: their line on top, the ask inside as its author's
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
-      foregroundDecoration: _HairlineDecoration(p.border),
+      foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         GestureDetector(
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? ''))),
@@ -880,8 +880,8 @@ class LatestReplies extends StatelessWidget {
     const bubble = BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(14), bottomLeft: Radius.circular(14), bottomRight: Radius.circular(14));
     void openProfile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
     // open on the card (no panel of its own): a heading at the card's edge (talk icon, label, count, a hairline that
-    // fades out, All n), then the replies as bubbles set in under the author's name as a thread (the author avatar's 40
-    // plus its 10 gap), as on the web
+    // fades out), then the replies as compact bubbles set in under the author's name as a thread (the author avatar's 40
+    // plus its 10 gap), and All n after the third, as on the web
     final any = replies.isNotEmpty || referrers.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.only(top: 12),
@@ -900,10 +900,6 @@ class LatestReplies extends StatelessWidget {
           ],
           const SizedBox(width: 8),
           Expanded(child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [kGold.withValues(alpha: .5), p.border, p.border.withValues(alpha: 0)])))),
-          if (total > shown || post.sharesCount > replies.length) ...[
-            const SizedBox(width: 8),
-            GestureDetector(onTap: onMore, child: Text('${t('All {n}', {'n': total})} →', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
-          ],
         ]),
         Padding(
           // set in less on a phone, as on the web
@@ -911,13 +907,17 @@ class LatestReplies extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         for (final r in replies)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: 6),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              GestureDetector(onTap: () => openProfile(r.handle), child: Avatar(name: r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name, photoUrl: r.photoUrl, size: 28)),
+              GestureDetector(onTap: () => openProfile(r.handle), child: Avatar(name: r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name, photoUrl: r.photoUrl, size: 24)),
               const SizedBox(width: 8),
               Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
+                // react and reply from the name line, as on the web
+                child: ReplySocial(
+                  key: ValueKey('${post.id}-${r.uid}'),
+                  postId: post.id,
+                  reply: r,
+                  meta: [
                     Flexible(
                       child: GestureDetector(
                         onTap: () => openProfile(r.handle),
@@ -925,38 +925,44 @@ class LatestReplies extends StatelessWidget {
                             maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                       ),
                     ),
-                    if (r.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: r.verification)],
+                    if (r.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: r.verification, size: 14)],
                     const SizedBox(width: 6),
                     Text(timeAgo(r.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
-                  ]),
-                  const SizedBox(height: 3),
-                  if (r.kind == 'info' && (r.text ?? '').isNotEmpty) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(color: p.chip, borderRadius: bubble),
-                      child: HashtagText(r.text!, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, height: 1.35)),
-                    ),
-                    // a photo sent with the note
-                    if ((r.imageUrl ?? '').isNotEmpty)
-                      Padding(padding: const EdgeInsets.only(top: 4), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 112, height: 80))),
-                  ]
-                  else if (r.kind == 'media' && (r.imageUrl ?? '').isNotEmpty)
-                    ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 112, height: 80))
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(borderRadius: bubble, border: Border.all(color: p.border)),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        WIcon(WI.lock, size: 13, color: p.muted),
-                        const SizedBox(width: 4),
-                        Flexible(child: Text(t('Shared a contact privately'), style: TextStyle(fontSize: 12, color: p.muted))),
-                      ]),
-                    ),
-                  // react to it and reply to it, as on x.com
-                  ReplySocial(key: ValueKey('${post.id}-${r.uid}'), postId: post.id, reply: r),
-                ]),
+                  ],
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: r.kind == 'info' && (r.text ?? '').isNotEmpty
+                        ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(color: p.chip, borderRadius: bubble),
+                              child: HashtagText(r.text!, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, height: 1.35)),
+                            ),
+                            // a photo sent with the note
+                            if ((r.imageUrl ?? '').isNotEmpty)
+                              Padding(padding: const EdgeInsets.only(top: 4), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 96, height: 64))),
+                          ])
+                        : r.kind == 'media' && (r.imageUrl ?? '').isNotEmpty
+                            ? ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 96, height: 64))
+                            : Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                                decoration: BoxDecoration(borderRadius: bubble, border: Border.all(color: p.border)),
+                                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                  WIcon(WI.lock, size: 13, color: p.muted),
+                                  const SizedBox(width: 4),
+                                  Flexible(child: Text(t('Shared a contact privately'), style: TextStyle(fontSize: 12, color: p.muted))),
+                                ]),
+                              ),
+                  ),
+                ),
               ),
             ]),
+          ),
+        // after the third: the rest are on the ask page
+        if (total > shown || post.sharesCount > replies.length)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: GestureDetector(onTap: onMore, child: Text('${t('All {n}', {'n': total})} →', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
           ),
         if (referrers.isNotEmpty)
           Padding(
