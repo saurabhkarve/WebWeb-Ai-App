@@ -132,7 +132,13 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     final p = Pal.of(context);
     final top = MediaQuery.of(context).padding.top;
     const header = 56.0;
-    return Scaffold(
+    // without the island on Ask, back returns to Connect
+    return PopScope(
+      canPop: _i != 3,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _i == 3) _go(0);
+      },
+      child: Scaffold(
       body: Column(children: [
         const ActiveCallBanner(),
         Expanded(
@@ -168,8 +174,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             ),
             // "Waiting for network…" / "Connecting…" under the header, WhatsApp-style
             Positioned(top: top + header + 8, left: 0, right: 0, child: const ConnectionPill()),
-            // floating island
-            Positioned(
+            // floating island; on Ask it steps aside so the ask's Publish bar has the bottom edge
+            if (_i != 3) Positioned(
               left: 0,
               right: 0,
               bottom: 0,
@@ -182,6 +188,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
           ]),
         ),
       ]),
+      ),
     );
   }
 

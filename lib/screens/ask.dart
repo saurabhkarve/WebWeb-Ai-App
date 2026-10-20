@@ -228,6 +228,7 @@ class _AskFormState extends State<_AskForm> {
   // Ask AI
   bool _aiOn = false;
   bool _aiBusy = false;
+  int _aiSpin = 0; // spins the pill's star on each Ask AI
   String? _aiError;
   Map<String, String>? _aiDraft;
   /// before an AI suggestion was used: title, details
@@ -490,6 +491,7 @@ class _AskFormState extends State<_AskForm> {
   Future<void> _askAi() async {
     setState(() {
       _aiBusy = true;
+      _aiSpin++;
       _aiError = null;
       _aiDraft = null;
     });
@@ -594,6 +596,51 @@ class _AskFormState extends State<_AskForm> {
     super.dispose();
   }
 
+  /// An example as a card: category icon and the AI pill, its name, then the sample title with its [blanks] marked.
+  Widget _exampleCard(Pal p, (String, String, String, String) s) {
+    final sample = t(s.$3);
+    final spans = <InlineSpan>[];
+    var at = 0;
+    for (final m in _blank.allMatches(sample)) {
+      if (m.start > at) spans.add(TextSpan(text: sample.substring(at, m.start)));
+      spans.add(WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(4)),
+          child: Text(m.group(0)!.substring(1, m.group(0)!.length - 1), style: TextStyle(fontSize: 12, height: 1.35, fontWeight: FontWeight.w600, color: p.text)),
+        ),
+      ));
+      at = m.end;
+    }
+    if (at < sample.length) spans.add(TextSpan(text: sample.substring(at)));
+    return GestureDetector(
+      onTap: () => _applyTemplate(s.$1, s.$3, s.$4),
+      child: Container(
+        width: 176,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border.withValues(alpha: .7))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: kGold.withValues(alpha: .18), shape: BoxShape.circle),
+              child: WIcon(categoryIcon(s.$1), size: 16, color: p.tagText, still: true),
+            ),
+            const Spacer(),
+            const AiPill(font: 8),
+          ]),
+          const SizedBox(height: 8),
+          Text(t(s.$2), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 3),
+          Text.rich(TextSpan(children: spans), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, height: 1.35, color: p.muted)),
+        ]),
+      ),
+    );
+  }
+
   /// Ask AI's suggestion for the title and details, shown before anything changes.
   Widget? _aiCard(Pal p) {
     final d = _aiDraft;
@@ -604,9 +651,9 @@ class _AskFormState extends State<_AskForm> {
       decoration: BoxDecoration(color: kGold.withValues(alpha: .1), borderRadius: BorderRadius.circular(12), border: Border.all(color: kGold)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          WIcon(WI.sparkle, size: 14, color: p.tagText),
+          const AiPill(font: 9),
           const SizedBox(width: 6),
-          Text(t(d['kept'] != null ? 'Tidied' : 'AI suggestion').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.tagText)),
+          Text(t(d['kept'] != null ? 'Tidied' : 'AI suggestion').replaceAll('AI', '').trim().toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.tagText)),
         ]),
         if (d['kept'] != null)
           Padding(
@@ -722,7 +769,7 @@ class _AskFormState extends State<_AskForm> {
         WIcon(icon, size: 14, color: p.muted, still: true),
         const SizedBox(width: 4),
         Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: set || open ? p.text.withValues(alpha: .8) : p.muted))),
-        if (auto) ...[const SizedBox(width: 3), const WIcon(WI.sparkle, size: 12, color: kGold)],
+        if (auto) ...[const SizedBox(width: 4), const AiPill(font: 8)],
         const SizedBox(width: 2),
         AnimatedRotation(turns: open ? .5 : 0, duration: const Duration(milliseconds: 150), child: WIcon(WI.chevronDown, size: 14, color: p.muted)),
       ]);
@@ -856,8 +903,6 @@ class _AskFormState extends State<_AskForm> {
           ),
           const SizedBox(height: 12),
         ],
-        Text(t('This is how your ask will look on Connect. Fill in each part.'), style: TextStyle(fontSize: 12, color: p.muted)),
-        const SizedBox(height: 10),
         // the ask laid out like its row on Connect: photo, name and time, then the title, details and chips as fields
         KeyedSubtree(
           key: _tk('ask-card'),
@@ -876,12 +921,6 @@ class _AskFormState extends State<_AskForm> {
                           Text(t('just now'), style: TextStyle(fontSize: 12, color: p.muted)),
                         ]),
                         Text(me.isEntrepreneur ? me.name : me.company, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: p.tagBg, borderRadius: BorderRadius.circular(20)),
-                          child: Text('✦ ${t(_editing ? 'Editing your ask' : 'Your ask')}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.tagText)),
-                        ),
                       ]),
                     ),
                     // Ask AI, top right: on once the title has a few words
@@ -893,18 +932,24 @@ class _AskFormState extends State<_AskForm> {
                           enabled: canAskAi && !_aiBusy,
                           child: GestureDetector(
                             onTap: canAskAi && !_aiBusy ? _askAi : () => toast(context, t('Write a title first')),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                gradient: canAskAi ? kGoldGradient : null,
-                                color: canAskAi ? null : p.chip,
-                                borderRadius: BorderRadius.circular(20),
+                            // "Ask" + the logo's AI pill, on a quiet gold-edged pill
+                            child: Opacity(
+                              opacity: canAskAi ? 1 : .5,
+                              child: Container(
+                                padding: const EdgeInsets.fromLTRB(12, 5, 6, 5),
+                                decoration: BoxDecoration(
+                                  color: p.card,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: const Color(0xFFC9AE24).withValues(alpha: .5)),
+                                ),
+                                child: _aiBusy
+                                    ? Row(mainAxisSize: MainAxisSize.min, children: [
+                                        Text(t('Thinking…'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text)),
+                                        const SizedBox(width: 5),
+                                        AiPill(font: 10, spin: _aiSpin),
+                                      ])
+                                    : withAiPill(t('Ask AI'), TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text), font: 10, spin: _aiSpin),
                               ),
-                              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                WIcon(WI.sparkle, size: 16, color: canAskAi ? kInk : p.muted),
-                                const SizedBox(width: 6),
-                                Text(_aiBusy ? t('Thinking…') : t('Ask AI'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: canAskAi ? kInk : p.muted)),
-                              ]),
                             ),
                           ),
                         ),
@@ -1100,20 +1145,14 @@ class _AskFormState extends State<_AskForm> {
         if (empty && !_editing) ...[
           const SizedBox(height: 16),
           _caps(p, 'Or start from an example'),
-          const SizedBox(height: 6),
-          KeyedSubtree(key: _tk('ask-templates'), child: hScroll(height: 36, [
-            for (final s in examples)
-              DashedBox(
-                radius: 20,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                onTap: () => _applyTemplate(s.$1, s.$3, s.$4),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  WIcon(categoryIcon(s.$1), size: 14, color: p.link, still: true),
-                  const SizedBox(width: 6),
-                  Text(t(s.$2), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.link)),
-                ]),
-              ),
-          ])),
+          const SizedBox(height: 2),
+          Text(t('Tap one, then change the details to yours.'), style: TextStyle(fontSize: 12, color: p.muted)),
+          const SizedBox(height: 8),
+          KeyedSubtree(
+            key: _tk('ask-templates'),
+            // edge to edge, swiped sideways
+            child: hScroll(height: 124, [for (final e in examples) _exampleCard(p, e)]),
+          ),
         ],
         const SizedBox(height: 12),
         Text(t('Write in your own language: हिंदी, मराठी, ગુજરાતી, English or any other. It is posted as you write it.'), style: TextStyle(fontSize: 12, color: p.muted)),
@@ -1124,30 +1163,38 @@ class _AskFormState extends State<_AskForm> {
     return Column(children: [
       // a tap anywhere outside an open chip's choices closes them
       Expanded(child: _open == null ? form : GestureDetector(onTap: () => setState(() => _open = null), child: form)),
-      // Publish stays within thumb reach, above the island
+      // Publish in one bar on the bottom edge (the island steps aside on Ask): reach and strength, then the button
       Container(
         key: _tk('ask-publish'),
-        padding: EdgeInsets.fromLTRB(16, 8, 16, _editing ? MediaQuery.of(context).padding.bottom + 12 : islandSpace(context) - 4),
-        decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [p.canvas, p.canvas.withValues(alpha: .95), p.canvas.withValues(alpha: 0)], stops: const [0, .7, 1])),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Row(children: [
-            WIcon(WI.users, size: 16, color: p.muted),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                _reach != null ? '${t('Reaches')} $_reach ${t(_reach == 1 ? 'member' : 'members')}${_location.isNotEmpty ? ' ${t('in')} ${t(_location)}' : ''}' : t('Reaches nearby members'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted),
-              ),
-            ),
-            if (ready || title.trim().isNotEmpty || desc.trim().isNotEmpty) ...[
-              const SizedBox(width: 12),
-              Text(t(ready ? strength : missing), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
-            ],
-          ]),
-          const SizedBox(height: 8),
-          SizedBox(width: double.infinity, child: GoldButton(label: t(_editing ? 'Save changes' : 'Publish Ask'), wi: WI.askPlus, loading: _busy, onPressed: ready ? _publish : null)),
+        padding: EdgeInsets.fromLTRB(16, 10, 16, MediaQuery.of(context).padding.bottom + 10),
+        decoration: BoxDecoration(color: p.canvas.withValues(alpha: .97), border: Border(top: BorderSide(color: p.border.withValues(alpha: .7)))),
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              Row(children: [
+                WIcon(WI.users, size: 14, color: p.muted),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    _reach != null ? '${t('Reaches')} $_reach ${t(_reach == 1 ? 'member' : 'members')}${_location.isNotEmpty ? ' ${t('in')} ${t(_location)}' : ''}' : t('Reaches nearby members'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted),
+                  ),
+                ),
+              ]),
+              if (ready || title.trim().isNotEmpty || desc.trim().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(t(ready ? strength : missing),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ready ? const Color(0xFF059669) : p.muted)),
+                ),
+            ]),
+          ),
+          const SizedBox(width: 12),
+          GoldButton(label: t(_editing ? 'Save' : 'Publish'), wi: WI.askPlus, height: 44, loading: _busy, onPressed: ready ? _publish : null),
         ]),
       ),
     ]);

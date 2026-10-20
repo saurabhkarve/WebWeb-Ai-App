@@ -67,20 +67,11 @@ class LogoInline extends StatefulWidget {
   State<LogoInline> createState() => _LogoInlineState();
 }
 
-class _LogoInlineState extends State<LogoInline> with SingleTickerProviderStateMixin {
+class _LogoInlineState extends State<LogoInline> {
   int _play = 0;
-  late final AnimationController _spin = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
-  static const _curve = Cubic(0.34, 1.3, 0.64, 1);
-
-  @override
-  void dispose() {
-    _spin.dispose();
-    super.dispose();
-  }
 
   void _replay() {
     setState(() => _play++);
-    _spin.forward(from: 0);
     widget.onTap?.call();
   }
 
@@ -96,7 +87,6 @@ class _LogoInlineState extends State<LogoInline> with SingleTickerProviderStateM
     final goldWord = p.dark
         ? const LinearGradient(colors: [Color(0xFFFFD84A), Color(0xFFFFC700), Color(0xFFE0AD00)], stops: [0, .5, 1], begin: Alignment.topLeft, end: Alignment.bottomRight)
         : const LinearGradient(colors: [Color(0xFF7A5B00), Color(0xFFD9B53A), Color(0xFF9A7B00)], stops: [0, .45, 1], begin: Alignment.topLeft, end: Alignment.bottomRight);
-    final starColor = p.dark ? '#ffd84a' : '#1e1e1e';
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _replay,
@@ -116,47 +106,7 @@ class _LogoInlineState extends State<LogoInline> with SingleTickerProviderStateM
             ),
           ]),
           SizedBox(height: stacked ? 3 : 0, width: stacked ? 0 : 4),
-          Container(
-            height: pillH,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(pillH),
-              gradient: p.dark
-                  ? const LinearGradient(colors: [Color(0xFF34322B), Color(0xFF1E1E1E)], begin: Alignment.topCenter, end: Alignment.bottomCenter)
-                  : const LinearGradient(colors: [Color(0xFFFFE27A), Color(0xFFFFC700), Color(0xFFE6AC00)], stops: [0, .55, 1], begin: Alignment.topLeft, end: Alignment.bottomRight),
-              border: Border.all(color: p.dark ? kGold.withValues(alpha: .6) : const Color(0xFFC9AE24).withValues(alpha: .7)),
-              boxShadow: [BoxShadow(color: p.dark ? Colors.black.withValues(alpha: .4) : const Color(0xFF9A7B00).withValues(alpha: .35), blurRadius: 3, offset: const Offset(0, 1))],
-            ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Text('AI', style: TextStyle(fontSize: pillFont, fontWeight: FontWeight.w700, height: 1, letterSpacing: pillFont * .06, color: p.dark ? const Color(0xFFFFD84A) : kInk)),
-              const SizedBox(width: 3),
-              // ai-spin: 0 -> 400deg at 1.25x (60 %), settles at 360deg / 1x
-              AnimatedBuilder(
-                animation: _spin,
-                builder: (_, child) {
-                  final t = _spin.value;
-                  double turns = 0, scale = 1;
-                  if (_spin.isAnimating) {
-                    if (t < .6) {
-                      final k = _curve.transform(t / .6);
-                      turns = 400 / 360 * k;
-                      scale = 1 + .25 * k;
-                    } else {
-                      final k = _curve.transform((t - .6) / .4);
-                      turns = (400 - 40 * k) / 360;
-                      scale = 1.25 - .25 * k;
-                    }
-                  }
-                  return Transform.rotate(angle: turns * 2 * math.pi, child: Transform.scale(scale: scale, child: child));
-                },
-                child: SvgPicture.string(
-                  '<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M5 0l1.2 3.8L10 5 6.2 6.2 5 10 3.8 6.2 0 5l3.8-1.2z" fill="$starColor"/></svg>',
-                  width: pillFont - 1,
-                  height: pillFont - 1,
-                ),
-              ),
-            ]),
-          ),
+          AiPill(font: pillFont, height: pillH, padX: 8, spin: _play),
         ])),
       ]),
     );
@@ -183,6 +133,97 @@ class _LogoInlineState extends State<LogoInline> with SingleTickerProviderStateM
       ]),
     );
   }
+}
+
+/// The logo's AI pill (gold gradient, "AI" and the four-point star); every change of [spin] spins the star.
+/// Used wherever the app's AI acts: Ask AI, its suggestion, the category it picked and the examples.
+class AiPill extends StatefulWidget {
+  final double font;
+  final double? height;
+  final double? padX;
+  final int spin;
+  const AiPill({super.key, this.font = 10, this.height, this.padX, this.spin = 0});
+  @override
+  State<AiPill> createState() => _AiPillState();
+}
+
+class _AiPillState extends State<AiPill> with SingleTickerProviderStateMixin {
+  late final AnimationController _spin = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+  static const _curve = Cubic(0.34, 1.3, 0.64, 1);
+
+  @override
+  void didUpdateWidget(AiPill old) {
+    super.didUpdateWidget(old);
+    if (old.spin != widget.spin) _spin.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _spin.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final f = widget.font;
+    final h = widget.height ?? (f * 1.8).roundToDouble();
+    final starColor = p.dark ? '#ffd84a' : '#1e1e1e';
+    return Container(
+      height: h,
+      padding: EdgeInsets.symmetric(horizontal: widget.padX ?? math.max(5, f * .7)),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(h),
+        gradient: p.dark
+            ? const LinearGradient(colors: [Color(0xFF34322B), Color(0xFF1E1E1E)], begin: Alignment.topCenter, end: Alignment.bottomCenter)
+            : const LinearGradient(colors: [Color(0xFFFFE27A), Color(0xFFFFC700), Color(0xFFE6AC00)], stops: [0, .55, 1], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        border: Border.all(color: p.dark ? kGold.withValues(alpha: .6) : const Color(0xFFC9AE24).withValues(alpha: .7)),
+        boxShadow: [BoxShadow(color: p.dark ? Colors.black.withValues(alpha: .4) : const Color(0xFF9A7B00).withValues(alpha: .35), blurRadius: 3, offset: const Offset(0, 1))],
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Text('AI', style: TextStyle(fontSize: f, fontWeight: FontWeight.w700, height: 1, letterSpacing: f * .06, color: p.dark ? const Color(0xFFFFD84A) : kInk)),
+        SizedBox(width: math.max(2, f * .25)),
+        // ai-spin: 0 -> 400deg at 1.25x (60 %), settles at 360deg / 1x
+        AnimatedBuilder(
+          animation: _spin,
+          builder: (_, child) {
+            final t = _spin.value;
+            double turns = 0, scale = 1;
+            if (_spin.isAnimating) {
+              if (t < .6) {
+                final k = _curve.transform(t / .6);
+                turns = 400 / 360 * k;
+                scale = 1 + .25 * k;
+              } else {
+                final k = _curve.transform((t - .6) / .4);
+                turns = (400 - 40 * k) / 360;
+                scale = 1.25 - .25 * k;
+              }
+            }
+            return Transform.rotate(angle: turns * 2 * math.pi, child: Transform.scale(scale: scale, child: child));
+          },
+          child: SvgPicture.string(
+            '<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M5 0l1.2 3.8L10 5 6.2 6.2 5 10 3.8 6.2 0 5l3.8-1.2z" fill="$starColor"/></svg>',
+            width: f - 1,
+            height: f - 1,
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+/// [text] with its "AI" drawn as the [AiPill] ("Ask AI" -> Ask + pill; translations keep the literal "AI").
+Widget withAiPill(String text, TextStyle style, {double? font, int spin = 0}) {
+  final i = text.indexOf('AI');
+  if (i < 0) return Text(text, style: style);
+  final before = text.substring(0, i).trim(), after = text.substring(i + 2).trim();
+  final pill = AiPill(font: font ?? ((style.fontSize ?? 13) * .8).roundToDouble(), spin: spin);
+  return Row(mainAxisSize: MainAxisSize.min, children: [
+    if (before.isNotEmpty) ...[Text(before, style: style), const SizedBox(width: 5)],
+    pill,
+    if (after.isNotEmpty) ...[const SizedBox(width: 5), Text(after, style: style)],
+  ]);
 }
 
 // ---------- small building blocks ----------
