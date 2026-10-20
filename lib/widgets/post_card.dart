@@ -727,8 +727,8 @@ class PostActionsState extends State<PostActions> {
         final c = Container(
           height: 36,
           padding: EdgeInsets.symmetric(horizontal: text != null ? 14 : 9),
-          // plain, as on x.com: no border or fill unless asked for
-          decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(18), border: edge == null ? null : Border.all(color: edge)),
+          // a light outline on each (gold on Refer), as on the web
+          decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(18), border: Border.all(color: edge ?? p.border)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             icon,
             if (text != null) ...[const SizedBox(width: 6), Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color ?? p.text))],
@@ -752,7 +752,7 @@ class PostActionsState extends State<PostActions> {
       final wide = MediaQuery.of(context).size.width >= 600;
       return Row(mainAxisAlignment: wide ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start, children: [
         if (mine)
-          pill(label: 'Review responses', text: t('Review responses'), icon: WIcon(WI.talk, size: 18, color: p.tagText), color: p.tagText, onTap: widget.onReview ?? widget.onReply)
+          pill(label: 'Review responses', text: t('Review responses'), icon: WIcon(WI.talk, size: 18, color: p.tagText), color: p.tagText, edge: kGold.withValues(alpha: .45), onTap: widget.onReview ?? widget.onReply)
         else ...[
           // Refer keeps its own width; Reply is its icon and count (the web's phone row)
           if (isAsk)
@@ -767,6 +767,7 @@ class PostActionsState extends State<PostActions> {
                 color: p.tagText,
                 badge: p.tagBg,
                 splash: kGold.withValues(alpha: .15),
+                edge: kGold.withValues(alpha: .45),
                 onTap: _refer,
               ),
             ),
