@@ -6,6 +6,7 @@ import '../auth_provider.dart';
 import '../i18n.dart';
 import '../models.dart';
 import '../safety.dart';
+import '../screens/ask.dart';
 import '../screens/contact_picker.dart';
 import '../screens/find.dart';
 import '../screens/post_detail.dart';
@@ -44,6 +45,7 @@ class PostCard extends StatefulWidget {
 
 class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin {
   late Post post = widget.post;
+  bool _gone = false; // deleted from its ⋯ menu
   late final AnimationController _burst = AnimationController(vsync: this, duration: const Duration(milliseconds: 750));
 
   @override
@@ -150,8 +152,56 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         myReaction: p.myReaction,
       );
 
+  /// ⋯ on my own ask: edit it in the Ask editor, or delete it (a soft delete: it leaves every feed,
+  /// including where it was reposted).
+  Future<void> _ownerMenu() async {
+    final p = Pal.of(context);
+    final isAsk = post.isRequirement;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: p.canvas,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (isAsk) ListTile(leading: WIcon(WI.edit, size: 20, color: p.text), title: Text(t('Edit ask')), onTap: () => Navigator.pop(ctx, 'edit')),
+          ListTile(
+            leading: WIcon(WI.trash, size: 20, color: p.danger),
+            title: Text(t(isAsk ? 'Delete ask' : 'Delete'), style: TextStyle(color: p.danger)),
+            onTap: () => Navigator.pop(ctx, 'delete'),
+          ),
+        ]),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'edit') {
+      final saved = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => SubPage(title: t('Edit ask'), body: AskScreen(onPosted: () {}, edit: post))));
+      if (saved == true) widget.onChanged?.call();
+      return;
+    }
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t(isAsk ? 'Delete this ask?' : 'Delete this post?'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        content: Text(t('It will be removed from the feed, including where it was reposted, along with its responses and referrals.'), style: TextStyle(fontSize: 14, color: p.muted)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('Keep'), style: TextStyle(color: p.text, fontWeight: FontWeight.w700))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('Delete'), style: TextStyle(color: p.danger, fontWeight: FontWeight.w700))),
+        ],
+      ),
+    );
+    if (yes != true || !mounted) return;
+    try {
+      await context.read<AuthProvider>().api.delete('/posts/${post.id}');
+      if (!mounted) return;
+      setState(() => _gone = true);
+      widget.onChanged?.call();
+    } catch (e) {
+      if (mounted) toast(context, '$e', error: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_gone) return const SizedBox.shrink();
     final p = Pal.of(context);
     final isAsk = post.isRequirement;
     final mine = _isOwner;
@@ -216,6 +266,16 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * .38),
                     child: GoldTag(match),
+                  ),
+                ),
+              if (mine && !widget.detail)
+                Semantics(
+                  button: true,
+                  label: t('More options'),
+                  child: InkResponse(
+                    onTap: _ownerMenu,
+                    radius: 18,
+                    child: SizedBox(width: 28, height: 32, child: Center(child: Icon(Icons.more_vert, size: 18, color: p.muted))),
                   ),
                 ),
               if (!mine)

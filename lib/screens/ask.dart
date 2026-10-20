@@ -998,8 +998,8 @@ class _AskFormState extends State<_AskForm> {
                         auto: _category.isNotEmpty && !_typeChosen,
                       ),
                     ),
-                    chip('where', WI.pin, _location.isEmpty ? t('Where') : t(_location), _location.isNotEmpty),
-                    if (_geo != null) chip('where', WI.locate, t('{d} reach', {'d': _radiusLabel(_geo!.radiusM)}), true),
+                    // where and how far, one chip: "Vashi · 10 km"
+                    chip('where', WI.pin, '${_location.isEmpty ? t('Where') : t(_location)}${_geo != null ? ' · ${_radiusLabel(_geo!.radiusM)}' : ''}', _location.isNotEmpty || _geo != null),
                     chip('budget', WI.rupee, _budget.isEmpty ? t('Budget') : _budget, _budget.isNotEmpty),
                     chip('when', WI.clock, _urgency.isEmpty ? t('When') : t(labelOf(kUrgencies, _urgency)), _urgency.isNotEmpty),
                   ]),
