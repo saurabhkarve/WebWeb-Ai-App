@@ -918,11 +918,28 @@ class _AskFormState extends State<_AskForm> {
         KeyedSubtree(
           key: _tk('ask-card'),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (me != null) ...[Avatar(name: shownName, photoUrl: me.photoUrl, size: 40, type: me.userType, badge: 18, uid: me.uid), const SizedBox(width: 10)],
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 if (me != null) ...[
+                  // back (the island steps aside on Ask) and the photo share the name line, so the fields get the full width
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    if (widget.onBack != null)
+                      Semantics(
+                        button: true,
+                        label: t('Back'),
+                        child: InkResponse(
+                          onTap: widget.onBack,
+                          radius: 18,
+                          child: Transform.translate(
+                            offset: const Offset(-8, 0),
+                            child: SizedBox(width: 28, height: 38, child: Center(child: WIcon(WI.back, size: 22, color: p.text))),
+                          ),
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: Avatar(name: shownName, photoUrl: me.photoUrl, size: 38, type: me.userType, badge: 16, uid: me.uid),
+                    ),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Row(children: [
@@ -1172,23 +1189,6 @@ class _AskFormState extends State<_AskForm> {
     );
 
     return Column(children: [
-      // back to Connect, since the island is out of the way on Ask
-      if (widget.onBack != null)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 4, 16, 0),
-          child: Row(children: [
-            Semantics(
-              button: true,
-              label: t('Back'),
-              child: InkResponse(
-                onTap: widget.onBack,
-                radius: 22,
-                child: SizedBox(width: 44, height: 44, child: Center(child: WIcon(WI.back, size: 28, color: p.text))),
-              ),
-            ),
-            Text(t('Ask'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-          ]),
-        ),
       // a tap anywhere outside an open chip's choices closes them
       Expanded(child: _open == null ? form : GestureDetector(onTap: () => setState(() => _open = null), child: form)),
       // Publish in one bar on the bottom edge (the island steps aside on Ask): reach and strength, then the button
