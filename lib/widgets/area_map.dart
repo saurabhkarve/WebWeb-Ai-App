@@ -169,9 +169,20 @@ class _AskAreaSheetState extends State<_AskAreaSheet> {
             ),
           const SizedBox(height: 10),
           if (lat != null && lng != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(height: 280, child: AreaMap(lat: lat, lng: lng, radiusM: radius, point: spot == null ? null : (lat: spot.lat, lng: spot.lng))),
+            // edge to edge in the sheet, square corners (as on the web)
+            SizedBox(
+              height: 280,
+              child: LayoutBuilder(
+                builder: (_, box) => OverflowBox(
+                  maxWidth: box.maxWidth + 32,
+                  minWidth: box.maxWidth + 32,
+                  child: DecoratedBox(
+                    position: DecorationPosition.foreground,
+                    decoration: BoxDecoration(border: Border.symmetric(horizontal: BorderSide(color: p.border))),
+                    child: AreaMap(lat: lat, lng: lng, radiusM: radius, point: spot == null ? null : (lat: spot.lat, lng: spot.lng)),
+                  ),
+                ),
+              ),
             )
           else
             Container(height: 120, alignment: Alignment.center, decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(12)), child: Text(t(area), style: TextStyle(color: p.muted))),

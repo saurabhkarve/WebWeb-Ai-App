@@ -386,8 +386,12 @@ class _RequestShareState extends State<RequestShare> {
           customBorder: const StadiumBorder(),
           onTap: _state == 'idle' ? _send : null,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-            child: Text(t(_state == 'sent' ? 'Requested' : 'Request to share'), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.tagText)),
+            padding: const EdgeInsets.fromLTRB(8, 3, 10, 3),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              WIcon(WI.contactCard, size: 14, color: p.tagText),
+              const SizedBox(width: 4),
+              Text(t(_state == 'sent' ? 'Requested' : 'Request to share'), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.tagText)),
+            ]),
           ),
         ),
       ),
