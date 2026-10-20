@@ -731,7 +731,7 @@ class PostActionsState extends State<PostActions> {
           decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(18), border: Border.all(color: edge ?? p.border)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             icon,
-            if (text != null) ...[const SizedBox(width: 6), Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color ?? p.text))],
+            if (text != null) ...[const SizedBox(width: 6), Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color ?? p.text))],
             // counts sit in a small badge (gold on Refer), as on the web
             if (count > 0) ...[
               const SizedBox(width: 4),
