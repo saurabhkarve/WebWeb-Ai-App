@@ -235,7 +235,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         GestureDetector(
           onTap: _openAuthor,
-          child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: small ? 36 : 44, ring: post.authorHasUpdate, type: post.authorType, badge: small ? 15 : 18),
+          child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: small ? 36 : 44, ring: post.authorHasUpdate, type: post.authorType, uid: post.authorUid, badge: small ? 15 : 18),
         ),
         SizedBox(width: small ? 10 : 12),
         Expanded(

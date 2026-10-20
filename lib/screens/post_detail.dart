@@ -217,7 +217,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             Row(children: [
               GestureDetector(
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.authorHandle))),
-                child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: 44, ring: post.authorHasUpdate, type: post.authorType, badge: 18),
+                child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: 44, ring: post.authorHasUpdate, type: post.authorType, uid: post.authorUid, badge: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -538,7 +538,7 @@ class _ShareTileState extends State<_ShareTile> {
               behavior: HitTestBehavior.opaque,
               onTap: (s.sharerHandle ?? '').isEmpty ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: s.sharerHandle!))),
               child: Row(children: [
-                Avatar(name: s.sharerName, photoUrl: s.sharerPhotoUrl, size: 44, type: s.sharerType, badge: 18),
+                Avatar(name: s.sharerName, photoUrl: s.sharerPhotoUrl, size: 44, type: s.sharerType, badge: 18, uid: s.sharerUid),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

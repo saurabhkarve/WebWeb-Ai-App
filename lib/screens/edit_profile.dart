@@ -280,7 +280,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           width: 84,
                           height: 84,
                           child: Stack(clipBehavior: Clip.none, children: [
-                            Avatar(name: me.name, photoUrl: me.photoUrl, size: 80, ring: me.hasUpdate, type: me.userType, badge: 26),
+                            Avatar(name: me.name, photoUrl: me.photoUrl, size: 80, ring: me.hasUpdate, type: me.userType, badge: 26, uid: me.uid),
                             Positioned(
                               right: -2,
                               bottom: -2,

@@ -376,7 +376,7 @@ class _MemberRow extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(children: [
-          Avatar(name: name, photoUrl: u.photoUrl, size: 48, type: u.userType, badge: 18),
+          Avatar(name: name, photoUrl: u.photoUrl, size: 48, type: u.userType, badge: 18, uid: u.uid),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -606,7 +606,7 @@ class _ExploreState extends State<_Explore> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Row(children: [
-                    Avatar(name: u.name, photoUrl: u.photoUrl, size: 44, type: u.userType),
+                    Avatar(name: u.name, photoUrl: u.photoUrl, size: 44, type: u.userType, uid: u.uid),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

@@ -281,7 +281,7 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: k == 0 ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border))),
                     child: Row(children: [
-                      Avatar(name: name, photoUrl: v['photoURL'] as String?, size: 40, type: '${v['userType']}', badge: 16),
+                      Avatar(name: name, photoUrl: v['photoURL'] as String?, size: 40, type: '${v['userType']}', badge: 16, uid: v['uid'] as String?),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -430,7 +430,7 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
                             behavior: HitTestBehavior.opaque,
                             onTap: () => _openAuthor(g.handle),
                             child: Row(mainAxisSize: MainAxisSize.min, children: [
-                              Avatar(name: g.shownName, size: 32, photoUrl: g.photoUrl, type: g.userType, badge: 14),
+                              Avatar(name: g.shownName, size: 32, photoUrl: g.photoUrl, type: g.userType, badge: 14, uid: g.uid),
                               const SizedBox(width: 8),
                               Flexible(
                                 child: Text(mine ? t('Your update') : g.shownName,

@@ -3,13 +3,16 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show TextInputFormatter;
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 
 import 'api.dart';
+import 'auth_provider.dart';
 import 'i18n.dart';
 import 'icons.dart';
 import 'indic.dart';
 export 'icons.dart';
 import 'models.dart' show Option;
+import 'presence.dart';
 import 'theme.dart';
 import 'widgets/logo_loader.dart';
 export 'widgets/logo_loader.dart';
@@ -240,7 +243,9 @@ class Avatar extends StatelessWidget {
   final String? photoUrl;
   /// badge box size (web `badge` prop, default 16)
   final double badge;
-  const Avatar({super.key, required this.name, this.size = 40, this.ring = false, this.type, this.photoUrl, this.badge = 16});
+  /// whose photo: the type badge turns green while they are online, gold when active in the last 2 hours
+  final String? uid;
+  const Avatar({super.key, required this.name, this.size = 40, this.ring = false, this.type, this.photoUrl, this.badge = 16, this.uid});
 
   @override
   Widget build(BuildContext context) {
@@ -276,15 +281,73 @@ class Avatar extends StatelessWidget {
         Positioned(
           left: c - b / 2 - 2,
           top: c - b / 2 - 2,
-          child: Container(
-            width: b + 4,
-            height: b + 4,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: p.typeBadge, border: Border.all(color: p.canvas, width: 2)),
-            child: WIcon(type == 'entrepreneur' ? WI.business : WI.user, size: (badge * .62).roundToDouble(), color: p.onInk, strokeWidth: 2.2),
-          ),
+          child: _TypeBadge(uid: uid, business: type == 'entrepreneur', box: b + 4, icon: (badge * .62).roundToDouble()),
         ),
       ]),
+    );
+  }
+}
+
+/// The avatar's type icon on a circle coloured by presence: green online, gold active in the last 2 hours,
+/// the usual ink otherwise (web components/ui/type-badge.tsx).
+class _TypeBadge extends StatefulWidget {
+  final String? uid;
+  final bool business;
+  final double box, icon;
+  const _TypeBadge({required this.uid, required this.business, required this.box, required this.icon});
+  @override
+  State<_TypeBadge> createState() => _TypeBadgeState();
+}
+
+class _TypeBadgeState extends State<_TypeBadge> {
+  final _store = PresenceStore.instance;
+  String? _watching;
+
+  void _watch(String? uid) {
+    if (_watching != null) _store.unwatch(_watching!);
+    _watching = uid;
+    if (uid != null && uid.isNotEmpty) _store.watch(uid, context.read<AuthProvider>().api);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _watch(widget.uid);
+  }
+
+  @override
+  void didUpdateWidget(covariant _TypeBadge old) {
+    super.didUpdateWidget(old);
+    if (old.uid != widget.uid) _watch(widget.uid);
+  }
+
+  @override
+  void dispose() {
+    _watch(null);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return ListenableBuilder(
+      listenable: _store,
+      builder: (_, __) {
+        final presence = widget.uid == null ? null : _store.of(widget.uid!);
+        final (bg, fg) = switch (presence) {
+          'online' => (const Color(0xFF2F9E6E), Colors.white),
+          'recent' => (kGold, kInk),
+          _ => (p.typeBadge, p.onInk),
+        };
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          width: widget.box,
+          height: widget.box,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: bg, border: Border.all(color: p.canvas, width: 2)),
+          child: WIcon(widget.business ? WI.business : WI.user, size: widget.icon, color: fg, strokeWidth: 2.2),
+        );
+      },
     );
   }
 }

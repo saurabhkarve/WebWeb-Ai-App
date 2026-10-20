@@ -401,7 +401,7 @@ class _TalkScreenState extends State<TalkScreen> {
   Widget _avatar(Peer u) {
     final on = context.watch<RealtimeService>().isOnline(u.uid);
     return Stack(clipBehavior: Clip.none, children: [
-      Avatar(name: u.name, photoUrl: u.photoUrl, size: 40, type: u.userType, badge: 16),
+      Avatar(name: u.name, photoUrl: u.photoUrl, size: 40, type: u.userType, badge: 16, uid: u.uid),
       if (on)
         Positioned(
           left: -1,
@@ -866,7 +866,7 @@ class _ChatThreadState extends State<ChatThread> {
                 behavior: HitTestBehavior.opaque,
                 onTap: _peer.handle.isEmpty ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: _peer.handle))),
                 child: Row(children: [
-                  Avatar(name: _peer.name, photoUrl: _peer.photoUrl, size: 36, type: _peer.userType, badge: 16),
+                  Avatar(name: _peer.name, photoUrl: _peer.photoUrl, size: 36, type: _peer.userType, badge: 16, uid: _peer.uid),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

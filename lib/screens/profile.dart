@@ -1440,7 +1440,7 @@ class _ShareSheetState extends State<_ShareSheet> {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     child: Row(children: [
-                      Avatar(name: c.peer.name, photoUrl: c.peer.photoUrl, size: 40, type: c.peer.userType, badge: 16),
+                      Avatar(name: c.peer.name, photoUrl: c.peer.photoUrl, size: 40, type: c.peer.userType, badge: 16, uid: c.peer.uid),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

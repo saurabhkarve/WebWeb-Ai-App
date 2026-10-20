@@ -431,7 +431,7 @@ class _AccountMenu extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               decoration: BoxDecoration(color: p.chip.withValues(alpha: .5), border: Border(top: BorderSide(color: p.border.withValues(alpha: .6)), bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
               child: Row(children: [
-                Avatar(name: me.name, photoUrl: me.photoUrl, size: 56, ring: me.hasUpdate, type: me.userType, badge: 18),
+                Avatar(name: me.name, photoUrl: me.photoUrl, size: 56, ring: me.hasUpdate, type: me.userType, badge: 18, uid: me.uid),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -873,7 +873,7 @@ class _NotesPanelState extends State<_NotesPanel> {
                                         border: i == shown.length - 1 ? null : Border(bottom: BorderSide(color: p.border)),
                                       ),
                                       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                        Avatar(name: who, photoUrl: x.sharer.photoUrl, size: 36, type: x.sharer.userType, badge: 14),
+                                        Avatar(name: who, photoUrl: x.sharer.photoUrl, size: 36, type: x.sharer.userType, badge: 14, uid: x.sharer.uid),
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

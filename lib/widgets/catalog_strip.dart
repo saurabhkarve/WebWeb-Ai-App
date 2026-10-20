@@ -32,7 +32,7 @@ class CatalogStrip extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(children: [
-              Avatar(name: name, photoUrl: o.photoUrl, size: 44, type: o.userType),
+              Avatar(name: name, photoUrl: o.photoUrl, size: 44, type: o.userType, uid: o.uid),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

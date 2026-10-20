@@ -839,7 +839,7 @@ class _AskFormState extends State<_AskForm> {
         KeyedSubtree(
           key: _tk('ask-card'),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (me != null) ...[Avatar(name: shownName, photoUrl: me.photoUrl, size: 40, type: me.userType, badge: 18), const SizedBox(width: 10)],
+            if (me != null) ...[Avatar(name: shownName, photoUrl: me.photoUrl, size: 40, type: me.userType, badge: 18, uid: me.uid), const SizedBox(width: 10)],
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 if (me != null) ...[
