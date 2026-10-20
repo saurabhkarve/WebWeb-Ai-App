@@ -298,44 +298,15 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     );
 
     final framed = post.repostedByName != null && !widget.detail;
-    // asks: the Spotlight layout (web post-card.tsx), open on the feed with the hairline between rows: the time left
-    // and why you see it on top, who asked, the category, the ask, chips for place, budget and reach, the latest
-    // replies in public, then Refer as the gold button with Reply beside it.
+    // asks: the Spotlight layout (web post-card.tsx), open on the feed with the hairline between rows: who asked, the
+    // category with why you see it, the ask, chips for place, budget, time left and reach, the latest replies in public,
+    // then Refer as the gold button with Reply beside it.
     if (isAsk && !widget.detail) {
-      final band = post.urgency == 'immediate' ? t('Needed immediately') : urgency;
       final why = mine ? t('Your ask') : (match == null ? null : t(match));
       final spotlight = Container(
         padding: EdgeInsets.symmetric(vertical: framed ? 12 : 16),
         foregroundDecoration: framed ? null : _HairlineDecoration(p.border),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          if (band != null || why != null)
-            // on a gold gradient from the feed's left edge (its 16 of padding), fading out to the right, as on the web;
-            // inside a repost's box it stays a rounded band
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Stack(clipBehavior: Clip.none, children: [
-                Positioned(
-                  left: framed ? 0 : -16,
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: framed ? BorderRadius.circular(99) : const BorderRadius.horizontal(right: Radius.circular(99)),
-                      gradient: LinearGradient(colors: [kGold.withValues(alpha: .25), kGold.withValues(alpha: .08), kGold.withValues(alpha: 0)]),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.only(left: framed ? 10 : 0, top: 4, bottom: 4),
-                  child: Row(children: [
-                    if (band != null) ...[WIcon(WI.clock, size: 14, color: p.tagText), const SizedBox(width: 6)],
-                    Expanded(child: Text(band ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: p.tagText))),
-                    if (why != null) Flexible(child: GoldTag(why)),
-                  ]),
-                ),
-              ]),
-            ),
           Padding(
             padding: EdgeInsets.zero,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -362,18 +333,19 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                 ...more,
               ]),
               const SizedBox(height: 10),
-              // the category as a small heading
-              Row(mainAxisSize: MainAxisSize.min, children: [
+              // the category as a small heading, why you see this ask on the right
+              Row(children: [
                 WIcon(categoryIcon(post.category), size: 14, color: p.link, still: true),
                 const SizedBox(width: 6),
-                Flexible(
+                Expanded(
                   child: Text(t(post.categoryText).toUpperCase(),
                       maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.link)),
                 ),
+                if (why != null) ...[const SizedBox(width: 8), Flexible(child: GoldTag(why))],
               ]),
               const SizedBox(height: 4),
               tappable,
-              // where, budget, reach, photos as chips (the category and the time left are shown above)
+              // where, budget, time left, reach, photos as chips (the category is shown above)
               Padding(
                 key: widget.tourTarget ? Tours.key('chips') : null,
                 padding: const EdgeInsets.only(top: 10),
@@ -386,6 +358,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                       onTap: () => showAskAreaSheet(context, post),
                     ),
                   if ((post.budget ?? '').isNotEmpty) InfoPill(small: true, wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
+                  if (urgency != null) InfoPill(small: true, wi: WI.clock, text: urgency),
                   if ((post.radiusM ?? 0) > 0) InfoPill(small: true, wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)}), onTap: () => showAskAreaSheet(context, post)),
                   if (post.images.isNotEmpty) InfoPill(small: true, wi: WI.camera, text: t(post.images.length == 1 ? '1 photo' : '{n} photos', {'n': post.images.length})),
                 ]),
