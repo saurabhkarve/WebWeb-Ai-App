@@ -752,6 +752,18 @@ class PostActionsState extends State<PostActions> {
           tour('reply', GoldButton(label: isAsk && post.sharesCount > 0 ? '${t('Reply')} · ${post.sharesCount}' : t('Reply'), wi: WI.talk, height: 36, outlined: true, onPressed: widget.onReply)),
         ],
         const SizedBox(width: 4),
+        ReactionPicker(
+          quick: true,
+          value: post.myReaction,
+          onChange: react,
+          trigger: (_) => pill(
+            label: 'React',
+            icon: reacted ? SizedBox(width: 18, height: 18, child: Center(child: ReactionGlyph(post.myReaction!, size: 15))) : WIcon(WI.heart, size: 18, color: p.muted),
+            count: post.reactionsCount,
+            color: reacted ? p.text : p.muted,
+          ),
+        ),
+        const SizedBox(width: 4),
         // views, as on x.com: people who saw it (not a button)
         if (post.viewsCount > 0)
           Semantics(
@@ -766,18 +778,6 @@ class PostActionsState extends State<PostActions> {
               ]),
             ),
           ),
-        ReactionPicker(
-          quick: true,
-          value: post.myReaction,
-          onChange: react,
-          trigger: (_) => pill(
-            label: 'React',
-            icon: reacted ? SizedBox(width: 18, height: 18, child: Center(child: ReactionGlyph(post.myReaction!, size: 15))) : WIcon(WI.heart, size: 18, color: p.muted),
-            count: post.reactionsCount,
-            color: reacted ? p.text : p.muted,
-          ),
-        ),
-        const SizedBox(width: 4),
         pill(
           label: post.reposted ? 'Reposted' : 'Share',
           icon: WIcon(post.reposted ? WI.repost : WI.share, size: 18, color: post.reposted ? green : p.muted),
