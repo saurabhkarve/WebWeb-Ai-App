@@ -737,7 +737,9 @@ class PostActionsState extends State<PostActions> {
 
       // asks are answered by referring someone: Refer is the gold button, Reply the secondary one beside it
       // (the asker reviews responses instead)
-      return Row(children: [
+      // a phone puts space either side of React; a tablet spreads the five evenly across the row, as on x.com
+      final wide = MediaQuery.of(context).size.width >= 600;
+      return Row(mainAxisAlignment: wide ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start, children: [
         if (mine)
           GoldButton(label: t('Review responses'), wi: WI.talk, height: 36, onPressed: widget.onReview ?? widget.onReply)
         else ...[
@@ -748,7 +750,7 @@ class PostActionsState extends State<PostActions> {
           tour('reply', pill(label: 'Reply', icon: WIcon(WI.talk, size: 18, color: p.text), count: isAsk ? post.sharesCount : 0, color: p.text, fill: p.chip, onTap: widget.onReply)),
         ],
         // React in the middle, with space either side
-        const Spacer(),
+        if (!wide) const Spacer(),
         ReactionPicker(
           quick: true,
           value: post.myReaction,
@@ -760,7 +762,7 @@ class PostActionsState extends State<PostActions> {
             color: reacted ? p.text : p.muted,
           ),
         ),
-        const Spacer(),
+        if (!wide) const Spacer(),
         // views, as on x.com: people who saw it, in the same bordered pill as React and Share (not a button)
         if (post.viewsCount > 0) ...[
           Semantics(
