@@ -293,13 +293,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 const SizedBox(width: 8),
                 Text(ResponseActivity.countLabel(post.sharesCount, post.referralsCount), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
               ]),
-              if (!owner)
+              // the latest 3 replies in public, as on the card; "All" opens the whole log
+              if (!owner && _allResponses == null) LatestReplies(post: post, onMore: _loadAllResponses),
+              if (!owner && _allResponses != null)
                 ResponseActivity(
                   hideHeader: true,
-                  items: _allResponses ?? post.recentResponses,
+                  items: _allResponses!,
                   total: post.sharesCount + post.referralsCount,
                   referrals: post.referralsCount,
-                  onMore: _loadAllResponses,
                 ),
             ],
             const SizedBox(height: 20),

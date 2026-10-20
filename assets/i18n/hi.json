@@ -1560,5 +1560,11 @@
   "Consultant / Advisor Needed": "सलाहकार / कंसल्टेंट चाहिए",
   "More ways to share": "शेयर करने के और तरीके",
   "Save ask": "ज़रूरत सेव करें",
-  "Remove from saved": "सेव से हटाएँ"
+  "Remove from saved": "सेव से हटाएँ",
+  "Needed immediately": "तुरंत चाहिए",
+  "Latest replies": "ताज़ा जवाब",
+  "All {n}": "सभी {n}",
+  "Shared a contact privately": "निजी तौर पर एक संपर्क शेयर किया",
+  "referred {n} contacts": "ने {n} संपर्कों की सिफ़ारिश की",
+  "Review responses": "जवाब देखें"
 }

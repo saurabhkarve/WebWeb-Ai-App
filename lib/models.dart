@@ -173,14 +173,25 @@ class ResponseLog {
   final String userType, company;
   final int verification;
   final String? photoUrl, reaction;
+  /// a text reply's words / a photo reply's picture (public for the newest replies; never a shared number)
+  final String? text, imageUrl;
   final int? rating;
   final DateTime createdAt;
-  ResponseLog({required this.uid, required this.name, required this.handle, required this.kind, this.userType = 'entrepreneur', this.company = '', this.verification = 0, this.photoUrl, this.reaction, this.rating, required this.createdAt});
+  ResponseLog({required this.uid, required this.name, required this.handle, required this.kind, this.userType = 'entrepreneur', this.company = '', this.verification = 0, this.photoUrl, this.reaction, this.rating, this.text, this.imageUrl, required this.createdAt});
   factory ResponseLog.fromJson(Map j) => ResponseLog(
         uid: '${j['uid']}', name: '${j['name']}', handle: '${j['handle'] ?? ''}', kind: '${j['kind']}', photoUrl: j['photoURL'] as String?,
         userType: '${j['userType'] ?? 'entrepreneur'}', company: '${j['company'] ?? ''}', verification: (j['verification'] as num?)?.toInt() ?? 0,
         reaction: j['reaction'] as String?, rating: (j['rating'] as num?)?.toInt(), createdAt: _ms(j['createdAt']),
+        text: j['text'] as String?, imageUrl: j['imageUrl'] as String?,
       );
+}
+
+/// Who referred contacts on an ask, with how many (the people referred are never shown).
+class Referrer {
+  final String name, handle;
+  final int n;
+  const Referrer(this.name, this.handle, this.n);
+  factory Referrer.fromJson(Map j) => Referrer('${j['name']}', '${j['handle'] ?? ''}', (j['n'] as num?)?.toInt() ?? 1);
 }
 
 class Post {
@@ -204,6 +215,9 @@ class Post {
   final bool authorHasUpdate;
   final DateTime createdAt;
   final List<ResponseLog> recentResponses;
+  /// the card's "Latest replies": the 3 newest replies with what they said
+  final List<ResponseLog> latestReplies;
+  final List<Referrer> referrers;
   // viewer state (changes locally for optimistic updates)
   int reactionsCount, repostsCount, referralsCount;
   bool reacted, reposted, bookmarked;
@@ -213,7 +227,7 @@ class Post {
     required this.id, required this.kind, required this.authorUid, required this.authorName, required this.authorCompany,
     required this.authorHandle, this.authorPhotoUrl, this.title, this.description, this.category, this.locationPref, this.budget,
     this.urgency, this.matchReason, this.slug, this.categoryLabel, this.authorType = 'entrepreneur', this.authorVerification = 1, this.authorPremium = false, this.distanceM, this.radiusM, this.lat, this.lng, this.editedAt, this.repostedByName, this.repostedByHandle, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
-    this.recentResponses = const [], this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0,
+    this.recentResponses = const [], this.latestReplies = const [], this.referrers = const [], this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0,
     this.reacted = false, this.reposted = false, this.bookmarked = false, this.myReaction,
   });
 
@@ -237,6 +251,8 @@ class Post {
         images: _strings(j['images']), sharesCount: (j['sharesCount'] as num?)?.toInt() ?? 0,
         authorHasUpdate: j['authorHasUpdate'] == true, createdAt: _ms(j['createdAt']),
         recentResponses: ((j['recentResponses'] as List?) ?? const []).map((e) => ResponseLog.fromJson(e as Map)).toList(),
+        latestReplies: ((j['latestReplies'] as List?) ?? const []).map((e) => ResponseLog.fromJson(e as Map)).toList(),
+        referrers: ((j['referrers'] as List?) ?? const []).map((e) => Referrer.fromJson(e as Map)).toList(),
         reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, repostsCount: (j['repostsCount'] as num?)?.toInt() ?? 0,
         referralsCount: (j['referralsCount'] as num?)?.toInt() ?? 0, reacted: j['reacted'] == true, reposted: j['reposted'] == true,
         bookmarked: j['bookmarked'] == true, myReaction: j['myReaction'] as String? ?? (j['reacted'] == true ? 'heart' : null),
