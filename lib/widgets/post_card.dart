@@ -721,57 +721,59 @@ class PostActionsState extends State<PostActions> {
     final reacted = post.myReaction != null;
     const green = Color(0xFF059669);
     if (widget.spotlight) {
-      // a small bordered pill: icon and count side by side; the row is the web's phone size (36 tall, tighter gaps) so
-      // Refer and Reply keep their words
+      // a small tile, as on the web: the icon with its count badge to the right, a short title under, a light outline
+      // (gold on Refer)
       Widget pill({required Widget icon, int count = 0, Color? color, VoidCallback? onTap, required String label, Color? fill, Color? edge, String? text, Color? badge, Color? splash}) {
         final c = Container(
-          height: 32,
-          padding: EdgeInsets.symmetric(horizontal: text != null ? 14 : 9),
-          // a light outline on each (gold on Refer), as on the web
-          decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(16), border: Border.all(color: edge ?? p.border)),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            icon,
-            if (text != null) ...[const SizedBox(width: 6), Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color ?? p.text))],
-            // counts sit in a small badge (gold on Refer), as on the web
-            if (count > 0) ...[
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                decoration: BoxDecoration(color: badge ?? p.chip, borderRadius: BorderRadius.circular(9)),
-                child: Text(compactCount(count), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color ?? p.muted, fontFeatures: const [FontFeature.tabularFigures()])),
-              ),
-            ],
+          constraints: const BoxConstraints(minWidth: 56),
+          padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
+          decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(12), border: Border.all(color: edge ?? p.border)),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            SizedBox(
+              height: 18,
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                icon,
+                if (count > 0) ...[
+                  const SizedBox(width: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    decoration: BoxDecoration(color: badge ?? p.chip, borderRadius: BorderRadius.circular(9)),
+                    child: Text(compactCount(count), style: TextStyle(fontSize: 11, height: 1.45, fontWeight: FontWeight.w700, color: color ?? p.muted, fontFeatures: const [FontFeature.tabularFigures()])),
+                  ),
+                ],
+              ]),
+            ),
+            const SizedBox(height: 4),
+            Text(text ?? t(label), maxLines: 1, style: TextStyle(fontSize: 10, height: 1, fontWeight: FontWeight.w700, color: color ?? p.muted)),
           ]),
         );
-        return Semantics(button: true, label: t(label), child: onTap == null ? c : InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), hoverColor: splash, highlightColor: splash, child: c));
+        return Semantics(button: true, label: t(label), excludeSemantics: true, child: onTap == null ? c : InkWell(onTap: onTap, borderRadius: BorderRadius.circular(12), hoverColor: splash, highlightColor: splash, child: c));
       }
 
-      // asks are answered by referring someone: Refer is the gold button, Reply the secondary one beside it
-      // (the asker reviews responses instead)
+      // asks are answered by referring someone: Refer leads in gold (the asker reviews responses instead)
       // spread evenly at every size, as on x.com: each keeps its own width (Refer, with its label, the widest) and the
       // space left over is shared equally; at least 4 apart when the row has to scroll
       final row = Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, spacing: 4, children: [
         if (mine)
-          pill(label: 'Review responses', text: t('Review responses'), icon: WIcon(WI.talk, size: 18, color: p.tagText), color: p.tagText, edge: kGold.withValues(alpha: .45), onTap: widget.onReview ?? widget.onReply)
+          pill(label: 'Review responses', icon: WIcon(WI.talk, size: 18, color: p.tagText), count: post.sharesCount, badge: p.tagBg, color: p.tagText, edge: kGold.withValues(alpha: .45), fill: kGold.withValues(alpha: .08), onTap: widget.onReview ?? widget.onReply)
         else ...[
-          // Refer keeps its own width; Reply is its icon and count (the web's phone row)
           if (isAsk)
             // plain like the rest, in deep gold so it still leads (as on the web)
             tour(
               'refer',
               pill(
                 label: 'Refer',
-                text: t('Refer'),
                 icon: WIcon(WI.refer, size: 18, color: p.tagText),
                 count: post.referralsCount,
                 color: p.tagText,
                 badge: p.tagBg,
                 splash: kGold.withValues(alpha: .15),
                 edge: kGold.withValues(alpha: .45),
+                fill: kGold.withValues(alpha: .08),
                 onTap: _refer,
               ),
             ),
-          tour('reply', pill(label: 'Reply', icon: WIcon(WI.talk, size: 18, color: p.text), count: isAsk ? post.sharesCount : 0, color: p.text, onTap: widget.onReply)),
+          tour('reply', pill(label: 'Reply', icon: WIcon(WI.talk, size: 18, color: p.muted), count: isAsk ? post.sharesCount : 0, color: p.muted, onTap: widget.onReply)),
         ],
         // React in the middle, with space either side
         ReactionPicker(
@@ -787,7 +789,7 @@ class PostActionsState extends State<PostActions> {
             color: reacted ? p.text : p.muted,
           ),
         ),
-        // views, as on x.com: people who saw it, in the same bordered pill as React and Share (not a button)
+        // views, as on x.com: people who saw it (a count, not a button)
         if (post.viewsCount > 0) ...[
           Semantics(
             label: t(post.viewsCount == 1 ? '1 view' : '{n} views', {'n': post.viewsCount}),
@@ -801,6 +803,7 @@ class PostActionsState extends State<PostActions> {
           count: post.repostsCount,
           color: post.reposted ? green : p.muted,
           badge: post.reposted ? green.withValues(alpha: .1) : null,
+          edge: post.reposted ? green.withValues(alpha: .4) : null,
           onTap: _share,
         ),
       ]);

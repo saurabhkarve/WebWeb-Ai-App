@@ -1584,5 +1584,6 @@
   "No places found": "कोई जगह नहीं मिली",
   "{place} is {d} from this ask": "{place} इस ज़रूरत से {d} दूर है",
   "Inside the reach": "दायरे के अंदर",
-  "Outside the reach": "दायरे के बाहर"
+  "Outside the reach": "दायरे के बाहर",
+  "Views": "व्यू"
 }
