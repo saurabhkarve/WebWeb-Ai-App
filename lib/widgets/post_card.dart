@@ -835,14 +835,15 @@ class LatestReplies extends StatelessWidget {
     final referrers = post.referrers;
     final total = post.sharesCount + post.referralsCount;
     if (total == 0) {
-      return Padding(padding: const EdgeInsets.only(top: 12), child: Text(t('Be the first to respond'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)));
+      return Padding(padding: const EdgeInsets.only(top: 12, left: 50), child: Text(t('Be the first to respond'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)));
     }
     final shown = replies.length + referrers.fold<int>(0, (n, r) => n + r.n);
     const bubble = BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(14), bottomLeft: Radius.circular(14), bottomRight: Radius.circular(14));
     void openProfile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
     // open on the card (no panel of its own): a small heading, then the replies as bubbles
+    // set in under the author's name as a thread (the author avatar's 40 plus its 10 gap), as on the web
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: 12, left: 50),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(child: Text((replies.isNotEmpty || referrers.isNotEmpty ? t('Latest replies') : ResponseActivity.countLabel(post.sharesCount, post.referralsCount)).toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.muted))),
