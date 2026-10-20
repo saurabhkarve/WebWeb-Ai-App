@@ -750,7 +750,7 @@ class PostActionsState extends State<PostActions> {
       // (the asker reviews responses instead)
       // a phone puts space either side of React; a tablet spreads the five evenly across the row, as on x.com
       final wide = MediaQuery.of(context).size.width >= 600;
-      return Row(mainAxisAlignment: wide ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start, children: [
+      final row = Row(mainAxisAlignment: wide ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start, children: [
         if (mine)
           pill(label: 'Review responses', text: t('Review responses'), icon: WIcon(WI.talk, size: 18, color: p.tagText), color: p.tagText, edge: kGold.withValues(alpha: .45), onTap: widget.onReview ?? widget.onReply)
         else ...[
@@ -808,6 +808,14 @@ class PostActionsState extends State<PostActions> {
           onTap: _share,
         ),
       ]);
+      // scrolls sideways when it is wider than the screen (a narrow phone, a long translation); at least the full width,
+      // so the spacing still spreads the buttons when they fit
+      return LayoutBuilder(
+        builder: (_, box) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(constraints: BoxConstraints(minWidth: box.maxWidth), child: IntrinsicWidth(child: row)),
+        ),
+      );
     }
     return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       ReactionPicker(
