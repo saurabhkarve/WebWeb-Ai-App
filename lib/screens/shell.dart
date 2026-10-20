@@ -154,7 +154,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                     ConnectScreen(refreshTick: _feedTick, topTick: _topTick, onGoAsk: () => _go(3)),
                     const FindScreen(),
                     if (_i == 2) const TalkScreen() else const SizedBox.shrink(), // reload conversations each time it opens
-                    AskScreen(active: _i == 3, onPosted: () => setState(() {
+                    AskScreen(active: _i == 3, onBack: () => _go(0), onPosted: () => setState(() {
                           _feedTick++;
                           _i = 0;
                         })),

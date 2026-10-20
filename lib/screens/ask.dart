@@ -170,16 +170,19 @@ class AskScreen extends StatelessWidget {
   final bool active;
   /// one of your asks to change: the same card, filled in; saving pops with true
   final Post? edit;
-  const AskScreen({super.key, required this.onPosted, this.active = true, this.edit});
+  /// the Ask tab's back button (the island steps aside on Ask); the edit page has its own
+  final VoidCallback? onBack;
+  const AskScreen({super.key, required this.onPosted, this.active = true, this.edit, this.onBack});
   @override
-  Widget build(BuildContext context) => _AskForm(onPosted: onPosted, active: active, edit: edit);
+  Widget build(BuildContext context) => _AskForm(onPosted: onPosted, active: active, edit: edit, onBack: onBack);
 }
 
 class _AskForm extends StatefulWidget {
   final VoidCallback onPosted;
   final bool active;
   final Post? edit;
-  const _AskForm({required this.onPosted, this.active = true, this.edit});
+  final VoidCallback? onBack;
+  const _AskForm({required this.onPosted, this.active = true, this.edit, this.onBack});
   @override
   State<_AskForm> createState() => _AskFormState();
 }
@@ -1161,6 +1164,23 @@ class _AskFormState extends State<_AskForm> {
     );
 
     return Column(children: [
+      // back to Connect, since the island is out of the way on Ask
+      if (widget.onBack != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 4, 16, 0),
+          child: Row(children: [
+            Semantics(
+              button: true,
+              label: t('Back'),
+              child: InkResponse(
+                onTap: widget.onBack,
+                radius: 22,
+                child: SizedBox(width: 44, height: 44, child: Center(child: WIcon(WI.back, size: 28, color: p.text))),
+              ),
+            ),
+            Text(t('Ask'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+          ]),
+        ),
       // a tap anywhere outside an open chip's choices closes them
       Expanded(child: _open == null ? form : GestureDetector(onTap: () => setState(() => _open = null), child: form)),
       // Publish in one bar on the bottom edge (the island steps aside on Ask): reach and strength, then the button
