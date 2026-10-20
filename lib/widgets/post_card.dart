@@ -722,13 +722,14 @@ class PostActionsState extends State<PostActions> {
     if (widget.spotlight) {
       // a small bordered pill: icon and count side by side; the row is the web's phone size (36 tall, tighter gaps) so
       // Refer and Reply keep their words
-      Widget pill({required Widget icon, int count = 0, Color? color, VoidCallback? onTap, required String label, Color? fill}) {
+      Widget pill({required Widget icon, int count = 0, Color? color, VoidCallback? onTap, required String label, Color? fill, Color? edge, String? text}) {
         final c = Container(
           height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 9),
-          decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(18), border: Border.all(color: p.border)),
+          padding: EdgeInsets.symmetric(horizontal: text != null ? 14 : 9),
+          decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(18), border: Border.all(color: edge ?? p.border)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             icon,
+            if (text != null) ...[const SizedBox(width: 6), Text(text, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color ?? p.text))],
             if (count > 0) ...[const SizedBox(width: 4), Text(compactCount(count), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color ?? p.muted, fontFeatures: const [FontFeature.tabularFigures()]))],
           ]),
         );
@@ -745,7 +746,20 @@ class PostActionsState extends State<PostActions> {
         else ...[
           // Refer keeps its own width; Reply is its icon and count (the web's phone row)
           if (isAsk)
-            tour('refer', GoldButton(label: post.referralsCount > 0 ? '${t('Refer')} · ${post.referralsCount}' : t('Refer'), wi: WI.refer, height: 36, onPressed: _refer)),
+            // a light gold button like Reply's, so it leads without outweighing the ask (as on the web)
+            tour(
+              'refer',
+              pill(
+                label: 'Refer',
+                text: t('Refer'),
+                icon: WIcon(WI.refer, size: 18, color: p.text),
+                count: post.referralsCount,
+                color: p.text,
+                fill: kGold.withValues(alpha: .16),
+                edge: kGold.withValues(alpha: .45),
+                onTap: _refer,
+              ),
+            ),
           const SizedBox(width: 4),
           tour('reply', pill(label: 'Reply', icon: WIcon(WI.talk, size: 18, color: p.text), count: isAsk ? post.sharesCount : 0, color: p.text, fill: p.chip, onTap: widget.onReply)),
         ],
