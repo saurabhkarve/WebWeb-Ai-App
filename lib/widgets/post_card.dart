@@ -882,7 +882,7 @@ class LatestReplies extends StatelessWidget {
     void openProfile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
     // open on the card (no panel of its own): a heading at the card's edge (talk icon, label, count, a hairline that
     // fades out), then the replies as compact bubbles set in under the author's name as a thread (the author avatar's 40
-    // plus its 10 gap), and All n after the third, as on the web
+    // plus its 10 gap), and Show all n last, as on the web
     final any = replies.isNotEmpty || referrers.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.only(top: 12),
@@ -959,12 +959,6 @@ class LatestReplies extends StatelessWidget {
               ),
             ]),
           ),
-        // after the third: the rest are on the ask page
-        if (total > shown || post.sharesCount > replies.length)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: GestureDetector(onTap: onMore, child: Text('${t('All {n}', {'n': total})} →', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
-          ),
         if (referrers.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -976,6 +970,12 @@ class LatestReplies extends StatelessWidget {
               ]),
               style: TextStyle(fontSize: 12, color: p.muted),
             ),
+          ),
+        // last, after the replies and who referred: the rest are on the ask page
+        if (total > shown || post.sharesCount > replies.length)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: GestureDetector(onTap: onMore, child: Text('${t('Show all {n}', {'n': total})} →', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
           ),
           ]),
         ),
