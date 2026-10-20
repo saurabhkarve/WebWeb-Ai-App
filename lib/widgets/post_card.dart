@@ -722,7 +722,7 @@ class PostActionsState extends State<PostActions> {
     if (widget.spotlight) {
       // a small bordered pill: icon and count side by side; the row is the web's phone size (36 tall, tighter gaps) so
       // Refer and Reply keep their words
-      Widget pill({required Widget icon, int count = 0, Color? color, VoidCallback? onTap, required String label, Color? fill, Color? edge, String? text}) {
+      Widget pill({required Widget icon, int count = 0, Color? color, VoidCallback? onTap, required String label, Color? fill, Color? edge, String? text, Color? badge, Color? splash}) {
         final c = Container(
           height: 36,
           padding: EdgeInsets.symmetric(horizontal: text != null ? 14 : 9),
@@ -731,10 +731,18 @@ class PostActionsState extends State<PostActions> {
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             icon,
             if (text != null) ...[const SizedBox(width: 6), Text(text, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color ?? p.text))],
-            if (count > 0) ...[const SizedBox(width: 4), Text(compactCount(count), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color ?? p.muted, fontFeatures: const [FontFeature.tabularFigures()]))],
+            // counts sit in a small badge (gold on Refer), as on the web
+            if (count > 0) ...[
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(color: badge ?? p.chip, borderRadius: BorderRadius.circular(9)),
+                child: Text(compactCount(count), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color ?? p.muted, fontFeatures: const [FontFeature.tabularFigures()])),
+              ),
+            ],
           ]),
         );
-        return Semantics(button: true, label: t(label), child: onTap == null ? c : InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: c));
+        return Semantics(button: true, label: t(label), child: onTap == null ? c : InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), hoverColor: splash, highlightColor: splash, child: c));
       }
 
       // asks are answered by referring someone: Refer is the gold button, Reply the secondary one beside it
@@ -756,6 +764,8 @@ class PostActionsState extends State<PostActions> {
                 icon: WIcon(WI.refer, size: 18, color: p.tagText),
                 count: post.referralsCount,
                 color: p.tagText,
+                badge: p.tagBg,
+                splash: kGold.withValues(alpha: .15),
                 onTap: _refer,
               ),
             ),
@@ -768,8 +778,10 @@ class PostActionsState extends State<PostActions> {
           quick: true,
           value: post.myReaction,
           onChange: react,
-          trigger: (_) => pill(
+          // a rose tint while the picker is open, like the web's hover
+          trigger: (open) => pill(
             label: 'React',
+            fill: open ? const Color(0xFFF43F5E).withValues(alpha: .1) : null,
             icon: reacted ? SizedBox(width: 18, height: 18, child: Center(child: ReactionGlyph(post.myReaction!, size: 15))) : WIcon(WI.heart, size: 18, color: p.muted),
             count: post.reactionsCount,
             color: reacted ? p.text : p.muted,
@@ -790,6 +802,7 @@ class PostActionsState extends State<PostActions> {
           icon: WIcon(post.reposted ? WI.repost : WI.share, size: 18, color: post.reposted ? green : p.muted),
           count: post.repostsCount,
           color: post.reposted ? green : p.muted,
+          badge: post.reposted ? green.withValues(alpha: .1) : null,
           onTap: _share,
         ),
       ]);
