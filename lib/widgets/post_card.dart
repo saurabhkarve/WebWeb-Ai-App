@@ -768,13 +768,28 @@ class PostActionsState extends State<PostActions> {
         return Semantics(button: true, label: t(label), excludeSemantics: true, child: onTap == null ? c : InkWell(onTap: onTap, borderRadius: radius, hoverColor: splash, highlightColor: splash, child: c));
       }
 
-      // asks are answered by referring someone: Refer leads in gold (the asker reviews responses instead)
-      // spread evenly at every size, as on x.com: each keeps its own width (Refer, with its label, the widest) and the
-      // space left over is shared equally; at least 4 apart when the row has to scroll
+      // React, Reply, Refer, Views, Share at every size (as on the web), so Refer sits in the middle: in gold, since asks
+      // are answered by referring someone (the asker reviews responses instead). Spread evenly, as on x.com: each keeps
+      // its own width and the space left over is shared equally; at least 4 apart when the row has to scroll
       final row = Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, spacing: 4, children: [
+        // React first
+        ReactionPicker(
+          quick: true,
+          value: post.myReaction,
+          onChange: react,
+          // a rose tint while the picker is open, like the web's hover
+          trigger: (open) => pill(
+            label: 'React',
+            fill: open ? const Color(0xFFF43F5E).withValues(alpha: .1) : null,
+            icon: reacted ? SizedBox(width: 18, height: 18, child: Center(child: ReactionGlyph(post.myReaction!, size: 15))) : WIcon(WI.heart, size: 18, color: p.muted),
+            count: post.reactionsCount,
+            color: reacted ? p.text : p.muted,
+          ),
+        ),
         if (mine)
           pill(label: 'Review responses', icon: WIcon(WI.talk, size: 18, color: p.tagText), count: post.sharesCount, badge: p.tagBg, color: p.tagText, edge: kGold.withValues(alpha: .45), fill: kGold.withValues(alpha: .1), onTap: widget.onReview ?? widget.onReply)
         else ...[
+          tour('reply', pill(label: 'Reply', icon: WIcon(WI.talk, size: 18, color: p.muted), count: isAsk ? post.sharesCount : 0, color: p.muted, onTap: widget.onReply)),
           if (isAsk)
             // plain like the rest, in deep gold so it still leads (as on the web)
             tour(
@@ -791,22 +806,7 @@ class PostActionsState extends State<PostActions> {
                 onTap: _refer,
               ),
             ),
-          tour('reply', pill(label: 'Reply', icon: WIcon(WI.talk, size: 18, color: p.muted), count: isAsk ? post.sharesCount : 0, color: p.muted, onTap: widget.onReply)),
         ],
-        // React in the middle, with space either side
-        ReactionPicker(
-          quick: true,
-          value: post.myReaction,
-          onChange: react,
-          // a rose tint while the picker is open, like the web's hover
-          trigger: (open) => pill(
-            label: 'React',
-            fill: open ? const Color(0xFFF43F5E).withValues(alpha: .1) : null,
-            icon: reacted ? SizedBox(width: 18, height: 18, child: Center(child: ReactionGlyph(post.myReaction!, size: 15))) : WIcon(WI.heart, size: 18, color: p.muted),
-            count: post.reactionsCount,
-            color: reacted ? p.text : p.muted,
-          ),
-        ),
         // views, as on x.com: people who saw it (a count, not a button)
         if (post.viewsCount > 0) ...[
           Semantics(

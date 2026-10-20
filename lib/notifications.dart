@@ -430,7 +430,7 @@ Future<void> showActivity(Map<String, dynamic> d, {required String title, requir
     await showMessage(chatId: '${d['chatId']}', name: title, body: body);
     return;
   }
-  const asks = {'ask_response', 'ask_referral', 'share_asked', 'share_answered', 'contact_request', 'item_referral', 'ask_match'};
+  const asks = {'ask_response', 'ask_referral', 'ask_reaction', 'ask_repost', 'ask_shared', 'ask_thread', 'share_asked', 'share_answered', 'contact_request', 'item_referral', 'ask_match'};
   final details = kind == 'missed_call' ? _messageDetails : (asks.contains(kind) ? _asksDetails : _activityDetails);
   final key = '${d['postId'] ?? d['productId'] ?? d['storyId'] ?? _sender(d) ?? d['nid'] ?? title}$kind';
   await _local.show(
