@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/hashtag_text.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -282,11 +283,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 if (why != null) ...[const SizedBox(width: 8), Flexible(child: GoldTag(why))],
               ]),
               const SizedBox(height: 4),
-              Text(post.title ?? '', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, height: 1.3)),
+              HashtagText(post.title ?? '', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, height: 1.3)),
               const SizedBox(height: 4),
             ],
             if ((post.description ?? '').isNotEmpty)
-              SelectableText(post.description!,
+              HashtagText(post.description!, selectable: true,
                   style: isAsk ? TextStyle(fontSize: 15, height: 1.375, color: p.text.withValues(alpha: .75)) : const TextStyle(fontSize: 18, height: 1.375)),
             ImageGrid(post.images, shareUrl: post.webUrl, shareRef: post.id),
             // the essentials as chips, like the feed card (the category is the heading above)
@@ -636,7 +637,7 @@ class _ShareTileState extends State<_ShareTile> {
                         child: Row(children: [WIcon(WI.phone, size: 16, color: p.text), const SizedBox(width: 8), Text(s.payload!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))]),
                       )
                     : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        SelectableText(s.payload!, style: const TextStyle(fontSize: 14)),
+                        HashtagText(s.payload!, selectable: true, style: const TextStyle(fontSize: 14)),
                         // a photo sent with the note
                         if ((s.imageUrl ?? '').isNotEmpty)
                           Padding(

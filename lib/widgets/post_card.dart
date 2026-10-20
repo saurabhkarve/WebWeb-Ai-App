@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'hashtag_text.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -236,11 +237,11 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     final match = (post.matchReason ?? '').isEmpty ? null : post.matchReason!;
 
     final body = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (isAsk) Text(post.title ?? '', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.375)),
+      if (isAsk) HashtagText(post.title ?? '', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.375)),
       if ((post.description ?? '').isNotEmpty)
         Padding(
           padding: EdgeInsets.only(top: isAsk ? 4 : 0),
-          child: Text(
+          child: HashtagText(
             post.description!,
             maxLines: isAsk && !widget.detail ? 2 : null,
             overflow: isAsk && !widget.detail ? TextOverflow.ellipsis : null,
@@ -911,7 +912,7 @@ class LatestReplies extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(color: p.chip, borderRadius: bubble),
-                      child: Text(r.text!, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, height: 1.35)),
+                      child: HashtagText(r.text!, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, height: 1.35)),
                     ),
                     // a photo sent with the note
                     if ((r.imageUrl ?? '').isNotEmpty)

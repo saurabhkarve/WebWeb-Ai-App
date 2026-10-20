@@ -1024,8 +1024,18 @@ class _AskFormState extends State<_AskForm> {
                   style: const TextStyle(fontSize: 15, height: 1.4),
                   decoration: _input(p, t(tip?.$1 ?? 'Describe what you need: quantity, quality, area, timing')),
                 ),
-                if (title.length > 80 || desc.length > 800)
-                  Align(alignment: Alignment.centerRight, child: Text(desc.length > 800 ? '${desc.length}/1000' : '${title.length}/100', style: TextStyle(fontSize: 12, color: p.muted))),
+                // hashtags in the title or description become links to every ask that carries them
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(child: Text(t('Add #tags like #plumber or #Vashi so the right people find it.'), style: TextStyle(fontSize: 12, color: p.muted))),
+                    if (title.length > 80 || desc.length > 240)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Text(desc.length > 240 ? '${desc.length}/300' : '${title.length}/100', style: TextStyle(fontSize: 12, color: p.muted)),
+                      ),
+                  ]),
+                ),
                 const SizedBox(height: 10),
                 Wrap(spacing: 8, runSpacing: 8, children: [
                   for (final ph in _photos)
