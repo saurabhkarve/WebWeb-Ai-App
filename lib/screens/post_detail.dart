@@ -293,7 +293,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             // the essentials as chips, like the feed card (the category is the heading above)
             if (hasDetails || (post.radiusM ?? 0) > 0) ...[
               const SizedBox(height: 12),
-              Wrap(spacing: 6, runSpacing: 6, children: [
+              ChipLine(children: [
                 if ((post.locationPref ?? '').isNotEmpty)
                   InfoPill(
                     gold: true,
