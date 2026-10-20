@@ -721,33 +721,43 @@ class PostActionsState extends State<PostActions> {
     final reacted = post.myReaction != null;
     const green = Color(0xFF059669);
     if (widget.spotlight) {
-      // a small tile, as on the web: the icon with its count badge to the right, a short title under, a light outline
-      // (gold on Refer)
+      // as on the web: on a phone a small tile (the icon with its count badge to the right, a short title under); on a
+      // tablet a pill with the icon, the title and the count in one line. A soft card with a light outline (gold on Refer)
+      final wide = MediaQuery.sizeOf(context).width >= 600;
       Widget pill({required Widget icon, int count = 0, Color? color, VoidCallback? onTap, required String label, Color? fill, Color? edge, String? text, Color? badge, Color? splash}) {
+        final c0 = color ?? p.muted;
+        final title = Text(text ?? t(label), maxLines: 1, style: TextStyle(fontSize: wide ? 12 : 10, height: 1, fontWeight: FontWeight.w700, color: c0));
+        final chip = count > 0
+            ? Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                decoration: BoxDecoration(color: badge ?? p.chip, borderRadius: BorderRadius.circular(9)),
+                child: Text(compactCount(count), style: TextStyle(fontSize: 11, height: 1.45, fontWeight: FontWeight.w700, color: c0, fontFeatures: const [FontFeature.tabularFigures()])),
+              )
+            : null;
+        final radius = BorderRadius.circular(wide ? 18 : 12);
         final c = Container(
-          constraints: const BoxConstraints(minWidth: 56),
-          padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
-          decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(12), border: Border.all(color: edge ?? p.border)),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            SizedBox(
-              height: 18,
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                icon,
-                if (count > 0) ...[
-                  const SizedBox(width: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    decoration: BoxDecoration(color: badge ?? p.chip, borderRadius: BorderRadius.circular(9)),
-                    child: Text(compactCount(count), style: TextStyle(fontSize: 11, height: 1.45, fontWeight: FontWeight.w700, color: color ?? p.muted, fontFeatures: const [FontFeature.tabularFigures()])),
-                  ),
-                ],
-              ]),
-            ),
-            const SizedBox(height: 4),
-            Text(text ?? t(label), maxLines: 1, style: TextStyle(fontSize: 10, height: 1, fontWeight: FontWeight.w700, color: color ?? p.muted)),
-          ]),
+          constraints: BoxConstraints(minWidth: wide ? 0 : 56, minHeight: wide ? 36 : 0),
+          padding: wide ? const EdgeInsets.symmetric(horizontal: 12) : const EdgeInsets.fromLTRB(10, 6, 10, 4),
+          decoration: BoxDecoration(
+            color: fill ?? p.card,
+            borderRadius: radius,
+            border: Border.all(color: edge ?? p.border),
+            boxShadow: const [BoxShadow(color: Color(0x0D1E1E1E), blurRadius: 2, offset: Offset(0, 1))],
+          ),
+          child: wide
+              ? Row(mainAxisSize: MainAxisSize.min, children: [
+                  icon,
+                  const SizedBox(width: 6),
+                  title,
+                  if (chip != null) ...[const SizedBox(width: 6), chip],
+                ])
+              : Column(mainAxisSize: MainAxisSize.min, children: [
+                  SizedBox(height: 18, child: Row(mainAxisSize: MainAxisSize.min, children: [icon, if (chip != null) ...[const SizedBox(width: 4), chip]])),
+                  const SizedBox(height: 4),
+                  title,
+                ]),
         );
-        return Semantics(button: true, label: t(label), excludeSemantics: true, child: onTap == null ? c : InkWell(onTap: onTap, borderRadius: BorderRadius.circular(12), hoverColor: splash, highlightColor: splash, child: c));
+        return Semantics(button: true, label: t(label), excludeSemantics: true, child: onTap == null ? c : InkWell(onTap: onTap, borderRadius: radius, hoverColor: splash, highlightColor: splash, child: c));
       }
 
       // asks are answered by referring someone: Refer leads in gold (the asker reviews responses instead)
@@ -755,7 +765,7 @@ class PostActionsState extends State<PostActions> {
       // space left over is shared equally; at least 4 apart when the row has to scroll
       final row = Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, spacing: 4, children: [
         if (mine)
-          pill(label: 'Review responses', icon: WIcon(WI.talk, size: 18, color: p.tagText), count: post.sharesCount, badge: p.tagBg, color: p.tagText, edge: kGold.withValues(alpha: .45), fill: kGold.withValues(alpha: .08), onTap: widget.onReview ?? widget.onReply)
+          pill(label: 'Review responses', icon: WIcon(WI.talk, size: 18, color: p.tagText), count: post.sharesCount, badge: p.tagBg, color: p.tagText, edge: kGold.withValues(alpha: .45), fill: kGold.withValues(alpha: .1), onTap: widget.onReview ?? widget.onReply)
         else ...[
           if (isAsk)
             // plain like the rest, in deep gold so it still leads (as on the web)
@@ -769,7 +779,7 @@ class PostActionsState extends State<PostActions> {
                 badge: p.tagBg,
                 splash: kGold.withValues(alpha: .15),
                 edge: kGold.withValues(alpha: .45),
-                fill: kGold.withValues(alpha: .08),
+                fill: kGold.withValues(alpha: .1),
                 onTap: _refer,
               ),
             ),

@@ -42,6 +42,9 @@ Future<void> showAskAreaSheet(BuildContext context, Post post) {
     backgroundColor: p.canvas,
     barrierColor: kInk.withValues(alpha: .6),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    // a bottom drawer: drag it down by its handle (or anywhere, the map is a still picture) or tap the close icon
+    showDragHandle: true,
+    enableDrag: true,
     builder: (ctx) => _AskAreaSheet(post: post, outer: context),
   );
 }
@@ -114,7 +117,7 @@ class _AskAreaSheetState extends State<_AskAreaSheet> {
     final away = spot != null && lat != null && lng != null ? distanceKm(lat, lng, spot.lat, spot.lng) * 1000 : null;
     return SafeArea(
       child: Padding(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
             Expanded(child: Text(t('Where this ask reaches'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
