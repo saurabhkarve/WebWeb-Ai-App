@@ -1572,5 +1572,10 @@
   "Your reply shows on the ask. To pass on someone's number, use Refer.": "तुमचो जाप ह्या गरजेचेर दिसता. कोणाचो नंबर दिवपाक 'शिफारस' वापरात.",
   "{n} views": "{n} जाणांनी पळयलें",
   "1 view": "1 मनशान पळयलें",
-  "Add #tags like #plumber or #Vashi so the right people find it.": "#plumber वा #Vashi सारके #टॅग जोडात, म्हळ्यार योग्य लोकांक हें मेळटलें."
+  "Add #tags like #plumber or #Vashi so the right people find it.": "#plumber वा #Vashi सारके #टॅग जोडात, म्हळ्यार योग्य लोकांक हें मेळटलें.",
+  "Hide replies": "जापो लिपयात",
+  "View 1 reply": "1 जाप पळयात",
+  "View {n} replies": "{n} जापो पळयात",
+  "Write a reply…": "जाप बरयात…",
+  "Delete this reply?": "हो जाप काडून उडोवचो?"
 }

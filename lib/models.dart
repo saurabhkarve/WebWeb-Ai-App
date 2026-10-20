@@ -177,13 +177,35 @@ class ResponseLog {
   final String? text, imageUrl;
   final int? rating;
   final DateTime createdAt;
-  ResponseLog({required this.uid, required this.name, required this.handle, required this.kind, this.userType = 'entrepreneur', this.company = '', this.verification = 0, this.photoUrl, this.reaction, this.rating, this.text, this.imageUrl, required this.createdAt});
+  /// on the card's latest replies: members' reactions and replies to this reply, and mine
+  final int reactionsCount, repliesCount;
+  final String? myReaction;
+  ResponseLog({required this.uid, required this.name, required this.handle, required this.kind, this.userType = 'entrepreneur', this.company = '', this.verification = 0, this.photoUrl, this.reaction, this.rating, this.text, this.imageUrl, required this.createdAt, this.reactionsCount = 0, this.repliesCount = 0, this.myReaction});
   factory ResponseLog.fromJson(Map j) => ResponseLog(
         uid: '${j['uid']}', name: '${j['name']}', handle: '${j['handle'] ?? ''}', kind: '${j['kind']}', photoUrl: j['photoURL'] as String?,
         userType: '${j['userType'] ?? 'entrepreneur'}', company: '${j['company'] ?? ''}', verification: (j['verification'] as num?)?.toInt() ?? 0,
         reaction: j['reaction'] as String?, rating: (j['rating'] as num?)?.toInt(), createdAt: _ms(j['createdAt']),
         text: j['text'] as String?, imageUrl: j['imageUrl'] as String?,
+        reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, repliesCount: (j['repliesCount'] as num?)?.toInt() ?? 0,
+        myReaction: j['myReaction'] as String?,
       );
+}
+
+/// A reply to a reply (one level deep, as on x.com).
+class ReplyComment {
+  final int id;
+  final String text, uid, name, company, userType, handle;
+  final int verification, reactionsCount;
+  final String? photoUrl, myReaction;
+  final DateTime createdAt;
+  ReplyComment({required this.id, required this.text, required this.uid, required this.name, this.company = '', this.userType = 'entrepreneur', required this.handle, this.verification = 0, this.reactionsCount = 0, this.photoUrl, this.myReaction, required this.createdAt});
+  factory ReplyComment.fromJson(Map j) => ReplyComment(
+        id: (j['id'] as num).toInt(), text: '${j['text']}', uid: '${j['uid']}', name: '${j['name']}', company: '${j['company'] ?? ''}',
+        userType: '${j['userType'] ?? 'entrepreneur'}', handle: '${j['handle'] ?? ''}', verification: (j['verification'] as num?)?.toInt() ?? 0,
+        reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, photoUrl: j['photoURL'] as String?, myReaction: j['myReaction'] as String?,
+        createdAt: _ms(j['createdAt']),
+      );
+  String get display => userType == 'entrepreneur' && company.isNotEmpty ? company : name;
 }
 
 /// Who referred contacts on an ask, with how many (the people referred are never shown).

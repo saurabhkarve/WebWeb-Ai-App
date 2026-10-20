@@ -21,6 +21,7 @@ import '../widgets.dart';
 import 'area_map.dart';
 import 'image_grid.dart';
 import 'reaction_picker.dart';
+import 'reply_thread.dart';
 import 'response_sheet.dart';
 import 'tour.dart';
 import '../share_log.dart';
@@ -730,7 +731,7 @@ class PostActionsState extends State<PostActions> {
           decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(18), border: edge == null ? null : Border.all(color: edge)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             icon,
-            if (text != null) ...[const SizedBox(width: 6), Text(text, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color ?? p.text))],
+            if (text != null) ...[const SizedBox(width: 6), Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color ?? p.text))],
             // counts sit in a small badge (gold on Refer), as on the web
             if (count > 0) ...[
               const SizedBox(width: 4),
@@ -951,6 +952,8 @@ class LatestReplies extends StatelessWidget {
                         Flexible(child: Text(t('Shared a contact privately'), style: TextStyle(fontSize: 12, color: p.muted))),
                       ]),
                     ),
+                  // react to it and reply to it, as on x.com
+                  ReplySocial(key: ValueKey('${post.id}-${r.uid}'), postId: post.id, reply: r),
                 ]),
               ),
             ]),
