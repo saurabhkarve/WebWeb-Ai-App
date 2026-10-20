@@ -1019,7 +1019,7 @@ class _AskFormState extends State<_AskForm> {
                   focusNode: _descFocus,
                   minLines: 3,
                   maxLines: 12,
-                  maxLength: 1000,
+                  maxLength: 300,
                   textCapitalization: TextCapitalization.sentences,
                   style: const TextStyle(fontSize: 15, height: 1.4),
                   decoration: _input(p, t(tip?.$1 ?? 'Describe what you need: quantity, quality, area, timing')),

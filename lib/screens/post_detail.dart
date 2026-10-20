@@ -36,6 +36,8 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   Post? _post;
+  // the owner's responses section, where "Review responses" scrolls to
+  final _responsesKey = GlobalKey();
   // the full response log, once "+N more" is tapped
   List<ResponseLog>? _allResponses;
   bool _missing = false;
@@ -211,6 +213,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final isAsk = post.isRequirement;
     final owner = _isOwner;
     final hasDetails = (post.locationPref ?? '').isNotEmpty || (post.budget ?? '').isNotEmpty || (post.urgency ?? '').isNotEmpty;
+    // why you see this ask, as on the feed card
+    final why = owner ? t('Your ask') : ((post.matchReason ?? '').isEmpty ? null : t(post.matchReason!));
 
     Widget iconBtn(WI icon, String label, VoidCallback onTap, {Color? color}) => Semantics(
           button: true,
@@ -225,24 +229,26 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 32),
+          // an ask reads like its feed card (post_card.dart): who asked, the category with why you see it, the ask, its
+          // essentials as chips, the latest replies, then Refer and Reply
           children: [
             // author row
             Row(children: [
               GestureDetector(
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.authorHandle))),
-                child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: 44, ring: post.authorHasUpdate, type: post.authorType, uid: post.authorUid, badge: 18),
+                child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: 40, ring: post.authorHasUpdate, type: post.authorType, uid: post.authorUid, badge: 15),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: GestureDetector(
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.authorHandle))),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
-                      Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.25))),
-                      if (post.authorVerification > 0 || post.authorPremium) ...[const SizedBox(width: 4), VerifiedBadge(level: post.authorVerification, premium: post.authorPremium)],
+                      Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25))),
+                      if (post.authorVerification > 0 || post.authorPremium) ...[const SizedBox(width: 6), VerifiedBadge(level: post.authorVerification, premium: post.authorPremium)],
                     ]),
                     Text('${post.authorType == 'entrepreneur' ? post.authorName : post.authorCompany} · ${timeAgo(post.createdAt)}${post.editedAt != null ? ' · ${editedLabel(post.editedAt!)}' : ''}',
-                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted, height: 1.25)),
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted, height: 1.3)),
                   ]),
                 ),
               ),
@@ -260,39 +266,53 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 iconBtn(WI.trash, t('Delete ask'), _removeAsk, color: p.danger),
               ],
             ]),
-            const SizedBox(height: 20),
+            SizedBox(height: isAsk ? 12 : 20),
             if (isAsk) ...[
-              Text('#${t(post.category == 'other' && (post.categoryLabel ?? '').isNotEmpty ? post.categoryLabel! : labelOf(kPostCategories, post.category))}',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link)),
-              const SizedBox(height: 8),
-              Text(post.title ?? '', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1.375)),
-              const SizedBox(height: 8),
+              // the category as a small heading, why you see this ask on the right
+              Row(children: [
+                WIcon(categoryIcon(post.category), size: 14, color: p.link, still: true),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(t(post.categoryText).toUpperCase(),
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.link)),
+                ),
+                if (why != null) ...[const SizedBox(width: 8), Flexible(child: GoldTag(why))],
+              ]),
+              const SizedBox(height: 4),
+              Text(post.title ?? '', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, height: 1.3)),
+              const SizedBox(height: 4),
             ],
-            if ((post.description ?? '').isNotEmpty) SelectableText(post.description!, style: isAsk ? const TextStyle(fontSize: 16, height: 1.625) : const TextStyle(fontSize: 18, height: 1.375)),
+            if ((post.description ?? '').isNotEmpty)
+              SelectableText(post.description!,
+                  style: isAsk ? TextStyle(fontSize: 15, height: 1.375, color: p.text.withValues(alpha: .75)) : const TextStyle(fontSize: 18, height: 1.375)),
             ImageGrid(post.images, shareUrl: post.webUrl, shareRef: post.id),
             // the essentials as chips, like the feed card (the category is the heading above)
             if (hasDetails || (post.radiusM ?? 0) > 0) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Wrap(spacing: 6, runSpacing: 6, children: [
                 if ((post.locationPref ?? '').isNotEmpty)
                   InfoPill(
+                    gold: true,
                     wi: WI.pin,
                     text: '${t(post.locationPref!)}${post.distanceM == null ? '' : ' · ${formatDistance(post.distanceM!)}'}',
                     onTap: () => showAskAreaSheet(context, post),
                   ),
-                if ((post.budget ?? '').isNotEmpty) InfoPill(wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
+                if ((post.budget ?? '').isNotEmpty) InfoPill(gold: true, wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
                 if ((post.urgency ?? '').isNotEmpty)
-                  InfoPill(wi: WI.clock, text: askTimeLeft(post)!, onTap: () => _openFind(urgency: post.urgency)),
-                if ((post.radiusM ?? 0) > 0) InfoPill(wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)}), onTap: () => showAskAreaSheet(context, post)),
+                  InfoPill(gold: true, wi: WI.clock, text: askTimeLeft(post)!, onTap: () => _openFind(urgency: post.urgency)),
+                if ((post.radiusM ?? 0) > 0) InfoPill(gold: true, wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)}), onTap: () => showAskAreaSheet(context, post)),
               ]),
             ],
             if (isAsk) ...[
-              const SizedBox(height: 20),
-              Row(children: [
-                WIcon(WI.users, size: 20, color: p.text),
-                const SizedBox(width: 8),
-                Text(ResponseActivity.countLabel(post.sharesCount, post.referralsCount), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-              ]),
+              // the whole log, once "All n" is open (the latest replies carry their own heading)
+              if (_allResponses != null) ...[
+                const SizedBox(height: 16),
+                Row(children: [
+                  WIcon(WI.users, size: 20, color: p.text),
+                  const SizedBox(width: 8),
+                  Text(ResponseActivity.countLabel(post.sharesCount, post.referralsCount), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                ]),
+              ],
               // the latest 3 replies in public, as on the card; "All" opens the whole log
               if (!owner && _allResponses == null) LatestReplies(post: post, onMore: _loadAllResponses),
               if (!owner && _allResponses != null)
@@ -303,7 +323,26 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   referrals: post.referralsCount,
                 ),
             ],
-            const SizedBox(height: 20),
+            SizedBox(height: isAsk ? 12 : 20),
+            if (isAsk)
+              PostActions(
+                post: post,
+                spotlight: true,
+                onChanged: () => setState(() {}),
+                onReview: () {
+                  final c = _responsesKey.currentContext;
+                  if (c != null) Scrollable.ensureVisible(c, duration: const Duration(milliseconds: 300));
+                },
+                onReply: () {
+                  final mine = _mine;
+                  if (mine?.shared == true) {
+                    _respond(existing: ExistingResponse(mine!.kind ?? 'contact', text: mine.text, imageUrl: mine.imageUrl));
+                  } else {
+                    _respond();
+                  }
+                },
+              )
+            else
             Container(
               padding: const EdgeInsets.symmetric(vertical: 4),
               decoration: BoxDecoration(border: Border.symmetric(horizontal: BorderSide(color: p.border))),
@@ -330,7 +369,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 onPressed: () => _message(post.authorUid, name: post.authorName, company: post.authorCompany, handle: post.authorHandle, photo: post.authorPhotoUrl, type: post.authorType),
               ),
             if (!owner && isAsk) _visitor(post, p),
-            if (owner && isAsk) _ownerSection(post, p),
+            if (owner && isAsk) KeyedSubtree(key: _responsesKey, child: _ownerSection(post, p)),
             if (!owner && _referrals.isNotEmpty) _myReferrals(p),
           ],
         ),
@@ -341,9 +380,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   // ---------- visitor ----------
   Widget _visitor(Post post, Pal p) {
     final mine = _mine;
-    if (mine == null || !mine.shared) {
-      return GoldButton(label: t('Respond · share contact, photo or info'), onPressed: () => _respond());
-    }
+    // Reply in the row above opens the sheet; once you replied, its status and what you can do with it
+    if (mine == null || !mine.shared) return const SizedBox.shrink();
     final kind = _kindWord[mine.kind ?? 'contact'] ?? 'your contact';
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
@@ -728,7 +766,7 @@ class _EditAskSheetState extends State<_EditAskSheet> {
                 onChanged: (v) => setState(() => _category = v.isEmpty ? _category : v)),
             const SizedBox(height: 12),
           ],
-          AppField(controller: _desc, label: t(_isAsk ? 'Description *' : 'Description'), maxLines: 5, maxLength: 1000, onChanged: (_) => setState(() {})),
+          AppField(controller: _desc, label: t(_isAsk ? 'Description *' : 'Description'), maxLines: 5, maxLength: _isAsk ? 300 : 1000, onChanged: (_) => setState(() {})),
           if (_isAsk) ...[
             const SizedBox(height: 12),
             Row(children: [

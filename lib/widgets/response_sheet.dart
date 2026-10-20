@@ -100,13 +100,14 @@ class _ResponseSheetState extends State<_ResponseSheet> {
             autofocus: true,
             minLines: 4,
             maxLines: 6,
-            maxLength: 500,
+            maxLength: 300,
             onChanged: (_) => setState(() {}),
             style: const TextStyle(fontSize: 16),
             decoration: InputDecoration(
               hintText: t('e.g. We can supply 2000 boxes/month at ₹18 each, delivery in 2 days.'),
               hintStyle: TextStyle(color: p.muted),
-              counterText: '',
+              // the count shows near the 300 limit
+              counterText: _text.text.length > 240 ? '${_text.text.length}/300' : '',
               filled: true,
               fillColor: p.field,
               contentPadding: const EdgeInsets.all(12),
