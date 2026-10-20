@@ -48,14 +48,17 @@ class _ReactButton extends StatelessWidget {
   }
 }
 
-Widget _textButton(BuildContext context, String label, VoidCallback onTap, {Color? color}) {
+Widget _textButton(BuildContext context, String label, VoidCallback onTap, {Color? color, WI? icon}) {
   final p = Pal.of(context);
   return InkWell(
     onTap: onTap,
     borderRadius: BorderRadius.circular(99),
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color ?? p.muted)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        if (icon != null) ...[WIcon(icon, size: 14, color: color ?? p.muted), const SizedBox(width: 4)],
+        Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color ?? p.muted)),
+      ]),
     ),
   );
 }
@@ -195,7 +198,7 @@ class _ReplySocialState extends State<ReplySocial> {
             offset: const Offset(6, 0),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               _ReactButton(value: _mine, count: _count, onChange: _react),
-              _textButton(context, t('Reply'), () => _write(widget.reply.handle)),
+              _textButton(context, t('Reply'), () => _write(widget.reply.handle), icon: WI.reply),
             ]),
           ),
         ],
@@ -327,7 +330,7 @@ class _ThreadReplyState extends State<_ThreadReply> {
               offset: const Offset(6, 0),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 _ReactButton(value: _mine, count: _count, onChange: _react),
-                _textButton(context, t('Reply'), widget.onReply),
+                _textButton(context, t('Reply'), widget.onReply, icon: WI.reply),
                 if (widget.mine) _textButton(context, t('Delete'), widget.onDelete),
               ]),
             ),
