@@ -271,21 +271,29 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
     // as on an ask's row: plain icons with their counts in small badges (web ItemCard)
     Widget action({required Widget icon, int count = 0, required String label, required Color color, Color? badge, VoidCallback? onTap}) {
       final content = Container(
-        height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          icon,
-          if (count > 0) ...[
-            const SizedBox(width: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-              decoration: BoxDecoration(color: badge ?? p.chip, borderRadius: BorderRadius.circular(9)),
-              child: Text(compactCount(count), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
-            ),
-          ],
+        constraints: const BoxConstraints(minWidth: 52),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          SizedBox(
+            height: 20,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              icon,
+              if (count > 0) ...[
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(color: badge ?? p.chip, borderRadius: BorderRadius.circular(9)),
+                  child: Text(compactCount(count), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+                ),
+              ],
+            ]),
+          ),
+          const SizedBox(height: 2),
+          // a small label under, as on the web
+          Text(t(label), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, height: 1, color: color)),
         ]),
       );
-      return Semantics(button: true, label: t(label), child: onTap == null ? content : InkWell(borderRadius: BorderRadius.circular(18), onTap: onTap, child: content));
+      return Semantics(button: true, label: t(label), excludeSemantics: true, child: onTap == null ? content : InkWell(borderRadius: BorderRadius.circular(8), onTap: onTap, child: content));
     }
 
     Widget overlayPill(Widget child) => Container(
@@ -402,11 +410,11 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
                 customBorder: const StadiumBorder(),
                 onTap: _busy ? null : () => _send(_defaultText, true),
                 child: SizedBox(
-                  height: 34,
+                  height: 30,
                   child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    WIcon(WI.talk, size: 16, color: p.tagText),
+                    WIcon(WI.talk, size: 14, color: p.tagText),
                     const SizedBox(width: 6),
-                    Text(t('Enquire now'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.tagText)),
+                    Text(t('Enquire now'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.tagText)),
                   ]),
                 ),
               ),
@@ -419,7 +427,7 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
                 value: it.myReaction,
                 onChange: _react,
                 trigger: (open) => Container(
-                  decoration: BoxDecoration(color: open ? const Color(0xFFF43F5E).withValues(alpha: .1) : null, borderRadius: BorderRadius.circular(18)),
+                  decoration: BoxDecoration(color: open ? const Color(0xFFF43F5E).withValues(alpha: .1) : null, borderRadius: BorderRadius.circular(8)),
                   child: action(
                     icon: it.myReaction != null
                         ? SizedBox(width: 20, height: 20, child: Center(child: ReactionGlyph(it.myReaction!, size: 14)))
