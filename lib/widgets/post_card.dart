@@ -854,7 +854,7 @@ class _HairlinePainter extends BoxPainter {
   void paint(Canvas canvas, Offset offset, ImageConfiguration cfg) {
     final size = cfg.size!;
     final rect = Rect.fromLTWH(offset.dx, offset.dy + size.height - 1, size.width, 1);
-    canvas.drawRect(rect, Paint()..shader = LinearGradient(colors: [color.withValues(alpha: 0), color, color.withValues(alpha: 0)]).createShader(rect));
+    canvas.drawRect(rect, Paint()..shader = LinearGradient(colors: [color.withValues(alpha: 0), color, color, color.withValues(alpha: 0)], stops: const [0, .12, .88, 1]).createShader(rect));
   }
 }
 

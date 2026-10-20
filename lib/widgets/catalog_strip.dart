@@ -82,7 +82,7 @@ class CatalogStrip extends StatelessWidget {
         // border-b inside the feed's gutter
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [kGold.withValues(alpha: 0), kGold.withValues(alpha: .6), kGold.withValues(alpha: 0)]))),
+          child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [kGold.withValues(alpha: 0), kGold.withValues(alpha: .6), kGold.withValues(alpha: .6), kGold.withValues(alpha: 0)], stops: const [0, .12, .88, 1]))),
         ),
       ]),
     );
