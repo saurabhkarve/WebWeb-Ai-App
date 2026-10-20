@@ -62,6 +62,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       if (e['type'] == 'notify') _refreshAll();
     });
     _pushSub = NotificationService.activity.stream.listen((_) => _refreshAll());
+    tourRequest.addListener(_replayTour);
     // service contacts: look quietly if the member turned it on; the one-time invitation from the third open
     _svcTimer = Timer(const Duration(seconds: 12), () async {
       if (!mounted) return;
@@ -105,8 +106,19 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     _pushSub?.cancel();
     _poll?.cancel();
     _svcTimer?.cancel();
+    tourRequest.removeListener(_replayTour);
     _notes.dispose();
     super.dispose();
+  }
+
+  /// "Take the app tour" from the account menu: back to the top of Connect, then the tour.
+  void _replayTour() {
+    if (!mounted) return;
+    setState(() {
+      _i = 0;
+      _topTick++;
+    });
+    Tours.start(context, 'connect', kConnectTour);
   }
 
   void _go(int k) {
@@ -187,9 +199,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         builder: (_, __) => Row(mainAxisSize: MainAxisSize.min, children: [
           for (var k = 0; k < _items.length; k++) ...[
             if (k > 0) const SizedBox(width: 4),
-            k == 3
-                ? KeyedSubtree(key: Tours.key('nav-ask'), child: _islandItem(p, k))
-                : _islandItem(p, k, badge: k == 0 ? _notes.unseen : (k == 2 ? _unread : 0)),
+            k == 0
+                ? _islandItem(p, k, badge: _notes.unseen)
+                : KeyedSubtree(key: Tours.key(const ['', 'nav-find', 'nav-talk', 'nav-ask'][k]), child: _islandItem(p, k, badge: k == 2 ? _unread : 0)),
           ],
         ]),
       ),
@@ -277,7 +289,8 @@ class _AppHeader extends StatelessWidget {
                 child: Semantics(
                   button: true,
                   label: t('Account menu'),
-                  child: Avatar(name: me?.name ?? 'Me', photoUrl: me?.photoUrl, size: 32, ring: me?.hasUpdate ?? false, type: me?.userType, badge: 14),
+                  child: Avatar(
+                    key: Tours.key('account'),name: me?.name ?? 'Me', photoUrl: me?.photoUrl, size: 32, ring: me?.hasUpdate ?? false, type: me?.userType, badge: 14),
                 ),
               ),
             ),
@@ -446,6 +459,21 @@ class _AccountMenu extends StatelessWidget {
                 Navigator.of(context).pop();
                 final from = defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
                 launchUrl(Uri.parse('$siteUrl/help?lang=${i18n.lang}&from=$from'), mode: LaunchMode.externalApplication);
+              }),
+              item(WI.sparkle, 'Take the app tour', () {
+                Navigator.of(context).pop();
+                tourRequest.value++;
+              }),
+              // @webwebai: the assistant answers in a chat
+              item(WI.sparkle, 'Ask WebWeb AI', () async {
+                final nav = Navigator.of(context);
+                final api = auth.api;
+                nav.pop();
+                try {
+                  final u = Profile.fromJson(await api.get('/users/handle/webwebai') as Map);
+                  final ctx = nav.context;
+                  if (ctx.mounted) openChat(ctx, Peer.fromProfile(u));
+                } catch (_) {}
               }),
               // the Help page's form, in the app and signed in
               item(WI.talk, 'Write to us', () {

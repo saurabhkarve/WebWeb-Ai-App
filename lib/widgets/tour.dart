@@ -15,7 +15,8 @@ class TourStep {
   const TourStep(this.title, this.body, [this.target]);
 }
 
-/// Same steps and wording as the web (components/tour.tsx), so the translations are shared.
+/// The first-login tour of the app: the feed (same wording as the web's components/tour.tsx, so the
+/// translations are shared), then the tabs and the account menu, where "Take the app tour" replays it.
 const kConnectTour = [
   TourStep('Welcome to WebWeb', 'Businesses and job seekers near you ask for what they need here, and others answer with a contact. Here is a 30-second look around.'),
   TourStep('Updates', '24-hour updates from people near you: new stock, openings and offers. Tap a circle to view one.', 'updates'),
@@ -23,8 +24,14 @@ const kConnectTour = [
   TourStep('The essentials at a glance', "What it is, where (and how far from you), the budget and how soon it's needed. Tap a chip to find similar asks.", 'chips'),
   TourStep('Answer in one tap', 'Reply shares your contact, a photo or a note with the person who asked. Only they see what you share.', 'reply'),
   TourStep('Know someone who can help?', 'Refer shares a contact from your phone book for this ask, so the right person gets the work.', 'refer'),
+  TourStep('Find', 'Search members, businesses and asks by what they do and where.', 'nav-find'),
+  TourStep('Talk', 'Your chats and calls. Message @webwebai, the WebWeb AI assistant, for contacts or to post an ask for you.', 'nav-talk'),
   TourStep('Need something yourself?', 'Tap Ask to post what you need. Members who fit get it on their phone, and answers come with contact numbers.', 'nav-ask'),
+  TourStep('Your account', 'Your profile, saved asks, help and settings. Take this tour again from here any time.', 'account'),
 ];
+
+/// "Take the app tour" in the account menu: the shell switches to Connect and starts the tour.
+final tourRequest = ValueNotifier<int>(0);
 
 const kAskTour = [
   TourStep('Post your first ask', "An ask tells nearby businesses and workers what you need. They answer with their contact, so you can call them directly. It's free."),
@@ -61,6 +68,15 @@ class Tours {
     api.put('/me/tours/$id', {'status': status, 'step': step, 'steps': steps, 'platform': _platform}).catchError((_) => null);
   }
 
+  /// Show tour [id] now, whether or not it was seen (the account menu's "Take the app tour").
+  static Future<void> start(BuildContext context, String id, List<TourStep> steps) async {
+    if (_showing) return;
+    final auth = context.read<AuthProvider>();
+    await Future.delayed(const Duration(milliseconds: 500)); // let the tab switch settle
+    if (!context.mounted || _showing) return;
+    _run(context, auth.api, id, steps, () {});
+  }
+
   /// Show tour [id] if this member hasn't finished or skipped it yet.
   static Future<void> maybeShow(BuildContext context, String id, List<TourStep> steps) async {
     if (_showing) return;
@@ -85,6 +101,13 @@ class Tours {
     if (seen is Map && seen['status'] != 'started') return markDone();
     await Future.delayed(const Duration(milliseconds: 900)); // let the page settle
     if (!context.mounted || _showing) return;
+    _run(context, api, id, steps, () {
+      markDone();
+      _log = _log?.then((l) => {...l, id: {'status': 'done'}});
+    });
+  }
+
+  static void _run(BuildContext context, dynamic api, String id, List<TourStep> steps, VoidCallback onEnd) {
     // only the stops that are on screen now (no "first ask" stop on an empty feed)
     final list = steps.where((s) => s.target == null || _box(s.target!) != null).toList();
     if (list.isEmpty) return;
@@ -97,8 +120,7 @@ class Tours {
         onDone: (status, step) {
           entry.remove();
           _showing = false;
-          markDone();
-          _log = _log?.then((l) => {...l, id: {'status': status, 'lastStep': step}});
+          onEnd();
           _record(api, id, status, step, list.length);
         },
       ),
