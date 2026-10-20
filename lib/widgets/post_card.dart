@@ -743,7 +743,7 @@ class PostActionsState extends State<PostActions> {
       final wide = MediaQuery.of(context).size.width >= 600;
       return Row(mainAxisAlignment: wide ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start, children: [
         if (mine)
-          GoldButton(label: t('Review responses'), wi: WI.talk, height: 36, onPressed: widget.onReview ?? widget.onReply)
+          pill(label: 'Review responses', text: t('Review responses'), icon: WIcon(WI.talk, size: 18, color: p.tagText), color: p.tagText, onTap: widget.onReview ?? widget.onReply)
         else ...[
           // Refer keeps its own width; Reply is its icon and count (the web's phone row)
           if (isAsk)
