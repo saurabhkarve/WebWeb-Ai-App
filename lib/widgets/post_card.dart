@@ -722,11 +722,11 @@ class PostActionsState extends State<PostActions> {
     if (widget.spotlight) {
       // a small bordered pill: icon and count side by side; the row is the web's phone size (36 tall, tighter gaps) so
       // Refer and Reply keep their words
-      Widget pill({required Widget icon, int count = 0, Color? color, VoidCallback? onTap, required String label}) {
+      Widget pill({required Widget icon, int count = 0, Color? color, VoidCallback? onTap, required String label, Color? fill}) {
         final c = Container(
           height: 36,
           padding: const EdgeInsets.symmetric(horizontal: 9),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: p.border)),
+          decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(18), border: Border.all(color: p.border)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             icon,
             if (count > 0) ...[const SizedBox(width: 4), Text(compactCount(count), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color ?? p.muted, fontFeatures: const [FontFeature.tabularFigures()]))],
@@ -739,19 +739,16 @@ class PostActionsState extends State<PostActions> {
       // (the asker reviews responses instead)
       return Row(children: [
         if (mine)
-          Expanded(child: GoldButton(label: t('Review responses'), wi: WI.talk, height: 36, onPressed: widget.onReview ?? widget.onReply))
+          GoldButton(label: t('Review responses'), wi: WI.talk, height: 36, onPressed: widget.onReview ?? widget.onReply)
         else ...[
+          // Refer keeps its own width; Reply is its icon and count (the web's phone row)
           if (isAsk)
-            Expanded(
-              child: tour(
-                'refer',
-                GoldButton(label: post.referralsCount > 0 ? '${t('Refer')} · ${post.referralsCount}' : t('Refer'), wi: WI.refer, height: 36, onPressed: _refer),
-              ),
-            ),
+            tour('refer', GoldButton(label: post.referralsCount > 0 ? '${t('Refer')} · ${post.referralsCount}' : t('Refer'), wi: WI.refer, height: 36, onPressed: _refer)),
           const SizedBox(width: 4),
-          tour('reply', GoldButton(label: isAsk && post.sharesCount > 0 ? '${t('Reply')} · ${post.sharesCount}' : t('Reply'), wi: WI.talk, height: 36, outlined: true, onPressed: widget.onReply)),
+          tour('reply', pill(label: 'Reply', icon: WIcon(WI.talk, size: 18, color: p.text), count: isAsk ? post.sharesCount : 0, color: p.text, fill: p.chip, onTap: widget.onReply)),
         ],
-        const SizedBox(width: 4),
+        // React in the middle, with space either side
+        const Spacer(),
         ReactionPicker(
           quick: true,
           value: post.myReaction,
@@ -763,7 +760,7 @@ class PostActionsState extends State<PostActions> {
             color: reacted ? p.text : p.muted,
           ),
         ),
-        const SizedBox(width: 4),
+        const Spacer(),
         // views, as on x.com: people who saw it, in the same bordered pill as React and Share (not a button)
         if (post.viewsCount > 0) ...[
           Semantics(
