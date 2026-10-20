@@ -346,3 +346,51 @@ class _ThreadReplyState extends State<_ThreadReply> {
     ]);
   }
 }
+
+/// Beside "Shared a contact privately": anyone but the replier and the asker can ask the replier for their number
+/// (a contact request; the replier chooses whether to share), as on the web.
+class RequestShare extends StatefulWidget {
+  final String replyUid, askerUid;
+  const RequestShare({super.key, required this.replyUid, required this.askerUid});
+  @override
+  State<RequestShare> createState() => _RequestShareState();
+}
+
+class _RequestShareState extends State<RequestShare> {
+  String _state = 'idle';
+
+  Future<void> _send() async {
+    setState(() => _state = 'busy');
+    try {
+      await context.read<AuthProvider>().api.post('/users/${widget.replyUid}/contact-request', {});
+      if (mounted) setState(() => _state = 'sent');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _state = 'idle');
+        toast(context, '$e', error: true);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final me = context.watch<AuthProvider>().profile?.uid;
+    if (me == null || me == widget.replyUid || me == widget.askerUid) return const SizedBox.shrink();
+    return Opacity(
+      opacity: _state == 'idle' ? 1 : .7,
+      child: Material(
+        color: kGold.withValues(alpha: .1),
+        shape: StadiumBorder(side: BorderSide(color: kGold.withValues(alpha: .45))),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: _state == 'idle' ? _send : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            child: Text(t(_state == 'sent' ? 'Requested' : 'Request to share'), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.tagText)),
+          ),
+        ),
+      ),
+    );
+  }
+}

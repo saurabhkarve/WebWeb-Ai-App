@@ -669,7 +669,7 @@ class PostActionsState extends State<PostActions> {
             title: Text('${t(post.reposted ? 'Undo repost' : 'Repost')}${post.repostsCount > 0 ? ' · ${post.repostsCount}' : ''}'),
             onTap: () => Navigator.pop(ctx, 'repost'),
           ),
-          ListTile(leading: SvgPicture.string(_whatsApp, width: 20, height: 20), title: const Text('WhatsApp'), onTap: () => Navigator.pop(ctx, 'whatsapp')),
+          ListTile(leading: SvgPicture.string(whatsAppSvg, width: 20, height: 20), title: const Text('WhatsApp'), onTap: () => Navigator.pop(ctx, 'whatsapp')),
           ListTile(leading: WIcon(WI.share, size: 20, color: p.text), title: Text(t('More ways to share')), onTap: () => Navigator.pop(ctx, 'native')),
           ListTile(leading: WIcon(WI.link, size: 20, color: p.text), title: Text(t('Copy link')), onTap: () => Navigator.pop(ctx, 'copy')),
         ]),
@@ -953,7 +953,8 @@ class LatestReplies extends StatelessWidget {
                           ])
                         : r.kind == 'media' && (r.imageUrl ?? '').isNotEmpty
                             ? ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 96, height: 64))
-                            : Container(
+                            : Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                                Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                                 decoration: BoxDecoration(borderRadius: bubble, border: Border.all(color: p.border)),
                                 child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -962,6 +963,9 @@ class LatestReplies extends StatelessWidget {
                                   Flexible(child: Text(t('Shared a contact privately'), style: TextStyle(fontSize: 12, color: p.muted))),
                                 ]),
                               ),
+                                // the number went to the asker alone: anyone else can ask the replier for it
+                                RequestShare(replyUid: r.uid, askerUid: post.authorUid),
+                              ]),
                   ),
                 ),
               ),
@@ -983,7 +987,19 @@ class LatestReplies extends StatelessWidget {
         if (total > shown || post.sharesCount > replies.length)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: GestureDetector(onTap: onMore, child: Text('${t('Show all {n}', {'n': total})} →', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
+            // a gold pill, as on the web
+            child: Material(
+              color: kGold.withValues(alpha: .1),
+              shape: StadiumBorder(side: BorderSide(color: kGold.withValues(alpha: .45))),
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: onMore,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 8, 4),
+                  child: Text('${t('Show all {n}', {'n': total})}  →', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.tagText)),
+                ),
+              ),
+            ),
           ),
           ]),
         ),
@@ -1084,7 +1100,8 @@ class ResponseActivity extends StatelessWidget {
 }
 
 /// WhatsApp's mark, in its green (the Share sheet).
-const _whatsApp = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#25D366" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>';
+/// WhatsApp's mark, for share menus.
+const whatsAppSvg = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#25D366" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>';
 
 /// An ask's chips on one line that scrolls sideways (a phone has no room to wrap them), as on the web.
 class ChipLine extends StatelessWidget {

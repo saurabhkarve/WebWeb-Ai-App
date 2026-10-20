@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
+import '../config.dart';
 import '../i18n.dart';
 import '../models.dart';
 import '../screens/contact_picker.dart';
@@ -11,7 +14,9 @@ import '../screens/talk.dart';
 import '../theme.dart';
 import '../views.dart' show compactCount;
 import '../widgets.dart';
+import 'post_card.dart' show whatsAppSvg;
 import 'reaction_picker.dart';
+import '../share_log.dart';
 
 /// One business and what it offers, shown inside the Connect feed (web catalog-strip.tsx).
 class CatalogStrip extends StatelessWidget {
@@ -154,10 +159,9 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
     if (it.myReaction == null) _react('thumbs');
   }
 
-  /// Share: Repost to your page, or share the item's link (no Repost on a business page's own catalog tab).
+  /// Share: Repost to your page, WhatsApp, or share the item's link (no Repost on a business page's own catalog tab).
   Future<void> _shareMenu() async {
     void share() => showShareItemSheetFor(context, it, handle: widget.owner.handle, business: widget.ownerName);
-    if (!widget.repost) return share();
     final p = Pal.of(context);
     const green = Color(0xFF059669);
     final choice = await showModalBottomSheet<String>(
@@ -165,17 +169,30 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
       backgroundColor: p.canvas,
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ListTile(
-            leading: WIcon(WI.repost, size: 20, color: it.reposted ? green : p.text),
-            title: Text('${t(it.reposted ? 'Undo repost' : 'Repost')}${it.repostsCount > 0 ? ' · ${it.repostsCount}' : ''}'),
-            onTap: () => Navigator.pop(ctx, 'repost'),
-          ),
+          // no Repost on a business page's own catalog tab
+          if (widget.repost)
+            ListTile(
+              leading: WIcon(WI.repost, size: 20, color: it.reposted ? green : p.text),
+              title: Text('${t(it.reposted ? 'Undo repost' : 'Repost')}${it.repostsCount > 0 ? ' · ${it.repostsCount}' : ''}'),
+              onTap: () => Navigator.pop(ctx, 'repost'),
+            ),
+          ListTile(leading: SvgPicture.string(whatsAppSvg, width: 20, height: 20), title: const Text('WhatsApp'), onTap: () => Navigator.pop(ctx, 'whatsapp')),
           ListTile(leading: WIcon(WI.share, size: 20, color: p.text), title: Text(t('Share this item')), onTap: () => Navigator.pop(ctx, 'share')),
         ]),
       ),
     );
     if (!mounted || choice == null) return;
-    choice == 'repost' ? await _toggleRepost() : share();
+    switch (choice) {
+      case 'repost':
+        await _toggleRepost();
+      case 'whatsapp':
+        final url = '$siteUrl${it.pathFor(widget.owner.handle)}';
+        final text = '${it.name}${(it.price ?? '').isNotEmpty ? ' · ${it.price}' : ''} — ${widget.ownerName}';
+        final ok = await launchUrl(Uri.parse('https://wa.me/?text=${Uri.encodeComponent('$text\n$url')}'), mode: LaunchMode.externalApplication).catchError((_) => false);
+        if (ok) logShare(_api, 'item', it.id, channel: 'whatsapp');
+      default:
+        share();
+    }
   }
 
   Future<void> _toggleRepost() async {
