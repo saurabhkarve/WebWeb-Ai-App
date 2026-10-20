@@ -403,7 +403,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // the role on the picture's edge, coloured by presence; tapping it names it
               child: GestureDetector(
                 onTap: _openPicture,
-                child: Avatar(name: name, photoUrl: u.photoUrl, size: 56, ring: u.hasUpdate, type: u.userType, uid: u.uid, badge: 24, tip: t(labelOf(kUserTypes, u.userType))),
+                child: Avatar(name: name, photoUrl: u.photoUrl, size: 56, ring: u.hasUpdate, type: u.userType, uid: u.uid, badge: 22, tip: t(labelOf(kUserTypes, u.userType))),
               ),
             ),
             if (own)

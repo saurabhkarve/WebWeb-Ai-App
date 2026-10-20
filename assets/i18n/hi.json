@@ -1590,5 +1590,12 @@
   "Replying about {name}": "{name} के बारे में जवाब",
   "Write your message…": "अपना संदेश लिखें…",
   "Online": "ऑनलाइन",
-  "Active in the last 2 hours": "पिछले 2 घंटों में सक्रिय"
+  "Active in the last 2 hours": "पिछले 2 घंटों में सक्रिय",
+  "You asked for their contact": "आपने उनका संपर्क माँगा",
+  "{name} asks for your contact": "{name} आपका संपर्क माँग रहे हैं",
+  "About: {title}": "विषय: {title}",
+  "Waiting for their answer": "उनके जवाब का इंतज़ार",
+  "Reject": "अस्वीकार करें",
+  "Open chat": "चैट खोलें",
+  "Sorry, I'd rather not share my number right now. Let's talk here.": "माफ़ कीजिए, अभी मैं अपना नंबर साझा नहीं करना चाहता। यहीं बात करते हैं।"
 }

@@ -392,28 +392,9 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         ]),
       );
       if (!framed) return spotlight;
-      // reposted (Connect, a member's page): only a line on top says who and when; no frame, so the ask keeps its full
-      // width and every control stays where it always is
-      return Container(
-        padding: const EdgeInsets.only(top: 16),
-        foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? ''))),
-            child: Padding(
-              padding: const EdgeInsets.only(left: 4),
-              child: Row(children: [
-                WIcon(WI.repost, size: 16, color: p.muted),
-                const SizedBox(width: 6),
-                Flexible(child: Text(t('{name} reposted', {'name': post.repostedByName!}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted))),
-                // when, on the right end
-                if (post.repostedAt != null) ...[const Spacer(), Padding(padding: const EdgeInsets.only(right: 4), child: Text(timeAgo(post.repostedAt!), style: TextStyle(fontSize: 12, color: p.muted)))],
-              ]),
-            ),
-          ),
-          spotlight,
-        ]),
-      );
+      // reposted (Connect, a member's page): no frame, so the ask keeps its full width and every control stays where it
+      // always is; it is marked behind and beside it instead (_reposted)
+      return _reposted(p, spotlight, top: 16, gap: 0);
     }
 
     final card = Container(
@@ -527,24 +508,72 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       ]),
     );
     if (!framed) return card;
-    // someone else's ask on this member's page because they reposted it: their line on top, the ask inside as its author's
+    return _reposted(p, card, top: 16, gap: 8, bottom: 16);
+  }
+
+  /// A reposted post, marked without touching its layout (web post-card.tsx): a green rail in the gutter, a green wash
+  /// fading down from the top and a green "X reposted" tag (repost's colour) with when on the right.
+  Widget _reposted(Pal p, Widget child, {required double top, required double gap, double bottom = 0}) {
+    const green = Color(0xFF2F9E6E);
+    final ink = Theme.of(context).brightness == Brightness.dark ? const Color(0xFF7FD6AD) : const Color(0xFF1F7A52);
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: EdgeInsets.only(top: top, bottom: bottom),
       foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        GestureDetector(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? ''))),
-          child: Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Row(children: [
-              WIcon(WI.repost, size: 16, color: p.muted),
-              const SizedBox(width: 6),
-              Flexible(child: Text(t('{name} reposted', {'name': post.repostedByName!}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted))),
-              if (post.repostedAt != null) ...[const Spacer(), Padding(padding: const EdgeInsets.only(right: 4), child: Text(timeAgo(post.repostedAt!), style: TextStyle(fontSize: 12, color: p.muted)))],
-            ]),
+      child: Stack(clipBehavior: Clip.none, children: [
+        Positioned(
+          left: -10,
+          right: -10,
+          top: -top,
+          height: 224,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [green.withValues(alpha: .09), green.withValues(alpha: 0)]),
+              ),
+            ),
           ),
         ),
-        card,
+        Positioned(
+          left: -10,
+          top: -top + 8,
+          bottom: 20,
+          width: 3,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(2),
+                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [green, green.withValues(alpha: .5), green.withValues(alpha: 0)]),
+              ),
+            ),
+          ),
+        ),
+        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(
+            padding: EdgeInsets.only(bottom: gap),
+            child: Row(children: [
+              Flexible(
+                child: GestureDetector(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? ''))),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(6, 2, 10, 2),
+                    decoration: BoxDecoration(color: green.withValues(alpha: .15), borderRadius: BorderRadius.circular(99)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      WIcon(WI.repost, size: 14, color: ink),
+                      const SizedBox(width: 5),
+                      Flexible(child: Text(t('{name} reposted', {'name': post.repostedByName!}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ink))),
+                    ]),
+                  ),
+                ),
+              ),
+              if (post.repostedAt != null) ...[
+                const Spacer(),
+                Padding(padding: const EdgeInsets.only(right: 4), child: Text(timeAgo(post.repostedAt!), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: ink))),
+              ],
+            ]),
+          ),
+          child,
+        ]),
       ]),
     );
   }
@@ -989,7 +1018,12 @@ class LatestReplies extends StatelessWidget {
                                 ]),
                               ),
                                 // the number went to the asker alone: anyone else can ask the replier for it
-                                RequestShare(replyUid: r.uid, askerUid: post.authorUid),
+                                RequestShare(
+                                  replyUid: r.uid,
+                                  askerUid: post.authorUid,
+                                  postId: post.id,
+                                  peer: Peer(uid: r.uid, name: r.name, company: r.company, handle: r.handle, userType: r.userType, photoUrl: r.photoUrl, verification: r.verification),
+                                ),
                               ]),
                   ),
                 ),

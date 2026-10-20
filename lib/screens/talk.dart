@@ -101,6 +101,7 @@ String quoteText(String text, String kind) {
   if (text.isNotEmpty) return text;
   return switch (kind) {
     'contact' => '👤 Contact',
+    'contact_request' => '📇 Contact request',
     'location' => '📍 Location',
     'document' => '📎 Document',
     'profile' => '👤 Profile',
@@ -1099,11 +1100,14 @@ class _ChatThreadState extends State<ChatThread> {
                 child: ConstrainedBox(constraints: BoxConstraints(maxHeight: 256, maxWidth: maxW), child: NetImg(m.imageUrl!, width: maxW)),
               ),
             ),
-          if (m.attachment != null) _attachment(m.attachment!, mine, p),
+          if (m.attachment?['type'] == 'contact_request')
+            _contactRequest(m, mine, p)
+          else if (m.attachment != null)
+            _attachment(m.attachment!, mine, p),
           if (m.text.isNotEmpty)
             Padding(
               padding: m.imageUrl != null ? const EdgeInsets.symmetric(horizontal: 12, vertical: 4) : (m.attachment != null ? const EdgeInsets.fromLTRB(6, 6, 6, 2) : EdgeInsets.zero),
-              child: Text(m.text, style: TextStyle(fontSize: 15, color: fg, height: 1.4)),
+              child: Text(m.replyTo?.kind == 'contact_request' ? t(m.text) : m.text, style: TextStyle(fontSize: 15, color: fg, height: 1.4)),
             ),
         ]),
       ),
@@ -1177,6 +1181,96 @@ class _ChatThreadState extends State<ChatThread> {
             if (mine) ...[const SizedBox(width: 4), Ticks(m)],
           ]),
         ),
+      ]),
+    );
+  }
+
+  /// Contact requests answered here: their answer is the reply to them (a contact card means allowed).
+  String _requestStatus(Msg m) {
+    for (final x in _msgs) {
+      if (x.replyTo?.id == '${m.id}' && x.senderUid != m.senderUid) return x.attachment?['type'] == 'contact' ? 'approved' : 'declined';
+    }
+    return '${m.attachment?['status'] ?? 'pending'}';
+  }
+
+  int? _answering;
+
+  Future<void> _answer(Msg m, bool allow) async {
+    setState(() => _answering = m.id);
+    try {
+      final r = Map<String, dynamic>.from(await _api.post('/chats/${widget.chatId}/messages/${m.id}/contact', {'allow': allow}) as Map);
+      final sent = Msg.fromJson(r['message'] as Map);
+      if (mounted) setState(() => _msgs = _msgs.any((x) => x.id == sent.id) ? _msgs : [..._msgs, sent]);
+    } catch (e) {
+      if (mounted) toast(context, '$e', error: true);
+    } finally {
+      if (mounted) setState(() => _answering = null);
+    }
+  }
+
+  /// A contact request (web ContactRequestCard): the asker sees it waiting; the other person answers with Allow
+  /// (their number goes back as a contact card in reply) or Reject (a polite no in reply).
+  Widget _contactRequest(Msg m, bool mine, Pal p) {
+    final a = m.attachment!;
+    final fg = mine ? p.onBubble : p.text;
+    final status = _requestStatus(m);
+    final busy = _answering == m.id;
+    return Container(
+      width: 256,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(color: mine ? fg.withValues(alpha: .1) : p.canvas, borderRadius: BorderRadius.circular(8)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: kGold.withValues(alpha: .2)),
+            child: WIcon(WI.contactCard, size: 20, color: p.tagText),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(mine ? t('You asked for their contact') : t('{name} asks for your contact', {'name': _peer.name}),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg, height: 1.3)),
+              if (a['title'] != null && a['postId'] != null)
+                GestureDetector(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${a['postId']}'))),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(t('About: {title}', {'title': '${a['title']}'}), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: fg.withValues(alpha: .75))),
+                  ),
+                ),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        if (status == 'pending' && mine)
+          Text(t('Waiting for their answer'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fg.withValues(alpha: .7)))
+        else if (status == 'pending')
+          Row(children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: busy ? null : () => _answer(m, false),
+                style: OutlinedButton.styleFrom(shape: const StadiumBorder(), foregroundColor: fg, side: BorderSide(color: fg.withValues(alpha: .2)), padding: const EdgeInsets.symmetric(vertical: 8)),
+                child: Text(t('Reject'), style: const TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton(
+                onPressed: busy ? null : () => _answer(m, true),
+                style: FilledButton.styleFrom(shape: const StadiumBorder(), backgroundColor: kGold, foregroundColor: kInk, padding: const EdgeInsets.symmetric(vertical: 8)),
+                child: Text(busy ? '…' : t('Allow'), style: const TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ])
+        else
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            if (status == 'approved') ...[const WIcon(WI.tick, size: 14, color: Color(0xFF2F9E6E)), const SizedBox(width: 4)],
+            Text(t(status == 'approved' ? 'Contact shared' : 'Declined'),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: status == 'approved' ? const Color(0xFF2F9E6E) : fg.withValues(alpha: .7))),
+          ]),
       ]),
     );
   }

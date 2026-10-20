@@ -6,6 +6,7 @@ import '../auth_provider.dart';
 import '../i18n.dart';
 import '../models.dart';
 import '../screens/profile.dart';
+import '../screens/talk.dart' show ChatThread;
 import '../theme.dart';
 import '../views.dart' show compactCount;
 import '../widgets.dart';
@@ -190,30 +191,22 @@ class _ReplySocialState extends State<ReplySocial> {
     final p = Pal.of(context);
     final me = context.watch<AuthProvider>().profile;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // a chat bubble holding who and when on top and the reply under it; React and Reply beside it (as on the web)
-      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
-              decoration: BoxDecoration(color: p.chip, borderRadius: _bubble),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Row(mainAxisSize: MainAxisSize.min, children: widget.meta),
-                widget.child,
-              ]),
-            ),
-          ),
-        ),
-        if (me != null)
-          Transform.translate(
-            offset: const Offset(6, 0),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
+      // a chat bubble holding who and when on top (React and Reply at that line's end) and the reply under it, as on the web
+      Container(
+        padding: const EdgeInsets.fromLTRB(10, 4, 4, 6),
+        decoration: BoxDecoration(color: p.chip, borderRadius: _bubble),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            ...widget.meta,
+            if (me != null) ...[
+              const SizedBox(width: 8),
               _ReactButton(value: _mine, count: _count, onChange: _react),
               _textButton(context, t('Reply'), () => _write(widget.reply.handle), icon: WI.reply),
-            ]),
-          ),
-      ]),
+            ],
+          ]),
+          Padding(padding: const EdgeInsets.only(right: 6), child: widget.child),
+        ]),
+      ),
       if (_total > 0)
         Transform.translate(
           offset: const Offset(-6, 0),
@@ -328,57 +321,54 @@ class _ThreadReplyState extends State<_ThreadReply> {
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       GestureDetector(onTap: profile, child: Avatar(name: c.display, photoUrl: c.photoUrl, size: 24, uid: c.uid)),
       const SizedBox(width: 8),
-      Expanded(
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
-                decoration: BoxDecoration(color: p.chip, borderRadius: _bubble),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                  Row(mainAxisSize: MainAxisSize.min, children: [
-                    Flexible(child: GestureDetector(onTap: profile, child: Text(c.display, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)))),
-                    if (c.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: c.verification, size: 12)],
-                    const SizedBox(width: 6),
-                    Text(timeAgo(c.createdAt), style: TextStyle(fontSize: 11, color: p.muted)),
-                  ]),
-                  HashtagText(c.text, style: const TextStyle(fontSize: 12, height: 1.35)),
-                ]),
-              ),
-            ),
-          ),
-          Transform.translate(
-            offset: const Offset(6, 0),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Flexible(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 4, 4, 6),
+          decoration: BoxDecoration(color: p.chip, borderRadius: _bubble),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              Flexible(child: GestureDetector(onTap: profile, child: Text(c.display, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)))),
+              if (c.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: c.verification, size: 12)],
+              const SizedBox(width: 6),
+              Text(timeAgo(c.createdAt), style: TextStyle(fontSize: 11, color: p.muted)),
+              const SizedBox(width: 8),
               _ReactButton(value: _mine, count: _count, onChange: _react),
               _textButton(context, t('Reply'), widget.onReply, icon: WI.reply),
               if (widget.mine) _textButton(context, t('Delete'), widget.onDelete),
             ]),
-          ),
-        ]),
+            Padding(padding: const EdgeInsets.only(right: 6), child: HashtagText(c.text, style: const TextStyle(fontSize: 12, height: 1.35))),
+          ]),
+        ),
       ),
     ]);
   }
 }
 
-/// Beside "Shared a contact privately": anyone but the replier and the asker can ask the replier for their number
-/// (a contact request; the replier chooses whether to share), as on the web.
+/// Beside "Shared a contact privately": anyone but the replier and the asker can ask the replier for their number.
+/// The request is a message in the chat with them, which they allow or reject there; once sent this opens that chat.
 class RequestShare extends StatefulWidget {
   final String replyUid, askerUid;
-  const RequestShare({super.key, required this.replyUid, required this.askerUid});
+  final String? postId;
+  final Peer? peer;
+  const RequestShare({super.key, required this.replyUid, required this.askerUid, this.postId, this.peer});
   @override
   State<RequestShare> createState() => _RequestShareState();
 }
 
 class _RequestShareState extends State<RequestShare> {
   String _state = 'idle';
+  String? _chatId;
 
   Future<void> _send() async {
     setState(() => _state = 'busy');
     try {
-      await context.read<AuthProvider>().api.post('/users/${widget.replyUid}/contact-request', {});
-      if (mounted) setState(() => _state = 'sent');
+      final r = await context.read<AuthProvider>().api.post('/users/${widget.replyUid}/contact-request', {if (widget.postId != null) 'postId': widget.postId});
+      if (mounted) {
+        setState(() {
+          _state = 'sent';
+          _chatId = (r is Map ? r['chatId'] : null) as String?;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _state = 'idle');
@@ -387,25 +377,32 @@ class _RequestShareState extends State<RequestShare> {
     }
   }
 
+  void _openChat() {
+    if (_chatId == null || widget.peer == null) return;
+    Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: _chatId!, peer: widget.peer!)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final me = context.watch<AuthProvider>().profile?.uid;
     if (me == null || me == widget.replyUid || me == widget.askerUid) return const SizedBox.shrink();
+    final sent = _state == 'sent';
     return Opacity(
-      opacity: _state == 'idle' ? 1 : .7,
+      opacity: _state == 'busy' ? .7 : 1,
       child: Material(
         color: kGold.withValues(alpha: .1),
         shape: StadiumBorder(side: BorderSide(color: kGold.withValues(alpha: .45))),
         child: InkWell(
           customBorder: const StadiumBorder(),
-          onTap: _state == 'idle' ? _send : null,
+          onTap: _state == 'idle' ? _send : (sent ? _openChat : null),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(8, 3, 10, 3),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               WIcon(WI.contactCard, size: 12, color: p.tagText),
               const SizedBox(width: 4),
-              Text(t(_state == 'sent' ? 'Requested' : 'Request to share'), style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: p.tagText)),
+              Text(sent ? (widget.peer != null && _chatId != null ? '${t('Requested')} · ${t('Open chat')}' : t('Requested')) : t('Request to share'),
+                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: p.tagText)),
             ]),
           ),
         ),

@@ -1590,5 +1590,12 @@
   "Replying about {name}": "{name} विशीं जाप",
   "Write your message…": "तुमचो संदेश बरयात…",
   "Online": "ऑनलायन",
-  "Active in the last 2 hours": "निमण्या 2 वरांनी सक्रिय"
+  "Active in the last 2 hours": "निमण्या 2 वरांनी सक्रिय",
+  "You asked for their contact": "तुमी तांचो संपर्क मागलो",
+  "{name} asks for your contact": "{name} तुमचो संपर्क मागता",
+  "About: {title}": "विशय: {title}",
+  "Waiting for their answer": "तांच्या जापेची वाट",
+  "Reject": "न्हयकार दियात",
+  "Open chat": "चॅट उगडात",
+  "Sorry, I'd rather not share my number right now. Let's talk here.": "माफ करात, आतां हांव म्हजो नंबर वांटूंक सोदिना. हांगाच उलोवया."
 }

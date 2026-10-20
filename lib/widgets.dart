@@ -11,7 +11,7 @@ import 'i18n.dart';
 import 'icons.dart';
 import 'indic.dart';
 export 'icons.dart';
-import 'models.dart' show Option;
+import 'models.dart' show Option, kUserTypes, labelOf;
 import 'presence.dart';
 import 'theme.dart';
 import 'widgets/logo_loader.dart';
@@ -391,9 +391,10 @@ class _TypeBadgeState extends State<_TypeBadge> {
           decoration: BoxDecoration(shape: BoxShape.circle, color: bg, border: Border.all(color: p.canvas, width: 2)),
           child: WIcon(widget.business ? WI.business : WI.user, size: widget.icon, color: fg, strokeWidth: 2.2),
         );
-        if (widget.tip == null) return dot;
-        final said = '${widget.tip}${presence == 'online' ? ' · ${t('Online')}' : presence == 'recent' ? ' · ${t('Active in the last 2 hours')}' : ''}';
-        return Tooltip(message: said, triggerMode: TooltipTriggerMode.tap, child: dot);
+        // every role icon names the role (and presence): on hover with a mouse, on a long press on a phone (a tap
+        // where the icon is not inside something tappable, e.g. a profile's picture, which passes `tip`)
+        final said = '${widget.tip ?? t(labelOf(kUserTypes, widget.business ? 'entrepreneur' : 'job_seeker'))}${presence == 'online' ? ' · ${t('Online')}' : presence == 'recent' ? ' · ${t('Active in the last 2 hours')}' : ''}';
+        return Tooltip(message: said, triggerMode: widget.tip != null ? TooltipTriggerMode.tap : TooltipTriggerMode.longPress, child: dot);
       },
     );
   }
