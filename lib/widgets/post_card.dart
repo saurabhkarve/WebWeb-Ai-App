@@ -736,52 +736,53 @@ class PostActionsState extends State<PostActions> {
     final reacted = post.myReaction != null;
     const green = Color(0xFF059669);
     if (widget.spotlight) {
-      // a small bordered pill: icon and count side by side
+      // a small bordered pill: icon and count side by side; the row is the web's phone size (36 tall, tighter gaps) so
+      // Refer and Reply keep their words
       Widget pill({required Widget icon, int count = 0, Color? color, VoidCallback? onTap, required String label}) {
         final c = Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: p.border)),
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 9),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: p.border)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             icon,
-            if (count > 0) ...[const SizedBox(width: 6), Text('$count', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color ?? p.muted, fontFeatures: const [FontFeature.tabularFigures()]))],
+            if (count > 0) ...[const SizedBox(width: 4), Text('$count', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color ?? p.muted, fontFeatures: const [FontFeature.tabularFigures()]))],
           ]),
         );
-        return Semantics(button: true, label: t(label), child: onTap == null ? c : InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: c));
+        return Semantics(button: true, label: t(label), child: onTap == null ? c : InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: c));
       }
 
       // asks are answered by referring someone: Refer is the gold button, Reply the secondary one beside it
       // (the asker reviews responses instead)
       return Row(children: [
         if (mine)
-          Expanded(child: GoldButton(label: t('Review responses'), wi: WI.talk, height: 40, onPressed: widget.onReview ?? widget.onReply))
+          Expanded(child: GoldButton(label: t('Review responses'), wi: WI.talk, height: 36, onPressed: widget.onReview ?? widget.onReply))
         else ...[
           if (isAsk)
             Expanded(
               child: tour(
                 'refer',
-                GoldButton(label: post.referralsCount > 0 ? '${t('Refer')} · ${post.referralsCount}' : t('Refer'), wi: WI.refer, height: 40, onPressed: _refer),
+                GoldButton(label: post.referralsCount > 0 ? '${t('Refer')} · ${post.referralsCount}' : t('Refer'), wi: WI.refer, height: 36, onPressed: _refer),
               ),
             ),
-          const SizedBox(width: 6),
-          tour('reply', GoldButton(label: t('Reply'), wi: WI.talk, height: 40, outlined: true, onPressed: widget.onReply)),
+          const SizedBox(width: 4),
+          tour('reply', GoldButton(label: isAsk && post.sharesCount > 0 ? '${t('Reply')} · ${post.sharesCount}' : t('Reply'), wi: WI.talk, height: 36, outlined: true, onPressed: widget.onReply)),
         ],
-        const SizedBox(width: 6),
+        const SizedBox(width: 4),
         ReactionPicker(
           quick: true,
           value: post.myReaction,
           onChange: react,
           trigger: (_) => pill(
             label: 'React',
-            icon: reacted ? SizedBox(width: 20, height: 20, child: Center(child: ReactionGlyph(post.myReaction!, size: 15))) : WIcon(WI.heart, size: 20, color: p.muted),
+            icon: reacted ? SizedBox(width: 18, height: 18, child: Center(child: ReactionGlyph(post.myReaction!, size: 15))) : WIcon(WI.heart, size: 18, color: p.muted),
             count: post.reactionsCount,
             color: reacted ? p.text : p.muted,
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 4),
         pill(
           label: post.reposted ? 'Reposted' : 'Share',
-          icon: WIcon(post.reposted ? WI.repost : WI.share, size: 20, color: post.reposted ? green : p.muted),
+          icon: WIcon(post.reposted ? WI.repost : WI.share, size: 18, color: post.reposted ? green : p.muted),
           count: post.repostsCount,
           color: post.reposted ? green : p.muted,
           onTap: _share,
