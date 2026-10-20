@@ -434,20 +434,25 @@ class InfoPill extends StatelessWidget {
   final VoidCallback? onTap;
   /// compact, for the feed card's chip row
   final bool small;
-  const InfoPill({super.key, this.wi, required this.text, this.onTap, this.small = false});
+  /// highlighted (an ask's essentials, as the web's ask chips): a light gold fill and ring with a gold icon
+  final bool gold;
+  const InfoPill({super.key, this.wi, required this.text, this.onTap, this.small = false, this.gold = false});
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
+    final compact = small && !gold;
     final chip = Container(
-      padding: EdgeInsets.symmetric(horizontal: small ? 8 : 10, vertical: small ? 3 : 4),
-      decoration: BoxDecoration(color: p.field, borderRadius: BorderRadius.circular(20)),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 10, vertical: compact ? 3 : 4),
+      decoration: gold
+          ? BoxDecoration(color: kGold.withValues(alpha: .12), border: Border.all(color: kGold.withValues(alpha: .35)), borderRadius: BorderRadius.circular(20))
+          : BoxDecoration(color: p.field, borderRadius: BorderRadius.circular(20)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        if (wi != null) ...[WIcon(wi!, size: small ? 12 : 14, color: p.muted), const SizedBox(width: 4)],
+        if (wi != null) ...[WIcon(wi!, size: compact ? 12 : 14, color: gold ? (p.dark ? kGold : const Color(0xFFB38600)) : p.muted), const SizedBox(width: 4)],
         // compact chips sit in a sideways-scrolling row (unbounded width), so no Flexible there
         if (small)
-          Text(text, maxLines: 1, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .8)))
+          Text(text, maxLines: 1, style: TextStyle(fontSize: gold ? 12 : 11, fontWeight: FontWeight.w600, color: gold ? p.text : p.text.withValues(alpha: .8)))
         else
-          Flexible(child: Text(text, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .8)))),
+          Flexible(child: Text(text, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: gold ? p.text : p.text.withValues(alpha: .8)))),
       ]),
     );
     return onTap == null ? chip : GestureDetector(onTap: onTap, child: chip);
