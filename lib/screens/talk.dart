@@ -961,6 +961,8 @@ class _ChatThreadState extends State<ChatThread> {
                 Expanded(
                   child: TextField(
                     controller: _input,
+                    // an item or post tagged on the way in: the box is ready for the message about it
+                    autofocus: widget.pending != null,
                     minLines: 1,
                     maxLines: 5,
                     textCapitalization: TextCapitalization.sentences,
@@ -970,7 +972,7 @@ class _ChatThreadState extends State<ChatThread> {
                     },
                     style: const TextStyle(fontSize: 16),
                     decoration: InputDecoration(
-                      hintText: _pending != null ? t('Add a message with your enquiry…') : t('Message...'),
+                      hintText: _pending != null ? t('Write your message…') : t('Message...'),
                       hintStyle: TextStyle(color: p.muted),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -1225,8 +1227,9 @@ class _ChatThreadState extends State<ChatThread> {
         final icon = a['kind'] == 'service' ? WI.service : WI.box;
         // passed on by the sender (not an enquiry): opens the item on the seller's page
         final shared = a['shared'] == true && '${a['handle'] ?? ''}'.isNotEmpty;
+        // shared or enquired about, it reads like the message a reply quotes: a gold edge, the words under it
         return box(
-          goldEdge: shared,
+          goldEdge: true,
           onTap: shared
               ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: '${a['handle']}', itemId: a['itemId'] as String?)))
               : null,
@@ -1345,7 +1348,7 @@ class _ChatThreadState extends State<ChatThread> {
         ? '${t(a['kind'] == 'ask' ? 'Replying to ask' : 'Replying to update')}${a['by'] != null ? ' · ${a['by']}' : ''}'
         : a['type'] == 'cart'
             ? t('Sending your cart · {n} items', {'n': items.fold<int>(0, (s, i) => s + ((i['qty'] as num?)?.toInt() ?? 1))})
-            : t('Enquiring about {name}', {'name': '${a['name']}'});
+            : t('Replying about {name}', {'name': '${a['name']}'});
     final sub = isPost ? '${a['title']}' : (a['type'] == 'cart' ? items.map((i) => '${i['qty']}× ${i['name']}').join(', ') : (a['price'] as String?));
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 0),

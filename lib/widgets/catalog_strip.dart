@@ -243,20 +243,24 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
     toast(context, ok > 0 ? t('Referral sent') : (err ?? t('Could not refer')), error: ok == 0);
   }
 
-  /// Sends [text] about this item to the owner; [open] goes to the chat, else a short note.
+  /// The item a message is about: it goes with the message, so the business sees it as a reply to this item.
+  Map<String, dynamic> get _about => {
+        'type': 'item', 'name': it.name, 'kind': it.kind, 'itemId': it.id, 'handle': widget.owner.handle,
+        if (it.price != null) 'price': it.price, if (it.imageUrl != null) 'imageUrl': it.imageUrl,
+      };
+
+  /// Reply (the small sheet, [open] false): sends [text] about this item and stays here. Enquire ([open] true): opens
+  /// the chat with this item tagged above the box; what they write goes out as a reply to it.
   Future<void> _send(String text, bool open) async {
     setState(() => _busy = true);
     try {
       final chatId = (await _api.post('/chats', {'userId': widget.owner.uid}) as Map)['id'] as String;
-      await _api.post('/chats/$chatId/messages', {
-        'text': text,
-        'attachment': {'type': 'item', 'name': it.name, 'kind': it.kind, if (it.price != null) 'price': it.price, if (it.imageUrl != null) 'imageUrl': it.imageUrl},
-      });
+      if (!open) await _api.post('/chats/$chatId/messages', {'text': text, 'attachment': _about});
       _api.post('/products/${it.id}/enquire', {}).catchError((_) => null);
       setState(() => it.enquiriesCount++);
       if (!mounted) return;
       if (open) {
-        await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: chatId, peer: widget.owner)));
+        await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: chatId, peer: widget.owner, pending: _about)));
       } else {
         toast(context, t('Message sent'));
       }

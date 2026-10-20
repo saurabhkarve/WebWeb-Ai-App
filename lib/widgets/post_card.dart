@@ -317,7 +317,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     if (isAsk && !widget.detail) {
       final why = mine ? t('Your ask') : (match == null ? null : t(match));
       final spotlight = Container(
-        padding: EdgeInsets.symmetric(vertical: framed ? 12 : 20),
+        padding: framed ? const EdgeInsets.only(top: 8, bottom: 20) : const EdgeInsets.symmetric(vertical: 20),
         foregroundDecoration: framed ? null : _HairlineDecoration(kGold.withValues(alpha: .6)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(
@@ -392,9 +392,10 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         ]),
       );
       if (!framed) return spotlight;
-      // reposted on a member's page: their line on top, the ask in a frame under it
+      // reposted (Connect, a member's page): only a line on top says who and when; no frame, so the ask keeps its full
+      // width and every control stays where it always is
       return Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.only(top: 16),
         foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           GestureDetector(
@@ -410,12 +411,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               ]),
             ),
           ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)),
-            child: spotlight,
-          ),
+          spotlight,
         ]),
       );
     }
