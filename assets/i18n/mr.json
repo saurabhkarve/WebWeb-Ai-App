@@ -1580,5 +1580,9 @@
   "Delete this reply?": "हे उत्तर हटवायचे?",
   "Share this item": "ही वस्तू शेअर करा",
   "Show all {n}": "सर्व {n} पाहा",
-  "Request to share": "शेअर करण्याची विनंती करा"
+  "Request to share": "शेअर करण्याची विनंती करा",
+  "No places found": "कोणतीही जागा सापडली नाही",
+  "{place} is {d} from this ask": "{place} या गरजेपासून {d} दूर आहे",
+  "Inside the reach": "परिघाच्या आत",
+  "Outside the reach": "परिघाच्या बाहेर"
 }

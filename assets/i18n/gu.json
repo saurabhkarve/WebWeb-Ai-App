@@ -1580,5 +1580,9 @@
   "Delete this reply?": "આ જવાબ કાઢી નાખવો છે?",
   "Share this item": "આ વસ્તુ શેર કરો",
   "Show all {n}": "બધા {n} જુઓ",
-  "Request to share": "શેર કરવા વિનંતી કરો"
+  "Request to share": "શેર કરવા વિનંતી કરો",
+  "No places found": "કોઈ જગ્યા મળી નહીં",
+  "{place} is {d} from this ask": "{place} આ જરૂરિયાતથી {d} દૂર છે",
+  "Inside the reach": "વિસ્તારની અંદર",
+  "Outside the reach": "વિસ્તારની બહાર"
 }

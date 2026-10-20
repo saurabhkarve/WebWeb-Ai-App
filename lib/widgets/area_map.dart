@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import '../i18n.dart';
 import '../models.dart';
@@ -30,7 +32,8 @@ String editedLabel(DateTime d) {
   return t('Edited {time}', {'time': when});
 }
 
-/// Where an ask reaches: a map of its area with the reach circle (web ask-area-sheet.tsx).
+/// Where an ask reaches: a map of its area with the reach circle (web ask-area-sheet.tsx). A search box drops a pin on
+/// any place and says how far it is from the ask and whether it is inside the circle.
 Future<void> showAskAreaSheet(BuildContext context, Post post) {
   final p = Pal.of(context);
   return showModalBottomSheet(
@@ -39,59 +42,184 @@ Future<void> showAskAreaSheet(BuildContext context, Post post) {
     backgroundColor: p.canvas,
     barrierColor: kInk.withValues(alpha: .6),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (ctx) {
-      final place = findPlace(post.locationPref);
-      final lat = post.lat ?? place?.lat, lng = post.lng ?? place?.lng;
-      final radius = (post.radiusM ?? (place?.radiusKm ?? 10) * 1000).toDouble();
-      final area = post.locationPref ?? '';
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
-              Expanded(child: Text(t('Where this ask reaches'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
-              InkResponse(onTap: () => Navigator.pop(ctx), radius: 20, child: Padding(padding: const EdgeInsets.all(6), child: WIcon(WI.close, size: 20, color: p.muted))),
-            ]),
-            const SizedBox(height: 12),
-            if (lat != null && lng != null)
-              ClipRRect(borderRadius: BorderRadius.circular(12), child: SizedBox(height: 280, child: AreaMap(lat: lat, lng: lng, radiusM: radius)))
-            else
-              Container(height: 120, alignment: Alignment.center, decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(12)), child: Text(t(area), style: TextStyle(color: p.muted))),
-            const SizedBox(height: 12),
-            Row(children: [
-              if (area.isNotEmpty) ...[
-                WIcon(WI.pin, size: 16, color: p.muted),
-                const SizedBox(width: 4),
-                Flexible(child: Text(t(area), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
-                const SizedBox(width: 12),
-              ],
-              WIcon(WI.locate, size: 16, color: p.muted),
-              const SizedBox(width: 4),
-              Text(t('{d} reach', {'d': formatDistance(radius)}), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-            ]),
-            const SizedBox(height: 4),
-            Text(t('Members inside the circle see this ask.'), style: TextStyle(fontSize: 12, color: p.muted)),
-            if (area.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              GestureDetector(
-                onTap: () {
-                  Navigator.pop(ctx);
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => FindScreen(standalone: true, initialLocation: area)));
-                },
-                child: Text(t('More asks in {area}', {'area': t(area)}), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link)),
-              ),
-            ],
-          ]),
-        ),
-      );
-    },
+    builder: (ctx) => _AskAreaSheet(post: post, outer: context),
   );
+}
+
+typedef _Spot = ({String name, String sub, double lat, double lng});
+
+class _AskAreaSheet extends StatefulWidget {
+  final Post post;
+  final BuildContext outer;
+  const _AskAreaSheet({required this.post, required this.outer});
+  @override
+  State<_AskAreaSheet> createState() => _AskAreaSheetState();
+}
+
+class _AskAreaSheetState extends State<_AskAreaSheet> {
+  final _q = TextEditingController();
+  List<_Spot> _hits = [];
+  bool _busy = false, _none = false;
+  _Spot? _spot;
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  // our own places as you type (instant, offline); the keyboard's search also asks OpenStreetMap for streets and landmarks
+  void _type(String v) => setState(() {
+        _none = false;
+        _hits = v.trim().length < 2
+            ? []
+            : searchPlaces(v, limit: 6).where((x) => x.lat != null && x.lng != null).map((x) => (name: t(x.name), sub: x.subtitle, lat: x.lat!, lng: x.lng!)).toList();
+      });
+
+  Future<void> _search() async {
+    final text = _q.text.trim();
+    if (text.length < 3) return;
+    setState(() => _busy = true);
+    try {
+      final res = await http.get(
+        Uri.parse('https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=in&q=${Uri.encodeComponent(text)}'),
+        headers: const {'Accept-Language': 'en', 'User-Agent': 'WebWebAI-app/1.0 (+https://webweb.ai)'},
+      );
+      final found = (jsonDecode(res.body) as List).map((d) {
+        final parts = '${d['display_name']}'.split(',').map((x) => x.trim()).toList();
+        return (name: parts.first, sub: parts.skip(1).take(2).join(', '), lat: double.parse('${d['lat']}'), lng: double.parse('${d['lon']}'));
+      }).toList();
+      if (mounted) {
+        setState(() {
+          _hits = found;
+          _none = found.isEmpty;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _none = true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final post = widget.post;
+    final place = findPlace(post.locationPref);
+    final lat = post.lat ?? place?.lat, lng = post.lng ?? place?.lng;
+    final radius = (post.radiusM ?? (place?.radiusKm ?? 10) * 1000).toDouble();
+    final area = post.locationPref ?? '';
+    final spot = _spot;
+    final away = spot != null && lat != null && lng != null ? distanceKm(lat, lng, spot.lat, spot.lng) * 1000 : null;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Expanded(child: Text(t('Where this ask reaches'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+            InkResponse(onTap: () => Navigator.pop(context), radius: 20, child: Padding(padding: const EdgeInsets.all(6), child: WIcon(WI.close, size: 20, color: p.muted))),
+          ]),
+          const SizedBox(height: 10),
+          // search a place: a pin on the map and how far it is
+          TextField(
+            controller: _q,
+            onChanged: _type,
+            onSubmitted: (_) => _search(),
+            textInputAction: TextInputAction.search,
+            style: const TextStyle(fontSize: 14),
+            decoration: InputDecoration(
+              hintText: t('Search a place, e.g. Turbhe MIDC'),
+              isDense: true,
+              filled: true,
+              fillColor: p.field,
+              prefixIcon: Padding(padding: const EdgeInsets.all(10), child: WIcon(WI.search, size: 18, color: p.muted)),
+              prefixIconConstraints: const BoxConstraints(minWidth: 38),
+              suffixIcon: _busy ? const Padding(padding: EdgeInsets.all(12), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))) : null,
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(99), borderSide: BorderSide(color: p.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(99), borderSide: BorderSide(color: p.border)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(99), borderSide: BorderSide(color: kGold.withValues(alpha: .6))),
+            ),
+          ),
+          if (_hits.isNotEmpty || _none)
+            Container(
+              margin: const EdgeInsets.only(top: 6),
+              constraints: const BoxConstraints(maxHeight: 220),
+              decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(12), border: Border.all(color: p.border)),
+              child: _none
+                  ? Padding(padding: const EdgeInsets.all(12), child: Text(t('No places found'), style: TextStyle(color: p.muted)))
+                  : ListView(shrinkWrap: true, padding: EdgeInsets.zero, children: [
+                      for (final h in _hits)
+                        ListTile(
+                          dense: true,
+                          leading: WIcon(WI.pin, size: 16, color: p.muted),
+                          title: Text(h.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+                          subtitle: h.sub.isEmpty ? null : Text(h.sub, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          onTap: () {
+                            FocusScope.of(context).unfocus();
+                            setState(() {
+                              _spot = h;
+                              _hits = [];
+                              _q.text = h.name;
+                            });
+                          },
+                        ),
+                    ]),
+            ),
+          const SizedBox(height: 10),
+          if (lat != null && lng != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(height: 280, child: AreaMap(lat: lat, lng: lng, radiusM: radius, point: spot == null ? null : (lat: spot.lat, lng: spot.lng))),
+            )
+          else
+            Container(height: 120, alignment: Alignment.center, decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(12)), child: Text(t(area), style: TextStyle(color: p.muted))),
+          const SizedBox(height: 12),
+          Row(children: [
+            if (area.isNotEmpty) ...[
+              WIcon(WI.pin, size: 16, color: p.muted),
+              const SizedBox(width: 4),
+              Flexible(child: Text(t(area), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+              const SizedBox(width: 12),
+            ],
+            WIcon(WI.locate, size: 16, color: p.muted),
+            const SizedBox(width: 4),
+            Text(t('{d} reach', {'d': formatDistance(radius)}), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          ]),
+          const SizedBox(height: 4),
+          if (spot != null && away != null)
+            Text.rich(TextSpan(children: [
+              TextSpan(text: t('{place} is {d} from this ask', {'place': spot.name, 'd': formatDistance(away)})),
+              TextSpan(
+                text: ' · ${t(away <= radius ? 'Inside the reach' : 'Outside the reach')}',
+                style: TextStyle(fontWeight: FontWeight.w700, color: away <= radius ? const Color(0xFF059669) : p.muted),
+              ),
+            ]), style: const TextStyle(fontSize: 13))
+          else
+            Text(t('Members inside the circle see this ask.'), style: TextStyle(fontSize: 12, color: p.muted)),
+          if (area.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(widget.outer, MaterialPageRoute(builder: (_) => FindScreen(standalone: true, initialLocation: area)));
+              },
+              child: Text(t('More asks in {area}', {'area': t(area)}), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link)),
+            ),
+          ],
+        ]),
+      ),
+    );
+  }
 }
 
 /// A still map (OpenStreetMap tiles) centred on a point, zoomed so the reach circle fits, with the circle drawn on top.
 class AreaMap extends StatelessWidget {
   final double lat, lng, radiusM;
-  const AreaMap({super.key, required this.lat, required this.lng, required this.radiusM});
+  /// a searched place, drawn as a dark pin; the map zooms out to keep it in view
+  final ({double lat, double lng})? point;
+  const AreaMap({super.key, required this.lat, required this.lng, required this.radiusM, this.point});
 
   static const _tile = 256.0;
 
@@ -100,7 +228,8 @@ class AreaMap extends StatelessWidget {
         final w = box.maxWidth, h = box.maxHeight;
         final cosLat = math.cos(lat * math.pi / 180);
         // metres per pixel at zoom 0 is 156543 · cos(lat); pick the zoom where the circle fills ~70% of the height
-        final want = radiusM / (h * .35);
+        final reach = point == null ? radiusM : math.max(radiusM, distanceKm(lat, lng, point!.lat, point!.lng) * 1000 * 1.15);
+        final want = reach / (h * .35);
         final z = (math.log(156543.03 * cosLat / want) / math.ln2).floor().clamp(3, 15);
         final scale = math.pow(2, z).toDouble();
         final mpp = 156543.03 * cosLat / scale;
@@ -132,6 +261,17 @@ class AreaMap extends StatelessWidget {
           const Positioned.fill(child: ColoredBox(color: Color(0xFFEDEAE3))),
           ...tiles,
           Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: _Circle(radiusM / mpp)))),
+          if (point != null)
+            Builder(builder: (_) {
+              final px = (point!.lng + 180) / 360 * _tile * scale - left;
+              final s2 = math.sin(point!.lat * math.pi / 180);
+              final py = (0.5 - math.log((1 + s2) / (1 - s2)) / (4 * math.pi)) * _tile * scale - top;
+              return Positioned(
+                left: px - 14,
+                top: py - 34,
+                child: IgnorePointer(child: CustomPaint(size: const Size(28, 36), painter: _Pin())),
+              );
+            }),
           Positioned(
             right: 0,
             bottom: 0,
@@ -165,4 +305,28 @@ class _Circle extends CustomPainter {
 
   @override
   bool shouldRepaint(_Circle old) => old.r != r;
+}
+
+/// The searched place's pin: dark, gold-rimmed, its tip on the spot (web area-map's search pin).
+class _Pin extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(14, 35)
+      ..cubicTo(14, 35, 1.5, 22, 1.5, 13.2)
+      ..cubicTo(1.5, 6.4, 7, 1, 14, 1)
+      ..cubicTo(21, 1, 26.5, 6.4, 26.5, 13.2)
+      ..cubicTo(26.5, 22, 14, 35, 14, 35)
+      ..close();
+    canvas.drawShadow(path, Colors.black, 3, false);
+    canvas.drawPath(path, Paint()..color = const Color(0xFF1E1E1E));
+    canvas.drawPath(path, Paint()
+      ..color = const Color(0xFFFFC700)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2);
+    canvas.drawCircle(const Offset(14, 13), 4.5, Paint()..color = const Color(0xFFFFC700));
+  }
+
+  @override
+  bool shouldRepaint(_Pin old) => false;
 }
