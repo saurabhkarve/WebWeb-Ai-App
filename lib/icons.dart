@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-enum WI { refresh, check, lock, qr, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, consultant, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, logout, machinery, mentor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, website }
+enum WI { refresh, check, lock, qr, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, consultant, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, link, logout, machinery, mentor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, website }
 
 /// SVG body per icon. {C} = colour, {SW/x} = stroke width divided by x (scaled groups).
 const Map<WI, (String, double?)> _body = {
@@ -39,6 +39,7 @@ const Map<WI, (String, double?)> _body = {
   WI.camera: (r'<path d="M4.5 8h2.6l1.2-2h7.4l1.2 2h2.6a1.2 1.2 0 0 1 1.2 1.2v8.6a1.2 1.2 0 0 1-1.2 1.2H4.5a1.2 1.2 0 0 1-1.2-1.2V9.2A1.2 1.2 0 0 1 4.5 8z" /> <circle cx="12" cy="13.2" r="3.1" />', null),
   WI.cart: (r'<path d="M3 4.5h2.3l1.7 9.2a1.6 1.6 0 0 0 1.6 1.3h8a1.6 1.6 0 0 0 1.6-1.2l1.3-5.8H6.1" /> <circle cx="9.5" cy="19" r="1.3" /> <circle cx="16.5" cy="19" r="1.3" />', null),
   WI.checkCircle: (r'<circle cx="12" cy="12" r="8.6" /> <path d="M8.2 12.4l2.7 2.7 5-5.6" />', null),
+  WI.link: (r'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.2 1.2" /> <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.2-1.2" />', null),
   WI.clip: (r'<path d="M18.5 11.5l-6.3 6.3a4.2 4.2 0 0 1-6-6l7-7a2.8 2.8 0 0 1 4 4l-7 7a1.4 1.4 0 0 1-2-2l6.3-6.3" />', null),
   WI.clock: (r'<circle cx="12" cy="12" r="8.6" /> <path d="M12 7.2V12l3.2 2" />', null),
   WI.close: (r'<path d="M6 6l12 12M18 6L6 18" />', null),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'api.dart';
 import 'auth_provider.dart';
+import 'i18n.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -57,11 +58,18 @@ Future<bool> blockUser(BuildContext context, {required String uid, required Stri
 }
 
 /// "Report or block" sheet for a person (optionally from one of their asks). Returns true when they were blocked.
-Future<bool> showSafetySheet(BuildContext context, {required String uid, required String name, String? postId}) async {
+/// [saved] + [onToggleSave]: a Save / Remove from saved row on top (the ⋯ under someone else's ask).
+Future<bool> showSafetySheet(BuildContext context, {required String uid, required String name, String? postId, bool? saved, VoidCallback? onToggleSave}) async {
   final choice = await showModalBottomSheet<String>(
     context: context,
     builder: (ctx) => SafeArea(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
+        if (onToggleSave != null)
+          ListTile(
+            leading: WIcon(WI.bookmark, size: 20, color: Pal.of(ctx).text, fill: saved == true),
+            title: Text(t(saved == true ? 'Remove from saved' : 'Save ask')),
+            onTap: () => Navigator.pop(ctx, 'save'),
+          ),
         if (postId != null) ListTile(leading: const Icon(Icons.flag_outlined), title: const Text('Report this ask'), onTap: () => Navigator.pop(ctx, 'post')),
         ListTile(leading: const Icon(Icons.flag_outlined), title: Text('Report $name'), onTap: () => Navigator.pop(ctx, 'user')),
         ListTile(leading: const Icon(Icons.block, color: Colors.redAccent), title: Text('Block $name', style: const TextStyle(color: Colors.redAccent)), onTap: () => Navigator.pop(ctx, 'block')),
@@ -69,7 +77,9 @@ Future<bool> showSafetySheet(BuildContext context, {required String uid, require
     ),
   );
   if (choice == null || !context.mounted) return false;
-  if (choice == 'post') {
+  if (choice == 'save') {
+    onToggleSave?.call();
+  } else if (choice == 'post') {
     await reportContent(context, kind: 'post', targetId: postId!, what: 'this ask');
   } else if (choice == 'user') {
     await reportContent(context, kind: 'user', targetId: uid, what: name);

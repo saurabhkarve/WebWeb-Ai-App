@@ -115,6 +115,19 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     await _run(() async => _api.delete('/posts/${_post!.id}/share'));
   }
 
+  /// Save / remove from saved (it left the row under the ask; on this page it sits by the author).
+  Future<void> _toggleSave() async {
+    final post = _post!;
+    final on = !post.bookmarked;
+    setState(() => post.bookmarked = on);
+    try {
+      on ? await _api.post('/posts/${post.id}/bookmark') : await _api.delete('/posts/${post.id}/bookmark');
+      if (mounted) toast(context, t(on ? 'Saved' : 'Removed from saved'));
+    } catch (_) {
+      if (mounted) setState(() => post.bookmarked = !on);
+    }
+  }
+
   Future<void> _removeAsk() async {
     if (!await _confirm(t('Delete this ask?'), t("It will be removed from the feed along with its responses and referrals. This can't be undone."), t('Delete'), cancel: t('Keep'))) return;
     setState(() => _busy = true);
@@ -231,6 +244,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     Text('${post.authorType == 'entrepreneur' ? post.authorName : post.authorCompany} · ${timeAgo(post.createdAt)}${post.editedAt != null ? ' · ${editedLabel(post.editedAt!)}' : ''}',
                         maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted, height: 1.25)),
                   ]),
+                ),
+              ),
+              Semantics(
+                button: true,
+                label: t(post.bookmarked ? 'Remove from saved' : 'Save'),
+                child: InkResponse(
+                  onTap: _toggleSave,
+                  radius: 20,
+                  child: Padding(padding: const EdgeInsets.all(8), child: WIcon(WI.bookmark, size: 20, color: post.bookmarked ? p.link : p.muted, fill: post.bookmarked)),
                 ),
               ),
               if (owner) ...[

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
@@ -23,7 +26,7 @@ import '../share_log.dart';
 
 /// Feed row, same layout as the web PostCard (post-card.tsx): avatar on the left; who + why you see it;
 /// the category chip, title and two lines of description; photos; location / budget / timing chips;
-/// a compact response log; then React · Refer · Repost · Reply · Save. Tap opens the ask, double tap
+/// a compact response log; then React · Refer · Reply · Share. Tap opens the ask, double tap
 /// gives it a thumbs up.
 class PostCard extends StatefulWidget {
   final Post post;
@@ -162,6 +165,11 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       backgroundColor: p.canvas,
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: WIcon(WI.bookmark, size: 20, color: p.text, fill: post.bookmarked),
+            title: Text(t(post.bookmarked ? 'Remove from saved' : (isAsk ? 'Save ask' : 'Save'))),
+            onTap: () => Navigator.pop(ctx, 'save'),
+          ),
           if (isAsk) ListTile(leading: WIcon(WI.edit, size: 20, color: p.text), title: Text(t('Edit ask')), onTap: () => Navigator.pop(ctx, 'edit')),
           ListTile(
             leading: WIcon(WI.trash, size: 20, color: p.danger),
@@ -172,6 +180,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       ),
     );
     if (!mounted || choice == null) return;
+    if (choice == 'save') return _actionsKey.currentState?.toggleBookmark();
     if (choice == 'edit') {
       final saved = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => SubPage(title: t('Edit ask'), body: AskScreen(onPosted: () {}, edit: post))));
       if (saved == true) widget.onChanged?.call();
@@ -284,7 +293,9 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                   label: 'Report or block',
                   child: InkResponse(
                     onTap: () async {
-                      if (await showSafetySheet(context, uid: post.authorUid, name: post.shownName, postId: post.id) && mounted) widget.onBlocked?.call();
+                      if (await showSafetySheet(context, uid: post.authorUid, name: post.shownName, postId: post.id, saved: post.bookmarked, onToggleSave: () => _actionsKey.currentState?.toggleBookmark()) && mounted) {
+                        widget.onBlocked?.call();
+                      }
                     },
                     radius: 18,
                     child: SizedBox(width: 28, height: 32, child: Center(child: Icon(Icons.more_vert, size: 18, color: p.muted))),
@@ -409,8 +420,9 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
   }
 }
 
-/// React · Refer · Repost · Reply · Share · Save under an ask or update (web post-actions.tsx). Counts sit in
-/// a small pill next to the icon; labels never shift when the state flips.
+/// React · Refer · Reply · Share under an ask or update (web post-actions.tsx). Share opens a sheet that also
+/// holds Repost, WhatsApp and Copy link; Save is in the ⋯ menu. Counts sit in a small pill next to the icon;
+/// labels never shift when the state flips.
 class PostActions extends StatefulWidget {
   final Post post;
   final VoidCallback onReply;
@@ -471,7 +483,8 @@ class PostActionsState extends State<PostActions> {
     }
   }
 
-  Future<void> _toggleBookmark() async {
+  /// Save / remove from saved (from the ⋯ menu).
+  Future<void> toggleBookmark() async {
     final on = !post.bookmarked;
     setState(() => post.bookmarked = on);
     try {
@@ -515,10 +528,44 @@ class PostActionsState extends State<PostActions> {
   @override
   Widget build(BuildContext context) => _actions(Pal.of(context), post.isRequirement, _isOwner);
 
+  String get _subject => post.title ?? (post.isRequirement ? 'WebWeb AI ask' : 'WebWeb AI update');
+
+  /// Share: repost to your page, WhatsApp, the phone's share sheet, copy link.
   Future<void> _share() async {
-    try {
-      await shareAndLog(_api, entity: 'post', ref: post.id, text: post.webUrl, subject: post.title ?? (post.isRequirement ? 'WebWeb AI ask' : 'WebWeb AI update'));
-    } catch (_) {}
+    final p = Pal.of(context);
+    const green = Color(0xFF059669);
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: p.canvas,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: WIcon(WI.repost, size: 20, color: post.reposted ? green : p.text),
+            title: Text('${t(post.reposted ? 'Undo repost' : 'Repost')}${post.repostsCount > 0 ? ' · ${post.repostsCount}' : ''}'),
+            onTap: () => Navigator.pop(ctx, 'repost'),
+          ),
+          ListTile(leading: SvgPicture.string(_whatsApp, width: 20, height: 20), title: const Text('WhatsApp'), onTap: () => Navigator.pop(ctx, 'whatsapp')),
+          ListTile(leading: WIcon(WI.share, size: 20, color: p.text), title: Text(t('More ways to share')), onTap: () => Navigator.pop(ctx, 'native')),
+          ListTile(leading: WIcon(WI.link, size: 20, color: p.text), title: Text(t('Copy link')), onTap: () => Navigator.pop(ctx, 'copy')),
+        ]),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case 'repost':
+        await _toggleRepost();
+      case 'whatsapp':
+        final ok = await launchUrl(Uri.parse('https://wa.me/?text=${Uri.encodeComponent('$_subject\n${post.webUrl}')}'), mode: LaunchMode.externalApplication).catchError((_) => false);
+        if (ok) logShare(_api, 'post', post.id, channel: 'whatsapp');
+      case 'native':
+        try {
+          await shareAndLog(_api, entity: 'post', ref: post.id, text: post.webUrl, subject: _subject);
+        } catch (_) {}
+      case 'copy':
+        await Clipboard.setData(ClipboardData(text: post.webUrl));
+        logShare(_api, 'post', post.id, channel: 'copy');
+        if (mounted) toast(context, t('Link copied'));
+    }
   }
 
   Widget _actions(Pal p, bool isAsk, bool mine) {
@@ -562,24 +609,16 @@ class PostActionsState extends State<PostActions> {
         ),
       ),
       if (isAsk && !mine) tour('refer', btn(icon: WIcon(WI.refer, size: 20, color: p.muted), count: post.referralsCount, label: 'Refer', color: p.muted, onTap: _refer)),
+      tour('reply', btn(icon: WIcon(WI.talk, size: 20, color: p.muted), count: isAsk ? post.sharesCount : null, label: 'Reply', color: p.muted, onTap: widget.onReply)),
+      // Share holds Repost too: green with the repost icon once you have reposted it
       btn(
-        icon: WIcon(WI.repost, size: 20, color: post.reposted ? const Color(0xFF059669) : p.muted),
+        icon: WIcon(post.reposted ? WI.repost : WI.share, size: 20, color: post.reposted ? const Color(0xFF059669) : p.muted),
         count: post.repostsCount,
-        label: 'Repost',
+        label: 'Share',
         altLabel: 'Reposted',
         alt: post.reposted,
         color: post.reposted ? const Color(0xFF059669) : p.muted,
-        onTap: _toggleRepost,
-      ),
-      tour('reply', btn(icon: WIcon(WI.talk, size: 20, color: p.muted), count: isAsk ? post.sharesCount : null, label: 'Reply', color: p.muted, onTap: widget.onReply)),
-      btn(icon: WIcon(WI.share, size: 20, color: p.muted), label: 'Share', color: p.muted, onTap: _share),
-      btn(
-        icon: WIcon(WI.bookmark, size: 20, color: post.bookmarked ? p.link : p.muted, fill: post.bookmarked),
-        label: 'Save',
-        altLabel: 'Saved',
-        alt: post.bookmarked,
-        color: post.bookmarked ? p.link : p.muted,
-        onTap: _toggleBookmark,
+        onTap: _share,
       ),
     ]);
   }
@@ -696,3 +735,6 @@ class ResponseActivity extends StatelessWidget {
     );
   }
 }
+
+/// WhatsApp's mark, in its green (the Share sheet).
+const _whatsApp = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#25D366" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>';
