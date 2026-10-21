@@ -557,11 +557,14 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         ]),
         Padding(
           padding: const EdgeInsets.only(left: 50, top: 4),
-          child: Container(
-            // clipped, so the sideways-scrolling chips stay inside the frame
+          // as on x.com (and the web) the whole quote is one link to the ask: a tap anywhere in it, the name and chips
+          // included, opens the ask, so the quote's own taps are absorbed
+          child: Material(
+            color: Colors.transparent,
+            // clipped, so the chips stay inside the frame
             clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)),
-            child: quote,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: p.border)),
+            child: InkWell(onTap: _openDetail, child: AbsorbPointer(child: quote)),
           ),
         ),
         if (ask) ...[
