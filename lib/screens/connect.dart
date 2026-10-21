@@ -471,8 +471,10 @@ class _UpdatesBarState extends State<_UpdatesBar> {
       fresh: n > 0,
       badge: const WIcon(WI.sparkle, size: 10, color: kInk, strokeWidth: 2.6),
       onTap: () async {
-        await openLeads(context);
+        await openDailyStories(context, 'leads');
         _daily();
+        // views of the leads go out in a batch a few seconds later: count again once they have
+        Future.delayed(const Duration(milliseconds: 3500), _daily);
       },
       child: Container(
         // a shade above the dark page so the circle still reads as one
@@ -501,7 +503,7 @@ class _UpdatesBarState extends State<_UpdatesBar> {
       fresh: !f.seen && f.day == f.today,
       badge: ask ? const Text('?', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kInk)) : null,
       onTap: () async {
-        await openToday(context);
+        await openDailyStories(context, 'today');
         _daily();
       },
       child: Container(

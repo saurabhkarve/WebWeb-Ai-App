@@ -11,7 +11,15 @@ import '../notifications.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/city_picker.dart';
-import '../widgets/p1.dart' show kGreenDark;
+import 'package:url_launcher/url_launcher.dart';
+
+import '../config.dart' show siteUrl;
+import '../views.dart';
+import '../widgets/area_map.dart' show askTimeLeft;
+import '../widgets/p1.dart' show kGreenDark, leadReasonText;
+import 'edit_profile.dart';
+import 'leads.dart';
+import 'post_detail.dart';
 
 /// P2 (docs/P2-MICRO-PLAN.md), as on the web: Today in your area with Today's question (components/today.tsx,
 /// /today), alerts for new asks (components/alert-sheet.tsx, /alerts) and the push nudge (components/push-nudge.tsx).
@@ -862,4 +870,464 @@ class _PushNudgeState extends State<PushNudge> {
       ]),
     );
   }
+}
+
+// ===================== daily stories =====================
+
+/// One card of a daily story: its own backdrop, the card, how long it shows, and what showing it does.
+typedef _Frame = ({String id, List<Color> bg, int ms, VoidCallback? onShow, Widget card});
+
+const _inkBg = [Color(0xFF5A4710), Color(0xFF1E1E1E)];
+const _todayBg = {
+  'cover': [Color(0xFFFFE27A), Color(0xFFC99400), Color(0xFF3A2C05)],
+  'poll': [Color(0xFF6B5410), Color(0xFF1E1E1E)],
+  'rates': [Color(0xFF1F6B4A), Color(0xFF0F2A1F)],
+  'notice': [Color(0xFFA8560F), Color(0xFF2E1A08)],
+  'tender': [Color(0xFF1F4F8F), Color(0xFF0F1D33)],
+  'event': [Color(0xFF6A2F8F), Color(0xFF22102E)],
+  'end': [Color(0xFF4A3B0B), Color(0xFF1E1E1E)],
+};
+
+/// Leads for you or Today in your area ([kind] 'leads' / 'today'), played like an update (web daily-stories.tsx).
+Future<void> openDailyStories(BuildContext context, String kind) =>
+    Navigator.push(context, MaterialPageRoute(fullscreenDialog: true, builder: (_) => DailyStories(kind: kind)));
+
+/// One card per lead or per Today item: tap right for the next and left for the one before, hold to pause. Each
+/// card carries what to do now (I can do this, Answer, Interested, Open tender) and a link (Open ask, Directions,
+/// the full page). Opened from the circles at the front of Updates.
+class DailyStories extends StatefulWidget {
+  final String kind;
+  const DailyStories({super.key, required this.kind});
+  @override
+  State<DailyStories> createState() => _DailyStoriesState();
+}
+
+class _DailyStoriesState extends State<DailyStories> with SingleTickerProviderStateMixin {
+  List<Post>? _leads;
+  TodayFeed? _today;
+  int _i = 0;
+  late final AnimationController _bar = AnimationController(vsync: this)..addStatusListener((s) {
+      if (s == AnimationStatus.completed) _next();
+    });
+  bool _held = false, _typing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final api = context.read<AuthProvider>().api;
+    if (widget.kind == 'leads') {
+      api.get('/posts/leads').then((d) => _set(() => _leads = (d as List).map((e) => Post.fromJson(e as Map)).take(12).toList())).catchError((_) => _set(() => _leads = []));
+    } else {
+      api.get('/today').then((d) => _set(() => _today = TodayFeed.fromJson(d as Map))).catchError((_) => _set(() => _today = const TodayFeed()));
+      api.post('/today/seen').catchError((_) => null);
+    }
+    FocusManager.instance.addListener(_focus);
+  }
+
+  void _set(VoidCallback fn) {
+    if (!mounted) return;
+    setState(fn);
+    _start();
+  }
+
+  // a field in focus (the rate check) holds the card
+  void _focus() {
+    final typing = FocusManager.instance.primaryFocus?.context?.widget is EditableText;
+    if (typing != _typing) {
+      _typing = typing;
+      _sync();
+    }
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeListener(_focus);
+    _bar.dispose();
+    super.dispose();
+  }
+
+  List<_Frame>? _framesCache;
+  List<_Frame>? get _frames => _framesCache ??= _build();
+
+  void _start() {
+    _framesCache = null;
+    final f = _frames;
+    if (f == null || f.isEmpty) return;
+    final fr = f[_i.clamp(0, f.length - 1)];
+    _bar.duration = Duration(milliseconds: fr.ms);
+    _bar.value = 0;
+    fr.onShow?.call();
+    _sync();
+  }
+
+  void _sync() {
+    if (_held || _typing) {
+      _bar.stop();
+    } else if (_frames != null && !_bar.isAnimating) {
+      _bar.forward();
+    }
+  }
+
+  void _next() {
+    final f = _frames;
+    if (f == null) return;
+    if (_i < f.length - 1) {
+      setState(() => _i++);
+      _start();
+    } else {
+      Navigator.maybePop(context);
+    }
+  }
+
+  void _prev() {
+    if (_i == 0) return;
+    setState(() => _i--);
+    _start();
+  }
+
+  /// Leave the story for a page (back from it lands on Connect).
+  void _go(Widget page) => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
+
+  List<_Frame>? _build() {
+    if (widget.kind == 'leads') {
+      final list = _leads;
+      if (list == null) return null;
+      final api = context.read<AuthProvider>().api;
+      return [
+        for (final post in list)
+          (
+            id: post.id,
+            bg: _inkBg,
+            ms: 8000,
+            onShow: () => ViewTracker.record(api, post.id),
+            card: _LeadStoryCard(post: post, onReply: () => _go(PostDetailScreen(postId: post.id, openReply: true)), onOpen: () => _go(PostDetailScreen(postId: post.id))),
+          ),
+        (
+          id: 'end',
+          bg: _todayBg['end']!,
+          ms: 6000,
+          onShow: null,
+          card: _EndStoryCard(
+            emoji: '✨',
+            title: list.isEmpty ? t('No open leads right now') : t("That's your leads for now"),
+            hint: t('Set an alert and new asks that fit come straight to you.'),
+            primary: t(list.length == 1 ? 'See {n} open lead' : 'See all {n} open leads', {'n': list.length}),
+            onPrimary: () => _go(SubPage(title: t('Leads for you'), body: const LeadsScreen())),
+            link: t('Set an alert'),
+            onLink: () => _go(SubPage(title: t('Alerts'), body: const AlertsScreen())),
+          ),
+        ),
+      ];
+    }
+    final f = _today;
+    if (f == null) return null;
+    if (f.cluster == null) {
+      return [
+        (
+          id: 'none',
+          bg: _todayBg['end']!,
+          ms: 6000,
+          onShow: null,
+          card: _EndStoryCard(
+            emoji: '☀',
+            title: t("Today isn't in your area yet"),
+            hint: t("We're starting with Navi Mumbai. Set your city on your profile to get it when it reaches you."),
+            primary: t('Edit profile'),
+            onPrimary: () {
+              final me = context.read<AuthProvider>().profile;
+              if (me != null) _go(EditProfileScreen(profile: me));
+            },
+          ),
+        ),
+      ];
+    }
+    final place = f.cluster!;
+    final shown = f.day ?? f.today!;
+    final ask = f.poll != null && !f.poll!.answered && !f.poll!.closed;
+    return [
+      (
+        id: 'cover',
+        bg: _todayBg['cover']!,
+        ms: 4000,
+        onShow: null,
+        card: Column(mainAxisSize: MainAxisSize.min, children: [
+          const WIcon(WI.sun, size: 88, color: kInk, strokeWidth: 1.6),
+          const SizedBox(height: 12),
+          Text(t('Today in {place}', {'place': place}), textAlign: TextAlign.center, style: const TextStyle(fontSize: 30, height: 1.15, fontWeight: FontWeight.w800, color: kInk)),
+          const SizedBox(height: 4),
+          Text(shown == f.today ? dayLabel(shown) : t('Yesterday'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: kInk.withValues(alpha: .75))),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: BoxDecoration(color: kInk.withValues(alpha: .85), borderRadius: BorderRadius.circular(99)),
+            child: Text(
+              [t(f.items.length == 1 ? '1 update' : '{n} updates', {'n': f.items.length}), if (ask) t('1 question for you')].join(' · '),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFFFFD84A)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(t('Tap to see each one'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kInk.withValues(alpha: .7))),
+        ]),
+      ),
+      // the question first: answering is the one thing to do today
+      if (f.poll != null && !f.poll!.closed) (id: 'poll', bg: _todayBg['poll']!, ms: 9000, onShow: null, card: _StoryCard(child: PollCard(poll: f.poll!))),
+      for (final it in f.items) (id: it.id, bg: _todayBg[it.type] ?? _todayBg['end']!, ms: it.type == 'rates' ? 8000 : 7000, onShow: null, card: _TodayStoryCard(it: it)),
+      (
+        id: 'end',
+        bg: _todayBg['end']!,
+        ms: 5000,
+        onShow: null,
+        card: _EndStoryCard(
+          emoji: '☀',
+          title: t("That's today in {place}", {'place': place}),
+          hint: t('New every morning. Something to add for your area?'),
+          primary: t('Open the full page'),
+          onPrimary: () => _go(SubPage(title: t('Today in your area'), body: const TodayScreen())),
+          link: t('Tell us'),
+          onLink: () => launchUrl(Uri.parse('$siteUrl/help'), mode: LaunchMode.externalApplication),
+        ),
+      ),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final frames = _frames;
+    final top = MediaQuery.of(context).padding.top;
+    if (frames == null) return const Scaffold(backgroundColor: kInk, body: Center(child: Spinner(size: 32, color: Color(0xFFFFD84A))));
+    final fr = frames[_i.clamp(0, frames.length - 1)];
+    final leads = widget.kind == 'leads';
+    return Scaffold(
+      backgroundColor: kInk,
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        // tap left a third for the one before, anywhere else for the next; buttons and fields keep their taps
+        onTapUp: (d) => d.localPosition.dx < MediaQuery.of(context).size.width / 3 ? _prev() : _next(),
+        onLongPressStart: (_) {
+          _held = true;
+          _sync();
+        },
+        onLongPressEnd: (_) {
+          _held = false;
+          _sync();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          decoration: BoxDecoration(gradient: RadialGradient(center: const Alignment(-.4, -.7), radius: 1.3, colors: fr.bg)),
+          child: Stack(children: [
+            Positioned.fill(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, top + 72, 16, 32),
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    transitionBuilder: (c, a) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: .96, end: 1.0).animate(a), child: c)),
+                    child: KeyedSubtree(key: ValueKey(fr.id), child: SingleChildScrollView(child: fr.card)),
+                  ),
+                ),
+              ),
+            ),
+            // top bar, as on an update
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              child: Container(
+                padding: EdgeInsets.fromLTRB(12, top + 10, 4, 16),
+                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [kInk.withValues(alpha: .6), kInk.withValues(alpha: 0)])),
+                child: Column(children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: AnimatedBuilder(
+                      animation: _bar,
+                      builder: (_, __) => Row(children: [
+                        for (var k = 0; k < frames.length; k++) ...[
+                          if (k > 0) const SizedBox(width: 4),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(2),
+                              child: LinearProgressIndicator(
+                                value: k < _i ? 1 : (k == _i ? _bar.value : 0),
+                                minHeight: 2,
+                                backgroundColor: Colors.white.withValues(alpha: .3),
+                                valueColor: const AlwaysStoppedAnimation(Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: leads ? kInk : null,
+                        gradient: leads ? null : const LinearGradient(colors: [Color(0xFFFFF4C7), Color(0xFFFFD84A)]),
+                        border: Border.all(color: const Color(0xFFFFD84A), width: 2),
+                      ),
+                      child: WIcon(leads ? WI.sparkle : WI.sun, size: 16, color: leads ? const Color(0xFFFFD84A) : kInk),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        leads ? t('Leads for you') : t('Today in {place}', {'place': _today?.cluster ?? ''}),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                    ),
+                    Text('${_i + 1}/${frames.length}', style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: .7))),
+                    IconButton(onPressed: () => Navigator.maybePop(context), icon: const WIcon(WI.close, size: 24, color: Colors.white), tooltip: t('Close')),
+                  ]),
+                ]),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// The light card a frame shows, like a text card on an update.
+class _StoryCard extends StatelessWidget {
+  final Widget child;
+  const _StoryCard({required this.child});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 32, offset: Offset(0, 12))]),
+      child: child,
+    );
+  }
+}
+
+/// One lead: who asks, what, where and the budget, why it fits and how many replied; I can do this, or open the ask.
+class _LeadStoryCard extends StatelessWidget {
+  final Post post;
+  final VoidCallback onReply, onOpen;
+  const _LeadStoryCard({required this.post, required this.onReply, required this.onOpen});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final x = post;
+    final left = askTimeLeft(x);
+    final n = x.sharesCount;
+    return _StoryCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Text(t(kCategoryShort[x.category] ?? 'Ask').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.tagText)),
+          if (x.leadNew)
+            Container(
+              margin: const EdgeInsets.only(left: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              decoration: BoxDecoration(color: kGold, borderRadius: BorderRadius.circular(4)),
+              child: Text(t('NEW'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kInk)),
+            ),
+          const Spacer(),
+          Text(timeAgo(x.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
+        ]),
+        const SizedBox(height: 8),
+        Text(x.title ?? '', style: const TextStyle(fontSize: 24, height: 1.2, fontWeight: FontWeight.w800)),
+        if ((x.description ?? '').isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(x.description!, maxLines: 4, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, height: 1.45, color: p.text.withValues(alpha: .75))),
+        ],
+        const SizedBox(height: 12),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          if ((x.locationPref ?? '').isNotEmpty) InfoPill(small: true, gold: true, wi: WI.pin, text: '${t(x.locationPref!)}${x.distanceM == null ? '' : ' · ${formatDistance(x.distanceM!)}'}'),
+          if ((x.budget ?? '').isNotEmpty) InfoPill(small: true, gold: true, wi: WI.rupee, text: x.budget!),
+          if (left != null) InfoPill(small: true, gold: true, wi: WI.clock, text: left),
+        ]),
+        const SizedBox(height: 16),
+        Row(children: [
+          Avatar(name: x.shownName, photoUrl: x.authorPhotoUrl, type: x.authorType, size: 32, badge: 13),
+          const SizedBox(width: 8),
+          Expanded(child: Text(x.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+        ]),
+        if ((x.leadReason ?? '').isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(color: kGold.withValues(alpha: .2), borderRadius: BorderRadius.circular(99)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              WIcon(WI.sparkle, size: 14, color: p.tagText),
+              const SizedBox(width: 4),
+              Flexible(child: Text(leadReasonText(x.leadReason!), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.tagText))),
+            ]),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Text(
+          n == 0 ? t('No replies yet · be the first') : t(n == 1 ? '1 replied' : '{n} replied', {'n': n}),
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: n == 0 ? (p.dark ? kGreenDark : kGreen) : p.muted),
+        ),
+        const SizedBox(height: 16),
+        Row(children: [
+          Expanded(child: GoldButton(label: t('I can do this'), onPressed: onReply)),
+          const SizedBox(width: 8),
+          GoldButton(label: t('Open ask'), outlined: true, onPressed: onOpen),
+        ]),
+      ]),
+    );
+  }
+}
+
+/// One Today item: the item as on the Today page (with Useful / Interested), plus what to do with it now.
+class _TodayStoryCard extends StatelessWidget {
+  final TodayItem it;
+  const _TodayStoryCard({required this.it});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final pl = it.payload;
+    final link = it.type == 'tender' && pl['link'] != null
+        ? (label: t('Open tender'), url: '${pl['link']}')
+        : it.type == 'event' && pl['venue'] != null
+            ? (label: t('Directions'), url: 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('${pl['venue']}')}')
+            : null;
+    final share = 'https://wa.me/?text=${Uri.encodeComponent('${_text(it).title}\n$siteUrl/today')}';
+    void open(String url) => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    return _StoryCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _ItemRow(it: it, onChange: () {}),
+        Divider(height: 1, color: p.border),
+        const SizedBox(height: 12),
+        Row(children: [
+          if (link != null) ...[Expanded(child: GoldButton(label: link.label, onPressed: () => open(link.url))), const SizedBox(width: 8)],
+          // next to another button there's only room for the app's name
+          Expanded(child: GoldButton(label: link != null ? 'WhatsApp' : t('Share on WhatsApp'), outlined: link != null, onPressed: () => open(share))),
+        ]),
+      ]),
+    );
+  }
+}
+
+/// The last card: what's next, with one button and a link.
+class _EndStoryCard extends StatelessWidget {
+  final String emoji, title, hint, primary;
+  final VoidCallback onPrimary;
+  final String? link;
+  final VoidCallback? onLink;
+  const _EndStoryCard({required this.emoji, required this.title, required this.hint, required this.primary, required this.onPrimary, this.link, this.onLink});
+  @override
+  Widget build(BuildContext context) => Column(mainAxisSize: MainAxisSize.min, children: [
+        Text(emoji, style: const TextStyle(fontSize: 56)),
+        const SizedBox(height: 12),
+        Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, height: 1.2, fontWeight: FontWeight.w800, color: Colors.white)),
+        const SizedBox(height: 8),
+        Text(hint, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: .75))),
+        const SizedBox(height: 24),
+        ConstrainedBox(constraints: const BoxConstraints(maxWidth: 320), child: SizedBox(width: double.infinity, child: GoldButton(label: primary, onPressed: onPrimary))),
+        if (link != null)
+          TextButton(onPressed: onLink, child: Text('$link →', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFFFFD84A)))),
+      ]);
 }
