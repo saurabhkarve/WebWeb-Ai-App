@@ -287,8 +287,13 @@ class _AppHeader extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(children: [
-            Padding(padding: const EdgeInsets.only(left: 4), child: LogoInline(size: 36, markSize: 44, onTap: onHome)),
-            const Spacer(),
+            // with the BUSINESS NETWORK slogan, as on the web; shrinks rather than crowd the bell on the narrowest phones
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4, right: 8),
+                child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: LogoInline(size: 34, markSize: 44, tagline: true, onTap: onHome)),
+              ),
+            ),
             _Bell(notes: notes),
             const SizedBox(width: 8),
             Builder(
