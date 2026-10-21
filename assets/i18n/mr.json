@@ -1684,5 +1684,15 @@
   "Reply opens with I can do this: add your price and when you can do it, so the asker can compare. A note or photo is optional.": "उत्तर \"मी हे करू शकतो\" ने उघडते: तुमची किंमत आणि कधी करू शकता ते जोडा, म्हणजे विचारणाऱ्याला तुलना करता येईल. टीप किंवा फोटो ऐच्छिक आहे.",
   "Tap Ask to post what you need. When you find someone, close your ask and pick who you chose: they hear they won the job.": "हवे ते पोस्ट करण्यासाठी Ask वर टॅप करा. कोणी मिळाले की तुमची गरज बंद करा आणि निवडलेली व्यक्ती निवडा: त्यांना काम मिळाल्याचे कळवले जाईल.",
   "Your week, and this tour": "तुमचा आठवडा, आणि ही टूर",
-  "Every Monday, Your week shows your leads, replies, jobs won and your rank. Find it here, along with Leads for you and this tour.": "दर सोमवारी, तुमचा आठवडा तुमच्या लीड, उत्तरे, जिंकलेली कामे आणि तुमची क्रमवारी दाखवतो. तो इथे मिळेल, सोबत तुमच्यासाठी लीड आणि ही टूर."
+  "Every Monday, Your week shows your leads, replies, jobs won and your rank. Find it here, along with Leads for you and this tour.": "दर सोमवारी, तुमचा आठवडा तुमच्या लीड, उत्तरे, जिंकलेली कामे आणि तुमची क्रमवारी दाखवतो. तो इथे मिळेल, सोबत तुमच्यासाठी लीड आणि ही टूर.",
+  "Asks you answered. Only the asker sees your contact.": "तुम्ही उत्तर दिलेल्या गरजा. तुमचा संपर्क फक्त विचारणाऱ्यालाच दिसतो.",
+  "Asks {name} answered. Contacts stay private between them and the asker.": "{name} यांनी उत्तर दिलेल्या गरजा. संपर्क त्यांच्या आणि विचारणाऱ्याच्या दरम्यान खाजगी राहतात.",
+  "{name}'s ask": "{name} यांची गरज",
+  "Sent a photo": "फोटो पाठवला",
+  "Replied": "उत्तर दिले",
+  "Won this job": "हे काम मिळाले",
+  "Open": "खुली",
+  "from the asker": "विचारणाऱ्याकडून",
+  "Photo updates": "फोटो अपडेट",
+  "{n} answered": "{n} ला उत्तर दिले"
 }

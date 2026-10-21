@@ -376,18 +376,30 @@ class AskItem {
 }
 
 /// What I shared on other people's asks, with feedback.
+/// Connects on a profile: an ask this member answered, who asked it, how they answered (never the contact itself),
+/// the asker's feedback and how the ask ended.
 class Deal {
   final String postId, postTitle, ownerName, ownerCompany, ownerHandle, kind;
+  final String? postSlug, category, categoryLabel, ownerUid, ownerType, ownerPhotoUrl, outcome, quote, readyWhen;
+  final int ownerVerification;
+  final bool canDo;
   final int? rating;
   final String? reaction;
   final DateTime createdAt;
   /// the owner chose them for this ask
   final bool won;
-  Deal({required this.postId, required this.postTitle, required this.ownerName, required this.ownerCompany, required this.ownerHandle, required this.kind, this.rating, this.reaction, required this.createdAt, this.won = false});
+  Deal({required this.postId, required this.postTitle, required this.ownerName, required this.ownerCompany, required this.ownerHandle, required this.kind, this.rating, this.reaction, required this.createdAt, this.won = false,
+      this.postSlug, this.category, this.categoryLabel, this.ownerUid, this.ownerType, this.ownerPhotoUrl, this.ownerVerification = 1, this.outcome, this.canDo = false, this.quote, this.readyWhen});
+  String get askerName => (ownerType ?? 'entrepreneur') == 'entrepreneur' && ownerCompany.isNotEmpty ? ownerCompany : ownerName;
+  String get categoryText => category == 'other' && (categoryLabel ?? '').isNotEmpty ? categoryLabel! : (kCategoryShort[category] ?? 'Ask');
   factory Deal.fromJson(Map j) => Deal(
         postId: '${j['postId']}', postTitle: '${j['postTitle']}', ownerName: '${j['ownerName']}', ownerCompany: '${j['ownerCompany'] ?? ''}',
         ownerHandle: '${j['ownerHandle'] ?? ''}', kind: '${j['kind']}', rating: (j['rating'] as num?)?.toInt(), reaction: j['reaction'] as String?,
         createdAt: _ms(j['createdAt']), won: j['won'] == true,
+        postSlug: j['postSlug'] as String?, category: j['category'] as String?, categoryLabel: j['categoryLabel'] as String?,
+        ownerUid: j['ownerUid'] as String?, ownerType: j['ownerType'] as String?, ownerPhotoUrl: j['ownerPhotoURL'] as String?,
+        ownerVerification: (j['ownerVerification'] as num?)?.toInt() ?? 1, outcome: j['outcome'] as String?,
+        canDo: j['canDo'] == true, quote: j['quote'] as String?, readyWhen: j['readyWhen'] as String?,
       );
 }
 

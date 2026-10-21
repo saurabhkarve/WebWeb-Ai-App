@@ -1684,5 +1684,15 @@
   "Reply opens with I can do this: add your price and when you can do it, so the asker can compare. A note or photo is optional.": "उत्तर \"हांव हें करूंक शकता\" हाचेवांगडा उगडटा: तुमचें मोल आनी केन्ना करूंक शकतात तें जोडात, जाका लागून विचारपी तुळा करूंक शकता. टीप वा फोटो ऐच्छीक.",
   "Tap Ask to post what you need. When you find someone, close your ask and pick who you chose: they hear they won the job.": "जाय तें पोस्ट करपाक Ask चेर टॅप करात. कोण मेळ्ळो जाल्यार तुमची गरज बंद करात आनी वेंचिल्लो मनीस वेंचात: ताका काम मेळ्ळें हें कळयतले.",
   "Your week, and this tour": "तुमचो सप्तक, आनी ही टूर",
-  "Every Monday, Your week shows your leads, replies, jobs won and your rank. Find it here, along with Leads for you and this tour.": "दर सोमारा, तुमचो सप्तक तुमच्यो लीड, उत्तरां, जिखिल्लीं कामां आनी तुमचो क्रमांक दाखयता. तो हांगा मेळटलो, तुमचेखातीर लीड आनी ही टूर वांगडा."
+  "Every Monday, Your week shows your leads, replies, jobs won and your rank. Find it here, along with Leads for you and this tour.": "दर सोमारा, तुमचो सप्तक तुमच्यो लीड, उत्तरां, जिखिल्लीं कामां आनी तुमचो क्रमांक दाखयता. तो हांगा मेळटलो, तुमचेखातीर लीड आनी ही टूर वांगडा.",
+  "Asks you answered. Only the asker sees your contact.": "तुमी जाप दिल्ल्यो गरजो. तुमचो संपर्क फकत विचारप्याकच दिसता.",
+  "Asks {name} answered. Contacts stay private between them and the asker.": "{name} हांणी जाप दिल्ल्यो गरजो. संपर्क तांच्या आनी विचारप्याच्या मदीं खाजगी उरतात.",
+  "{name}'s ask": "{name} हांची गरज",
+  "Sent a photo": "फोटो धाडलो",
+  "Replied": "जाप दिलो",
+  "Won this job": "हें काम मेळ्ळें",
+  "Open": "उक्ती",
+  "from the asker": "विचारप्या कडल्यान",
+  "Photo updates": "फोटो अपडेट",
+  "{n} answered": "{n} जाप दिल्ले"
 }
