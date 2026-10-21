@@ -22,6 +22,7 @@ import 'ask.dart';
 import 'connect.dart';
 import 'edit_profile.dart';
 import 'find.dart';
+import 'leads.dart';
 import 'post_detail.dart';
 import 'profile.dart';
 import 'service_contacts_sheet.dart';
@@ -460,6 +461,8 @@ class _AccountMenu extends StatelessWidget {
             child: ListView(padding: const EdgeInsets.all(8), children: [
               item(WI.user, 'View profile', () => push(const ProfileScreen())),
               item(WI.edit, 'Edit profile', () => push(EditProfileScreen(profile: me))),
+              item(WI.sparkle, 'Leads for you', () => push(SubPage(title: t('Leads for you'), body: const LeadsScreen()))),
+              item(WI.deals, 'Your week', () => push(SubPage(title: t('Your week'), body: const WeekScreen()))),
               item(WI.bookmark, 'Saved asks', () => push(const SavedPostsScreen())),
               // help lives on the website so articles stay current without an app update
               item(WI.help, 'Help & Support', () {

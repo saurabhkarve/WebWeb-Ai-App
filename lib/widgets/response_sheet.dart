@@ -6,16 +6,21 @@ import '../auth_provider.dart';
 import '../i18n.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'p1.dart';
 
 /// Existing response being edited (web: ResponseSheet `existing`).
 class ExistingResponse {
   final String kind;
   final String? text, imageUrl;
-  const ExistingResponse(this.kind, {this.text, this.imageUrl});
+  /// an offer ("I can do this"), with its price and when
+  final bool canDo;
+  final String? quote, readyWhen;
+  const ExistingResponse(this.kind, {this.text, this.imageUrl, this.canDo = false, this.quote, this.readyWhen});
 }
 
-/// Bottom sheet: reply to an ask in one step, a note with an optional photo (or a photo on its own), like the web's
-/// response-sheet.tsx. Passing on someone's number is Refer's job, so there is no "share my contact" here.
+/// Bottom sheet: reply to an ask in one step, like the web's response-sheet.tsx. It opens on "I can do this", an offer
+/// that needs no words (a price and when are optional chips the asker can compare), or "Just a note": a note with an
+/// optional photo (or a photo on its own). Passing on someone's number is Refer's job, so there is no "share my contact" here.
 /// Resolves true when a reply was sent.
 Future<bool> showResponseSheet(BuildContext context, String postId, {ExistingResponse? existing}) async {
   final r = await showModalBottomSheet<bool>(
@@ -40,6 +45,10 @@ class _ResponseSheet extends StatefulWidget {
 
 class _ResponseSheetState extends State<_ResponseSheet> {
   late final _text = TextEditingController(text: widget.existing?.text ?? '');
+  // a new reply starts as an offer; an edited one keeps what it was
+  late bool _canDo = widget.existing == null || widget.existing!.canDo;
+  late final _quote = TextEditingController(text: widget.existing?.quote ?? '');
+  late String? _when = widget.existing?.readyWhen;
   XFile? _file;
   late String? _kept = widget.existing?.imageUrl;
   bool _busy = false;
@@ -49,6 +58,7 @@ class _ResponseSheetState extends State<_ResponseSheet> {
   bool get _hasPhoto => _file != null || _kept != null;
   bool get _ready {
     final n = _text.text.trim().length;
+    if (_canDo) return n != 1;
     return n >= 2 || (n == 0 && _hasPhoto);
   }
 
@@ -62,6 +72,11 @@ class _ResponseSheetState extends State<_ResponseSheet> {
       final note = _text.text.trim();
       final body = <String, dynamic>{'kind': 'info'};
       if (note.isNotEmpty) body['text'] = note;
+      if (_canDo) {
+        body['canDo'] = true;
+        if (_quote.text.trim().isNotEmpty) body['quote'] = _quote.text.trim();
+        if (_when != null) body['readyWhen'] = _when;
+      }
       final imageUrl = _file != null ? await api.uploadImage(await _file!.readAsBytes(), _file!.name) : _kept;
       if (imageUrl != null) body['imageUrl'] = imageUrl;
       _editing ? await api.put('/posts/${widget.postId}/share', body) : await api.post('/posts/${widget.postId}/share', body);
@@ -79,6 +94,7 @@ class _ResponseSheetState extends State<_ResponseSheet> {
   @override
   void dispose() {
     _text.dispose();
+    _quote.dispose();
     super.dispose();
   }
 
@@ -95,16 +111,84 @@ class _ResponseSheetState extends State<_ResponseSheet> {
             GestureDetector(onTap: () => Navigator.pop(context), child: WIcon(WI.close, size: 24, color: p.text)),
           ]),
           const SizedBox(height: 12),
+          // what kind of reply: an offer to do it, or just a note
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(99)),
+            child: Row(children: [
+              for (final v in [true, false])
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _canDo = v),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        gradient: _canDo == v && v ? kGoldGradient : null,
+                        color: _canDo == v && !v ? p.canvas : null,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(v ? '✓ ${t('I can do this')}' : t('Just a note'),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _canDo == v ? (v ? kInk : p.text) : p.muted)),
+                    ),
+                  ),
+                ),
+            ]),
+          ),
+          if (_canDo) ...[
+            const SizedBox(height: 12),
+            Text(t('Price (optional)'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+            const SizedBox(height: 4),
+            TextField(
+              controller: _quote,
+              maxLength: 40,
+              style: const TextStyle(fontSize: 16),
+              decoration: InputDecoration(
+                hintText: t('e.g. ₹18 per box'),
+                hintStyle: TextStyle(color: p.muted),
+                counterText: '',
+                isDense: true,
+                filled: true,
+                fillColor: p.field,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: p.border)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: p.border)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: p.text)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(t('When can you do it?'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final e in kReadyLabel.entries)
+                GestureDetector(
+                  onTap: () => setState(() => _when = _when == e.key ? null : e.key),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _when == e.key ? kGold.withValues(alpha: .25) : null,
+                      border: Border.all(color: _when == e.key ? kGold : p.border),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(t(e.value), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _when == e.key ? p.text : p.muted)),
+                  ),
+                ),
+            ]),
+            const SizedBox(height: 12),
+          ] else
+            const SizedBox(height: 12),
           TextField(
             controller: _text,
-            autofocus: true,
-            minLines: 4,
+            autofocus: !_canDo,
+            minLines: _canDo ? 2 : 4,
             maxLines: 6,
             maxLength: 300,
             onChanged: (_) => setState(() {}),
             style: const TextStyle(fontSize: 16),
             decoration: InputDecoration(
-              hintText: t('e.g. We can supply 2000 boxes/month at ₹18 each, delivery in 2 days.'),
+              hintText: t(_canDo ? 'Add a note (optional)' : 'e.g. We can supply 2000 boxes/month at ₹18 each, delivery in 2 days.'),
               hintStyle: TextStyle(color: p.muted),
               // the count shows near the 300 limit
               counterText: _text.text.length > 240 ? '${_text.text.length}/300' : '',

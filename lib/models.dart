@@ -126,6 +126,8 @@ class Profile {
   final List<String> services, skills;
   final int contributions;
   final int? statPosts, statShared;
+  /// asks whose owner chose them ("deals won")
+  final int statWon;
   /// 0 none, 1 mobile verified, 2 documents, 3 owner verified
   final int verification;
   /// WEBWEB Premium: given only by an admin, shown next to the earned badge
@@ -142,7 +144,7 @@ class Profile {
     required this.uid, required this.handle, required this.name, required this.company, required this.userType,
     required this.category, required this.location, this.photoUrl, this.bannerUrl, this.gstin, this.completion, this.bio, this.experience, this.education,
     this.contactMasked, this.services = const [], this.skills = const [], this.contributions = 0,
-    this.statPosts, this.statShared, this.verification = 1, this.premium = false, this.plan, this.hasUpdate = false, this.upi = const [], required this.createdAt,
+    this.statPosts, this.statShared, this.statWon = 0, this.verification = 1, this.premium = false, this.plan, this.hasUpdate = false, this.upi = const [], required this.createdAt,
   });
 
   bool get isEntrepreneur => userType == 'entrepreneur';
@@ -160,7 +162,7 @@ class Profile {
       education: j['education'] as String?, contactMasked: j['contactMasked'] as String?,
       services: _strings(j['services']), skills: _strings(j['skills']),
       contributions: (j['contributions'] as num?)?.toInt() ?? (stats?['contributions'] as num?)?.toInt() ?? 0,
-      statPosts: (stats?['posts'] as num?)?.toInt(), statShared: (stats?['shared'] as num?)?.toInt(),
+      statPosts: (stats?['posts'] as num?)?.toInt(), statShared: (stats?['shared'] as num?)?.toInt(), statWon: (stats?['won'] as num?)?.toInt() ?? 0,
       verification: (j['verificationLevel'] as num?)?.toInt() ?? 1, premium: j['premium'] == true, plan: j['plan'] as String?, hasUpdate: stats?['hasUpdate'] == true,
       upi: [for (final u in (j['upi'] as List?) ?? const []) UpiId.fromJson(u as Map)],
       createdAt: _ms(j['createdAt']),
@@ -182,7 +184,10 @@ class ResponseLog {
   /// on the card's latest replies: members' reactions and replies to this reply, and mine
   final int reactionsCount, repliesCount;
   final String? myReaction;
-  ResponseLog({required this.uid, required this.name, required this.handle, required this.kind, this.userType = 'entrepreneur', this.company = '', this.verification = 0, this.photoUrl, this.reaction, this.rating, this.text, this.imageUrl, required this.createdAt, this.reactionsCount = 0, this.repliesCount = 0, this.myReaction});
+  /// "I can do this": an offer, with an optional price and when (today | week | month)
+  final bool canDo;
+  final String? quote, readyWhen;
+  ResponseLog({required this.uid, required this.name, required this.handle, required this.kind, this.userType = 'entrepreneur', this.company = '', this.verification = 0, this.photoUrl, this.reaction, this.rating, this.text, this.imageUrl, required this.createdAt, this.reactionsCount = 0, this.repliesCount = 0, this.myReaction, this.canDo = false, this.quote, this.readyWhen});
   factory ResponseLog.fromJson(Map j) => ResponseLog(
         uid: '${j['uid']}', name: '${j['name']}', handle: '${j['handle'] ?? ''}', kind: '${j['kind']}', photoUrl: j['photoURL'] as String?,
         userType: '${j['userType'] ?? 'entrepreneur'}', company: '${j['company'] ?? ''}', verification: (j['verification'] as num?)?.toInt() ?? 0,
@@ -190,6 +195,7 @@ class ResponseLog {
         text: j['text'] as String?, imageUrl: j['imageUrl'] as String?,
         reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, repliesCount: (j['repliesCount'] as num?)?.toInt() ?? 0,
         myReaction: j['myReaction'] as String?,
+        canDo: j['canDo'] == true, quote: j['quote'] as String?, readyWhen: j['readyWhen'] as String?,
       );
 }
 
@@ -253,6 +259,13 @@ class Post {
   int viewsCount;
   bool reacted, reposted, bookmarked;
   String? myReaction;
+  /// how the ask ended (found_here | found_elsewhere | not_needed); a closed ask takes no new replies
+  final String? outcome;
+  /// the member the owner chose (found here)
+  final String? wonBy;
+  /// on "Leads for you": why it fits, and whether the member has seen it yet
+  final String? leadReason;
+  final bool leadNew;
 
   Post({
     required this.id, required this.kind, required this.authorUid, required this.authorName, required this.authorCompany,
@@ -260,7 +273,10 @@ class Post {
     this.urgency, this.matchReason, this.slug, this.categoryLabel, this.authorType = 'entrepreneur', this.authorVerification = 1, this.authorPremium = false, this.authorPlan, this.distanceM, this.radiusM, this.lat, this.lng, this.editedAt, this.repostedByName, this.repostedByHandle, this.repostedBy, this.repostedAt, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
     this.recentResponses = const [], this.latestReplies = const [], this.referrers = const [], this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0, this.viewsCount = 0,
     this.reacted = false, this.reposted = false, this.bookmarked = false, this.myReaction,
+    this.outcome, this.wonBy, this.leadReason, this.leadNew = false,
   });
+
+  bool get closed => outcome != null;
 
   bool get isRequirement => kind == 'requirement';
   String get shownName => authorType == 'entrepreneur' && authorCompany.isNotEmpty ? authorCompany : authorName;
@@ -289,6 +305,7 @@ class Post {
         reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, viewsCount: (j['viewsCount'] as num?)?.toInt() ?? 0, repostsCount: (j['repostsCount'] as num?)?.toInt() ?? 0,
         referralsCount: (j['referralsCount'] as num?)?.toInt() ?? 0, reacted: j['reacted'] == true, reposted: j['reposted'] == true,
         bookmarked: j['bookmarked'] == true, myReaction: j['myReaction'] as String? ?? (j['reacted'] == true ? 'heart' : null),
+        outcome: j['outcome'] as String?, wonBy: j['wonBy'] as String?, leadReason: j['leadReason'] as String?, leadNew: j['leadNew'] == true,
       );
 }
 
@@ -299,11 +316,13 @@ class MyResponse {
   /// your own content (info text / photo), for editing
   final String? text, imageUrl;
   final int? rating;
-  const MyResponse({required this.shared, this.kind, this.askStatus, this.ownerReaction, this.text, this.imageUrl, this.rating});
+  final bool canDo;
+  final String? quote, readyWhen;
+  const MyResponse({required this.shared, this.kind, this.askStatus, this.ownerReaction, this.text, this.imageUrl, this.rating, this.canDo = false, this.quote, this.readyWhen});
   factory MyResponse.fromJson(Map j) => MyResponse(
         shared: j['shared'] == true, kind: j['kind'] as String?, askStatus: j['askStatus'] as String?,
         ownerReaction: j['ownerReaction'] as String?, text: j['text'] as String?, imageUrl: j['imageUrl'] as String?,
-        rating: (j['rating'] as num?)?.toInt(),
+        rating: (j['rating'] as num?)?.toInt(), canDo: j['canDo'] == true, quote: j['quote'] as String?, readyWhen: j['readyWhen'] as String?,
       );
 }
 
@@ -316,27 +335,32 @@ class ContactShare {
   final int? rating;
   final bool revealed;
   final DateTime createdAt;
+  final bool canDo;
+  final String? quote, readyWhen;
   ContactShare({
     this.id = '', required this.sharerUid, required this.sharerName, required this.sharerCompany, required this.kind, this.sharerType, this.sharerHandle,
     this.sharerPhotoUrl, this.askStatus, this.ownerReaction, this.payload, this.imageUrl, this.rating, required this.revealed, required this.createdAt,
+    this.canDo = false, this.quote, this.readyWhen,
   });
   factory ContactShare.fromJson(Map j) => ContactShare(
         id: '${j['id'] ?? j['sharerUid']}', sharerUid: '${j['sharerUid']}', sharerName: '${j['sharerName']}', sharerCompany: '${j['sharerCompany'] ?? ''}', kind: '${j['kind']}',
         sharerType: j['sharerType'] as String?, sharerHandle: j['sharerHandle'] as String?, sharerPhotoUrl: j['sharerPhotoURL'] as String?, askStatus: j['askStatus'] as String?,
         ownerReaction: j['ownerReaction'] as String?, payload: j['payload'] as String?, imageUrl: j['imageUrl'] as String?, rating: (j['rating'] as num?)?.toInt(),
         revealed: j['revealed'] == true, createdAt: _ms(j['createdAt']),
+        canDo: j['canDo'] == true, quote: j['quote'] as String?, readyWhen: j['readyWhen'] as String?,
       );
 }
 
 /// A third party's contact referred on an ask (owner sees all; a referrer sees their own).
 class Referral {
   final String id, name, phone;
-  final String? note, referrerName, referrerHandle;
+  final String? note, referrerName, referrerHandle, referrerUid, referrerPhotoUrl;
   final DateTime createdAt;
-  Referral({required this.id, required this.name, required this.phone, this.note, this.referrerName, this.referrerHandle, required this.createdAt});
+  Referral({required this.id, required this.name, required this.phone, this.note, this.referrerName, this.referrerHandle, this.referrerUid, this.referrerPhotoUrl, required this.createdAt});
   factory Referral.fromJson(Map j) => Referral(
         id: '${j['id']}', name: '${j['name']}', phone: '${j['phone']}', note: j['note'] as String?,
-        referrerName: j['referrerName'] as String?, referrerHandle: j['referrerHandle'] as String?, createdAt: _ms(j['createdAt']),
+        referrerName: j['referrerName'] as String?, referrerHandle: j['referrerHandle'] as String?,
+        referrerUid: j['referrerUid'] as String?, referrerPhotoUrl: j['referrerPhotoURL'] as String?, createdAt: _ms(j['createdAt']),
       );
 }
 
@@ -357,12 +381,48 @@ class Deal {
   final int? rating;
   final String? reaction;
   final DateTime createdAt;
-  Deal({required this.postId, required this.postTitle, required this.ownerName, required this.ownerCompany, required this.ownerHandle, required this.kind, this.rating, this.reaction, required this.createdAt});
+  /// the owner chose them for this ask
+  final bool won;
+  Deal({required this.postId, required this.postTitle, required this.ownerName, required this.ownerCompany, required this.ownerHandle, required this.kind, this.rating, this.reaction, required this.createdAt, this.won = false});
   factory Deal.fromJson(Map j) => Deal(
         postId: '${j['postId']}', postTitle: '${j['postTitle']}', ownerName: '${j['ownerName']}', ownerCompany: '${j['ownerCompany'] ?? ''}',
         ownerHandle: '${j['ownerHandle'] ?? ''}', kind: '${j['kind']}', rating: (j['rating'] as num?)?.toInt(), reaction: j['reaction'] as String?,
-        createdAt: _ms(j['createdAt']),
+        createdAt: _ms(j['createdAt']), won: j['won'] == true,
       );
+}
+
+// ===================== leads & your week (P1) =====================
+
+/// "Leads for you" on the Connect header: new (unseen), open, and arrived this week.
+class LeadSummary {
+  final int unseen, open, week;
+  final String? category, location;
+  /// false: nothing to match on yet, so the header asks what they do
+  final bool hasTrade;
+  const LeadSummary({this.unseen = 0, this.open = 0, this.week = 0, this.category, this.location, this.hasTrade = true});
+  factory LeadSummary.fromJson(Map j) => LeadSummary(
+        unseen: (j['unseen'] as num?)?.toInt() ?? 0, open: (j['open'] as num?)?.toInt() ?? 0, week: (j['week'] as num?)?.toInt() ?? 0,
+        category: j['category'] as String?, location: j['location'] as String?, hasTrade: j['hasTrade'] != false,
+      );
+}
+
+/// "Your week": the last 7 days, and rank in trade (and area).
+class WeekStats {
+  final String? category, location;
+  final int leads, replied, won, wonTotal, askViews, responsesReceived, newAsksInTrade, openLeads;
+  final int? rank, rankOf;
+  final String? rankArea;
+  const WeekStats({this.category, this.location, this.leads = 0, this.replied = 0, this.won = 0, this.wonTotal = 0, this.askViews = 0, this.responsesReceived = 0, this.newAsksInTrade = 0, this.openLeads = 0, this.rank, this.rankOf, this.rankArea});
+  bool get hasNews => leads + replied + won + responsesReceived + askViews > 0;
+  factory WeekStats.fromJson(Map j) {
+    final r = j['rank'] as Map?;
+    int n(String k) => (j[k] as num?)?.toInt() ?? 0;
+    return WeekStats(
+      category: j['category'] as String?, location: j['location'] as String?, leads: n('leads'), replied: n('replied'), won: n('won'),
+      wonTotal: n('wonTotal'), askViews: n('askViews'), responsesReceived: n('responsesReceived'), newAsksInTrade: n('newAsksInTrade'),
+      openLeads: n('openLeads'), rank: (r?['rank'] as num?)?.toInt(), rankOf: (r?['of'] as num?)?.toInt(), rankArea: r?['area'] as String?,
+    );
+  }
 }
 
 // ===================== catalog & stories =====================

@@ -13,6 +13,7 @@ import '../widgets.dart';
 import '../widgets/city_picker.dart';
 import '../widgets/area_map.dart';
 import '../widgets/image_grid.dart';
+import '../widgets/p1.dart';
 import '../widgets/post_card.dart';
 import '../widgets/reaction_picker.dart';
 import '../widgets/response_sheet.dart';
@@ -31,7 +32,10 @@ class PostDetailScreen extends StatefulWidget {
 
   /// "+N more" from the feed: open with the whole response log shown
   final bool expandResponses;
-  const PostDetailScreen({super.key, required this.postId, this.openReply = false, this.expandResponses = false});
+
+  /// "Did you find someone?" (the push, or the line on the feed): open with the question in view
+  final bool askOutcome;
+  const PostDetailScreen({super.key, required this.postId, this.openReply = false, this.expandResponses = false, this.askOutcome = false});
   @override
   State<PostDetailScreen> createState() => _PostDetailScreenState();
 }
@@ -40,6 +44,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Post? _post;
   // the owner's responses section, where "Review responses" scrolls to
   final _responsesKey = GlobalKey();
+  // the owner's "Did you find someone?"
+  final _outcomeKey = GlobalKey();
+  bool _scrolledToOutcome = false;
   // the full response log, once "+N more" is tapped
   List<ResponseLog>? _allResponses;
   bool _missing = false;
@@ -91,7 +98,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         _referrals = refs;
       });
       if (widget.expandResponses && _allResponses == null && p.isRequirement && p.authorUid != _me) _loadAllResponses();
-      if (widget.openReply && !_openedReply && p.isRequirement && p.authorUid != _me && mine != null && !mine.shared) {
+      if (widget.askOutcome && !_scrolledToOutcome && p.authorUid == _me) {
+        _scrolledToOutcome = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final c = _outcomeKey.currentContext;
+          if (c != null) Scrollable.ensureVisible(c, alignment: .3, duration: const Duration(milliseconds: 300));
+        });
+      }
+      if (widget.openReply && !_openedReply && p.isRequirement && !p.closed && p.authorUid != _me && mine != null && !mine.shared) {
         _openedReply = true;
         WidgetsBinding.instance.addPostFrameCallback((_) => _respond());
       }
@@ -101,7 +115,28 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   Future<void> _respond({ExistingResponse? existing}) async {
+    // the owner found someone (or no longer needs it): no new replies, though a reply already sent can still be edited
+    if (existing == null && _post!.closed) return toast(context, t('This ask is closed'));
     if (await showResponseSheet(context, _post!.id, existing: existing)) _load();
+  }
+
+  ExistingResponse _existing(MyResponse m) =>
+      ExistingResponse(m.kind ?? 'contact', text: m.text, imageUrl: m.imageUrl, canDo: m.canDo, quote: m.quote, readyWhen: m.readyWhen);
+
+  /// Who the owner can say they chose: everyone who replied or referred, once each.
+  List<Responder> get _responders {
+    final out = <Responder>[];
+    void add(String? uid, String? name, String? photo) {
+      if (uid == null || out.any((r) => r.uid == uid)) return;
+      out.add(Responder(uid, name ?? '', photo));
+    }
+    for (final s in _shares) {
+      add(s.sharerUid, s.sharerName, s.sharerPhotoUrl);
+    }
+    for (final r in _referrals) {
+      add(r.referrerUid, r.referrerName, r.referrerPhotoUrl);
+    }
+    return out;
   }
 
   Future<void> _run(Future<void> Function() fn) async {
@@ -219,6 +254,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final hasDetails = (post.locationPref ?? '').isNotEmpty || (post.budget ?? '').isNotEmpty || (post.urgency ?? '').isNotEmpty;
     // why you see this ask, as on the feed card
     final why = owner ? t('Your ask') : ((post.matchReason ?? '').isEmpty ? null : t(post.matchReason!));
+    final won = post.closed && post.wonBy != null && post.wonBy == _me;
 
     Widget iconBtn(WI icon, String label, VoidCallback onTap, {Color? color}) => Semantics(
           button: true,
@@ -280,7 +316,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   child: Text(t(post.categoryText).toUpperCase(),
                       maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.link)),
                 ),
-                if (why != null) ...[const SizedBox(width: 8), Flexible(child: GoldTag(why))],
+                if (post.closed) ...[const SizedBox(width: 8), Flexible(child: ClosedChip(post))]
+                else if (why != null) ...[const SizedBox(width: 8), Flexible(child: GoldTag(why))],
               ]),
               const SizedBox(height: 4),
               HashtagText(post.title ?? '', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, height: 1.3)),
@@ -307,6 +344,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 if ((post.radiusM ?? 0) > 0) InfoPill(gold: true, wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)}), onTap: () => showAskAreaSheet(context, post)),
               ]),
             ],
+            if (won) ...[const SizedBox(height: 12), WinnerBanner(ownerName: post.shownName)],
             if (isAsk) ...[
               // the whole log, once "All n" is open (the latest replies carry their own heading)
               if (_allResponses != null) ...[
@@ -340,7 +378,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 onReply: () {
                   final mine = _mine;
                   if (mine?.shared == true) {
-                    _respond(existing: ExistingResponse(mine!.kind ?? 'contact', text: mine.text, imageUrl: mine.imageUrl));
+                    _respond(existing: _existing(mine!));
                   } else {
                     _respond();
                   }
@@ -373,6 +411,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 onPressed: () => _message(post.authorUid, name: post.authorName, company: post.authorCompany, handle: post.authorHandle, photo: post.authorPhotoUrl, type: post.authorType),
               ),
             if (!owner && isAsk) _visitor(post, p),
+            // the owner: how the ask ended, or "Did you find someone?" (prominent once it is due, or when the push led here)
+            if (owner && isAsk)
+              Padding(
+                key: _outcomeKey,
+                padding: const EdgeInsets.only(bottom: 16),
+                child: OutcomeCard(post: post, responders: _responders, prominent: widget.askOutcome || outcomeDue(post), onChanged: _load),
+              ),
             if (owner && isAsk) KeyedSubtree(key: _responsesKey, child: _ownerSection(post, p)),
             if (!owner && _referrals.isNotEmpty) _myReferrals(p),
           ],
@@ -429,7 +474,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             label: t('Edit response'),
             height: 40,
             outlined: true,
-            onPressed: _busy ? null : () => _respond(existing: ExistingResponse(mine.kind ?? 'contact', text: mine.text, imageUrl: mine.imageUrl)),
+            onPressed: _busy ? null : () => _respond(existing: _existing(mine)),
           ),
         ),
         const SizedBox(width: 8),
@@ -617,10 +662,11 @@ class _ShareTileState extends State<_ShareTile> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(6)),
-            child: Text('${t(label[s.kind] ?? s.kind)} ${t('shared')}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            child: Text(s.canDo ? t('Offer') : '${t(label[s.kind] ?? s.kind)} ${t('shared')}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
           ),
         ]),
         const SizedBox(height: 8),
+        OfferChips(canDo: s.canDo, quote: s.quote, readyWhen: s.readyWhen),
         // what they shared: the owner only, once revealed
         if ((s.payload ?? '').isNotEmpty)
           Container(
@@ -649,7 +695,7 @@ class _ShareTileState extends State<_ShareTile> {
                           ),
                       ]),
           )
-        else
+        else if (!s.canDo)
           Row(children: [
             Expanded(
               child: Text(

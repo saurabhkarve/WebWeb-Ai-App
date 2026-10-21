@@ -436,6 +436,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   stat(u.statShared?.toString(), 'Connects'),
                   const TextSpan(text: ' · '),
                   stat('${u.contributions}', 'Contributions'),
+                  // deals won: asks whose owner chose them (only once there is one)
+                  if (u.statWon > 0) ...[const TextSpan(text: ' · 🏆 '), stat('${u.statWon}', u.statWon == 1 ? 'deal won' : 'deals won')],
                 ]),
                 textAlign: TextAlign.right,
                 style: TextStyle(fontSize: 12, height: 1.25, color: p.muted),

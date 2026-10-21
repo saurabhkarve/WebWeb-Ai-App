@@ -18,6 +18,7 @@ import '../widgets/story_viewer.dart';
 import '../widgets/tour.dart';
 import 'edit_profile.dart';
 import 'find.dart';
+import 'leads.dart';
 
 /// Connect (home), same as the web feed (feed-page.tsx): profile-strength strip, Updates row, then the
 /// Asks timeline with a business catalog block after every third ask. Pull down to refresh (the W draws
@@ -44,6 +45,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
   int _offset = 0;
   final _scroll = ScrollController();
   final _updatesKey = GlobalKey<_UpdatesBarState>();
+  final _todayKey = GlobalKey<TodayStripState>();
   Timer? _poll;
   bool _tourTried = false;
 
@@ -110,6 +112,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     await Future.wait([
       _load(),
       _updatesKey.currentState?.load() ?? Future.value(),
+      _todayKey.currentState?.load() ?? Future.value(),
       context.read<AuthProvider>().loadProfile(),
     ]);
   }
@@ -167,6 +170,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
     final firstAsk = posts?.indexWhere((x) => x.isRequirement) ?? -1;
     final children = <Widget>[
       const _StrengthNudge(),
+      // the daily surface: leads for you, and at the start of the week, your week
+      TodayStrip(key: _todayKey),
       const SizedBox(height: 12),
       RuleHeading(WI.updates, t('Updates')),
       const SizedBox(height: 6),
