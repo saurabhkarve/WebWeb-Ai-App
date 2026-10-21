@@ -99,7 +99,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       if (!_tourTried) {
         _tourTried = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) Tours.maybeShow(context, 'connect', kConnectTour);
+          if (mounted) Tours.maybeShow(context, kConnectTourId, kConnectTour);
         });
       }
     } catch (e) {
@@ -171,7 +171,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     final children = <Widget>[
       const _StrengthNudge(),
       // the daily surface: leads for you, and at the start of the week, your week
-      TodayStrip(key: _todayKey),
+      KeyedSubtree(key: Tours.key('today'), child: TodayStrip(key: _todayKey)),
       const SizedBox(height: 12),
       RuleHeading(WI.updates, t('Updates')),
       const SizedBox(height: 6),

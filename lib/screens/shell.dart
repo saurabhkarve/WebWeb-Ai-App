@@ -119,7 +119,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       _i = 0;
       _topTick++;
     });
-    Tours.start(context, 'connect', kConnectTour);
+    Tours.start(context, kConnectTourId, kConnectTour);
   }
 
   void _go(int k) {
