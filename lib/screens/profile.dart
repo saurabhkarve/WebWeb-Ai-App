@@ -1022,7 +1022,12 @@ class _ActionBtn extends StatelessWidget {
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   if (wi != null) WIcon(wi!, size: 16, color: fg, strokeWidth: 1.9, still: true),
                   if (wi != null && label.isNotEmpty) const SizedBox(width: 6),
-                  if (label.isNotEmpty) Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: fg))),
+                  // a long label (Hindi, Marathi…) wraps to a second line inside the button instead of being cut, as on the web
+                  if (label.isNotEmpty)
+                    Flexible(
+                      child: Text(label,
+                          maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, height: 1.15, fontWeight: FontWeight.w700, color: fg)),
+                    ),
                 ]),
               ),
             ),
