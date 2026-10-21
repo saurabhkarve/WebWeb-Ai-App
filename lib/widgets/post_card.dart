@@ -545,20 +545,24 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
           ]),
         ),
         Stack(clipBehavior: Clip.none, children: [
-          // one rounded block: a thin green edge on the left that follows the corners, and the wash fading down
+          // one rounded block lifted by a soft green shadow, the wash fading down inside it
           Positioned(
             left: -10,
             right: -10,
             top: 0,
             bottom: 12,
             child: IgnorePointer(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, stops: const [0, .45], colors: [green.withValues(alpha: .09), green.withValues(alpha: 0)]),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [BoxShadow(color: green.withValues(alpha: .28), blurRadius: 12, spreadRadius: -3, offset: const Offset(0, 2))],
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: const [0, .45],
+                    // opaque base under the wash so the shadow does not show through the block
+                    colors: [Color.alphaBlend(green.withValues(alpha: .09), p.canvas), p.canvas],
                   ),
-                  child: Align(alignment: Alignment.centerLeft, child: SizedBox(width: 2, height: double.infinity, child: ColoredBox(color: green.withValues(alpha: .4)))),
                 ),
               ),
             ),
