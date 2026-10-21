@@ -676,12 +676,16 @@ class _ShareTileState extends State<_ShareTile> {
               constraints: const BoxConstraints(minWidth: 36),
               padding: const EdgeInsets.symmetric(horizontal: 8),
               alignment: Alignment.center,
-              child: Text(s.ownerReaction == null ? '☺' : kReactionEmoji[s.ownerReaction] ?? '☺', style: TextStyle(fontSize: 18, color: p.muted)),
+              // the React heart used everywhere else (an emoji once a reaction is picked)
+              child: s.ownerReaction == null || kReactionEmoji[s.ownerReaction] == null
+                  ? WIcon(WI.heart, size: 20, color: p.muted)
+                  : Text(kReactionEmoji[s.ownerReaction]!, style: const TextStyle(fontSize: 18)),
             ),
           ),
           const Spacer(),
           GoldButton(
             label: t('Message'),
+            wi: WI.talk,
             height: 32,
             outlined: true,
             onPressed: () => openChat(

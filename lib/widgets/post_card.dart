@@ -555,7 +555,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
           ...more,
         ]),
         Padding(
-          padding: const EdgeInsets.only(left: 50, top: 10),
+          padding: const EdgeInsets.only(left: 50, top: 4),
           child: Container(
             decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)),
             child: quote,
