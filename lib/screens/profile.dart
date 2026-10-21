@@ -755,7 +755,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(color: _areaOpen == i ? kGold.withValues(alpha: .25) : p.field, borderRadius: BorderRadius.circular(20)),
-                  child: Text('${a['label']} · ${radius((a['radiusM'] as num?) ?? 0)}',
+                  child: Text('${t('${a['label']}')} · ${radius((a['radiusM'] as num?) ?? 0)}',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _areaOpen == i ? gold : null)),
                 ),
               ),
