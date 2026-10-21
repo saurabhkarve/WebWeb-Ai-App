@@ -291,7 +291,7 @@ class _AppHeader extends StatelessWidget {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(left: 4, right: 8),
-                child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: LogoInline(size: 34, markSize: 44, tagline: true, onTap: onHome)),
+                child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: LogoInline(size: 28, markSize: 36, tagline: true, onTap: onHome)),
               ),
             ),
             _Bell(notes: notes),
