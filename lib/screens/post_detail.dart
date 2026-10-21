@@ -346,24 +346,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             ],
             if (won) ...[const SizedBox(height: 12), WinnerBanner(ownerName: post.shownName)],
             if (isAsk) ...[
-              // the whole log, once "All n" is open (the latest replies carry their own heading)
-              if (_allResponses != null) ...[
-                const SizedBox(height: 16),
-                Row(children: [
-                  WIcon(WI.users, size: 20, color: p.text),
-                  const SizedBox(width: 8),
-                  Text(ResponseActivity.countLabel(post.sharesCount, post.referralsCount), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                ]),
-              ],
-              // the latest 3 replies in public, as on the card; "All" opens the whole log
+              // the latest replies in public, as on the card; "Show all" opens every reply and referral in the same style
               if (!owner && _allResponses == null) LatestReplies(post: post, onMore: _loadAllResponses),
-              if (!owner && _allResponses != null)
-                ResponseActivity(
-                  hideHeader: true,
-                  items: _allResponses!,
-                  total: post.sharesCount + post.referralsCount,
-                  referrals: post.referralsCount,
-                ),
+              if (!owner && _allResponses != null) AllReplies(post: post, items: _allResponses!),
             ],
             SizedBox(height: isAsk ? 12 : 20),
             if (isAsk)

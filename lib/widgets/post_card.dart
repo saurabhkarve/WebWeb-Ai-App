@@ -983,8 +983,6 @@ class LatestReplies extends StatelessWidget {
       return Padding(padding: const EdgeInsets.only(top: 12), child: Text(t('Be the first to respond'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)));
     }
     final shown = replies.length + referrers.fold<int>(0, (n, r) => n + r.n);
-    const bubble = BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(14), bottomLeft: Radius.circular(14), bottomRight: Radius.circular(14));
-    void openProfile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
     // open on the card (no panel of its own): a heading at the card's edge (talk icon, label, count, a hairline that
     // fades out), then the replies as compact bubbles set in under the author's name as a thread (the author avatar's 40
     // plus its 10 gap), and Show all n last, as on the web
@@ -1011,67 +1009,7 @@ class LatestReplies extends StatelessWidget {
           // set in less on a phone, as on the web
           padding: const EdgeInsets.only(left: 20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        for (final r in replies)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              GestureDetector(onTap: () => openProfile(r.handle), child: Avatar(name: r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name, photoUrl: r.photoUrl, size: 24)),
-              const SizedBox(width: 8),
-              Expanded(
-                // react and reply from the name line, as on the web
-                child: ReplySocial(
-                  key: ValueKey('${post.id}-${r.uid}'),
-                  postId: post.id,
-                  reply: r,
-                  meta: [
-                    Flexible(
-                      child: GestureDetector(
-                        onTap: () => openProfile(r.handle),
-                        child: Text(r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name,
-                            maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .85))),
-                      ),
-                    ),
-                    if (r.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: r.verification, size: 12)],
-                    const SizedBox(width: 6),
-                    Text(timeAgo(r.createdAt), style: TextStyle(fontSize: 11, color: p.muted)),
-                  ],
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: r.kind == 'info' && ((r.text ?? '').isNotEmpty || r.canDo)
-                        ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            OfferChips(canDo: r.canDo, quote: r.quote, readyWhen: r.readyWhen),
-                            // the bubble is ReplySocial's, with the name and time on top
-                            if ((r.text ?? '').isNotEmpty)
-                              HashtagText(r.text!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, height: 1.35, color: p.text.withValues(alpha: .75))),
-                            // a photo sent with the note
-                            if ((r.imageUrl ?? '').isNotEmpty)
-                              Padding(padding: const EdgeInsets.only(top: 4), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 96, height: 64))),
-                          ])
-                        : r.kind == 'media' && (r.imageUrl ?? '').isNotEmpty
-                            ? ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 96, height: 64))
-                            : Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                                Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                                decoration: BoxDecoration(borderRadius: bubble, border: Border.all(color: p.border)),
-                                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                  WIcon(WI.lock, size: 13, color: p.muted),
-                                  const SizedBox(width: 4),
-                                  Flexible(child: Text(t('Shared a contact privately'), style: TextStyle(fontSize: 11, color: p.muted))),
-                                ]),
-                              ),
-                                // the number went to the asker alone: anyone else can ask the replier for it
-                                RequestShare(
-                                  replyUid: r.uid,
-                                  askerUid: post.authorUid,
-                                  postId: post.id,
-                                  peer: Peer(uid: r.uid, name: r.name, company: r.company, handle: r.handle, userType: r.userType, photoUrl: r.photoUrl, verification: r.verification),
-                                ),
-                              ]),
-                  ),
-                ),
-              ),
-            ]),
-          ),
+        for (final r in replies) Padding(padding: const EdgeInsets.only(top: 6), child: ReplyBubble(post: post, r: r)),
         if (referrers.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -1098,6 +1036,137 @@ class LatestReplies extends StatelessWidget {
               ),
             ),
           ),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+/// One reply as a compact bubble (web latest-replies.tsx ReplyBubble): who and when with the asker's feedback, what
+/// they said (or that a contact was shared), and React and Reply from the name line.
+class ReplyBubble extends StatelessWidget {
+  final Post post;
+  final ResponseLog r;
+  const ReplyBubble({super.key, required this.post, required this.r});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    const bubble = BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(14), bottomLeft: Radius.circular(14), bottomRight: Radius.circular(14));
+    void openProfile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        GestureDetector(onTap: () => openProfile(r.handle), child: Avatar(name: r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name, photoUrl: r.photoUrl, size: 24)),
+        const SizedBox(width: 8),
+        Expanded(
+          // react and reply from the name line, as on the web
+          child: ReplySocial(
+            key: ValueKey('${post.id}-${r.uid}'),
+            postId: post.id,
+            reply: r,
+            meta: [
+              Flexible(
+                child: GestureDetector(
+                  onTap: () => openProfile(r.handle),
+                  child: Text(r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name,
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .85))),
+                ),
+              ),
+              if (r.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: r.verification, size: 12)],
+              const SizedBox(width: 6),
+              Text(timeAgo(r.createdAt), style: TextStyle(fontSize: 11, color: p.muted)),
+              // the asker's feedback on this reply
+              if (r.rating != null || r.reaction != null) ...[
+                const SizedBox(width: 4),
+                Text('${r.rating == 1 ? '👍' : r.rating == -1 ? '👎' : ''}${r.reaction == null ? '' : kReactionEmoji[r.reaction] ?? ''}', style: const TextStyle(fontSize: 11)),
+              ],
+            ],
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: r.kind == 'info' && ((r.text ?? '').isNotEmpty || r.canDo)
+                  ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      OfferChips(canDo: r.canDo, quote: r.quote, readyWhen: r.readyWhen),
+                      // the bubble is ReplySocial's, with the name and time on top
+                      if ((r.text ?? '').isNotEmpty)
+                        HashtagText(r.text!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, height: 1.35, color: p.text.withValues(alpha: .75))),
+                      // a photo sent with the note
+                      if ((r.imageUrl ?? '').isNotEmpty)
+                        Padding(padding: const EdgeInsets.only(top: 4), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 96, height: 64))),
+                    ])
+                  : r.kind == 'media' && (r.imageUrl ?? '').isNotEmpty
+                      ? ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 96, height: 64))
+                      : Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                          Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                          decoration: BoxDecoration(borderRadius: bubble, border: Border.all(color: p.border)),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            WIcon(WI.lock, size: 13, color: p.muted),
+                            const SizedBox(width: 4),
+                            Flexible(child: Text(t('Shared a contact privately'), style: TextStyle(fontSize: 11, color: p.muted))),
+                          ]),
+                        ),
+                          // the number went to the asker alone: anyone else can ask the replier for it
+                          RequestShare(
+                            replyUid: r.uid,
+                            askerUid: post.authorUid,
+                            postId: post.id,
+                            peer: Peer(uid: r.uid, name: r.name, company: r.company, handle: r.handle, userType: r.userType, photoUrl: r.photoUrl, verification: r.verification),
+                          ),
+                        ]),
+            ),
+          ),
+        ),
+      ]);
+  }
+}
+
+/// Every reply and referral on an ask ("Show all n" on the card opens it on the ask page; web AllReplies), drawn like
+/// the card's latest replies: the same heading, the replies as bubbles members can react and reply to, and who referred.
+class AllReplies extends StatelessWidget {
+  final Post post;
+  final List<ResponseLog> items;
+  const AllReplies({super.key, required this.post, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    final p = Pal.of(context);
+    void openProfile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
+    String shown(ResponseLog r) => r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name;
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          WIcon(WI.talk, size: 16, color: kGold.withValues(alpha: .8)),
+          const SizedBox(width: 8),
+          Text(ResponseActivity.countLabel(post.sharesCount, post.referralsCount), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+          const SizedBox(width: 8),
+          Expanded(child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [kGold.withValues(alpha: .3), p.border, p.border.withValues(alpha: 0)])))),
+        ]),
+        Padding(
+          padding: const EdgeInsets.only(left: 20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            for (final r in items)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: r.kind == 'referral'
+                    ? Row(children: [
+                        GestureDetector(onTap: () => openProfile(r.handle), child: Avatar(name: shown(r), photoUrl: r.photoUrl, size: 24)),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text.rich(
+                            TextSpan(children: [
+                              TextSpan(text: shown(r), style: TextStyle(fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .85))),
+                              TextSpan(text: ' ${t('referred a contact')} · ${timeAgo(r.createdAt)}'),
+                            ]),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: p.muted),
+                          ),
+                        ),
+                      ])
+                    : ReplyBubble(post: post, r: r),
+              ),
           ]),
         ),
       ]),
