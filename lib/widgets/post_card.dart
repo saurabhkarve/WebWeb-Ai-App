@@ -565,7 +565,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
           ),
         ),
         if (ask) ...[
-          LatestReplies(post: post, onMore: () => _openDetail(expandResponses: true)),
+          LatestReplies(post: post, hideEmpty: true, onMore: () => _openDetail(expandResponses: true)),
           const SizedBox(height: 12),
           PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
         ] else
@@ -931,7 +931,9 @@ class _HairlinePainter extends BoxPainter {
 class LatestReplies extends StatelessWidget {
   final Post post;
   final VoidCallback onMore;
-  const LatestReplies({super.key, required this.post, required this.onMore});
+  /// a repost doesn't invite "Be the first to respond": nothing shows until there are replies
+  final bool hideEmpty;
+  const LatestReplies({super.key, required this.post, required this.onMore, this.hideEmpty = false});
 
   @override
   Widget build(BuildContext context) {
@@ -940,6 +942,7 @@ class LatestReplies extends StatelessWidget {
     final referrers = post.referrers;
     final total = post.sharesCount + post.referralsCount;
     if (total == 0) {
+      if (hideEmpty) return const SizedBox.shrink();
       return Padding(padding: const EdgeInsets.only(top: 12), child: Text(t('Be the first to respond'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)));
     }
     final shown = replies.length + referrers.fold<int>(0, (n, r) => n + r.n);
