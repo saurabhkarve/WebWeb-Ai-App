@@ -23,7 +23,7 @@ const kConnectTourId = 'connect3';
 const kConnectTour = [
   TourStep('Welcome to WebWeb', 'Businesses and job seekers near you ask for what they need here, and others answer with a contact. Here is a 30-second look around.'),
   TourStep('Leads for you', 'Asks that fit your business, picked for you every day. The number shows the new ones: tap to see them, and reply early.', 'today'),
-  TourStep('Today in your area', 'Rates, notices, tenders and events near you, new every morning, and a quick question. One card, not a feed.', 'today-area'),
+  TourStep('Today in your area', "Rates, notices, tenders and events near you, new every morning, and a quick question. A gold ring means there's something new.", 'today-area'),
   TourStep('Show your work', "Post a photo of a job you finished or new stock. It stays up for 24 hours, and we'll tell you how many businesses saw it.", 'updates'),
   TourStep('This is an ask', 'Someone needs something: staff, a supplier, a buyer or space. Tap it to read the full ask.', 'first-ask'),
   TourStep('The essentials at a glance', "What it is, where (and how far from you), the budget and how soon it's needed. Tap a chip to find similar asks.", 'chips'),

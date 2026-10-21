@@ -12,7 +12,6 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/city_picker.dart';
 import '../widgets/p1.dart' show kGreenDark;
-import '../widgets/tour.dart';
 
 /// P2 (docs/P2-MICRO-PLAN.md), as on the web: Today in your area with Today's question (components/today.tsx,
 /// /today), alerts for new asks (components/alert-sheet.tsx, /alerts) and the push nudge (components/push-nudge.tsx).
@@ -83,84 +82,6 @@ class RatePill extends StatelessWidget {
           if (c < 0) TextSpan(text: ' ▼${c.abs()}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.danger)),
         ]),
         style: const TextStyle(fontSize: 12),
-      ),
-    );
-  }
-}
-
-/// The top of Connect (in the Today strip, under Leads): the most useful rates and one other item, with a gold dot
-/// until Today is opened today, and the day's question while it's unanswered.
-class TodayCard extends StatelessWidget {
-  final TodayFeed feed;
-  final VoidCallback onOpened;
-  const TodayCard({super.key, required this.feed, required this.onOpened});
-
-  @override
-  Widget build(BuildContext context) {
-    if (feed.cluster == null || (feed.items.isEmpty && feed.poll == null)) return const SizedBox.shrink();
-    final p = Pal.of(context);
-    final rates = feed.items.where((i) => i.type == 'rates').expand((i) => i.rates).take(3).toList();
-    final other = feed.items.where((i) => i.type != 'rates').firstOrNull;
-    final yesterday = feed.day != feed.today;
-    final fresh = !feed.seen && !yesterday;
-    final q = feed.poll;
-    return KeyedSubtree(
-      key: Tours.key('today-area'),
-      child: Material(
-        color: Colors.transparent,
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: fresh ? LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [kGold.withValues(alpha: .14), kGold.withValues(alpha: .04)]) : null,
-            color: fresh ? null : p.card,
-            border: Border.all(color: fresh ? kGold.withValues(alpha: .6) : p.border),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: () async {
-              await openToday(context);
-              onOpened();
-            },
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  WIcon(WI.sun, size: 16, color: p.text),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text.rich(
-                      TextSpan(children: [
-                        TextSpan(text: t('Today in {place}', {'place': feed.cluster!})),
-                        TextSpan(text: ' · ${yesterday ? t('Yesterday') : dayLabel(feed.day!)}', style: TextStyle(fontWeight: FontWeight.w600, color: p.muted)),
-                      ]),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  if (fresh) Container(width: 10, height: 10, margin: const EdgeInsets.only(left: 6), decoration: const BoxDecoration(color: Color(0xFFE0A800), shape: BoxShape.circle)),
-                  const SizedBox(width: 6),
-                  Text('›', style: TextStyle(fontSize: 20, color: p.muted)),
-                ]),
-                if (rates.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(children: [for (final r in rates) Padding(padding: const EdgeInsets.only(right: 6), child: RatePill(r))]),
-                  ),
-                ],
-                if (other != null) ...[
-                  const SizedBox(height: 8),
-                  Text('${_icon[other.type]} ${_text(other).title}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14)),
-                ],
-                if (q != null && !q.answered && !q.closed) ...[
-                  const SizedBox(height: 6),
-                  Text('❓ ${_question(q)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.tagText)),
-                ],
-              ]),
-            ),
-          ),
-        ),
       ),
     );
   }

@@ -19,6 +19,7 @@ import '../widgets/tour.dart';
 import 'edit_profile.dart';
 import 'find.dart';
 import 'leads.dart';
+import 'p2.dart';
 
 /// Connect (home), same as the web feed (feed-page.tsx): profile-strength strip, Updates row, then the
 /// Asks timeline with a business catalog block after every third ask. Pull down to refresh (the W draws
@@ -170,8 +171,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
     final firstAsk = posts?.indexWhere((x) => x.isRequirement) ?? -1;
     final children = <Widget>[
       const _StrengthNudge(),
-      // the daily surface: leads for you, and at the start of the week, your week
-      KeyedSubtree(key: Tours.key('today'), child: TodayStrip(key: _todayKey)),
+      // at the start of the week, your week (leads and Today are circles in Updates)
+      TodayStrip(key: _todayKey),
       const SizedBox(height: 12),
       RuleHeading(WI.updates, t('Updates')),
       const SizedBox(height: 6),
@@ -330,6 +331,9 @@ const _updatesPage = 12;
 
 class _UpdatesBarState extends State<_UpdatesBar> {
   List<StoryGroup> _groups = [];
+  // the daily circles at the front: Leads for you and Today in your area
+  LeadSummary? _leads;
+  TodayFeed? _today;
   Set<String> _seen = {};
   bool _hasMore = false;
   Future<int>? _loadingMore;
@@ -357,8 +361,21 @@ class _UpdatesBarState extends State<_UpdatesBar> {
     load();
   }
 
+  Future<void> _daily() async {
+    final api = context.read<AuthProvider>().api;
+    await Future.wait([
+      api.get('/posts/leads/summary').then((d) {
+        if (mounted) setState(() => _leads = LeadSummary.fromJson(d as Map));
+      }).catchError((_) {}),
+      api.get('/today').then((d) {
+        if (mounted) setState(() => _today = TodayFeed.fromJson(d as Map));
+      }).catchError((_) {}),
+    ]);
+  }
+
   Future<void> load() async {
     _loadingMore = null;
+    _daily();
     try {
       final d = await context.read<AuthProvider>().api.get('/updates?limit=$_updatesPage&offset=0') as List;
       if (mounted) {
@@ -429,12 +446,89 @@ class _UpdatesBarState extends State<_UpdatesBar> {
 
   bool _allSeen(StoryGroup g) => g.items.every((it) => _seen.contains(it.id));
 
+  /// Leads for you as a circle: the count of new ones in gold on ink (or "Get leads" before they say what they do).
+  Widget? _leadsTile(Pal p) {
+    final l = _leads;
+    if (l == null || (l.hasTrade && l.open == 0)) return null;
+    if (!l.hasTrade) {
+      return _HookTile(
+        tourKey: Tours.key('today'),
+        label: t('Get leads'),
+        fresh: true,
+        onTap: () async {
+          final auth = context.read<AuthProvider>();
+          if (auth.profile == null) return;
+          if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: auth.profile!))) == true) auth.loadProfile();
+          _daily();
+        },
+        child: Container(color: kGold.withValues(alpha: .15), alignment: Alignment.center, child: WIcon(WI.sparkle, size: 28, color: p.tagText)),
+      );
+    }
+    final n = l.unseen;
+    return _HookTile(
+      tourKey: Tours.key('today'),
+      label: t(n > 0 ? 'New leads' : 'Leads'),
+      fresh: n > 0,
+      badge: const WIcon(WI.sparkle, size: 10, color: kInk, strokeWidth: 2.6),
+      onTap: () async {
+        await openLeads(context);
+        _daily();
+      },
+      child: Container(
+        // a shade above the dark page so the circle still reads as one
+        color: p.dark ? const Color(0xFF2E2E2E) : kInk,
+        alignment: Alignment.center,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(n > 0 ? (n > 99 ? '99+' : '$n') : '${l.open}', style: const TextStyle(fontSize: 22, height: 1, fontWeight: FontWeight.w800, color: Color(0xFFFFD84A))),
+          const SizedBox(height: 2),
+          Text(t(n > 0 ? 'new' : 'open').toUpperCase(), style: TextStyle(fontSize: 9, height: 1, letterSpacing: .5, fontWeight: FontWeight.w700, color: const Color(0xFFFFD84A).withValues(alpha: .7))),
+        ]),
+      ),
+    );
+  }
+
+  /// Today in your area as a circle: a sun and the date; "?" while today's question waits for an answer.
+  Widget? _todayTile(Pal p) {
+    final f = _today;
+    if (f == null || f.cluster == null || (f.items.isEmpty && f.poll == null)) return null;
+    final d = DateTime.parse('${f.day ?? f.today}T12:00:00Z');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final ask = f.poll != null && !f.poll!.answered && !f.poll!.closed;
+    final fg = p.dark ? const Color(0xFFFFE9A8) : kInk;
+    return _HookTile(
+      tourKey: Tours.key('today-area'),
+      label: t('Today'),
+      fresh: !f.seen && f.day == f.today,
+      badge: ask ? const Text('?', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kInk)) : null,
+      onTap: () async {
+        await openToday(context);
+        _daily();
+      },
+      child: Container(
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: p.dark ? const [Color(0xFF4A3B0B), Color(0xFF7A5A00)] : const [Color(0xFFFFF4C7), Color(0xFFFFD84A)],
+          ),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          WIcon(WI.sun, size: 24, color: fg, strokeWidth: 2),
+          const SizedBox(height: 2),
+          Text('${d.day} ${t(months[d.month - 1])}', style: TextStyle(fontSize: 10, height: 1, fontWeight: FontWeight.w700, color: fg)),
+        ]),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final me = context.watch<AuthProvider>().profile;
     final mineIdx = _groups.indexWhere((g) => g.uid == me?.uid);
     final others = [for (var i = 0; i < _groups.length; i++) if (_groups[i].uid != me?.uid) i];
+    final leadsTile = _leadsTile(p), todayTile = _todayTile(p);
     return SizedBox(
       height: 100,
       child: ListView(
@@ -450,6 +544,8 @@ class _UpdatesBarState extends State<_UpdatesBar> {
             onTap: mineIdx >= 0 ? () => _open(mineIdx) : _compose,
             plus: _compose,
           ),
+          if (leadsTile != null) leadsTile,
+          if (todayTile != null) todayTile,
           for (final i in others)
             _UpdateTile(
               name: _groups[i].shownName,
@@ -462,7 +558,8 @@ class _UpdatesBarState extends State<_UpdatesBar> {
             ),
           if (_hasMore)
             const SizedBox(width: 48, child: Align(alignment: Alignment(0, -.45), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))),
-          if (others.isEmpty)
+          // the daily circles already fill an empty row
+          if (others.isEmpty && leadsTile == null && todayTile == null)
             Center(
               child: Padding(
                 padding: const EdgeInsets.only(left: 4),
@@ -479,6 +576,66 @@ class _UpdatesBarState extends State<_UpdatesBar> {
 }
 
 enum _Ring { none, seen, unseen }
+
+/// A daily circle at the front of the Updates row, opened like an update: gold ring while there's something new,
+/// grey once looked at, so the daily habit sits where members already tap every day.
+class _HookTile extends StatelessWidget {
+  final GlobalKey tourKey;
+  final String label;
+  final bool fresh;
+  final Widget child;
+  final Widget? badge;
+  final VoidCallback onTap;
+  const _HookTile({required this.tourKey, required this.label, required this.fresh, required this.child, required this.onTap, this.badge});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    const box = 74.0;
+    return KeyedSubtree(
+      key: tourKey,
+      child: Container(
+        width: 84,
+        margin: const EdgeInsets.only(right: 12),
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Column(children: [
+            SizedBox(
+              width: box,
+              height: box,
+              child: Stack(clipBehavior: Clip.none, children: [
+                Container(
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: BoxDecoration(shape: BoxShape.circle, gradient: fresh ? kGoldGradient : null, color: fresh ? null : p.border),
+                  child: Container(
+                    padding: const EdgeInsets.all(2.5),
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: p.canvas),
+                    child: ClipOval(child: SizedBox(width: 64, height: 64, child: child)),
+                  ),
+                ),
+                if (badge != null)
+                  Positioned(
+                    left: box * .854 - 10,
+                    top: box * .854 - 10,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: const Color(0xFFF4E9C8), shape: BoxShape.circle, border: Border.all(color: p.canvas, width: 2)),
+                      child: badge,
+                    ),
+                  ),
+              ]),
+            ),
+            const SizedBox(height: 4),
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: fresh ? FontWeight.w600 : FontWeight.w400)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
 
 class _UpdateTile extends StatelessWidget {
   final String name, label;

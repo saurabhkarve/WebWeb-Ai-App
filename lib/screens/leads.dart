@@ -20,8 +20,6 @@ bool _startOfWeekIST() {
   return day == DateTime.monday || day == DateTime.tuesday;
 }
 
-String _tradeArea(String? category, String? location) =>
-    [if ((category ?? '').isNotEmpty) t(labelOf(kProfileCategories, category)), if ((location ?? '').isNotEmpty) t(location!)].join(' · ');
 
 Future<void> openLeads(BuildContext context) =>
     Navigator.push(context, MaterialPageRoute(builder: (_) => SubPage(title: t('Leads for you'), body: const LeadsScreen())));
@@ -35,8 +33,8 @@ Future<void> _editProfile(BuildContext context) async {
   if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: me))) == true) auth.loadProfile();
 }
 
-/// The top of Connect, the daily surface: "Leads for you" with how many are new, and at the start of the week
-/// "Your week", with "Today in your area" (P2) between them.
+/// Above Updates at the start of the week: "Your week". Leads for you and Today in your area are circles at the front
+/// of the Updates row (connect.dart), where members already tap every day.
 class TodayStrip extends StatefulWidget {
   const TodayStrip({super.key});
   @override
@@ -44,9 +42,7 @@ class TodayStrip extends StatefulWidget {
 }
 
 class TodayStripState extends State<TodayStrip> {
-  LeadSummary? _leads;
   WeekStats? _week;
-  TodayFeed? _today;
 
   @override
   void initState() {
@@ -55,127 +51,50 @@ class TodayStripState extends State<TodayStrip> {
   }
 
   Future<void> load() async {
-    final api = context.read<AuthProvider>().api;
+    if (!_startOfWeekIST()) return;
     try {
-      final s = LeadSummary.fromJson(await api.get('/posts/leads/summary') as Map);
-      if (mounted) setState(() => _leads = s);
+      final w = WeekStats.fromJson(await context.read<AuthProvider>().api.get('/me/week') as Map);
+      if (mounted) setState(() => _week = w);
     } catch (_) {}
-    try {
-      final f = TodayFeed.fromJson(await api.get('/today') as Map);
-      if (mounted) setState(() => _today = f);
-    } catch (_) {}
-    if (_startOfWeekIST()) {
-      try {
-        final w = WeekStats.fromJson(await api.get('/me/week') as Map);
-        if (mounted) setState(() => _week = w);
-      } catch (_) {}
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final l = _leads;
     final w = _week;
-    final showWeek = w != null && w.hasNews;
-    final cards = <Widget>[];
-
-    if (l != null && !l.hasTrade) {
-      // nothing to match on yet: what they do is the investment that brings leads
-      cards.add(_card(
-        p,
-        onTap: () => _editProfile(context),
-        border: kGold.withValues(alpha: .6),
-        fill: kGold.withValues(alpha: .1),
-        lead: WIcon(WI.sparkle, size: 24, color: p.tagText),
-        title: t('Get leads for your business'),
-        sub: t("Add what you do, and we'll bring you asks that fit"),
-      ));
-    } else if (l != null && l.open > 0) {
-      final fresh = l.unseen > 0;
-      final sub = [_tradeArea(l.category, l.location), t(l.open == 1 ? '{n} open lead' : '{n} open leads', {'n': l.open})].where((s) => s.isNotEmpty).join(' · ');
-      cards.add(_card(
-        p,
-        onTap: () async {
-          await openLeads(context);
-          load();
-        },
-        gold: fresh,
-        border: fresh ? null : p.border,
-        fill: fresh ? null : p.chip.withValues(alpha: .4),
-        lead: fresh
-            ? Container(
-                constraints: const BoxConstraints(minWidth: 44),
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: kInk, borderRadius: BorderRadius.circular(12)),
-                child: Text(l.unseen > 99 ? '99+' : '${l.unseen}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFFFFD84A))),
-              )
-            : WIcon(WI.sparkle, size: 24, color: p.tagText),
-        title: fresh ? t(l.unseen == 1 ? 'new lead for you' : 'new leads for you') : t("You're all caught up"),
-        sub: sub,
-      ));
-    }
-
-    if (_today != null) cards.add(TodayCard(feed: _today!, onOpened: load));
-
-    if (showWeek) {
-      cards.add(_card(
-        p,
-        onTap: () => openWeek(context),
-        border: p.border,
-        fill: p.card,
-        lead: Text(w.won > 0 ? '🏆' : '📊', style: const TextStyle(fontSize: 18)),
-        title: t('Your week'),
-        sub: [
-          t(w.leads == 1 ? '{n} lead' : '{n} leads', {'n': w.leads}),
-          t(w.replied == 1 ? '{n} reply' : '{n} replies', {'n': w.replied}),
-          t('{n} won', {'n': w.won}),
-        ].join(' · '),
-        compact: true,
-      ));
-    }
-    if (cards.isEmpty) return const SizedBox.shrink();
-    // an empty Today card renders nothing: don't leave its gap
-    if (_today != null && (_today!.cluster == null || (_today!.items.isEmpty && _today!.poll == null))) cards.removeWhere((c) => c is TodayCard);
+    if (w == null || !w.hasNews) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: Column(children: [
-        for (var i = 0; i < cards.length; i++) ...[if (i > 0) const SizedBox(height: 8), cards[i]],
-      ]),
-    );
-  }
-
-  Widget _card(Pal p,
-      {required VoidCallback onTap, required Widget lead, required String title, required String sub, bool gold = false, Color? border, Color? fill, bool compact = false}) {
-    final ink = gold ? kInk : p.text;
-    return Material(
-      color: Colors.transparent,
-      child: Ink(
-        decoration: BoxDecoration(
-          gradient: gold ? kGoldGradient : null,
-          color: gold ? null : fill,
-          border: border == null ? null : Border.all(color: border),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: onTap,
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: compact ? 10 : 12),
-            child: Row(children: [
-              lead,
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: compact ? 14 : 16, fontWeight: FontWeight.w700, color: ink)),
-                  if (sub.isNotEmpty)
-                    Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: gold ? kInk.withValues(alpha: .75) : p.muted)),
-                ]),
-              ),
-              Text('›', style: TextStyle(fontSize: 20, color: gold ? kInk : p.muted)),
-            ]),
+      child: Material(
+        color: Colors.transparent,
+        child: Ink(
+          decoration: BoxDecoration(color: p.card, border: Border.all(color: p.border), borderRadius: BorderRadius.circular(18)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => openWeek(context),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(children: [
+                Text(w.won > 0 ? '🏆' : '📊', style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(t('Your week'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    Text(
+                      [
+                        t(w.leads == 1 ? '{n} lead' : '{n} leads', {'n': w.leads}),
+                        t(w.replied == 1 ? '{n} reply' : '{n} replies', {'n': w.replied}),
+                        t('{n} won', {'n': w.won}),
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: p.muted),
+                    ),
+                  ]),
+                ),
+                Text('›', style: TextStyle(fontSize: 20, color: p.muted)),
+              ]),
+            ),
           ),
         ),
       ),
