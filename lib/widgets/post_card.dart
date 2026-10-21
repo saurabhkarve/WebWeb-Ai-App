@@ -403,9 +403,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     }
 
     final card = Container(
-      padding: framed ? const EdgeInsets.fromLTRB(12, 12, 12, 8) : const EdgeInsets.symmetric(vertical: 16),
+      padding: framed ? const EdgeInsets.all(12) : const EdgeInsets.symmetric(vertical: 16),
       foregroundDecoration: framed ? null : _HairlineDecoration(kGold.withValues(alpha: .6)),
-      decoration: framed ? BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)) : null,
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         GestureDetector(
           onTap: _openAuthor,
@@ -442,7 +441,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                     child: GoldTag(match),
                   ),
                 ),
-              ...more,
+              if (!framed) ...more,
             ]),
             if (mine && isAsk) Padding(padding: const EdgeInsets.only(top: 6), child: GoldTag(t('Your ask'))),
             const SizedBox(height: 8),
@@ -503,22 +502,24 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                 hideHeader: mine,
                 onMore: () => _openDetail(expandResponses: true),
               ),
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child:
-                  Transform.translate(offset: const Offset(-6, 0), child: PostActions(key: _actionsKey, post: post, onReply: _reply, onChanged: () => setState(() {}), tourTarget: widget.tourTarget)),
-            ),
+            // quoted in a repost: the controls are the repost's
+            if (!framed)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child:
+                    Transform.translate(offset: const Offset(-6, 0), child: PostActions(key: _actionsKey, post: post, onReply: _reply, onChanged: () => setState(() {}), tourTarget: widget.tourTarget)),
+              ),
           ]),
         ),
       ]),
     );
     if (!framed) return card;
-    return _reposted(p, card, top: 16, gap: 8, bottom: 16);
+    return _quoteRepost(p, card, more, ask: false);
   }
 
   /// An ask someone reposted (x.com style): the reposter's row, the ask quoted in a light frame set in by the avatar's
   /// width and its gap, then the replies and the controls at full width.
-  Widget _quoteRepost(Pal p, Widget quote, List<Widget> more) {
+  Widget _quoteRepost(Pal p, Widget quote, List<Widget> more, {bool ask = true}) {
     final r = post.repostedBy ?? const {};
     const green = Color(0xFF1F7A52);
     final ink = Theme.of(context).brightness == Brightness.dark ? const Color(0xFF7FD6AD) : green;
@@ -557,74 +558,21 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         Padding(
           padding: const EdgeInsets.only(left: 50, top: 4),
           child: Container(
+            // clipped, so the sideways-scrolling chips stay inside the frame
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)),
             child: quote,
           ),
         ),
-        LatestReplies(post: post, onMore: () => _openDetail(expandResponses: true)),
-        const SizedBox(height: 12),
-        PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
-      ]),
-    );
-  }
-
-  /// A reposted post, marked without touching its layout (web post-card.tsx): a green "X reposted" tag on top with when
-  /// on the right, then a green quote line in the gutter and a green wash fading down, both beside the ask alone.
-  Widget _reposted(Pal p, Widget child, {required double top, required double gap, double bottom = 0}) {
-    const green = Color(0xFF2F9E6E);
-    final ink = Theme.of(context).brightness == Brightness.dark ? const Color(0xFF7FD6AD) : const Color(0xFF1F7A52);
-    return Container(
-      padding: EdgeInsets.only(top: top, bottom: bottom),
-      foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
-      // the tag on top; the quote line and the wash cover the ask alone, from just under it
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Padding(
-          padding: EdgeInsets.only(bottom: gap),
-          child: Row(children: [
-            Flexible(
-              child: GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? ''))),
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(6, 2, 10, 2),
-                  decoration: BoxDecoration(color: green.withValues(alpha: .15), borderRadius: BorderRadius.circular(99)),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    WIcon(WI.repost, size: 14, color: ink),
-                    const SizedBox(width: 5),
-                    Flexible(child: Text(t('{name} reposted', {'name': post.repostedByName!}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ink))),
-                  ]),
-                ),
-              ),
-            ),
-            if (post.repostedAt != null) ...[
-              const Spacer(),
-              Padding(padding: const EdgeInsets.only(right: 4), child: Text(timeAgo(post.repostedAt!), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: ink))),
-            ],
-          ]),
-        ),
-        Stack(clipBehavior: Clip.none, children: [
-          // one rounded block with a light green border, drawn behind the ask so nothing in it moves; the wash fades down inside
-          Positioned(
-            left: -10,
-            right: -10,
-            top: 0,
-            bottom: 12,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: green.withValues(alpha: .2)),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: const [0, .45],
-                    colors: [green.withValues(alpha: .09), green.withValues(alpha: 0)],
-                  ),
-                ),
-              ),
-            ),
+        if (ask) ...[
+          LatestReplies(post: post, onMore: () => _openDetail(expandResponses: true)),
+          const SizedBox(height: 12),
+          PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
+        ] else
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 50),
+            child: Transform.translate(offset: const Offset(-6, 0), child: PostActions(key: _actionsKey, post: post, onReply: _reply, onChanged: () => setState(() {}), tourTarget: widget.tourTarget)),
           ),
-          child,
-        ]),
       ]),
     );
   }

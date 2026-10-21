@@ -402,6 +402,31 @@ class _TypeBadgeState extends State<_TypeBadge> {
 
 /// Verification badges from the web (verified-badge.tsx): 1 green check circle (mobile verified),
 /// 2 blue seal (documents), 3 gold seal with a star (owner verified, premium). Nothing for 0.
+/// "WEBWEB Premium" / "WEBWEB Pro" / "WEBWEB Plus" chip on a profile (web verified-badge.tsx PremiumChip): an ink pill
+/// with the tier's crown seal, and the words in the tier's metal.
+class PremiumChip extends StatelessWidget {
+  final String tier;
+  const PremiumChip({super.key, required this.tier});
+  @override
+  Widget build(BuildContext context) {
+    final (fg, ring) = switch (tier) {
+      'pro' => (const Color(0xFFDFE3E8), const Color(0xFFC9CED6)),
+      'plus' => (const Color(0xFFF0B98A), const Color(0xFFD08A4E)),
+      _ => (const Color(0xFFFFD84A), const Color(0xFFFFC700)),
+    };
+    final label = switch (tier) { 'pro' => 'WEBWEB Pro', 'plus' => 'WEBWEB Plus', _ => 'WEBWEB Premium' };
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 4, 10, 4),
+      decoration: BoxDecoration(color: kInk, borderRadius: BorderRadius.circular(20), border: Border.all(color: ring.withValues(alpha: .5))),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        SvgPicture.string('<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">${VerifiedBadge.crown(tier)}</svg>', width: 14, height: 14),
+        const SizedBox(width: 6),
+        Text(t(label), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg)),
+      ]),
+    );
+  }
+}
+
 class VerifiedBadge extends StatelessWidget {
   final int level;
   final double size;

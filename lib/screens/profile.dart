@@ -464,6 +464,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Transform.translate(
       offset: const Offset(0, 0),
       child: Wrap(spacing: 6, runSpacing: 6, children: [
+        // WEBWEB Premium, or a paid plan below it, first (web PremiumChip): ink, with the tier's metal for crown and words
+        if (u.premium || u.plan == 'pro' || u.plan == 'plus') PremiumChip(tier: u.premium ? 'premium' : u.plan!),
         if (u.location.isNotEmpty) tag(icon: WI.pin, text: u.location == 'Other' ? t('Other') : u.location),
         if (u.category.isNotEmpty) tag(text: t(labelOf(kProfileCategories, u.category))),
         // a GSTIN is public record: tap to check it on the GST portal
