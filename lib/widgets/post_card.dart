@@ -938,7 +938,8 @@ class LatestReplies extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final replies = post.latestReplies;
+    // two on the card: the ask (title, words, chips) leads and the conversation follows a step quieter, as on the web
+    final replies = post.latestReplies.take(2).toList();
     final referrers = post.referrers;
     final total = post.sharesCount + post.referralsCount;
     if (total == 0) {
@@ -953,22 +954,22 @@ class LatestReplies extends StatelessWidget {
     // plus its 10 gap), and Show all n last, as on the web
     final any = replies.isNotEmpty || referrers.isNotEmpty;
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: 16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const WIcon(WI.talk, size: 16, color: kGold),
+          WIcon(WI.talk, size: 16, color: kGold.withValues(alpha: .8)),
           const SizedBox(width: 8),
-          Text(any ? t('Latest replies') : ResponseActivity.countLabel(post.sharesCount, post.referralsCount), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(any ? t('Latest replies') : ResponseActivity.countLabel(post.sharesCount, post.referralsCount), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
           if (any) ...[
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-              decoration: BoxDecoration(color: kGold.withValues(alpha: .15), borderRadius: BorderRadius.circular(99)),
-              child: Text('$total', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: p.tagText, fontFeatures: const [FontFeature.tabularFigures()])),
+              decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(99)),
+              child: Text('$total', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: p.muted, fontFeatures: const [FontFeature.tabularFigures()])),
             ),
           ],
           const SizedBox(width: 8),
-          Expanded(child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [kGold.withValues(alpha: .5), p.border, p.border.withValues(alpha: 0)])))),
+          Expanded(child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [kGold.withValues(alpha: .3), p.border, p.border.withValues(alpha: 0)])))),
         ]),
         Padding(
           // set in less on a phone, as on the web
@@ -991,7 +992,7 @@ class LatestReplies extends StatelessWidget {
                       child: GestureDetector(
                         onTap: () => openProfile(r.handle),
                         child: Text(r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name,
-                            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .85))),
                       ),
                     ),
                     if (r.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: r.verification, size: 12)],
@@ -1003,7 +1004,7 @@ class LatestReplies extends StatelessWidget {
                     child: r.kind == 'info' && (r.text ?? '').isNotEmpty
                         ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             // the bubble is ReplySocial's, with the name and time on top
-                            HashtagText(r.text!, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, height: 1.35)),
+                            HashtagText(r.text!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, height: 1.35, color: p.text.withValues(alpha: .75))),
                             // a photo sent with the note
                             if ((r.imageUrl ?? '').isNotEmpty)
                               Padding(padding: const EdgeInsets.only(top: 4), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 96, height: 64))),
@@ -1038,7 +1039,7 @@ class LatestReplies extends StatelessWidget {
             padding: const EdgeInsets.only(top: 8),
             child: Text.rich(
               TextSpan(children: [
-                TextSpan(text: referrers.first.name, style: TextStyle(fontWeight: FontWeight.w700, color: p.text)),
+                TextSpan(text: referrers.first.name, style: TextStyle(fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .85))),
                 TextSpan(text: ' ${t(referrers.first.n == 1 ? 'referred a contact' : 'referred {n} contacts', {'n': referrers.first.n})}'),
                 if (referrers.length > 1) TextSpan(text: ' · ${t('+{n} more', {'n': referrers.length - 1})}'),
               ]),
@@ -1049,17 +1050,13 @@ class LatestReplies extends StatelessWidget {
         if (total > shown || post.sharesCount > replies.length)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            // a gold pill, as on the web
-            child: Material(
-              color: kGold.withValues(alpha: .1),
-              shape: StadiumBorder(side: BorderSide(color: kGold.withValues(alpha: .45))),
-              child: InkWell(
-                customBorder: const StadiumBorder(),
-                onTap: onMore,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 8, 4),
-                  child: Text('${t('Show all {n}', {'n': total})}  →', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.tagText)),
-                ),
+            // a quiet link, as on the web: the gold on the card is the ask's own
+            child: InkWell(
+              borderRadius: BorderRadius.circular(99),
+              onTap: onMore,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(2, 4, 8, 4),
+                child: Text('${t('Show all {n}', {'n': total})}  →', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
               ),
             ),
           ),

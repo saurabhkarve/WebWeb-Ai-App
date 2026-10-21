@@ -194,7 +194,7 @@ class _ReplySocialState extends State<ReplySocial> {
       // a chat bubble holding who and when on top (React and Reply at that line's end) and the reply under it, as on the web
       Container(
         padding: const EdgeInsets.fromLTRB(10, 4, 4, 6),
-        decoration: BoxDecoration(color: p.chip, borderRadius: _bubble),
+        decoration: BoxDecoration(color: p.chip.withValues(alpha: .55), borderRadius: _bubble),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
           Row(mainAxisSize: MainAxisSize.min, children: [
             ...widget.meta,
@@ -324,7 +324,7 @@ class _ThreadReplyState extends State<_ThreadReply> {
       Flexible(
         child: Container(
           padding: const EdgeInsets.fromLTRB(10, 4, 4, 6),
-          decoration: BoxDecoration(color: p.chip, borderRadius: _bubble),
+          decoration: BoxDecoration(color: p.chip.withValues(alpha: .55), borderRadius: _bubble),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             Row(mainAxisSize: MainAxisSize.min, children: [
               Flexible(child: GestureDetector(onTap: profile, child: Text(c.display, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)))),
@@ -390,19 +390,20 @@ class _RequestShareState extends State<RequestShare> {
     final sent = _state == 'sent';
     return Opacity(
       opacity: _state == 'busy' ? .7 : 1,
+      // quiet, as on the web: the ask's own chips keep the gold on the card
       child: Material(
-        color: kGold.withValues(alpha: .1),
-        shape: StadiumBorder(side: BorderSide(color: kGold.withValues(alpha: .45))),
+        color: p.canvas.withValues(alpha: .7),
+        shape: StadiumBorder(side: BorderSide(color: p.border)),
         child: InkWell(
           customBorder: const StadiumBorder(),
           onTap: _state == 'idle' ? _send : (sent ? _openChat : null),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(8, 3, 10, 3),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              WIcon(WI.contactCard, size: 12, color: p.tagText),
+              WIcon(WI.contactCard, size: 12, color: p.text.withValues(alpha: .75)),
               const SizedBox(width: 4),
               Text(sent ? (widget.peer != null && _chatId != null ? '${t('Requested')} · ${t('Open chat')}' : t('Requested')) : t('Request to share'),
-                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: p.tagText)),
+                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .75))),
             ]),
           ),
         ),
