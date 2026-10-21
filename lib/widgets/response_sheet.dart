@@ -48,7 +48,8 @@ class _ResponseSheetState extends State<_ResponseSheet> {
   // a new reply starts as an offer; an edited one keeps what it was
   late bool _canDo = widget.existing == null || widget.existing!.canDo;
   late final _quote = TextEditingController(text: widget.existing?.quote ?? '');
-  late String? _when = widget.existing?.readyWhen;
+  // a new offer starts at Today (the most common answer, and the strongest); an edit keeps what was said
+  late String? _when = widget.existing == null ? 'today' : widget.existing!.readyWhen;
   XFile? _file;
   late String? _kept = widget.existing?.imageUrl;
   bool _busy = false;

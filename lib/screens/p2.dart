@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../api.dart';
 import '../auth_provider.dart';
 import '../i18n.dart';
 import '../models.dart';
@@ -17,7 +18,10 @@ import '../config.dart' show siteUrl;
 import '../views.dart';
 import '../widgets/area_map.dart' show askTimeLeft;
 import '../widgets/p1.dart' show kGreenDark, leadReasonText;
-import 'edit_profile.dart';
+import '../widgets/tour.dart' show Tours;
+import 'find.dart';
+import 'profile.dart';
+import 'talk.dart' show ChatThread;
 import 'leads.dart';
 import 'post_detail.dart';
 
@@ -306,7 +310,9 @@ class _ItemRowState extends State<_ItemRow> {
 /// and only from 5 answers; that's the reward.
 class PollCard extends StatefulWidget {
   final Poll poll;
-  const PollCard({super.key, required this.poll});
+  /// without its own frame and label, inside a story card
+  final bool bare;
+  const PollCard({super.key, required this.poll, this.bare = false});
   @override
   State<PollCard> createState() => _PollCardState();
 }
@@ -344,16 +350,22 @@ class _PollCardState extends State<PollCard> {
     final q = _poll;
     final res = q.result;
     final open = !q.answered && !q.closed;
+    final bare = widget.bare;
+    final answers = t(q.answers == 1 ? '1 answer' : '{n} answers', {'n': q.answers});
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: kGold.withValues(alpha: .05), border: Border.all(color: kGold.withValues(alpha: .5)), borderRadius: BorderRadius.circular(18)),
+      padding: bare ? EdgeInsets.zero : const EdgeInsets.all(16),
+      decoration: bare ? null : BoxDecoration(color: kGold.withValues(alpha: .05), border: Border.all(color: kGold.withValues(alpha: .5)), borderRadius: BorderRadius.circular(18)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: Text('❓ ${t(q.kind == 'rate' ? 'Rate check' : "Today's question").toUpperCase()}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.tagText))),
-          Text(t(q.answers == 1 ? '1 answer' : '{n} answers', {'n': q.answers}), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: p.muted)),
-        ]),
-        const SizedBox(height: 4),
-        Text(_question(q), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        // a story card names it in its own strip
+        if (!bare) ...[
+          Row(children: [
+            Expanded(child: Text('❓ ${t(q.kind == 'rate' ? 'Rate check' : "Today's question").toUpperCase()}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.tagText))),
+            Text(answers, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: p.muted)),
+          ]),
+          const SizedBox(height: 4),
+        ],
+        Text(_question(q), style: bare ? const TextStyle(fontSize: 22, height: 1.2, fontWeight: FontWeight.w800) : const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        if (bare) Padding(padding: const EdgeInsets.only(top: 4), child: Text('👥 $answers', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted))),
         if (open && q.kind == 'rate') ...[
           const SizedBox(height: 12),
           Row(children: [
@@ -874,60 +886,339 @@ class _PushNudgeState extends State<PushNudge> {
 
 // ===================== daily stories =====================
 
-/// One card of a daily story: its own backdrop, the card, how long it shows, and what showing it does.
-typedef _Frame = ({String id, List<Color> bg, int ms, VoidCallback? onShow, Widget card});
+/*
+ * The daily circles at the front of Updates (web daily-stories.tsx): Leads for you by kind of ask, Today in your area
+ * by kind of item, and businesses that just joined. Each circle is a story of cards, its ring cut into one segment per
+ * card (gold until that card is seen), and the player carries on from one circle to the next, as updates do.
+ */
 
-const _inkBg = [Color(0xFF5A4710), Color(0xFF1E1E1E)];
-const _todayBg = {
-  'cover': [Color(0xFFFFE27A), Color(0xFFC99400), Color(0xFF3A2C05)],
-  'poll': [Color(0xFF6B5410), Color(0xFF1E1E1E)],
-  'rates': [Color(0xFF1F6B4A), Color(0xFF0F2A1F)],
-  'notice': [Color(0xFFA8560F), Color(0xFF2E1A08)],
-  'tender': [Color(0xFF1F4F8F), Color(0xFF0F1D33)],
-  'event': [Color(0xFF6A2F8F), Color(0xFF22102E)],
-  'end': [Color(0xFF4A3B0B), Color(0xFF1E1E1E)],
+/// An emoji for each kind of ask.
+const kCategoryEmoji = {
+  'job': '👷', 'supplier': '📦', 'buyer': '🛒', 'logistics': '🚚', 'funding': '💰', 'advice': '💡', 'mentorship': '🧭', 'partnership': '🤝',
+  'machinery': '⚙️', 'space': '🏢', 'training': '🎓', 'jobwork': '🏭', 'compliance': '📑', 'consultant': '🧑‍💼', 'export': '🌍', 'tender': '📄',
+  'digital': '💻', 'repair': '🔧', 'other': '✨',
 };
 
-/// Leads for you or Today in your area ([kind] 'leads' / 'today'), played like an update (web daily-stories.tsx).
-Future<void> openDailyStories(BuildContext context, String kind) =>
-    Navigator.push(context, MaterialPageRoute(fullscreenDialog: true, builder: (_) => DailyStories(kind: kind)));
+/// Short names under the circles (the long ones don't fit 84 px).
+const _categoryTile = {
+  'job': 'Jobs', 'supplier': 'Suppliers', 'buyer': 'Buyers', 'logistics': 'Logistics', 'funding': 'Funding', 'advice': 'Advice', 'mentorship': 'Mentors',
+  'partnership': 'Partners', 'machinery': 'Machinery', 'space': 'Space', 'training': 'Training', 'jobwork': 'Job work', 'compliance': 'GST / Legal',
+  'consultant': 'Consultants', 'export': 'Export', 'tender': 'Tenders', 'digital': 'Digital', 'repair': 'Repairs', 'other': 'Other',
+};
 
-/// One card per lead or per Today item: tap right for the next and left for the one before, hold to pause. Each
-/// card carries what to do now (I can do this, Answer, Interested, Open tender) and a link (Open ask, Directions,
-/// the full page). Opened from the circles at the front of Updates.
+const _bg = {
+  'ink': [Color(0xFF6B5410), Color(0xFF2A2208), Color(0xFF141414)],
+  'poll': [Color(0xFFC99400), Color(0xFF5A4710), Color(0xFF1E1E1E)],
+  'rates': [Color(0xFF22875C), Color(0xFF0F3A29), Color(0xFF0B1F17)],
+  'notice': [Color(0xFFD9700F), Color(0xFF5A2F08), Color(0xFF1F1206)],
+  'tender': [Color(0xFF2F6FC4), Color(0xFF13305A), Color(0xFF0B1424)],
+  'event': [Color(0xFF9A45C9), Color(0xFF3D1957), Color(0xFF170A21)],
+  'new': [Color(0xFFE0457B), Color(0xFF5A1A33), Color(0xFF1E1E1E)],
+};
+
+/// The circles' fills (null: ink).
+const _tone = <String, List<Color>>{
+  'poll': [Color(0xFFFFF4C7), Color(0xFFFFC700)],
+  'rates': [Color(0xFFC9F2DC), Color(0xFF2FA36F)],
+  'notice': [Color(0xFFFFE2C2), Color(0xFFF08A24)],
+  'tender': [Color(0xFFD6E6FF), Color(0xFF4A86D8)],
+  'event': [Color(0xFFF0DCFF), Color(0xFFA45BD6)],
+};
+
+/// The coloured strip naming a card.
+const _strip = <String, List<Color>>{
+  'lead': [Color(0xFF1E1E1E), Color(0xFF1E1E1E)],
+  'poll': [Color(0xFFFFD84A), Color(0xFFC99400)],
+  'rates': [Color(0xFF059669), Color(0xFF059669)],
+  'notice': [Color(0xFFE07B16), Color(0xFFE07B16)],
+  'tender': [Color(0xFF2F6FC4), Color(0xFF2F6FC4)],
+  'event': [Color(0xFF8A3FBF), Color(0xFF8A3FBF)],
+  'new': [Color(0xFFE0457B), Color(0xFFFF8A4C)],
+};
+
+const _todayKinds = [
+  (type: 'rates', emoji: '📈', plural: 'Rates'),
+  (type: 'notice', emoji: '⚠️', plural: 'Notices'),
+  (type: 'tender', emoji: '📄', plural: 'Tenders'),
+  (type: 'event', emoji: '📅', plural: 'Events'),
+];
+
+/// Leaves the story for a page (back from it lands on Connect).
+typedef DailyGo = void Function(Widget page);
+
+/// One card of a circle's story.
+class DailyCard {
+  final String id;
+  final bool fresh;
+  final List<Color> bg;
+  final int ms;
+  final VoidCallback? onShow;
+  final Widget Function(DailyGo go) build;
+  const DailyCard({required this.id, required this.fresh, required this.bg, required this.ms, required this.build, this.onShow});
+}
+
+/// One circle: what it shows in the row, and its cards.
+class DailyGroup {
+  final String id, emoji, label, title, allLabel;
+  /// the circle's fill; null for ink
+  final List<Color>? tone;
+  /// a photo instead of the emoji (New here)
+  final ({String name, String? url})? photo;
+  final Widget Function() allPage;
+  /// the tour's target on the first leads and the first Today circle
+  final String? tour;
+  final List<DailyCard> cards;
+  const DailyGroup({required this.id, required this.emoji, required this.label, required this.title, required this.allLabel, required this.allPage, required this.cards, this.tone, this.photo, this.tour});
+  int get fresh => cards.where((c) => c.fresh).length;
+}
+
+/// The circles from Leads for you, Today and the businesses that just joined; [seen] is what this phone has shown
+/// (a lead the server no longer calls new counts as seen too).
+List<DailyGroup> buildDailyGroups({required List<Post>? leads, required TodayFeed? today, required List<Profile>? biz, required Set<String> seen, required Api api}) {
+  final out = <DailyGroup>[];
+  // ---- Leads for you, by kind of ask (the three busiest, then the rest together)
+  if (leads != null && leads.isNotEmpty) {
+    final by = <String, List<Post>>{};
+    for (final x in leads.take(30)) {
+      (by[x.category ?? 'other'] ??= []).add(x);
+    }
+    int freshOf(List<Post> ps) => ps.where((x) => x.leadNew && !seen.contains('lead:${x.id}')).length;
+    final ranked = by.entries.toList()..sort((a, b) => freshOf(b.value) != freshOf(a.value) ? freshOf(b.value) - freshOf(a.value) : b.value.length - a.value.length);
+    final sets = [
+      for (final e in ranked.take(3)) (cat: e.key, posts: e.value),
+      if (ranked.length > 3) (cat: 'more', posts: [for (final e in ranked.skip(3)) ...e.value]),
+    ];
+    for (var gi = 0; gi < sets.length; gi++) {
+      final cat = sets[gi].cat;
+      out.add(DailyGroup(
+        id: 'leads:$cat',
+        emoji: cat == 'more' ? '✨' : (kCategoryEmoji[cat] ?? '✨'),
+        label: cat == 'more' ? t('More leads') : t(_categoryTile[cat] ?? 'Other'),
+        title: cat == 'more' ? t('Leads for you') : '${t('Leads for you')} · ${t(kCategoryShort[cat] ?? 'Other')}',
+        allLabel: t('All leads'),
+        allPage: () => SubPage(title: t('Leads for you'), body: const LeadsScreen()),
+        tour: gi == 0 ? 'today' : null,
+        cards: [
+          for (final x in sets[gi].posts.take(8))
+            DailyCard(
+              id: 'lead:${x.id}',
+              fresh: x.leadNew && !seen.contains('lead:${x.id}'),
+              bg: _bg['ink']!,
+              ms: 8000,
+              onShow: () => ViewTracker.record(api, x.id),
+              build: (go) => _LeadStoryCard(post: x, go: go),
+            ),
+        ],
+      ));
+    }
+  }
+  // ---- Today in your area: the question, then a circle per kind of item
+  if (today != null && today.cluster != null) {
+    final place = today.cluster!;
+    final isToday = today.day == today.today;
+    var tour = 'today-area';
+    String? nextTour() {
+      final r = tour.isEmpty ? null : tour;
+      tour = '';
+      return r;
+    }
+
+    void seenToday() => api.post('/today/seen').catchError((_) => null);
+    final q = today.poll;
+    if (q != null && !q.closed) {
+      final rate = q.kind == 'rate';
+      out.add(DailyGroup(
+        id: 'today:poll',
+        emoji: rate ? '💸' : '❓',
+        label: t(rate ? 'Rate check' : 'Question'),
+        title: '${t('Today in {place}', {'place': place})} · ${t(rate ? 'Rate check' : "Today's question")}',
+        tone: _tone['poll'],
+        allLabel: t('Today'),
+        allPage: () => SubPage(title: t('Today in your area'), body: const TodayScreen()),
+        tour: nextTour(),
+        cards: [
+          DailyCard(id: 'poll:${q.id}', fresh: !q.answered && !seen.contains('poll:${q.id}'), bg: _bg['poll']!, ms: 12000, onShow: seenToday, build: (_) => _PollStory(feed: today)),
+        ],
+      ));
+    }
+    for (final k in _todayKinds) {
+      final items = today.items.where((i) => i.type == k.type).toList();
+      if (items.isEmpty) continue;
+      out.add(DailyGroup(
+        id: 'today:${k.type}',
+        emoji: k.emoji,
+        label: t(k.plural),
+        title: '${t('Today in {place}', {'place': place})} · ${t(k.plural)}',
+        tone: _tone[k.type],
+        allLabel: t('Today'),
+        allPage: () => SubPage(title: t('Today in your area'), body: const TodayScreen()),
+        tour: nextTour(),
+        cards: [
+          for (final it in items)
+            DailyCard(
+              id: 'today:${it.id}',
+              fresh: isToday && !seen.contains('today:${it.id}'),
+              bg: _bg[it.type]!,
+              ms: it.type == 'rates' ? 9000 : 8000,
+              onShow: seenToday,
+              build: (_) => _TodayStoryCard(it: it, day: today.day ?? today.today ?? ''),
+            ),
+        ],
+      ));
+    }
+  }
+  // ---- New here: businesses that just joined, the member's city first
+  if (biz != null && biz.isNotEmpty) {
+    final first = biz.first;
+    out.add(DailyGroup(
+      id: 'new',
+      emoji: '🎉',
+      label: t('New here'),
+      title: t('New on WEBWEB'),
+      photo: (name: first.company.isNotEmpty ? first.company : first.name, url: first.photoUrl),
+      allLabel: t('Find more'),
+      allPage: () => const FindScreen(standalone: true, initialScope: 'business'),
+      cards: [
+        for (final u in biz) DailyCard(id: 'biz:${u.uid}', fresh: !seen.contains('biz:${u.uid}'), bg: _bg['new']!, ms: 7000, build: (go) => _NewBizCard(u: u, go: go)),
+      ],
+    ));
+  }
+  return out;
+}
+
+/// A circle's ring cut into one segment per card: gold for the ones not seen yet, grey for the rest.
+class _SegmentRing extends CustomPainter {
+  final List<bool> fresh;
+  final Color seen;
+  _SegmentRing(this.fresh, this.seen);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final n = fresh.isEmpty ? 1 : fresh.length;
+    const w = 2.5;
+    final r = size.width / 2 - w / 2 - .25;
+    final rect = Rect.fromCircle(center: size.center(Offset.zero), radius: r);
+    const full = 2 * 3.141592653589793;
+    final gap = n > 1 ? (6 / r).clamp(0, full / n / 4).toDouble() : 0.0;
+    final sweep = full / n - gap;
+    for (var k = 0; k < n; k++) {
+      final on = k < fresh.length && fresh[k];
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = w
+        ..strokeCap = n > 1 ? StrokeCap.round : StrokeCap.butt
+        ..shader = on ? const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFFD84A), Color(0xFFC99400)]).createShader(rect) : null
+        ..color = on ? const Color(0xFFFFD84A) : seen;
+      canvas.drawArc(rect, -3.141592653589793 / 2 + k * (sweep + gap) + gap / 2, sweep, false, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SegmentRing old) => old.seen != seen || old.fresh.length != fresh.length || [for (var i = 0; i < fresh.length; i++) old.fresh[i] != fresh[i]].any((x) => x);
+}
+
+/// The circle in the Updates row.
+class DailyCircle extends StatelessWidget {
+  final DailyGroup group;
+  final VoidCallback onTap;
+  const DailyCircle({super.key, required this.group, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    const box = 74.0;
+    final g = group;
+    final n = g.fresh;
+    final tone = g.tone;
+    final circle = Container(
+      width: 64,
+      height: 64,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: g.photo != null ? p.chip : (tone == null ? (p.dark ? const Color(0xFF2E2E2E) : kInk) : null),
+        gradient: g.photo == null && tone != null ? LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: tone) : null,
+      ),
+      child: g.photo != null
+          ? ClipOval(
+              child: (g.photo!.url ?? '').isNotEmpty
+                  ? Image.network(g.photo!.url!, width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Text(initials(g.photo!.name)))
+                  : Text(initials(g.photo!.name), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.muted)),
+            )
+          : Text(g.emoji, style: const TextStyle(fontSize: 28, height: 1)),
+    );
+    final tile = Container(
+      width: 84,
+      margin: const EdgeInsets.only(right: 12),
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(children: [
+          SizedBox(
+            width: box,
+            height: box,
+            child: Stack(clipBehavior: Clip.none, children: [
+              Positioned.fill(child: CustomPaint(painter: _SegmentRing([for (final c in g.cards) c.fresh], p.border))),
+              Center(child: circle),
+              // how many are new, or the circle's emoji on a photo
+              if (n > 0 || g.photo != null)
+                Positioned(
+                  left: box * .854 - 11,
+                  top: box * .854 - 11,
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 22),
+                    height: 22,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(11), border: Border.all(color: p.canvas, width: 2)),
+                    child: Text(g.photo != null ? g.emoji : '$n', style: TextStyle(fontSize: g.photo != null ? 10 : 10, height: 1, fontWeight: FontWeight.w800, color: const Color(0xFFFFD84A))),
+                  ),
+                ),
+            ]),
+          ),
+          const SizedBox(height: 4),
+          Text(g.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: n > 0 ? FontWeight.w600 : FontWeight.w400)),
+        ]),
+      ),
+    );
+    return g.tour == null ? tile : KeyedSubtree(key: Tours.key(g.tour!), child: tile);
+  }
+}
+
+/// Plays [groups] from [start], one circle after another, like updates.
+Future<void> openDailyStories(BuildContext context, List<DailyGroup> groups, int start, void Function(String id) onSeen) =>
+    Navigator.push(context, MaterialPageRoute(fullscreenDialog: true, builder: (_) => DailyStories(groups: groups, start: start, onSeen: onSeen)));
+
+/// Tap right for the next card and left for the one before, hold to pause. Each card carries what to do now (I can do
+/// this, Answer, Interested, View profile) and a link (Open ask, Directions, Say hello); the header links to the page.
 class DailyStories extends StatefulWidget {
-  final String kind;
-  const DailyStories({super.key, required this.kind});
+  final List<DailyGroup> groups;
+  final int start;
+  final void Function(String id) onSeen;
+  const DailyStories({super.key, required this.groups, required this.start, required this.onSeen});
   @override
   State<DailyStories> createState() => _DailyStoriesState();
 }
 
 class _DailyStoriesState extends State<DailyStories> with SingleTickerProviderStateMixin {
-  List<Post>? _leads;
-  TodayFeed? _today;
-  int _i = 0;
+  // the groups as they were when opened: seeing cards mustn't reorder anything under the player
+  late final List<DailyGroup> _list = widget.groups;
+  late int _g = widget.start;
+  late int _i = _firstFresh(_list[_g]);
   late final AnimationController _bar = AnimationController(vsync: this)..addStatusListener((s) {
       if (s == AnimationStatus.completed) _next();
     });
   bool _held = false, _typing = false;
 
+  static int _firstFresh(DailyGroup g) => g.cards.indexWhere((c) => c.fresh).clamp(0, g.cards.length - 1);
+
+  DailyGroup get _group => _list[_g];
+  DailyCard get _card => _group.cards[_i];
+
   @override
   void initState() {
     super.initState();
-    final api = context.read<AuthProvider>().api;
-    if (widget.kind == 'leads') {
-      api.get('/posts/leads').then((d) => _set(() => _leads = (d as List).map((e) => Post.fromJson(e as Map)).take(12).toList())).catchError((_) => _set(() => _leads = []));
-    } else {
-      api.get('/today').then((d) => _set(() => _today = TodayFeed.fromJson(d as Map))).catchError((_) => _set(() => _today = const TodayFeed()));
-      api.post('/today/seen').catchError((_) => null);
-    }
     FocusManager.instance.addListener(_focus);
-  }
-
-  void _set(VoidCallback fn) {
-    if (!mounted) return;
-    setState(fn);
-    _start();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
 
   // a field in focus (the rate check) holds the card
@@ -946,162 +1237,65 @@ class _DailyStoriesState extends State<DailyStories> with SingleTickerProviderSt
     super.dispose();
   }
 
-  List<_Frame>? _framesCache;
-  List<_Frame>? get _frames => _framesCache ??= _build();
-
   void _start() {
-    _framesCache = null;
-    final f = _frames;
-    if (f == null || f.isEmpty) return;
-    final fr = f[_i.clamp(0, f.length - 1)];
-    _bar.duration = Duration(milliseconds: fr.ms);
+    if (!mounted) return;
+    final c = _card;
+    _bar.duration = Duration(milliseconds: c.ms);
     _bar.value = 0;
-    fr.onShow?.call();
+    c.onShow?.call();
+    widget.onSeen(c.id);
     _sync();
   }
 
   void _sync() {
     if (_held || _typing) {
       _bar.stop();
-    } else if (_frames != null && !_bar.isAnimating) {
+    } else if (!_bar.isAnimating) {
       _bar.forward();
     }
   }
 
   void _next() {
-    final f = _frames;
-    if (f == null) return;
-    if (_i < f.length - 1) {
+    if (_i < _group.cards.length - 1) {
       setState(() => _i++);
-      _start();
+    } else if (_g < _list.length - 1) {
+      setState(() {
+        _g++;
+        _i = _firstFresh(_group);
+      });
     } else {
       Navigator.maybePop(context);
+      return;
     }
-  }
-
-  void _prev() {
-    if (_i == 0) return;
-    setState(() => _i--);
     _start();
   }
 
-  /// Leave the story for a page (back from it lands on Connect).
-  void _go(Widget page) => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
-
-  List<_Frame>? _build() {
-    if (widget.kind == 'leads') {
-      final list = _leads;
-      if (list == null) return null;
-      final api = context.read<AuthProvider>().api;
-      return [
-        for (final post in list)
-          (
-            id: post.id,
-            bg: _inkBg,
-            ms: 8000,
-            onShow: () => ViewTracker.record(api, post.id),
-            card: _LeadStoryCard(post: post, onReply: () => _go(PostDetailScreen(postId: post.id, openReply: true)), onOpen: () => _go(PostDetailScreen(postId: post.id))),
-          ),
-        (
-          id: 'end',
-          bg: _todayBg['end']!,
-          ms: 6000,
-          onShow: null,
-          card: _EndStoryCard(
-            emoji: '✨',
-            title: list.isEmpty ? t('No open leads right now') : t("That's your leads for now"),
-            hint: t('Set an alert and new asks that fit come straight to you.'),
-            primary: t(list.length == 1 ? 'See {n} open lead' : 'See all {n} open leads', {'n': list.length}),
-            onPrimary: () => _go(SubPage(title: t('Leads for you'), body: const LeadsScreen())),
-            link: t('Set an alert'),
-            onLink: () => _go(SubPage(title: t('Alerts'), body: const AlertsScreen())),
-          ),
-        ),
-      ];
+  void _prev() {
+    if (_i > 0) {
+      setState(() => _i--);
+    } else if (_g > 0) {
+      setState(() {
+        _g--;
+        _i = 0;
+      });
+    } else {
+      return;
     }
-    final f = _today;
-    if (f == null) return null;
-    if (f.cluster == null) {
-      return [
-        (
-          id: 'none',
-          bg: _todayBg['end']!,
-          ms: 6000,
-          onShow: null,
-          card: _EndStoryCard(
-            emoji: '☀',
-            title: t("Today isn't in your area yet"),
-            hint: t("We're starting with Navi Mumbai. Set your city on your profile to get it when it reaches you."),
-            primary: t('Edit profile'),
-            onPrimary: () {
-              final me = context.read<AuthProvider>().profile;
-              if (me != null) _go(EditProfileScreen(profile: me));
-            },
-          ),
-        ),
-      ];
-    }
-    final place = f.cluster!;
-    final shown = f.day ?? f.today!;
-    final ask = f.poll != null && !f.poll!.answered && !f.poll!.closed;
-    return [
-      (
-        id: 'cover',
-        bg: _todayBg['cover']!,
-        ms: 4000,
-        onShow: null,
-        card: Column(mainAxisSize: MainAxisSize.min, children: [
-          const WIcon(WI.sun, size: 88, color: kInk, strokeWidth: 1.6),
-          const SizedBox(height: 12),
-          Text(t('Today in {place}', {'place': place}), textAlign: TextAlign.center, style: const TextStyle(fontSize: 30, height: 1.15, fontWeight: FontWeight.w800, color: kInk)),
-          const SizedBox(height: 4),
-          Text(shown == f.today ? dayLabel(shown) : t('Yesterday'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: kInk.withValues(alpha: .75))),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: BoxDecoration(color: kInk.withValues(alpha: .85), borderRadius: BorderRadius.circular(99)),
-            child: Text(
-              [t(f.items.length == 1 ? '1 update' : '{n} updates', {'n': f.items.length}), if (ask) t('1 question for you')].join(' · '),
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFFFFD84A)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(t('Tap to see each one'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kInk.withValues(alpha: .7))),
-        ]),
-      ),
-      // the question first: answering is the one thing to do today
-      if (f.poll != null && !f.poll!.closed) (id: 'poll', bg: _todayBg['poll']!, ms: 9000, onShow: null, card: _StoryCard(child: PollCard(poll: f.poll!))),
-      for (final it in f.items) (id: it.id, bg: _todayBg[it.type] ?? _todayBg['end']!, ms: it.type == 'rates' ? 8000 : 7000, onShow: null, card: _TodayStoryCard(it: it)),
-      (
-        id: 'end',
-        bg: _todayBg['end']!,
-        ms: 5000,
-        onShow: null,
-        card: _EndStoryCard(
-          emoji: '☀',
-          title: t("That's today in {place}", {'place': place}),
-          hint: t('New every morning. Something to add for your area?'),
-          primary: t('Open the full page'),
-          onPrimary: () => _go(SubPage(title: t('Today in your area'), body: const TodayScreen())),
-          link: t('Tell us'),
-          onLink: () => launchUrl(Uri.parse('$siteUrl/help'), mode: LaunchMode.externalApplication),
-        ),
-      ),
-    ];
+    _start();
   }
+
+  void _go(Widget page) => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
 
   @override
   Widget build(BuildContext context) {
-    final frames = _frames;
     final top = MediaQuery.of(context).padding.top;
-    if (frames == null) return const Scaffold(backgroundColor: kInk, body: Center(child: Spinner(size: 32, color: Color(0xFFFFD84A))));
-    final fr = frames[_i.clamp(0, frames.length - 1)];
-    final leads = widget.kind == 'leads';
+    final g = _group;
+    final c = _card;
     return Scaffold(
       backgroundColor: kInk,
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        // tap left a third for the one before, anywhere else for the next; buttons and fields keep their taps
+        // tap the left third for the card before, anywhere else for the next; buttons and fields keep their taps
         onTapUp: (d) => d.localPosition.dx < MediaQuery.of(context).size.width / 3 ? _prev() : _next(),
         onLongPressStart: (_) {
           _held = true;
@@ -1113,16 +1307,16 @@ class _DailyStoriesState extends State<DailyStories> with SingleTickerProviderSt
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          decoration: BoxDecoration(gradient: RadialGradient(center: const Alignment(-.4, -.7), radius: 1.3, colors: fr.bg)),
+          decoration: BoxDecoration(gradient: RadialGradient(center: const Alignment(-.5, -.8), radius: 1.4, colors: c.bg, stops: const [0, .5, 1])),
           child: Stack(children: [
             Positioned.fill(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(16, top + 72, 16, 32),
+                padding: EdgeInsets.fromLTRB(16, top + 76, 16, 32),
                 child: Center(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
-                    transitionBuilder: (c, a) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: .96, end: 1.0).animate(a), child: c)),
-                    child: KeyedSubtree(key: ValueKey(fr.id), child: SingleChildScrollView(child: fr.card)),
+                    transitionBuilder: (w, a) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: .96, end: 1.0).animate(a), child: w)),
+                    child: KeyedSubtree(key: ValueKey(c.id), child: SingleChildScrollView(child: c.build(_go))),
                   ),
                 ),
               ),
@@ -1134,21 +1328,21 @@ class _DailyStoriesState extends State<DailyStories> with SingleTickerProviderSt
               top: 0,
               child: Container(
                 padding: EdgeInsets.fromLTRB(12, top + 10, 4, 16),
-                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [kInk.withValues(alpha: .6), kInk.withValues(alpha: 0)])),
+                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black.withValues(alpha: .6), Colors.black.withValues(alpha: 0)])),
                 child: Column(children: [
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: AnimatedBuilder(
                       animation: _bar,
                       builder: (_, __) => Row(children: [
-                        for (var k = 0; k < frames.length; k++) ...[
+                        for (var k = 0; k < g.cards.length; k++) ...[
                           if (k > 0) const SizedBox(width: 4),
                           Expanded(
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(2),
                               child: LinearProgressIndicator(
                                 value: k < _i ? 1 : (k == _i ? _bar.value : 0),
-                                minHeight: 2,
+                                minHeight: 3,
                                 backgroundColor: Colors.white.withValues(alpha: .3),
                                 valueColor: const AlwaysStoppedAnimation(Colors.white),
                               ),
@@ -1161,27 +1355,32 @@ class _DailyStoriesState extends State<DailyStories> with SingleTickerProviderSt
                   const SizedBox(height: 10),
                   Row(children: [
                     Container(
-                      width: 32,
-                      height: 32,
+                      width: 36,
+                      height: 36,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: leads ? kInk : null,
-                        gradient: leads ? null : const LinearGradient(colors: [Color(0xFFFFF4C7), Color(0xFFFFD84A)]),
+                        color: g.tone == null ? (g.photo != null ? Colors.white24 : const Color(0xFF2E2E2E)) : null,
+                        gradient: g.tone == null ? null : LinearGradient(colors: g.tone!),
                         border: Border.all(color: const Color(0xFFFFD84A), width: 2),
                       ),
-                      child: WIcon(leads ? WI.sparkle : WI.sun, size: 16, color: leads ? const Color(0xFFFFD84A) : kInk),
+                      child: Text(g.emoji, style: const TextStyle(fontSize: 17, height: 1)),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        leads ? t('Leads for you') : t('Today in {place}', {'place': _today?.cluster ?? ''}),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(g.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+                        Text('${_i + 1} / ${g.cards.length}', style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: .7))),
+                      ]),
+                    ),
+                    GestureDetector(
+                      onTap: () => _go(g.allPage()),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: .15), borderRadius: BorderRadius.circular(99)),
+                        child: Text('${g.allLabel} →', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
                       ),
                     ),
-                    Text('${_i + 1}/${frames.length}', style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: .7))),
                     IconButton(onPressed: () => Navigator.maybePop(context), icon: const WIcon(WI.close, size: 24, color: Colors.white), tooltip: t('Close')),
                   ]),
                 ]),
@@ -1194,140 +1393,363 @@ class _DailyStoriesState extends State<DailyStories> with SingleTickerProviderSt
   }
 }
 
-/// The light card a frame shows, like a text card on an update.
-class _StoryCard extends StatelessWidget {
+// ----------------------- cards -----------------------
+
+/// A story button: the gold one does the main thing, the soft one the other.
+class _Cta extends StatelessWidget {
+  final String emoji, label;
+  final VoidCallback? onTap;
+  final bool soft, active;
+  const _Cta({required this.emoji, required this.label, this.onTap, this.soft = false, this.active = false});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          height: 48,
+          decoration: BoxDecoration(
+            gradient: soft ? null : kGoldGradient,
+            color: soft ? (active ? kGold.withValues(alpha: .2) : p.chip) : null,
+            border: soft ? Border.all(color: active ? kGold : p.border) : null,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: soft ? null : const [BoxShadow(color: Color(0x66C99400), blurRadius: 16, offset: Offset(0, 6))],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text(emoji, style: const TextStyle(fontSize: 17, height: 1)),
+              const SizedBox(width: 8),
+              Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: soft ? p.text : kInk))),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Widget _ctas(List<Widget> ctas) => Row(children: [
+      for (var k = 0; k < ctas.length; k++) ...[if (k > 0) const SizedBox(width: 8), Expanded(child: ctas[k])],
+    ]);
+
+/// The card a story frame shows, with a coloured strip naming what it is.
+class _Shell extends StatelessWidget {
+  final String strip;
+  final List<Color> stripColors;
+  final Color stripFg;
+  final String? right;
   final Widget child;
-  const _StoryCard({required this.child});
+  const _Shell({required this.strip, required this.stripColors, this.stripFg = Colors.white, this.right, required this.child});
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 32, offset: Offset(0, 12))]),
-      child: child,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(28), boxShadow: const [BoxShadow(color: Color(0x99000000), blurRadius: 40, offset: Offset(0, 16))]),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(gradient: LinearGradient(colors: stripColors)),
+          child: Row(children: [
+            Expanded(child: Text(strip.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: .6, color: stripFg))),
+            if (right != null) Text(right!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: stripFg.withValues(alpha: .85))),
+          ]),
+        ),
+        Padding(padding: const EdgeInsets.fromLTRB(20, 16, 20, 20), child: child),
+      ]),
     );
   }
 }
 
-/// One lead: who asks, what, where and the budget, why it fits and how many replied; I can do this, or open the ask.
+/// A small pill with an emoji: where, how much, how soon.
+class _Fact extends StatelessWidget {
+  final String emoji, text;
+  final Color? tint;
+  const _Fact(this.emoji, this.text, {this.tint});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(color: tint?.withValues(alpha: .16) ?? p.chip, borderRadius: BorderRadius.circular(99)),
+      child: Text('$emoji  $text', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+/// One lead: what, where, the budget and how soon, who asks and why it fits, how many replied; I can do this, or open it.
 class _LeadStoryCard extends StatelessWidget {
   final Post post;
-  final VoidCallback onReply, onOpen;
-  const _LeadStoryCard({required this.post, required this.onReply, required this.onOpen});
+  final DailyGo go;
+  const _LeadStoryCard({required this.post, required this.go});
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final x = post;
     final left = askTimeLeft(x);
     final n = x.sharesCount;
-    return _StoryCard(
+    return _Shell(
+      strip: '${kCategoryEmoji[x.category] ?? '✨'} ${t(kCategoryShort[x.category] ?? 'Ask')}',
+      stripColors: _strip['lead']!,
+      stripFg: const Color(0xFFFFD84A),
+      right: '${x.leadNew ? '${t('NEW')} · ' : ''}${timeAgo(x.createdAt)}',
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Text(t(kCategoryShort[x.category] ?? 'Ask').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.tagText)),
-          if (x.leadNew)
-            Container(
-              margin: const EdgeInsets.only(left: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              decoration: BoxDecoration(color: kGold, borderRadius: BorderRadius.circular(4)),
-              child: Text(t('NEW'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kInk)),
-            ),
-          const Spacer(),
-          Text(timeAgo(x.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
-        ]),
-        const SizedBox(height: 8),
-        Text(x.title ?? '', style: const TextStyle(fontSize: 24, height: 1.2, fontWeight: FontWeight.w800)),
+        Text(x.title ?? '', style: const TextStyle(fontSize: 24, height: 1.15, fontWeight: FontWeight.w800)),
         if ((x.description ?? '').isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text(x.description!, maxLines: 4, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, height: 1.45, color: p.text.withValues(alpha: .75))),
+          Text(x.description!, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, height: 1.45, color: p.text.withValues(alpha: .75))),
         ],
         const SizedBox(height: 12),
         Wrap(spacing: 6, runSpacing: 6, children: [
-          if ((x.locationPref ?? '').isNotEmpty) InfoPill(small: true, gold: true, wi: WI.pin, text: '${t(x.locationPref!)}${x.distanceM == null ? '' : ' · ${formatDistance(x.distanceM!)}'}'),
-          if ((x.budget ?? '').isNotEmpty) InfoPill(small: true, gold: true, wi: WI.rupee, text: x.budget!),
-          if (left != null) InfoPill(small: true, gold: true, wi: WI.clock, text: left),
+          if ((x.locationPref ?? '').isNotEmpty) _Fact('📍', '${t(x.locationPref!)}${x.distanceM == null ? '' : ' · ${formatDistance(x.distanceM!)}'}'),
+          if ((x.budget ?? '').isNotEmpty) _Fact('💰', x.budget!, tint: kGold),
+          if (left != null) _Fact('⏳', left),
         ]),
-        const SizedBox(height: 16),
-        Row(children: [
-          Avatar(name: x.shownName, photoUrl: x.authorPhotoUrl, type: x.authorType, size: 32, badge: 13),
-          const SizedBox(width: 8),
-          Expanded(child: Text(x.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
-        ]),
-        if ((x.leadReason ?? '').isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(color: kGold.withValues(alpha: .2), borderRadius: BorderRadius.circular(99)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              WIcon(WI.sparkle, size: 14, color: p.tagText),
-              const SizedBox(width: 4),
-              Flexible(child: Text(leadReasonText(x.leadReason!), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.tagText))),
+        const SizedBox(height: 14),
+        GestureDetector(
+          onTap: () => go(ProfileScreen(handle: x.authorHandle)),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(16)),
+            child: Row(children: [
+              Avatar(name: x.shownName, photoUrl: x.authorPhotoUrl, type: x.authorType, size: 36, badge: 13),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(x.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  if ((x.leadReason ?? '').isNotEmpty)
+                    Text('✨ ${leadReasonText(x.leadReason!)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.tagText)),
+                ]),
+              ),
             ]),
           ),
-        ],
-        const SizedBox(height: 8),
+        ),
+        const SizedBox(height: 12),
         Text(
-          n == 0 ? t('No replies yet · be the first') : t(n == 1 ? '1 replied' : '{n} replied', {'n': n}),
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: n == 0 ? (p.dark ? kGreenDark : kGreen) : p.muted),
+          n == 0 ? '🔥 ${t('No replies yet · be the first')}' : '👥 ${t(n == 1 ? '1 replied' : '{n} replied', {'n': n})}',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: n == 0 ? (p.dark ? kGreenDark : kGreen) : p.muted),
         ),
         const SizedBox(height: 16),
-        Row(children: [
-          Expanded(child: GoldButton(label: t('I can do this'), onPressed: onReply)),
-          const SizedBox(width: 8),
-          GoldButton(label: t('Open ask'), outlined: true, onPressed: onOpen),
+        _ctas([
+          _Cta(emoji: '✋', label: t('I can do this'), onTap: () => go(PostDetailScreen(postId: x.id, openReply: true))),
+          _Cta(emoji: '👀', label: t('Open ask'), soft: true, onTap: () => go(PostDetailScreen(postId: x.id))),
         ]),
       ]),
     );
   }
 }
 
-/// One Today item: the item as on the Today page (with Useful / Interested), plus what to do with it now.
-class _TodayStoryCard extends StatelessWidget {
+/// One Today item, with what to do with it now: share it, mark it useful or interested, open the tender, get directions.
+class _TodayStoryCard extends StatefulWidget {
   final TodayItem it;
-  const _TodayStoryCard({required this.it});
+  final String day;
+  const _TodayStoryCard({required this.it, required this.day});
+  @override
+  State<_TodayStoryCard> createState() => _TodayStoryCardState();
+}
+
+class _TodayStoryCardState extends State<_TodayStoryCard> {
+  late final Set<String> _marked = {...widget.it.marked};
+  late int _interested = widget.it.interested;
+
+  Future<void> _toggle(String kind) async {
+    final api = context.read<AuthProvider>().api;
+    final on = !_marked.contains(kind);
+    setState(() {
+      on ? _marked.add(kind) : _marked.remove(kind);
+      if (kind == 'interested') _interested += on ? 1 : -1;
+    });
+    try {
+      on ? await api.post('/today/items/${widget.it.id}/mark', {'kind': kind}) : await api.delete('/today/items/${widget.it.id}/mark', {'kind': kind});
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
+    final it = widget.it;
+    final x = _text(it);
     final pl = it.payload;
-    final link = it.type == 'tender' && pl['link'] != null
-        ? (label: t('Open tender'), url: '${pl['link']}')
-        : it.type == 'event' && pl['venue'] != null
-            ? (label: t('Directions'), url: 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('${pl['venue']}')}')
-            : null;
-    final share = 'https://wa.me/?text=${Uri.encodeComponent('${_text(it).title}\n$siteUrl/today')}';
+    final kind = _todayKinds.firstWhere((k) => k.type == it.type, orElse: () => _todayKinds.first);
     void open(String url) => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    return _StoryCard(
+    final share = _Cta(emoji: '📤', label: 'WhatsApp', onTap: () => open('https://wa.me/?text=${Uri.encodeComponent('${x.title}\n$siteUrl/today')}'));
+    String? left;
+    if (it.type == 'tender' && pl['deadline'] != null) {
+      final d = (DateTime.parse('${pl['deadline']}T23:59:59+05:30').difference(DateTime.now()).inHours / 24).ceil();
+      left = d < 0 ? t('Closed') : d == 0 ? t('Closes today') : t(d == 1 ? '1 day left' : '{n} days left', {'n': d});
+    }
+    final green = p.dark ? kGreenDark : kGreen;
+    return _Shell(
+      strip: '${kind.emoji} ${t(_typeLabel[it.type] ?? '')}',
+      stripColors: _strip[it.type] ?? _strip['lead']!,
+      right: it.source ?? dayLabel(widget.day),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _ItemRow(it: it, onChange: () {}),
-        Divider(height: 1, color: p.border),
-        const SizedBox(height: 12),
-        Row(children: [
-          if (link != null) ...[Expanded(child: GoldButton(label: link.label, onPressed: () => open(link.url))), const SizedBox(width: 8)],
-          // next to another button there's only room for the app's name
-          Expanded(child: GoldButton(label: link != null ? 'WhatsApp' : t('Share on WhatsApp'), outlined: link != null, onPressed: () => open(share))),
-        ]),
+        if (it.type != 'rates')
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            if (it.type == 'notice' && pl['when'] != null) _Fact('🕘', '${pl['when']}', tint: const Color(0xFFF08A24)),
+            if (left != null) _Fact('⏳', left, tint: const Color(0xFF4A86D8)),
+            if (it.type == 'event' && pl['startsAt'] != null) _Fact('🗓️', '${pl['startsAt']}', tint: const Color(0xFFA45BD6)),
+            if ((it.place ?? '').isNotEmpty) _Fact('📍', it.place!),
+          ]),
+        if (it.type != 'rates') const SizedBox(height: 12),
+        Text(x.title, style: const TextStyle(fontSize: 22, height: 1.2, fontWeight: FontWeight.w800)),
+        if (it.type == 'rates') ...[
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(border: Border.all(color: p.border), borderRadius: BorderRadius.circular(16)),
+            child: Column(children: [
+              for (var k = 0; k < it.rates.length; k++)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(border: k == 0 ? null : Border(top: BorderSide(color: p.border))),
+                  child: Row(children: [
+                    Expanded(child: Text(it.rates[k].name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
+                    Text.rich(TextSpan(children: [
+                      TextSpan(text: it.rates[k].value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                      if ((it.rates[k].unit ?? '').isNotEmpty) TextSpan(text: '/${it.rates[k].unit!.replaceFirst(RegExp(r'^/'), '')}', style: TextStyle(fontSize: 13, color: p.muted)),
+                    ])),
+                    const SizedBox(width: 10),
+                    Builder(builder: (_) {
+                      final c = it.rates[k].change ?? 0;
+                      final col = c > 0 ? green : (c < 0 ? p.danger : p.muted);
+                      return Container(
+                        width: 56,
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(color: c == 0 ? p.chip : col.withValues(alpha: .15), borderRadius: BorderRadius.circular(99)),
+                        child: Text(c > 0 ? '▲ ${c.abs()}' : c < 0 ? '▼ ${c.abs()}' : '–', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: col)),
+                      );
+                    }),
+                  ]),
+                ),
+            ]),
+          ),
+        ],
+        if ((x.body ?? '').isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(x.body!, style: TextStyle(fontSize: 15, height: 1.45, color: p.text.withValues(alpha: .75))),
+        ],
+        if (it.type == 'tender' && pl['who'] != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text('✅ ${t('Who can apply')}: ${pl['who']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+        if (it.type == 'event' && pl['venue'] != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text('📍 ${pl['venue']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+        if (it.type == 'event' && _interested > 0) Padding(padding: const EdgeInsets.only(top: 4), child: Text('⭐ ${t('{n} interested', {'n': _interested})}', style: TextStyle(fontSize: 14, color: p.muted))),
+        const SizedBox(height: 16),
+        if (it.type == 'event')
+          _ctas([
+            _Cta(emoji: _marked.contains('interested') ? '⭐' : '☆', label: t('Interested'), onTap: () => _toggle('interested')),
+            if (pl['venue'] != null) _Cta(emoji: '🗺️', label: t('Directions'), soft: true, onTap: () => open('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('${pl['venue']}')}')),
+          ])
+        else if (it.type == 'tender' && pl['link'] != null)
+          _ctas([
+            _Cta(emoji: '🔗', label: t('Open tender'), onTap: () => open('${pl['link']}')),
+            _Cta(emoji: '📤', label: 'WhatsApp', soft: true, onTap: () => open('https://wa.me/?text=${Uri.encodeComponent('${x.title}\n$siteUrl/today')}')),
+          ])
+        else
+          _ctas([share, _Cta(emoji: '👍', label: t('Useful'), soft: true, active: _marked.contains('useful'), onTap: () => _toggle('useful'))]),
+        const SizedBox(height: 10),
+        GestureDetector(
+          onTap: () => _toggle('outdated'),
+          child: Text(
+            _marked.contains('outdated') ? '🚩 ${t('Marked outdated')}' : t('Outdated or wrong?'),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _marked.contains('outdated') ? p.danger : p.muted),
+          ),
+        ),
       ]),
     );
   }
 }
 
-/// The last card: what's next, with one button and a link.
-class _EndStoryCard extends StatelessWidget {
-  final String emoji, title, hint, primary;
-  final VoidCallback onPrimary;
-  final String? link;
-  final VoidCallback? onLink;
-  const _EndStoryCard({required this.emoji, required this.title, required this.hint, required this.primary, required this.onPrimary, this.link, this.onLink});
+/// Today's question in a story: answer it right here.
+class _PollStory extends StatelessWidget {
+  final TodayFeed feed;
+  const _PollStory({required this.feed});
   @override
-  Widget build(BuildContext context) => Column(mainAxisSize: MainAxisSize.min, children: [
-        Text(emoji, style: const TextStyle(fontSize: 56)),
+  Widget build(BuildContext context) {
+    final q = feed.poll!;
+    return _Shell(
+      strip: q.kind == 'rate' ? '💸 ${t('Rate check')}' : '❓ ${t("Today's question")}',
+      stripColors: _strip['poll']!,
+      stripFg: kInk,
+      right: '📍 ${feed.cluster}',
+      child: PollCard(poll: q, bare: true),
+    );
+  }
+}
+
+/// A business that just joined: who they are and what they do; View profile, or Say hello.
+class _NewBizCard extends StatefulWidget {
+  final Profile u;
+  final DailyGo go;
+  const _NewBizCard({required this.u, required this.go});
+  @override
+  State<_NewBizCard> createState() => _NewBizCardState();
+}
+
+class _NewBizCardState extends State<_NewBizCard> {
+  bool _busy = false;
+
+  Future<void> _hello() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final u = widget.u;
+    final peer = Peer(uid: u.uid, name: u.name, company: u.company, handle: u.handle, userType: u.userType, photoUrl: u.photoUrl, verification: u.verification);
+    try {
+      final id = (await context.read<AuthProvider>().api.post('/chats', {'userId': u.uid}) as Map)['id'] as String;
+      widget.go(ChatThread(chatId: id, peer: peer));
+    } catch (_) {
+      widget.go(ProfileScreen(handle: u.handle));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final u = widget.u;
+    final name = u.company.isNotEmpty ? u.company : u.name;
+    return _Shell(
+      strip: '🎉 ${t('New on WEBWEB')}',
+      stripColors: _strip['new']!,
+      right: t('joined {when}', {'when': timeAgo(u.createdAt)}),
+      child: Column(children: [
+        Avatar(name: name, photoUrl: u.photoUrl, type: u.userType, size: 80, badge: 20),
         const SizedBox(height: 12),
-        Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, height: 1.2, fontWeight: FontWeight.w800, color: Colors.white)),
-        const SizedBox(height: 8),
-        Text(hint, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: .75))),
-        const SizedBox(height: 24),
-        ConstrainedBox(constraints: const BoxConstraints(maxWidth: 320), child: SizedBox(width: double.infinity, child: GoldButton(label: primary, onPressed: onPrimary))),
-        if (link != null)
-          TextButton(onPressed: onLink, child: Text('$link →', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFFFFD84A)))),
-      ]);
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Flexible(child: Text(name, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, height: 1.2, fontWeight: FontWeight.w800))),
+          const SizedBox(width: 6),
+          VerifiedBadge(level: u.verification, size: 18),
+        ]),
+        if (u.company.isNotEmpty && u.name != u.company) Text(u.name, style: TextStyle(fontSize: 14, color: p.muted)),
+        const SizedBox(height: 12),
+        Wrap(alignment: WrapAlignment.center, spacing: 6, runSpacing: 6, children: [
+          if (u.category.isNotEmpty) _Fact('🏷️', t(labelOf(kProfileCategories, u.category))),
+          if (u.location.isNotEmpty) _Fact('📍', u.location),
+        ]),
+        if ((u.bio ?? '').isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(u.bio!, maxLines: 3, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: TextStyle(fontSize: 15, height: 1.45, color: p.text.withValues(alpha: .75))),
+        ],
+        if (u.services.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(alignment: WrapAlignment.center, spacing: 6, runSpacing: 6, children: [
+            for (final s in u.services.take(4))
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: kGold.withValues(alpha: .1), border: Border.all(color: kGold.withValues(alpha: .5)), borderRadius: BorderRadius.circular(99)),
+                child: Text(s, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              ),
+          ]),
+        ],
+        const SizedBox(height: 20),
+        _ctas([
+          _Cta(emoji: '👤', label: t('View profile'), onTap: () => widget.go(ProfileScreen(handle: u.handle))),
+          _Cta(emoji: '👋', label: t('Say hello'), soft: true, onTap: _hello),
+        ]),
+      ]),
+    );
+  }
 }
