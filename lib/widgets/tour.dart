@@ -242,12 +242,16 @@ class _TourOverlayState extends State<_TourOverlay> {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () {},
-            child: TweenAnimationBuilder<Rect?>(
-              tween: RectTween(end: hole),
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOut,
-              builder: (_, r, __) => CustomPaint(painter: _HolePainter(r, const Color(0x9E14120C))),
-            ),
+            // a step with nothing to point at just dims the screen: a TweenAnimationBuilder with a null target
+            // throws in its initState (crash reports c028c40d…, Android), so it only animates a real spotlight
+            child: hole == null
+                ? CustomPaint(painter: _HolePainter(null, const Color(0x9E14120C)))
+                : TweenAnimationBuilder<Rect?>(
+                    tween: RectTween(end: hole),
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOut,
+                    builder: (_, r, __) => CustomPaint(painter: _HolePainter(r, const Color(0x9E14120C))),
+                  ),
           ),
         ),
         placed,
