@@ -611,55 +611,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
       case _Tab.updates:
         if (_updates == null || _textUpdates == null) return _loading();
         if (_updates!.isEmpty && _textUpdates!.isEmpty) return EmptyState(title: t('No updates yet'));
-        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          // text updates, as they read on Connect
-          if (_textUpdates!.isNotEmpty)
-            Transform.translate(
-              offset: const Offset(0, -16),
-              child: Column(children: [for (final x in _textUpdates!) PostCard(key: ValueKey(x.id), post: x, onChanged: () => _loadTabs(u))]),
+        // every update as a tile, newest first: the 24-hour photo updates open the viewer, text updates their own page
+        final tiles = <({DateTime at, String? imageUrl, String? text, VoidCallback onTap})>[
+          for (final s in _updates!) (at: s.createdAt, imageUrl: s.imageUrl, text: s.text, onTap: () => _openUpdates(_updates!)),
+          for (final x in _textUpdates!)
+            (
+              at: x.createdAt,
+              imageUrl: x.images.isEmpty ? null : x.images.first,
+              text: x.description,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: x.id))),
             ),
-          // the 24-hour photo updates, kept here after they leave the Updates bar
-          if (_updates!.isNotEmpty) ...[
-            if (_textUpdates!.isNotEmpty) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(t('Photo updates'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
-            GridView.count(
-              crossAxisCount: 3,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              mainAxisSpacing: 4,
-              crossAxisSpacing: 4,
-              childAspectRatio: 3 / 4,
-              children: [
-                for (final s in _updates!)
-                  GestureDetector(
-                    onTap: () => _openUpdates(_updates!),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Stack(fit: StackFit.expand, children: [
-                        s.imageUrl != null
-                            ? NetImg(s.imageUrl!)
-                            : Container(
-                                decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF3A3A3A), kInk], begin: Alignment.topLeft, end: Alignment.bottomRight)),
-                                padding: const EdgeInsets.all(8),
-                                alignment: Alignment.center,
-                                child: Text(s.text ?? '', textAlign: TextAlign.center, maxLines: 6, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
-                              ),
-                        Positioned(
-                          left: 4,
-                          bottom: 4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            decoration: BoxDecoration(color: kInk.withValues(alpha: .7), borderRadius: BorderRadius.circular(4)),
-                            child: Text(timeAgo(s.createdAt), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+        ]..sort((a, b) => b.at.compareTo(a.at));
+        return GridView.count(
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          mainAxisSpacing: 4,
+          crossAxisSpacing: 4,
+          childAspectRatio: 3 / 4,
+          children: [
+            for (final s in tiles)
+              GestureDetector(
+                onTap: s.onTap,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Stack(fit: StackFit.expand, children: [
+                    s.imageUrl != null
+                        ? NetImg(s.imageUrl!)
+                        : Container(
+                            decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF3A3A3A), kInk], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+                            padding: const EdgeInsets.all(8),
+                            alignment: Alignment.center,
+                            child: Text(s.text ?? '', textAlign: TextAlign.center, maxLines: 6, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
                           ),
-                        ),
-                      ]),
+                    Positioned(
+                      left: 4,
+                      bottom: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(color: kInk.withValues(alpha: .7), borderRadius: BorderRadius.circular(4)),
+                        child: Text(timeAgo(s.at), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+                      ),
                     ),
-                  ),
-              ],
-            ),
+                  ]),
+                ),
+              ),
           ],
-        ]);
+        );
       case _Tab.products:
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _areasSection(p, u),
