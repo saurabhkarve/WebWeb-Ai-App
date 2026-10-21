@@ -153,6 +153,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         editedAt: p.editedAt,
         repostedByName: p.repostedByName,
         repostedByHandle: p.repostedByHandle,
+        repostedBy: p.repostedBy,
         repostedAt: p.repostedAt,
         images: p.images,
         sharesCount: n,
@@ -317,7 +318,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     if (isAsk && !widget.detail) {
       final why = mine ? t('Your ask') : (match == null ? null : t(match));
       final spotlight = Container(
-        padding: framed ? const EdgeInsets.only(top: 8, bottom: 20) : const EdgeInsets.symmetric(vertical: 20),
+        padding: framed ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12) : const EdgeInsets.symmetric(vertical: 20),
         foregroundDecoration: framed ? null : _HairlineDecoration(kGold.withValues(alpha: .6)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(
@@ -326,7 +327,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 GestureDetector(
                   onTap: _openAuthor,
-                  child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: 40, ring: post.authorHasUpdate, type: post.authorType, uid: post.authorUid, badge: 15),
+                  child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: framed ? 32 : 40, ring: post.authorHasUpdate, type: post.authorType, uid: post.authorUid, badge: framed ? 14 : 15),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -343,7 +344,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                     ]),
                   ),
                 ),
-                ...more,
+                if (!framed) ...more,
               ]),
               const SizedBox(height: 10),
               // the category as a small heading, why you see this ask on the right
@@ -384,17 +385,21 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                   if (post.images.isNotEmpty) InfoPill(small: true, gold: true, wi: WI.camera, text: t(post.images.length == 1 ? '1 photo' : '{n} photos', {'n': post.images.length})),
                 ]),
               ),
-              LatestReplies(post: post, onMore: () => _openDetail(expandResponses: true)),
-              const SizedBox(height: 12),
-              PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
+              // quoted in a repost: the replies and the controls are the repost's (below)
+              if (!framed) ...[
+                LatestReplies(post: post, onMore: () => _openDetail(expandResponses: true)),
+                const SizedBox(height: 12),
+                PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
+              ],
             ]),
           ),
         ]),
       );
       if (!framed) return spotlight;
-      // reposted (Connect, a member's page): no frame, so the ask keeps its full width and every control stays where it
-      // always is; it is marked behind and beside it instead (_reposted)
-      return _reposted(p, spotlight, top: 16, gap: 0);
+      // reposted (Connect, a member's page), as on x.com: the repost is the row (who reposted, when, the menu), the ask sits
+      // inside it as a quote set in from the left, and the replies and every control belong to the repost, at the row's
+      // full width where they always are
+      return _quoteRepost(p, spotlight, more);
     }
 
     final card = Container(
@@ -509,6 +514,58 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     );
     if (!framed) return card;
     return _reposted(p, card, top: 16, gap: 8, bottom: 16);
+  }
+
+  /// An ask someone reposted (x.com style): the reposter's row, the ask quoted in a light frame set in by the avatar's
+  /// width and its gap, then the replies and the controls at full width.
+  Widget _quoteRepost(Pal p, Widget quote, List<Widget> more) {
+    final r = post.repostedBy ?? const {};
+    const green = Color(0xFF1F7A52);
+    final ink = Theme.of(context).brightness == Brightness.dark ? const Color(0xFF7FD6AD) : green;
+    void open() => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? '')));
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          GestureDetector(
+            onTap: open,
+            child: Avatar(name: post.repostedByName ?? '', photoUrl: r['photoURL'] as String?, size: 40, type: r['userType'] as String?, uid: r['uid'] as String?, badge: 15),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: GestureDetector(
+              onTap: open,
+              behavior: HitTestBehavior.opaque,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Flexible(child: Text(post.repostedByName ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25))),
+                  const SizedBox(width: 6),
+                  VerifiedBadge(level: (r['verification'] as num?)?.toInt() ?? 0, premium: r['premium'] == true, plan: r['plan'] as String?),
+                ]),
+                Row(children: [
+                  WIcon(WI.repost, size: 14, color: ink),
+                  const SizedBox(width: 4),
+                  Text(t('Reposted'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: ink, height: 1.3)),
+                  if (post.repostedAt != null) Text(' · ${timeAgo(post.repostedAt!)}', style: TextStyle(fontSize: 12, color: p.muted, height: 1.3)),
+                ]),
+              ]),
+            ),
+          ),
+          ...more,
+        ]),
+        Padding(
+          padding: const EdgeInsets.only(left: 50, top: 10),
+          child: Container(
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)),
+            child: quote,
+          ),
+        ),
+        LatestReplies(post: post, onMore: () => _openDetail(expandResponses: true)),
+        const SizedBox(height: 12),
+        PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
+      ]),
+    );
   }
 
   /// A reposted post, marked without touching its layout (web post-card.tsx): a green "X reposted" tag on top with when
@@ -780,8 +837,9 @@ class PostActionsState extends State<PostActions> {
           decoration: BoxDecoration(
             color: fill ?? p.card,
             borderRadius: radius,
-            border: Border.all(color: edge ?? p.border),
-            boxShadow: const [BoxShadow(color: Color(0x0D1E1E1E), blurRadius: 2, offset: Offset(0, 1))],
+            // on a phone no outline or shadow (Refer keeps its gold fill), as on the web
+            border: wide ? Border.all(color: edge ?? p.border) : null,
+            boxShadow: wide ? const [BoxShadow(color: Color(0x0D1E1E1E), blurRadius: 2, offset: Offset(0, 1))] : null,
           ),
           // centred in its share of the row (every control is the same width, count or not)
           child: wide
