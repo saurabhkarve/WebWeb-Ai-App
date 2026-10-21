@@ -23,6 +23,7 @@ import 'connect.dart';
 import 'edit_profile.dart';
 import 'find.dart';
 import 'leads.dart';
+import 'p2.dart';
 import 'post_detail.dart';
 import 'profile.dart';
 import 'service_contacts_sheet.dart';
@@ -467,6 +468,8 @@ class _AccountMenu extends StatelessWidget {
               item(WI.user, 'View profile', () => push(const ProfileScreen())),
               item(WI.edit, 'Edit profile', () => push(EditProfileScreen(profile: me))),
               item(WI.sparkle, 'Leads for you', () => push(SubPage(title: t('Leads for you'), body: const LeadsScreen()))),
+              item(WI.sun, 'Today in your area', () => push(SubPage(title: t('Today in your area'), body: const TodayScreen()))),
+              item(WI.bell, 'Alerts', () => push(SubPage(title: t('Alerts'), body: const AlertsScreen()))),
               item(WI.deals, 'Your week', () => push(SubPage(title: t('Your week'), body: const WeekScreen()))),
               item(WI.bookmark, 'Saved asks', () => push(const SavedPostsScreen())),
               // help lives on the website so articles stay current without an app update

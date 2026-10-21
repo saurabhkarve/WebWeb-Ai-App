@@ -20,6 +20,8 @@ bool outcomeDue(Post p) => p.isRequirement && !p.closed && DateTime.now().differ
 
 /// Why an ask is a lead for this member (from the API, in English), in the member's language.
 String leadReasonText(String reason) {
+  final alert = RegExp(r'^Matches your alert: (.+)$').firstMatch(reason);
+  if (alert != null) return t('Matches your alert: {label}', {'label': alert.group(1)!});
   final m = RegExp(r'^Matches your (.+) business$').firstMatch(reason);
   if (m != null) return t('Matches your {trade} business', {'trade': t(labelOf(kProfileCategories, m.group(1)))});
   return reason.split(' · ').map(t).join(' · ');

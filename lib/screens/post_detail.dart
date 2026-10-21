@@ -19,6 +19,7 @@ import '../widgets/reaction_picker.dart';
 import '../widgets/response_sheet.dart';
 import 'ask.dart';
 import 'find.dart';
+import 'p2.dart' show PushNudge;
 import 'profile.dart';
 import 'talk.dart' show openChat;
 
@@ -403,6 +404,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 padding: const EdgeInsets.only(bottom: 16),
                 child: OutcomeCard(post: post, responders: _responders, prominent: widget.askOutcome || outcomeDue(post), onChanged: _load),
               ),
+            if (owner && isAsk && post.outcome == null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: PushNudge(title: t('Get told the moment someone replies'), hint: t("Turn on notifications so you don't miss a reply to your ask.")),
+              ),
             if (owner && isAsk) KeyedSubtree(key: _responsesKey, child: _ownerSection(post, p)),
             if (!owner && _referrals.isNotEmpty) _myReferrals(p),
           ],
@@ -432,6 +438,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           ),
         ]),
       ),
+      // the moment push obviously helps: they're waiting to hear back
+      if (post.outcome == null) PushNudge(title: t('Know the moment the asker replies'), hint: t('Turn on notifications to hear when they react, message you, or choose you.')),
       if (mine.askStatus == 'asked') ...[
         const SizedBox(height: 12),
         Container(

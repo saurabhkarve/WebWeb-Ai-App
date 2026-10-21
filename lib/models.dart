@@ -617,3 +617,105 @@ class CallLog {
         durationS: (j['durationS'] as num?)?.toInt() ?? 0, createdAt: _ms(j['createdAt']), peer: j['peer'] == null ? null : Peer.fromJson(j['peer'] as Map),
       );
 }
+
+// ===================== P2: Today, Today's question, alerts =====================
+
+/// A rate with its move (percent or absolute; positive is up).
+class Rate {
+  final String name, value;
+  final String? unit;
+  final num? change;
+  const Rate({required this.name, required this.value, this.unit, this.change});
+  factory Rate.fromJson(Map j) => Rate(name: '${j['name'] ?? ''}', value: '${j['value'] ?? ''}', unit: j['unit'] as String?, change: j['change'] as num?);
+}
+
+/// One item of Today in your area (written by the team): rates, a notice, a tender or an event.
+class TodayItem {
+  final String id, type, title, day;
+  final String? place, body, source;
+  final Map<String, dynamic> i18n, payload;
+  final int interested;
+  final Set<String> marked;
+  const TodayItem({required this.id, required this.type, required this.title, required this.day, this.place, this.body, this.source, this.i18n = const {}, this.payload = const {}, this.interested = 0, this.marked = const {}});
+  List<Rate> get rates => ((payload['rates'] as List?) ?? const []).map((e) => Rate.fromJson(e as Map)).toList();
+  factory TodayItem.fromJson(Map j) => TodayItem(
+        id: j['id'] as String, type: j['type'] as String, title: '${j['title'] ?? ''}', day: '${j['day'] ?? ''}',
+        place: j['place'] as String?, body: j['body'] as String?, source: j['source'] as String?,
+        i18n: Map<String, dynamic>.from((j['i18n'] as Map?) ?? const {}), payload: Map<String, dynamic>.from((j['payload'] as Map?) ?? const {}),
+        interested: (j['interested'] as num?)?.toInt() ?? 0, marked: _strings(j['marked']).toSet(),
+      );
+}
+
+/// What others said, once answered (or closed): a median and range for a rate check, counts for a poll. Only [n]
+/// below 5 answers.
+class PollResult {
+  final int n;
+  final num? median, low, high;
+  final List<int>? counts;
+  final List<({String place, num median})> places;
+  const PollResult({this.n = 0, this.median, this.low, this.high, this.counts, this.places = const []});
+  bool get ready => median != null || counts != null;
+  factory PollResult.fromJson(Map j) => PollResult(
+        n: (j['n'] as num?)?.toInt() ?? 0, median: j['median'] as num?, low: j['low'] as num?, high: j['high'] as num?,
+        counts: (j['counts'] as List?)?.map((e) => (e as num).toInt()).toList(),
+        places: ((j['places'] as List?) ?? const []).map((e) => (place: '${(e as Map)['place']}', median: e['median'] as num)).toList(),
+      );
+}
+
+/// Today's question: a rate check ("what do you pay for…") or a poll of 2 to 4 options.
+class Poll {
+  final String id, kind, question;
+  final Map<String, dynamic> i18n;
+  final List<String> options;
+  final String? unit;
+  final DateTime closesAt;
+  final bool closed;
+  final int answers;
+  final int? myOption;
+  final num? myValue;
+  final PollResult? result;
+  const Poll({required this.id, required this.kind, required this.question, this.i18n = const {}, this.options = const [], this.unit, required this.closesAt, this.closed = false, this.answers = 0, this.myOption, this.myValue, this.result});
+  bool get answered => myOption != null || myValue != null;
+  factory Poll.fromJson(Map j) {
+    final mine = j['mine'] as Map?;
+    return Poll(
+      id: j['id'] as String, kind: j['kind'] as String, question: '${j['question'] ?? ''}',
+      i18n: Map<String, dynamic>.from((j['i18n'] as Map?) ?? const {}), options: _strings(j['options']), unit: j['unit'] as String?,
+      closesAt: _ms(j['closesAt']), closed: j['closed'] == true, answers: (j['answers'] as num?)?.toInt() ?? 0,
+      myOption: (mine?['option'] as num?)?.toInt(), myValue: mine?['value'] as num?,
+      result: j['result'] == null ? null : PollResult.fromJson(j['result'] as Map),
+    );
+  }
+}
+
+/// GET /today: the member's city cluster (null: not live there yet), the day shown, and the question.
+class TodayFeed {
+  final String? cluster, day, today;
+  final bool seen;
+  final List<TodayItem> items;
+  final Poll? poll;
+  const TodayFeed({this.cluster, this.day, this.today, this.seen = true, this.items = const [], this.poll});
+  factory TodayFeed.fromJson(Map j) => TodayFeed(
+        cluster: j['cluster'] as String?, day: j['day'] as String?, today: j['today'] as String?, seen: j['seen'] != false,
+        items: ((j['items'] as List?) ?? const []).map((e) => TodayItem.fromJson(e as Map)).toList(),
+        poll: j['poll'] == null ? null : Poll.fromJson(j['poll'] as Map),
+      );
+}
+
+/// "Tell me when someone asks for…": what, where, a budget floor, and how to tell (instant, daily, leads).
+class Alert {
+  final String id, label, delivery;
+  final String? category, place;
+  final List<String> keywords;
+  final int radiusKm, recentMatches;
+  final int? budgetMin;
+  final bool paused;
+  final DateTime? lastMatchedAt;
+  const Alert({required this.id, required this.label, this.delivery = 'instant', this.category, this.place, this.keywords = const [], this.radiusKm = 10, this.recentMatches = 0, this.budgetMin, this.paused = false, this.lastMatchedAt});
+  factory Alert.fromJson(Map j) => Alert(
+        id: j['id'] as String, label: '${j['label'] ?? ''}', delivery: '${j['delivery'] ?? 'instant'}', category: j['category'] as String?,
+        place: j['place'] as String?, keywords: _strings(j['keywords']), radiusKm: (j['radiusKm'] as num?)?.toInt() ?? 10,
+        recentMatches: (j['recentMatches'] as num?)?.toInt() ?? 0, budgetMin: (j['budgetMin'] as num?)?.toInt(), paused: j['paused'] == true,
+        lastMatchedAt: _msOpt(j['lastMatchedAt']),
+      );
+}

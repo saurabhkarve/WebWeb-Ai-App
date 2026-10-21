@@ -628,7 +628,15 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
   }
 }
 
-/// Bottom sheet to add an update (web update-composer.tsx): a photo, a caption, or both.
+/// What to post, by member type (web update-composer.tsx PROMPTS): ↻ shows another, and each sets the type.
+const _prompts = {
+  'business': [('Show one job you finished this week', 'work'), ('New stock arrived?', 'stock'), ("Today's offer", 'offer'), ('Show your team at work', 'work')],
+  'seeker': [('Show your work', 'work'), ("A certificate or a skill you're proud of", 'other')],
+};
+const _types = [('work', 'Work done'), ('stock', 'New stock'), ('offer', 'Offer'), ('other', 'Other')];
+
+/// Bottom sheet to add an update (web update-composer.tsx): a prompt says what to post, a type labels it, then a
+/// photo, a caption, or both. The footer promises the reach notification.
 Future<bool?> showStoryComposer(BuildContext context) {
   final p = Pal.of(context);
   return showModalBottomSheet<bool>(
@@ -652,6 +660,10 @@ class _StoryComposerState extends State<_StoryComposer> {
   XFile? _file;
   bool _busy = false;
   String? _error;
+  // a different prompt on different days
+  late final List<(String, String)> _list = _prompts[context.read<AuthProvider>().profile?.userType == 'job_seeker' ? 'seeker' : 'business']!;
+  late int _pi = DateTime.now().day % _list.length;
+  late String _type = _list[_pi].$2;
 
   Future<void> _post() async {
     final api = context.read<AuthProvider>().api;
@@ -662,7 +674,12 @@ class _StoryComposerState extends State<_StoryComposer> {
     try {
       String? url;
       if (_file != null) url = await api.uploadImage(await _file!.readAsBytes(), _file!.name);
-      await api.post('/updates', {if (url != null) 'imageUrl': url, if (_text.text.trim().isNotEmpty) 'text': _text.text.trim()});
+      await api.post('/updates', {
+        if (url != null) 'imageUrl': url,
+        if (_text.text.trim().isNotEmpty) 'text': _text.text.trim(),
+        'type': _type,
+        'prompt': _list[_pi].$1,
+      });
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -695,6 +712,43 @@ class _StoryComposerState extends State<_StoryComposer> {
           Expanded(child: Text(t('Add an update'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
           GestureDetector(onTap: () => Navigator.pop(context), child: WIcon(WI.close, size: 24, color: p.text)),
         ]),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+          decoration: BoxDecoration(color: kGold.withValues(alpha: .12), borderRadius: BorderRadius.circular(12)),
+          child: Row(children: [
+            Expanded(child: Text('“${t(_list[_pi].$1)}”', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+            TextButton(
+              onPressed: () => setState(() {
+                _pi = (_pi + 1) % _list.length;
+                _type = _list[_pi].$2;
+              }),
+              child: Text('↻ ${t('Another idea')}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            for (final ty in _types)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: GestureDetector(
+                  onTap: () => setState(() => _type = ty.$1),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: _type == ty.$1 ? kGold.withValues(alpha: .2) : null,
+                      border: Border.all(color: _type == ty.$1 ? kGold : p.border),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(t(ty.$2), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _type == ty.$1 ? p.text : p.muted)),
+                  ),
+                ),
+              ),
+          ]),
+        ),
         const SizedBox(height: 12),
         if (_file != null)
           GestureDetector(
@@ -746,6 +800,8 @@ class _StoryComposerState extends State<_StoryComposer> {
         if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: TextStyle(fontSize: 12, color: p.danger))),
         const SizedBox(height: 12),
         GoldButton(label: t('Add update'), loading: _busy, onPressed: (_file != null || _text.text.trim().isNotEmpty) ? _post : null),
+        const SizedBox(height: 8),
+        Text(t("Seen by businesses near you for 24 hours. We'll tell you how far it went."), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.muted)),
       ]),
     );
   }

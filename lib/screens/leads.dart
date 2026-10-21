@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/post_card.dart';
 import 'edit_profile.dart';
+import 'p2.dart';
 
 /// P1 (docs/P1-MICRO-PLAN.md), as on the web: the Today strip at the top of Connect (today-strip.tsx), "Leads for
 /// you" (/leads) and "Your week" (/week).
@@ -35,7 +36,7 @@ Future<void> _editProfile(BuildContext context) async {
 }
 
 /// The top of Connect, the daily surface: "Leads for you" with how many are new, and at the start of the week
-/// "Your week". The "Today in your area" card (P2) joins here.
+/// "Your week", with "Today in your area" (P2) between them.
 class TodayStrip extends StatefulWidget {
   const TodayStrip({super.key});
   @override
@@ -45,6 +46,7 @@ class TodayStrip extends StatefulWidget {
 class TodayStripState extends State<TodayStrip> {
   LeadSummary? _leads;
   WeekStats? _week;
+  TodayFeed? _today;
 
   @override
   void initState() {
@@ -57,6 +59,10 @@ class TodayStripState extends State<TodayStrip> {
     try {
       final s = LeadSummary.fromJson(await api.get('/posts/leads/summary') as Map);
       if (mounted) setState(() => _leads = s);
+    } catch (_) {}
+    try {
+      final f = TodayFeed.fromJson(await api.get('/today') as Map);
+      if (mounted) setState(() => _today = f);
     } catch (_) {}
     if (_startOfWeekIST()) {
       try {
@@ -112,6 +118,8 @@ class TodayStripState extends State<TodayStrip> {
       ));
     }
 
+    if (_today != null) cards.add(TodayCard(feed: _today!, onOpened: load));
+
     if (showWeek) {
       cards.add(_card(
         p,
@@ -129,6 +137,8 @@ class TodayStripState extends State<TodayStrip> {
       ));
     }
     if (cards.isEmpty) return const SizedBox.shrink();
+    // an empty Today card renders nothing: don't leave its gap
+    if (_today != null && (_today!.cluster == null || (_today!.items.isEmpty && _today!.poll == null))) cards.removeWhere((c) => c is TodayCard);
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Column(children: [
@@ -184,6 +194,9 @@ class LeadsScreen extends StatefulWidget {
 class _LeadsScreenState extends State<LeadsScreen> {
   List<Post>? _posts;
   LeadSummary? _sum;
+  // alerts: how many the member has, and the sheet to set one (the investment that brings the next lead)
+  int? _alerts;
+  String? _saved;
 
   @override
   void initState() {
@@ -203,6 +216,19 @@ class _LeadsScreenState extends State<LeadsScreen> {
       final s = LeadSummary.fromJson(await api.get('/posts/leads/summary') as Map);
       if (mounted) setState(() => _sum = s);
     } catch (_) {}
+    try {
+      final r = await api.get('/alerts') as Map;
+      if (mounted) setState(() => _alerts = ((r['alerts'] as List?) ?? const []).length);
+    } catch (_) {
+      if (mounted) setState(() => _alerts = 0);
+    }
+  }
+
+  Future<void> _setAlert() async {
+    final r = await showAlertSheet(context, label: alertSuggestions(context.read<AuthProvider>().profile).firstOrNull);
+    if (r == null || !mounted) return;
+    setState(() => _saved = savedMessage(r.openNow));
+    _load();
   }
 
   @override
@@ -217,16 +243,65 @@ class _LeadsScreenState extends State<LeadsScreen> {
       child: ListView(
         padding: EdgeInsets.fromLTRB(16, 12, 16, islandSpace(context)),
         children: [
-          if (posts.isNotEmpty)
-            Text.rich(
-              TextSpan(children: [
-                if (fresh > 0) TextSpan(text: '${t('{n} new', {'n': fresh})} · ', style: TextStyle(color: p.tagText)),
-                TextSpan(text: t(open == 1 ? '{n} open lead' : '{n} open leads', {'n': open})),
-              ]),
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted),
-            ),
+          Row(children: [
+            if (posts.isNotEmpty)
+              Expanded(
+                child: Text.rich(
+                  TextSpan(children: [
+                    if (fresh > 0) TextSpan(text: '${t('{n} new', {'n': fresh})} · ', style: TextStyle(color: p.tagText)),
+                    TextSpan(text: t(open == 1 ? '{n} open lead' : '{n} open leads', {'n': open})),
+                  ]),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted),
+                ),
+              )
+            else
+              const Spacer(),
+            // the way to alerts stays here on busy days, when the card below is hidden
+            if (_alerts != null && (_alerts! > 0 || fresh > 0))
+              GestureDetector(
+                onTap: () async {
+                  if (_alerts! > 0) {
+                    await openAlerts(context);
+                    _load();
+                  } else {
+                    _setAlert();
+                  }
+                },
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  WIcon(WI.bell, size: 14, color: p.link),
+                  const SizedBox(width: 4),
+                  Text(_alerts! > 0 ? t(_alerts == 1 ? '1 alert' : '{n} alerts', {'n': _alerts!}) : t('Set an alert'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.link)),
+                ]),
+              ),
+          ]),
           const SizedBox(height: 2),
           Text(t('Asks that fit what you do. Reply early: the first few replies get the most attention.'), style: TextStyle(fontSize: 14, color: p.muted)),
+          if (_saved != null)
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(color: kGreen.withValues(alpha: .1), borderRadius: BorderRadius.circular(12)),
+              child: Text(_saved!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kGreen)),
+            ),
+          // no alert yet, and nothing new: the moment to let them choose their own trigger
+          if (_alerts == 0 && fresh == 0)
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: kGold.withValues(alpha: .1), border: Border.all(color: kGold.withValues(alpha: .6)), borderRadius: BorderRadius.circular(18)),
+              child: Row(children: [
+                WIcon(WI.bell, size: 24, color: p.tagText),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(t('Get told first'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    Text(t('Set an alert for your trade and area. New asks that fit come straight to you.'), style: TextStyle(fontSize: 12, color: p.muted)),
+                  ]),
+                ),
+                const SizedBox(width: 8),
+                GoldButton(label: t('Set an alert'), height: 32, onPressed: _setAlert),
+              ]),
+            ),
           if (posts.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 40),

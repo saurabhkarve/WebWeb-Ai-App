@@ -13,6 +13,7 @@ import '../safety.dart';
 import '../screens/ask.dart';
 import '../screens/contact_picker.dart';
 import '../screens/find.dart';
+import '../screens/p2.dart' show showAlertSheet;
 import '../screens/post_detail.dart';
 import '../screens/profile.dart';
 import '../screens/talk.dart' show openChat;
@@ -178,6 +179,12 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         leadNew: p.leadNew,
       );
 
+  /// "Alert me for similar asks": the alert sheet, with this ask's category and place.
+  Future<void> _alertSimilar() async {
+    final r = await showAlertSheet(context, category: post.category, place: (post.locationPref ?? '').isEmpty ? null : post.locationPref);
+    if (r != null && mounted) toast(context, t("Alert saved. We'll tell you when a similar ask comes in."));
+  }
+
   /// ⋯ on my own ask: edit it in the Ask editor, or delete it (a soft delete: it leaves every feed,
   /// including where it was reposted).
   Future<void> _ownerMenu() async {
@@ -297,7 +304,16 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
           label: 'Report or block',
           child: InkResponse(
             onTap: () async {
-              if (await showSafetySheet(context, uid: post.authorUid, name: post.shownName, postId: post.id, saved: post.bookmarked, onToggleSave: () => _actionsKey.currentState?.toggleBookmark()) && mounted) {
+              if (await showSafetySheet(
+                    context,
+                    uid: post.authorUid,
+                    name: post.shownName,
+                    postId: post.id,
+                    saved: post.bookmarked,
+                    onToggleSave: () => _actionsKey.currentState?.toggleBookmark(),
+                    onAlert: post.isRequirement ? _alertSimilar : null,
+                  ) &&
+                  mounted) {
                 widget.onBlocked?.call();
               }
             },

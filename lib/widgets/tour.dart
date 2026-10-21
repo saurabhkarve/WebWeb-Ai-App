@@ -18,12 +18,13 @@ class TourStep {
 /// The first-login tour of the app: the feed (same wording as the web's components/tour.tsx, so the
 /// translations are shared), then the tabs and the account menu, where "Take the app tour" replays it.
 /// Its id changes when it gains new stops, so members who saw the earlier one see it once more ("connect2":
-/// leads, I can do this, closing an ask, your week).
-const kConnectTourId = 'connect2';
+/// leads, I can do this, closing an ask, your week; "connect3": Today in your area, show your work, alerts).
+const kConnectTourId = 'connect3';
 const kConnectTour = [
   TourStep('Welcome to WebWeb', 'Businesses and job seekers near you ask for what they need here, and others answer with a contact. Here is a 30-second look around.'),
   TourStep('Leads for you', 'Asks that fit your business, picked for you every day. The number shows the new ones: tap to see them, and reply early.', 'today'),
-  TourStep('Updates', '24-hour updates from people near you: new stock, openings and offers. Tap a circle to view one.', 'updates'),
+  TourStep('Today in your area', 'Rates, notices, tenders and events near you, new every morning, and a quick question. One card, not a feed.', 'today-area'),
+  TourStep('Show your work', "Post a photo of a job you finished or new stock. It stays up for 24 hours, and we'll tell you how many businesses saw it.", 'updates'),
   TourStep('This is an ask', 'Someone needs something: staff, a supplier, a buyer or space. Tap it to read the full ask.', 'first-ask'),
   TourStep('The essentials at a glance', "What it is, where (and how far from you), the budget and how soon it's needed. Tap a chip to find similar asks.", 'chips'),
   TourStep('Say "I can do this"', 'Reply opens with I can do this: add your price and when you can do it, so the asker can compare. A note or photo is optional.', 'reply'),
@@ -31,7 +32,7 @@ const kConnectTour = [
   TourStep('Find', 'Search members, businesses and asks by what they do and where.', 'nav-find'),
   TourStep('Talk', 'Your chats and calls. Message @webwebai, the WebWeb AI assistant, for contacts or to post an ask for you.', 'nav-talk'),
   TourStep('Need something yourself?', 'Tap Ask to post what you need. When you find someone, close your ask and pick who you chose: they hear they won the job.', 'nav-ask'),
-  TourStep('Your week, and this tour', 'Every Monday, Your week shows your leads, replies, jobs won and your rank. Find it here, along with Leads for you and this tour.', 'account'),
+  TourStep('Alerts, your week, and this tour', 'Set alerts for the asks you want first. Every Monday, Your week shows your leads, replies, jobs won and your rank. Find them here, with this tour.', 'account'),
 ];
 
 /// "Take the app tour" in the account menu: the shell switches to Connect and starts the tour.
