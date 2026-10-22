@@ -13,14 +13,18 @@ import '../safety.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/catalog_strip.dart';
+import '../widgets/house_card.dart';
 import '../widgets/post_card.dart';
 import '../widgets/story_viewer.dart';
 import '../widgets/tour.dart';
 import 'edit_profile.dart';
 import 'find.dart';
+import 'leads.dart';
+import 'p2.dart';
 
 /// Connect (home), same as the web feed (feed-page.tsx): profile-strength strip, Updates row, then the
-/// Asks timeline with a business catalog block after every third ask. Pull down to refresh (the W draws
+/// Asks timeline with a block after every third ask (a WEBWEB house card and a business catalog block taking turns)
+/// and a WEBWEB Facts card after every tenth. Pull down to refresh (the W draws
 /// itself), new asks are announced with a chip instead of shuffling the list.
 class ConnectScreen extends StatefulWidget {
   final int refreshTick;
@@ -36,6 +40,11 @@ const _page = 12;
 class _ConnectScreenState extends State<ConnectScreen> {
   List<Post>? _posts;
   List<CatalogGroup> _catalog = [];
+  /// WEBWEB house cards (API feed-cards.ts), taking turns with the business blocks; [_gone]: hidden from their menu
+  List<HouseCard> _house = [];
+  final Set<String> _gone = {};
+  /// WEBWEB Facts posts: one after every 10th ask
+  List<Post> _facts = [];
   List<Post> _fresh = [];
   String? _error;
   bool _hasMore = true;
@@ -44,6 +53,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
   int _offset = 0;
   final _scroll = ScrollController();
   final _updatesKey = GlobalKey<_UpdatesBarState>();
+  final _todayKey = GlobalKey<TodayStripState>();
   Timer? _poll;
   bool _tourTried = false;
 
@@ -53,6 +63,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
   void initState() {
     super.initState();
     _load();
+    _loadCards();
     _api.get('/products/feed', {'limit': 10}).then((d) {
       if (mounted) setState(() => _catalog = (d as List).map((e) => CatalogGroup.fromJson(e as Map)).toList());
     }).catchError((_) {});
@@ -97,7 +108,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       if (!_tourTried) {
         _tourTried = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) Tours.maybeShow(context, 'connect', kConnectTour);
+          if (mounted) Tours.maybeShow(context, kConnectTourId, kConnectTour);
         });
       }
     } catch (e) {
@@ -105,11 +116,25 @@ class _ConnectScreenState extends State<ConnectScreen> {
     }
   }
 
+  /// The WEBWEB cards and facts (optional: the feed works without them).
+  Future<void> _loadCards() async {
+    await Future.wait([
+      loadHouseCards(_api).then((c) {
+        if (mounted) setState(() => _house = c);
+      }).catchError((_) {}),
+      loadFactPosts(_api).then((f) {
+        if (mounted) setState(() => _facts = f);
+      }).catchError((_) {}),
+    ]);
+  }
+
   /// Pull to refresh: posts, updates and the profile strength.
   Future<void> _refresh() async {
     await Future.wait([
       _load(),
+      _loadCards(),
       _updatesKey.currentState?.load() ?? Future.value(),
+      _todayKey.currentState?.load() ?? Future.value(),
       context.read<AuthProvider>().loadProfile(),
     ]);
   }
@@ -154,19 +179,33 @@ class _ConnectScreenState extends State<ConnectScreen> {
     _toTop();
   }
 
-  /// One business block after ask 3, 6, 9 ... (and after the last ask of a short feed).
-  CatalogGroup? _catalogAt(int i, int n) {
-    final slot = (i + 1) % 3 == 0 ? (i + 1) ~/ 3 - 1 : (n < 3 && i == n - 1 ? 0 : -1);
-    return slot >= 0 && slot < _catalog.length ? _catalog[slot] : null;
+  /// The blocks between asks take turns: a WEBWEB card, then a business block; when one kind runs out the other fills in.
+  List<Object> get _blocks {
+    final cards = _house.where((c) => !_gone.contains(c.key)).toList();
+    return [
+      for (var k = 0; k < (cards.length > _catalog.length ? cards.length : _catalog.length); k++) ...[
+        if (k < cards.length) cards[k],
+        if (k < _catalog.length) _catalog[k],
+      ],
+    ];
   }
+
+  Widget _block(Object b) => b is HouseCard
+      ? HouseCardView(key: ValueKey('hc-${b.key}'), card: b, onGone: () => setState(() => _gone.add(b.key)))
+      : CatalogStrip(key: ValueKey('cat-${(b as CatalogGroup).owner.uid}'), group: b);
 
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final posts = _posts;
     final firstAsk = posts?.indexWhere((x) => x.isRequirement) ?? -1;
+    final blocks = _blocks;
+    final slotCount = posts == null ? 0 : (posts.length < 3 ? (posts.isEmpty ? 0 : 1) : posts.length ~/ 3);
+    final houseShown = blocks.take(slotCount).whereType<HouseCard>().length;
     final children = <Widget>[
       const _StrengthNudge(),
+      // at the start of the week, your week (leads and Today are circles in Updates)
+      TodayStrip(key: _todayKey),
       const SizedBox(height: 12),
       RuleHeading(WI.updates, t('Updates')),
       const SizedBox(height: 6),
@@ -182,7 +221,15 @@ class _ConnectScreenState extends State<ConnectScreen> {
             KeyedSubtree(key: Tours.key('first-ask'), child: PostCard(key: ValueKey(posts[i].id), post: posts[i], onBlocked: _load, tourTarget: true))
           else
             PostCard(key: ValueKey(posts[i].id), post: posts[i], onBlocked: _load),
-          if (_catalogAt(i, posts.length) case final g?) CatalogStrip(key: ValueKey('cat-${g.owner.uid}'), group: g),
+          // one block after every 3rd ask: ask 3, 6, 9 ... (and after the last ask of a short feed)
+          if (((i + 1) % 3 == 0 ? (i + 1) ~/ 3 - 1 : (posts.length < 3 && i == posts.length - 1 ? 0 : -1)) case final slot when slot >= 0 && slot < blocks.length) _block(blocks[slot]),
+          // a short feed: WEBWEB cards that got no slot go after the last ask, up to 3 cards in all
+          if (i == posts.length - 1) ...blocks.skip(slotCount).whereType<HouseCard>().take((3 - houseShown).clamp(0, 3)).map(_block),
+          // a fact after ask 10, 20, 30 ... (a short feed of 4+ asks gets one at its end)
+          if ((i + 1) % 10 == 0 && (i + 1) ~/ 10 - 1 < _facts.length)
+            PostCard(key: ValueKey('fact-${_facts[(i + 1) ~/ 10 - 1].id}'), post: _facts[(i + 1) ~/ 10 - 1])
+          else if (posts.length < 10 && posts.length >= 4 && i == posts.length - 1 && _facts.isNotEmpty)
+            PostCard(key: ValueKey('fact-${_facts.first.id}'), post: _facts.first),
         ],
       if (posts != null && posts.isNotEmpty)
         (_loadingMore || _hasMore)
@@ -310,6 +357,7 @@ class _StrengthNudgeState extends State<_StrengthNudge> {
 // ======================= updates row =======================
 
 const _seenKey = 'webweb_seen_updates';
+const _dailySeenKey = 'webweb_seen_daily';
 
 /// Updates row above the feed (web updates-bar.tsx): your tile first ("+" always adds), then everyone
 /// else; gold ring = unseen, grey ring = seen.
@@ -325,6 +373,12 @@ const _updatesPage = 12;
 
 class _UpdatesBarState extends State<_UpdatesBar> {
   List<StoryGroup> _groups = [];
+  // the daily circles: Leads for you by kind of ask, Today in your area by kind of item, New here
+  LeadSummary? _leads;
+  List<Post>? _leadList;
+  TodayFeed? _today;
+  List<Profile>? _biz;
+  Set<String> _dailySeen = {};
   Set<String> _seen = {};
   bool _hasMore = false;
   Future<int>? _loadingMore;
@@ -342,7 +396,13 @@ class _UpdatesBarState extends State<_UpdatesBar> {
     SharedPreferences.getInstance().then((sp) {
       try {
         final ids = (jsonDecode(sp.getString(_seenKey) ?? '[]') as List).map((e) => '$e').toSet();
-        if (mounted) setState(() => _seen = ids);
+        final daily = (jsonDecode(sp.getString(_dailySeenKey) ?? '[]') as List).map((e) => '$e').toSet();
+        if (mounted) {
+          setState(() {
+            _seen = ids;
+            _dailySeen = daily;
+          });
+        }
       } catch (_) {}
     });
     _scroll.addListener(() {
@@ -352,8 +412,35 @@ class _UpdatesBarState extends State<_UpdatesBar> {
     load();
   }
 
+  Future<void> _daily() async {
+    final api = context.read<AuthProvider>().api;
+    await Future.wait([
+      api.get('/posts/leads/summary').then((d) {
+        if (mounted) setState(() => _leads = LeadSummary.fromJson(d as Map));
+      }).catchError((_) {}),
+      api.get('/posts/leads').then((d) {
+        if (mounted) setState(() => _leadList = [for (final e in d as List) Post.fromJson(e as Map)]);
+      }).catchError((_) {}),
+      api.get('/today').then((d) {
+        if (mounted) setState(() => _today = TodayFeed.fromJson(d as Map));
+      }).catchError((_) {}),
+      api.get('/today/new-businesses').then((d) {
+        if (mounted) setState(() => _biz = [for (final e in d as List) Profile.fromJson(e as Map)]);
+      }).catchError((_) {}),
+    ]);
+  }
+
+  Future<void> _markDailySeen(String id) async {
+    if (_dailySeen.contains(id) || !mounted) return;
+    setState(() => _dailySeen = {..._dailySeen, id});
+    final sp = await SharedPreferences.getInstance();
+    final list = _dailySeen.toList();
+    sp.setString(_dailySeenKey, jsonEncode(list.length > 500 ? list.sublist(list.length - 500) : list));
+  }
+
   Future<void> load() async {
     _loadingMore = null;
+    _daily();
     try {
       final d = await context.read<AuthProvider>().api.get('/updates?limit=$_updatesPage&offset=0') as List;
       if (mounted) {
@@ -424,12 +511,64 @@ class _UpdatesBarState extends State<_UpdatesBar> {
 
   bool _allSeen(StoryGroup g) => g.items.every((it) => _seen.contains(it.id));
 
+  /// Before the member has said what they do there's nothing to match: what they do is the investment that brings leads.
+  Widget _getLeadsTile(Pal p) => KeyedSubtree(
+        key: Tours.key('today'),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () async {
+            final auth = context.read<AuthProvider>();
+            if (auth.profile == null) return;
+            if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: auth.profile!))) == true) auth.loadProfile();
+            _daily();
+          },
+          child: Container(
+            width: 84,
+            margin: const EdgeInsets.only(right: 12),
+            child: Column(children: [
+              Container(
+                width: 74,
+                height: 74,
+                padding: const EdgeInsets.all(2.5),
+                decoration: const BoxDecoration(shape: BoxShape.circle, gradient: kGoldGradient),
+                child: Container(
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: p.canvas),
+                  child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: kGold.withValues(alpha: .15)),
+                    child: const Text('✨', style: TextStyle(fontSize: 28, height: 1)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(t('Get leads'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            ]),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final me = context.watch<AuthProvider>().profile;
     final mineIdx = _groups.indexWhere((g) => g.uid == me?.uid);
     final others = [for (var i = 0; i < _groups.length; i++) if (_groups[i].uid != me?.uid) i];
+    final api = context.read<AuthProvider>().api;
+    final dailies = buildDailyGroups(leads: _leadList, today: _today, biz: _biz, seen: _dailySeen, api: api);
+    // circles with something new come before people's updates, the ones already seen after them, as seen updates do
+    final order = [...dailies.where((g) => g.fresh > 0), ...dailies.where((g) => g.fresh == 0)];
+    Widget circle(DailyGroup g) => DailyCircle(
+          key: ValueKey(g.id),
+          group: g,
+          onTap: () async {
+            await openDailyStories(context, order, order.indexOf(g), _markDailySeen);
+            _daily();
+            // views of the leads go out in a batch a few seconds later: count again once they have
+            Future.delayed(const Duration(milliseconds: 3500), () => mounted ? _daily() : null);
+          },
+        );
+    final getLeads = _leads != null && !_leads!.hasTrade;
     return SizedBox(
       height: 100,
       child: ListView(
@@ -445,6 +584,8 @@ class _UpdatesBarState extends State<_UpdatesBar> {
             onTap: mineIdx >= 0 ? () => _open(mineIdx) : _compose,
             plus: _compose,
           ),
+          if (getLeads) _getLeadsTile(p),
+          for (final g in order.where((g) => g.fresh > 0)) circle(g),
           for (final i in others)
             _UpdateTile(
               name: _groups[i].shownName,
@@ -455,9 +596,11 @@ class _UpdatesBarState extends State<_UpdatesBar> {
               ring: _allSeen(_groups[i]) ? _Ring.seen : _Ring.unseen,
               onTap: () => _open(i),
             ),
+          for (final g in order.where((g) => g.fresh == 0)) circle(g),
           if (_hasMore)
             const SizedBox(width: 48, child: Align(alignment: Alignment(0, -.45), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))),
-          if (others.isEmpty)
+          // the daily circles already fill an empty row
+          if (others.isEmpty && dailies.isEmpty && !getLeads)
             Center(
               child: Padding(
                 padding: const EdgeInsets.only(left: 4),

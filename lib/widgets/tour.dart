@@ -17,17 +17,22 @@ class TourStep {
 
 /// The first-login tour of the app: the feed (same wording as the web's components/tour.tsx, so the
 /// translations are shared), then the tabs and the account menu, where "Take the app tour" replays it.
+/// Its id changes when it gains new stops, so members who saw the earlier one see it once more ("connect2":
+/// leads, I can do this, closing an ask, your week; "connect3": Today in your area, show your work, alerts).
+const kConnectTourId = 'connect3';
 const kConnectTour = [
   TourStep('Welcome to WebWeb', 'Businesses and job seekers near you ask for what they need here, and others answer with a contact. Here is a 30-second look around.'),
-  TourStep('Updates', '24-hour updates from people near you: new stock, openings and offers. Tap a circle to view one.', 'updates'),
+  TourStep('Leads for you', 'Asks that fit your business, picked for you every day. The number shows the new ones: tap to see them, and reply early.', 'today'),
+  TourStep('Today in your area', "Rates, notices, tenders and events near you, new every morning, and a quick question. A gold ring means there's something new.", 'today-area'),
+  TourStep('Show your work', "Post a photo of a job you finished or new stock. It stays up for 24 hours, and we'll tell you how many businesses saw it.", 'updates'),
   TourStep('This is an ask', 'Someone needs something: staff, a supplier, a buyer or space. Tap it to read the full ask.', 'first-ask'),
   TourStep('The essentials at a glance', "What it is, where (and how far from you), the budget and how soon it's needed. Tap a chip to find similar asks.", 'chips'),
-  TourStep('Answer in one tap', 'Reply shares your contact, a photo or a note with the person who asked. Only they see what you share.', 'reply'),
+  TourStep('Say "I can do this"', 'Reply opens with I can do this: add your price and when you can do it, so the asker can compare. A note or photo is optional.', 'reply'),
   TourStep('Know someone who can help?', 'Refer shares a contact from your phone book for this ask, so the right person gets the work.', 'refer'),
   TourStep('Find', 'Search members, businesses and asks by what they do and where.', 'nav-find'),
   TourStep('Talk', 'Your chats and calls. Message @webwebai, the WebWeb AI assistant, for contacts or to post an ask for you.', 'nav-talk'),
-  TourStep('Need something yourself?', 'Tap Ask to post what you need. Members who fit get it on their phone, and answers come with contact numbers.', 'nav-ask'),
-  TourStep('Your account', 'Your profile, saved asks, help and settings. Take this tour again from here any time.', 'account'),
+  TourStep('Need something yourself?', 'Tap Ask to post what you need. When you find someone, close your ask and pick who you chose: they hear they won the job.', 'nav-ask'),
+  TourStep('Alerts, your week, and this tour', 'Set alerts for the asks you want first. Every Monday, Your week shows your leads, replies, jobs won and your rank. Find them here, with this tour.', 'account'),
 ];
 
 /// "Take the app tour" in the account menu: the shell switches to Connect and starts the tour.
@@ -107,7 +112,12 @@ class Tours {
     });
   }
 
-  static void _run(BuildContext context, dynamic api, String id, List<TourStep> steps, VoidCallback onEnd) {
+  static Future<void> _run(BuildContext context, dynamic api, String id, List<TourStep> steps, VoidCallback onEnd) async {
+    // parts that load on their own (the leads card) get up to 2.5 s to appear
+    for (var waited = 0; waited < 2500 && steps.any((s) => s.target != null && _box(s.target!) == null); waited += 250) {
+      await Future.delayed(const Duration(milliseconds: 250));
+    }
+    if (!context.mounted || _showing) return;
     // only the stops that are on screen now (no "first ask" stop on an empty feed)
     final list = steps.where((s) => s.target == null || _box(s.target!) != null).toList();
     if (list.isEmpty) return;

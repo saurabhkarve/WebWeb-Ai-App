@@ -85,7 +85,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Row(children: [
-                    const LogoInline(size: 30, stacked: false),
+                    const LogoInline(size: 30, tagline: true),
                     const Spacer(),
                     if (created == null)
                       GestureDetector(

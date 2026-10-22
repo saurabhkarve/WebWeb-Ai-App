@@ -31,11 +31,11 @@ import 'profile.dart';
 
 /// Opens (or creates) the 1:1 chat with [peer]. [attachment] (an ask / update being replied to, an
 /// item enquiry) waits above the composer and goes out with the next message, like the web.
-Future<void> openChat(BuildContext context, Peer peer, {Map<String, dynamic>? attachment}) async {
+Future<void> openChat(BuildContext context, Peer peer, {Map<String, dynamic>? attachment, String? draft}) async {
   final api = context.read<AuthProvider>().api;
   try {
     final id = (await api.post('/chats', {'userId': peer.uid}) as Map)['id'] as String;
-    if (context.mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: id, peer: peer, pending: attachment)));
+    if (context.mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: id, peer: peer, pending: attachment, draft: draft)));
   } catch (e) {
     if (context.mounted) toast(context, '$e', error: true);
   }
@@ -529,13 +529,15 @@ class ChatThread extends StatefulWidget {
   final Peer peer;
   /// sent along with the next message (reply to an ask / update, item enquiry)
   final Map<String, dynamic>? pending;
-  const ChatThread({super.key, required this.chatId, required this.peer, this.pending});
+  /// text the composer starts with (Reply on a WEBWEB card: 'About "…": ')
+  final String? draft;
+  const ChatThread({super.key, required this.chatId, required this.peer, this.pending, this.draft});
   @override
   State<ChatThread> createState() => _ChatThreadState();
 }
 
 class _ChatThreadState extends State<ChatThread> {
-  final _input = TextEditingController();
+  late final _input = TextEditingController(text: widget.draft);
   final _scroll = ScrollController();
   List<Msg> _msgs = [];
   List<CallLog> _calls = [];

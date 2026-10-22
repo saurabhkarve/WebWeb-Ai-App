@@ -15,6 +15,10 @@ import 'auth_provider.dart';
 import 'models.dart';
 import 'native_calls.dart';
 import 'realtime.dart';
+import 'widgets.dart';
+import 'i18n.dart';
+import 'screens/leads.dart';
+import 'screens/p2.dart';
 import 'screens/post_detail.dart';
 import 'screens/profile.dart';
 import 'screens/talk.dart' show ChatThread;
@@ -295,8 +299,32 @@ class NotificationService with WidgetsBindingObserver {
       final path = '${d['path'] ?? ''}';
       final isChat = d['type'] == 'msg' || d['chatId'] != null || path.startsWith('/chat/') || d['kind'] == 'missed_call';
       if (!isChat) {
+        // "Your week" (the Monday scorecard)
+        if (path == '/week') {
+          nv.push(MaterialPageRoute(builder: (_) => SubPage(title: t('Your week'), body: const WeekScreen())));
+          return;
+        }
+        // P2: Today (a morning notice, a question's result), alerts (the 8 pm summary goes to Leads), an update's reach
+        if (path.startsWith('/today')) {
+          final poll = Uri.tryParse(path)?.queryParameters['poll'];
+          nv.push(MaterialPageRoute(builder: (_) => SubPage(title: t('Today in your area'), body: TodayScreen(poll: poll))));
+          return;
+        }
+        if (path == '/alerts') {
+          nv.push(MaterialPageRoute(builder: (_) => SubPage(title: t('Alerts'), body: const AlertsScreen())));
+          return;
+        }
+        if (path == '/leads') {
+          nv.push(MaterialPageRoute(builder: (_) => SubPage(title: t('Leads for you'), body: const LeadsScreen())));
+          return;
+        }
+        if (path.startsWith('/update/') && auth.profile != null) {
+          nv.push(MaterialPageRoute(builder: (_) => ProfileScreen(handle: auth.profile!.handle)));
+          return;
+        }
         if (d['postId'] != null) {
-          nv.push(MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${d['postId']}')));
+          // "Did you find someone?" opens the ask with the question in view
+          nv.push(MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${d['postId']}', askOutcome: d['kind'] == 'ask_outcome' || path.contains('outcome=1'))));
           return;
         }
         final post = RegExp(r'^/post/([0-9a-f-]{36})').firstMatch(path)?.group(1);
@@ -430,7 +458,7 @@ Future<void> showActivity(Map<String, dynamic> d, {required String title, requir
     await showMessage(chatId: '${d['chatId']}', name: title, body: body);
     return;
   }
-  const asks = {'ask_response', 'ask_referral', 'ask_reaction', 'ask_repost', 'ask_shared', 'ask_thread', 'share_asked', 'share_answered', 'contact_request', 'item_referral', 'ask_match'};
+  const asks = {'ask_response', 'ask_referral', 'ask_reaction', 'ask_repost', 'ask_shared', 'ask_thread', 'share_asked', 'share_answered', 'contact_request', 'item_referral', 'ask_match', 'ask_won', 'ask_outcome'};
   final details = kind == 'missed_call' ? _messageDetails : (asks.contains(kind) ? _asksDetails : _activityDetails);
   final key = '${d['postId'] ?? d['productId'] ?? d['storyId'] ?? _sender(d) ?? d['nid'] ?? title}$kind';
   await _local.show(

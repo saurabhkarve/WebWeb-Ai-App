@@ -11,6 +11,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/city_picker.dart';
 import '../widgets/post_card.dart';
+import 'p2.dart';
 import 'post_detail.dart';
 import 'profile.dart';
 
@@ -295,6 +296,51 @@ class _FindScreenState extends State<FindScreen> {
         const SizedBox(height: 16),
         if (idle) _Explore(key: _explore, scope: _scope),
         if (empty && !_loading) EmptyState(title: t('Nothing found'), hint: t('Try a different word or another tab.')),
+        // a search for asks is a need they'll have again: let it become an alert (with or without results today)
+        if (!idle && _posts != null && !_loading && (_scope == 'all' || _scope == 'asks' || _scope == 'jobs') && (_q.text.trim().length >= 2 || _askCat.isNotEmpty))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Material(
+              color: Colors.transparent,
+              child: Ink(
+                decoration: BoxDecoration(color: kGold.withValues(alpha: .1), border: Border.all(color: kGold.withValues(alpha: .6)), borderRadius: BorderRadius.circular(18)),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () async {
+                    final r = await showAlertSheet(
+                      context,
+                      label: _q.text.trim().isEmpty ? null : _q.text.trim(),
+                      category: _askCat.isNotEmpty ? _askCat : (_scope == 'jobs' ? 'job' : null),
+                      place: _location.isEmpty ? null : _location,
+                    );
+                    if (r != null && context.mounted) {
+                      toast(context, savedMessage(r.openNow));
+                      openAlerts(context);
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Row(children: [
+                      WIcon(WI.bell, size: 20, color: p.tagText),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(t('Alert me for new asks like this'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                          Text(
+                            [if (_q.text.trim().isNotEmpty) _q.text.trim(), if (_askCat.isNotEmpty) t(kCategoryShort[_askCat] ?? ''), if (_location.isNotEmpty) _location].join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: p.muted),
+                          ),
+                        ]),
+                      ),
+                      Text('›', style: TextStyle(fontSize: 18, color: p.muted)),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          ),
         if (_users?.isNotEmpty == true) ...[
           if (_scope == 'all') _sectionLabel(p, 'Businesses & people'),
           ..._divided(p, [for (final u in _users!) _MemberRow(u)]),

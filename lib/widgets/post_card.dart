@@ -8,11 +8,13 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../auth_provider.dart';
 import '../i18n.dart';
+import '../links.dart';
 import '../models.dart';
 import '../safety.dart';
 import '../screens/ask.dart';
 import '../screens/contact_picker.dart';
 import '../screens/find.dart';
+import '../screens/p2.dart' show showAlertSheet;
 import '../screens/post_detail.dart';
 import '../screens/profile.dart';
 import '../screens/talk.dart' show openChat;
@@ -22,6 +24,7 @@ import 'area_map.dart';
 import 'image_grid.dart';
 import 'reaction_picker.dart';
 import 'reply_thread.dart';
+import 'p1.dart';
 import 'response_sheet.dart';
 import 'tour.dart';
 import '../share_log.dart';
@@ -82,9 +85,9 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     if (post.authorHandle.isNotEmpty) Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.authorHandle)));
   }
 
-  Future<void> _openDetail({bool expandResponses = false}) async {
+  Future<void> _openDetail({bool expandResponses = false, bool askOutcome = false}) async {
     if (widget.detail) return;
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: post.id, expandResponses: expandResponses)));
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: post.id, expandResponses: expandResponses, askOutcome: askOutcome)));
     widget.onChanged?.call();
   }
 
@@ -104,7 +107,9 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
   /// Reply stays in the feed: asks open the respond sheet, updates start a chat with the post attached.
   Future<void> _reply() async {
     if (widget.detail && widget.onReply != null) return widget.onReply!();
-    if (_isOwner) return toast(context, t('Responses to your ask are on its page'));
+    if (_isOwner) return post.isRequirement ? toast(context, t('Responses to your ask are on its page')) : _openDetail();
+    // the owner found someone (or no longer needs it): no new replies
+    if (post.isRequirement && post.closed) return toast(context, t('This ask is closed'));
     if (post.isRequirement) {
       if (await showResponseSheet(context, post.id) && mounted) {
         setState(() => post = _withShares(post, post.sharesCount + 1));
@@ -169,7 +174,18 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         reposted: p.reposted,
         bookmarked: p.bookmarked,
         myReaction: p.myReaction,
+        outcome: p.outcome,
+        wonBy: p.wonBy,
+        leadReason: p.leadReason,
+        leadNew: p.leadNew,
+        fact: p.fact,
       );
+
+  /// "Alert me for similar asks": the alert sheet, with this ask's category and place.
+  Future<void> _alertSimilar() async {
+    final r = await showAlertSheet(context, category: post.category, place: (post.locationPref ?? '').isEmpty ? null : post.locationPref);
+    if (r != null && mounted) toast(context, t("Alert saved. We'll tell you when a similar ask comes in."));
+  }
 
   /// ⋯ on my own ask: edit it in the Ask editor, or delete it (a soft delete: it leaves every feed,
   /// including where it was reposted).
@@ -240,8 +256,28 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     final match = (post.matchReason ?? '').isEmpty ? null : post.matchReason!;
 
     final body = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (isAsk) HashtagText(post.title ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.375, letterSpacing: -0.18)),
-      if ((post.description ?? '').isNotEmpty)
+      if (isAsk && post.leadNew)
+        // on "Leads for you": not seen yet, a NEW tag leading the title
+        Text.rich(
+          TextSpan(children: [
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Container(
+                margin: const EdgeInsets.only(right: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(color: kGold, borderRadius: BorderRadius.circular(4)),
+                child: Text(t('NEW'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: .4, color: kInk)),
+              ),
+            ),
+            TextSpan(text: post.title ?? ''),
+          ]),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.375, letterSpacing: -0.18),
+        )
+      else if (isAsk)
+        HashtagText(post.title ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.375, letterSpacing: -0.18)),
+      if (post.fact != null)
+        FactCard(post.fact!)
+      else if ((post.description ?? '').isNotEmpty)
         Padding(
           padding: EdgeInsets.only(top: isAsk ? 4 : 0),
           child: HashtagText(
@@ -253,6 +289,27 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         ),
       ImageGrid(post.images, shareUrl: post.webUrl, shareRef: post.id),
     ]);
+    // the first link in the text gets a preview card (not a fact's: its source shows under it; not inside a repost's quote)
+    final link = post.fact != null || post.repostedByName != null ? null : firstLink([post.title, post.description]);
+    final extra = <Widget>[
+      if (link != null) LinkPreviewCard(link, key: ValueKey(link)),
+      if (post.fact != null && post.fact!.sourceUrl.isNotEmpty)
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => openExternal(context, post.fact!.sourceUrl),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(children: [
+              WIcon(WI.link, size: 13, color: p.muted),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text('${t('Source')}: ${(post.fact!.sourceName ?? '').isNotEmpty ? post.fact!.sourceName : hostOf(post.fact!.sourceUrl)}',
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+              ),
+            ]),
+          ),
+        ),
+    ];
 
     // ⋯: my own ask's menu (save, edit, delete), or save / report / block on someone else's
     final more = <Widget>[
@@ -272,7 +329,16 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
           label: 'Report or block',
           child: InkResponse(
             onTap: () async {
-              if (await showSafetySheet(context, uid: post.authorUid, name: post.shownName, postId: post.id, saved: post.bookmarked, onToggleSave: () => _actionsKey.currentState?.toggleBookmark()) && mounted) {
+              if (await showSafetySheet(
+                    context,
+                    uid: post.authorUid,
+                    name: post.shownName,
+                    postId: post.id,
+                    saved: post.bookmarked,
+                    onToggleSave: () => _actionsKey.currentState?.toggleBookmark(),
+                    onAlert: post.isRequirement ? _alertSimilar : null,
+                  ) &&
+                  mounted) {
                 widget.onBlocked?.call();
               }
             },
@@ -316,7 +382,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     // category with why you see it, the ask, chips for place, budget, time left and reach, the latest replies in public,
     // then Refer as the gold button with Reply beside it.
     if (isAsk && !widget.detail) {
-      final why = mine ? t('Your ask') : (match == null ? null : t(match));
+      // on "Leads for you" the card says why it is a lead for this member
+      final why = mine ? t('Your ask') : ((post.leadReason ?? '').isNotEmpty ? leadReasonText(post.leadReason!) : (match == null ? null : t(match)));
       final spotlight = Container(
         padding: framed ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12) : const EdgeInsets.symmetric(vertical: 20),
         foregroundDecoration: framed ? null : _HairlineDecoration(kGold.withValues(alpha: .6)),
@@ -356,10 +423,11 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                       maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.link)),
                 ),
                 // "Near you" opens the ask's area map, like its place chip
-                if (why != null) ...[
+                if (post.closed) ...[const SizedBox(width: 8), Flexible(child: ClosedChip(post))]
+                else if (why != null) ...[
                   const SizedBox(width: 8),
                   Flexible(
-                    child: !mine && match != null && ((post.locationPref ?? '').isNotEmpty || post.lat != null)
+                    child: !mine && match != null && post.leadReason == null && ((post.locationPref ?? '').isNotEmpty || post.lat != null)
                         ? GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showAskAreaSheet(context, post), child: GoldTag(why))
                         : GoldTag(why),
                   ),
@@ -367,6 +435,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               ]),
               const SizedBox(height: 4),
               tappable,
+              ...extra,
               // where, budget, time left, reach, photos as chips (the category is shown above)
               Padding(
                 key: widget.tourTarget ? Tours.key('chips') : null,
@@ -385,9 +454,14 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                   if (post.images.isNotEmpty) InfoPill(small: true, gold: true, wi: WI.camera, text: t(post.images.length == 1 ? '1 photo' : '{n} photos', {'n': post.images.length})),
                 ]),
               ),
+              // a lead: how much competition there is, so the first few know to move
+              if (!framed && post.leadReason != null) Competition(post.sharesCount),
+              // my own ask, a few days in: "Did you find someone?"
+              if (!framed && mine) OutcomeNudge(post: post, onTap: () => _openDetail(askOutcome: true)),
               // quoted in a repost: the replies and the controls are the repost's (below)
               if (!framed) ...[
-                LatestReplies(post: post, onMore: () => _openDetail(expandResponses: true)),
+                // on a lead the competition line above already invites the first reply
+                LatestReplies(post: post, hideEmpty: post.leadReason != null, onMore: () => _openDetail(expandResponses: true)),
                 const SizedBox(height: 12),
                 PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
               ],
@@ -403,8 +477,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     }
 
     final card = Container(
-      padding: framed ? const EdgeInsets.all(12) : const EdgeInsets.symmetric(vertical: 16),
-      foregroundDecoration: framed ? null : _HairlineDecoration(kGold.withValues(alpha: .6)),
+      padding: framed ? const EdgeInsets.all(12) : EdgeInsets.zero,
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         GestureDetector(
           onTap: _openAuthor,
@@ -446,6 +519,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
             if (mine && isAsk) Padding(padding: const EdgeInsets.only(top: 6), child: GoldTag(t('Your ask'))),
             const SizedBox(height: 8),
             tappable,
+            ...extra,
             // the essentials as chips: what, where (and how far), budget, timing, reach, photos
             if (isAsk)
               Padding(
@@ -502,18 +576,23 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                 hideHeader: mine,
                 onMore: () => _openDetail(expandResponses: true),
               ),
-            // quoted in a repost: the controls are the repost's
-            if (!framed)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child:
-                    Transform.translate(offset: const Offset(-6, 0), child: PostActions(key: _actionsKey, post: post, onReply: _reply, onChanged: () => setState(() {}), tourTarget: widget.tourTarget)),
-              ),
           ]),
         ),
       ]),
     );
-    if (!framed) return card;
+    // an update has the same five controls as an ask (React · Reply · Refer · Views · Share), across the row's full
+    // width under it, as on the web; quoted in a repost, the controls are the repost's
+    if (!framed) {
+      return Container(
+        padding: const EdgeInsets.only(top: 16, bottom: 16),
+        foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          card,
+          const SizedBox(height: 12),
+          PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
+        ]),
+      );
+    }
     return _quoteRepost(p, card, more, ask: false);
   }
 
@@ -571,11 +650,10 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
           LatestReplies(post: post, hideEmpty: true, onMore: () => _openDetail(expandResponses: true)),
           const SizedBox(height: 12),
           PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
-        ] else
-          Padding(
-            padding: const EdgeInsets.only(top: 6, left: 50),
-            child: Transform.translate(offset: const Offset(-6, 0), child: PostActions(key: _actionsKey, post: post, onReply: _reply, onChanged: () => setState(() {}), tourTarget: widget.tourTarget)),
-          ),
+        ] else ...[
+          const SizedBox(height: 12),
+          PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
+        ],
       ]),
     );
   }
@@ -661,6 +739,7 @@ class PostActionsState extends State<PostActions> {
 
   /// Refer contacts from the phone book (one call per contact, max 5 per ask).
   Future<void> _refer() async {
+    if (widget.post.closed) return toast(context, t('This ask is closed'));
     final api = _api;
     var mine = 0;
     try {
@@ -692,7 +771,13 @@ class PostActionsState extends State<PostActions> {
   @override
   Widget build(BuildContext context) => _actions(Pal.of(context), post.isRequirement, _isOwner);
 
-  String get _subject => post.title ?? (post.isRequirement ? 'WebWeb AI ask' : 'WebWeb AI update');
+  String get _subject => post.title ?? post.fact?.title ?? (post.isRequirement ? 'WebWeb AI ask' : 'WebWeb AI update');
+
+  /// Refer on an update: pass it on to someone over WhatsApp.
+  Future<void> _whatsApp() async {
+    final ok = await launchUrl(Uri.parse('https://wa.me/?text=${Uri.encodeComponent('$_subject\n${post.webUrl}')}'), mode: LaunchMode.externalApplication).catchError((_) => false);
+    if (ok) logShare(_api, 'post', post.id, channel: 'whatsapp');
+  }
 
   /// Share: repost to your page, WhatsApp, the phone's share sheet, copy link.
   Future<void> _share() async {
@@ -827,13 +912,13 @@ class PostActionsState extends State<PostActions> {
             color: reacted ? p.text : p.muted,
           ),
         ),
-        if (mine)
+        if (mine && isAsk)
           pill(label: 'Review responses', icon: WIcon(WI.talk, size: 18, color: p.tagText), count: post.sharesCount, badge: p.tagBg, color: p.tagText, edge: kGold.withValues(alpha: .45), fill: kGold.withValues(alpha: .1), onTap: widget.onReview ?? widget.onReply)
         else ...[
           tour('reply', pill(label: 'Reply', icon: WIcon(WI.talk, size: 18, color: p.muted), count: isAsk ? post.sharesCount : 0, color: p.muted, onTap: widget.onReply)),
-          if (isAsk)
-            // plain like the rest, in deep gold so it still leads (as on the web)
-            tour(
+          // plain like the rest, in deep gold so it still leads (as on the web). An update has no one to put a contact in
+          // touch with, so there Refer passes it on to someone over WhatsApp
+          tour(
               'refer',
               pill(
                 label: 'Refer',
@@ -844,7 +929,7 @@ class PostActionsState extends State<PostActions> {
                 splash: kGold.withValues(alpha: .15),
                 edge: kGold.withValues(alpha: .45),
                 fill: kGold.withValues(alpha: .1),
-                onTap: _refer,
+                onTap: isAsk ? _refer : _whatsApp,
               ),
             ),
         ],
@@ -950,8 +1035,6 @@ class LatestReplies extends StatelessWidget {
       return Padding(padding: const EdgeInsets.only(top: 12), child: Text(t('Be the first to respond'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)));
     }
     final shown = replies.length + referrers.fold<int>(0, (n, r) => n + r.n);
-    const bubble = BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(14), bottomLeft: Radius.circular(14), bottomRight: Radius.circular(14));
-    void openProfile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
     // open on the card (no panel of its own): a heading at the card's edge (talk icon, label, count, a hairline that
     // fades out), then the replies as compact bubbles set in under the author's name as a thread (the author avatar's 40
     // plus its 10 gap), and Show all n last, as on the web
@@ -978,65 +1061,7 @@ class LatestReplies extends StatelessWidget {
           // set in less on a phone, as on the web
           padding: const EdgeInsets.only(left: 20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        for (final r in replies)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              GestureDetector(onTap: () => openProfile(r.handle), child: Avatar(name: r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name, photoUrl: r.photoUrl, size: 24)),
-              const SizedBox(width: 8),
-              Expanded(
-                // react and reply from the name line, as on the web
-                child: ReplySocial(
-                  key: ValueKey('${post.id}-${r.uid}'),
-                  postId: post.id,
-                  reply: r,
-                  meta: [
-                    Flexible(
-                      child: GestureDetector(
-                        onTap: () => openProfile(r.handle),
-                        child: Text(r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name,
-                            maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .85))),
-                      ),
-                    ),
-                    if (r.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: r.verification, size: 12)],
-                    const SizedBox(width: 6),
-                    Text(timeAgo(r.createdAt), style: TextStyle(fontSize: 11, color: p.muted)),
-                  ],
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: r.kind == 'info' && (r.text ?? '').isNotEmpty
-                        ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            // the bubble is ReplySocial's, with the name and time on top
-                            HashtagText(r.text!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, height: 1.35, color: p.text.withValues(alpha: .75))),
-                            // a photo sent with the note
-                            if ((r.imageUrl ?? '').isNotEmpty)
-                              Padding(padding: const EdgeInsets.only(top: 4), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 96, height: 64))),
-                          ])
-                        : r.kind == 'media' && (r.imageUrl ?? '').isNotEmpty
-                            ? ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 96, height: 64))
-                            : Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                                Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                                decoration: BoxDecoration(borderRadius: bubble, border: Border.all(color: p.border)),
-                                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                  WIcon(WI.lock, size: 13, color: p.muted),
-                                  const SizedBox(width: 4),
-                                  Flexible(child: Text(t('Shared a contact privately'), style: TextStyle(fontSize: 11, color: p.muted))),
-                                ]),
-                              ),
-                                // the number went to the asker alone: anyone else can ask the replier for it
-                                RequestShare(
-                                  replyUid: r.uid,
-                                  askerUid: post.authorUid,
-                                  postId: post.id,
-                                  peer: Peer(uid: r.uid, name: r.name, company: r.company, handle: r.handle, userType: r.userType, photoUrl: r.photoUrl, verification: r.verification),
-                                ),
-                              ]),
-                  ),
-                ),
-              ),
-            ]),
-          ),
+        for (final r in replies) Padding(padding: const EdgeInsets.only(top: 6), child: ReplyBubble(post: post, r: r)),
         if (referrers.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -1063,6 +1088,139 @@ class LatestReplies extends StatelessWidget {
               ),
             ),
           ),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+/// One reply as a compact bubble (web latest-replies.tsx ReplyBubble): who and when with the asker's feedback, what
+/// they said (or that a contact was shared), and React and Reply from the name line.
+class ReplyBubble extends StatelessWidget {
+  final Post post;
+  final ResponseLog r;
+  const ReplyBubble({super.key, required this.post, required this.r});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    const bubble = BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(14), bottomLeft: Radius.circular(14), bottomRight: Radius.circular(14));
+    void openProfile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        GestureDetector(onTap: () => openProfile(r.handle), child: Avatar(name: r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name, photoUrl: r.photoUrl, size: 24)),
+        const SizedBox(width: 8),
+        Expanded(
+          // react and reply from the name line, as on the web
+          child: ReplySocial(
+            key: ValueKey('${post.id}-${r.uid}'),
+            postId: post.id,
+            reply: r,
+            meta: [
+              Flexible(
+                child: GestureDetector(
+                  onTap: () => openProfile(r.handle),
+                  child: Text(r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name,
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .85))),
+                ),
+              ),
+              if (r.verification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: r.verification, size: 12)],
+              const SizedBox(width: 6),
+              Text(timeAgo(r.createdAt), style: TextStyle(fontSize: 11, color: p.muted)),
+              // the asker's feedback on this reply
+              if (r.rating != null || r.reaction != null) ...[
+                const SizedBox(width: 4),
+                Text('${r.rating == 1 ? '👍' : r.rating == -1 ? '👎' : ''}${r.reaction == null ? '' : kReactionEmoji[r.reaction] ?? ''}', style: const TextStyle(fontSize: 11)),
+              ],
+            ],
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: r.kind == 'info' && ((r.text ?? '').isNotEmpty || r.canDo)
+                  ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      OfferChips(canDo: r.canDo, quote: r.quote, readyWhen: r.readyWhen),
+                      // the bubble is ReplySocial's, with the name and time on top
+                      if ((r.text ?? '').isNotEmpty)
+                        HashtagText(r.text!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, height: 1.35, color: p.text.withValues(alpha: .75))),
+                      // a link in the reply: its small preview card
+                      if (firstLink([r.text]) case final link?) LinkPreviewCard(link, key: ValueKey(link), compact: true, margin: const EdgeInsets.only(top: 6)),
+                      // a photo sent with the note
+                      if ((r.imageUrl ?? '').isNotEmpty)
+                        Padding(padding: const EdgeInsets.only(top: 4), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 96, height: 64))),
+                    ])
+                  : r.kind == 'media' && (r.imageUrl ?? '').isNotEmpty
+                      ? ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 96, height: 64))
+                      : Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                          Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                          decoration: BoxDecoration(borderRadius: bubble, border: Border.all(color: p.border)),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            WIcon(WI.lock, size: 13, color: p.muted),
+                            const SizedBox(width: 4),
+                            Flexible(child: Text(t('Shared a contact privately'), style: TextStyle(fontSize: 11, color: p.muted))),
+                          ]),
+                        ),
+                          // the number went to the asker alone: anyone else can ask the replier for it
+                          RequestShare(
+                            replyUid: r.uid,
+                            askerUid: post.authorUid,
+                            postId: post.id,
+                            peer: Peer(uid: r.uid, name: r.name, company: r.company, handle: r.handle, userType: r.userType, photoUrl: r.photoUrl, verification: r.verification),
+                          ),
+                        ]),
+            ),
+          ),
+        ),
+      ]);
+  }
+}
+
+/// Every reply and referral on an ask ("Show all n" on the card opens it on the ask page; web AllReplies), drawn like
+/// the card's latest replies: the same heading, the replies as bubbles members can react and reply to, and who referred.
+class AllReplies extends StatelessWidget {
+  final Post post;
+  final List<ResponseLog> items;
+  const AllReplies({super.key, required this.post, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    final p = Pal.of(context);
+    void openProfile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
+    String shown(ResponseLog r) => r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name;
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          WIcon(WI.talk, size: 16, color: kGold.withValues(alpha: .8)),
+          const SizedBox(width: 8),
+          Text(ResponseActivity.countLabel(post.sharesCount, post.referralsCount), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+          const SizedBox(width: 8),
+          Expanded(child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [kGold.withValues(alpha: .3), p.border, p.border.withValues(alpha: 0)])))),
+        ]),
+        Padding(
+          padding: const EdgeInsets.only(left: 20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            for (final r in items)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: r.kind == 'referral'
+                    ? Row(children: [
+                        GestureDetector(onTap: () => openProfile(r.handle), child: Avatar(name: shown(r), photoUrl: r.photoUrl, size: 24)),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text.rich(
+                            TextSpan(children: [
+                              TextSpan(text: shown(r), style: TextStyle(fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .85))),
+                              TextSpan(text: ' ${t('referred a contact')} · ${timeAgo(r.createdAt)}'),
+                            ]),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: p.muted),
+                          ),
+                        ),
+                      ])
+                    : ReplyBubble(post: post, r: r),
+              ),
           ]),
         ),
       ]),
@@ -1127,7 +1285,8 @@ class ResponseActivity extends StatelessWidget {
                           if (r.verification > 0)
                             WidgetSpan(
                                 alignment: PlaceholderAlignment.middle, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 2), child: VerifiedBadge(level: r.verification, size: 13))),
-                          TextSpan(text: ' ${t(_verb[r.kind] ?? 'responded')}', style: TextStyle(color: p.muted)),
+                          TextSpan(text: ' ${t(r.canDo ? 'can do this' : (_verb[r.kind] ?? 'responded'))}', style: TextStyle(color: p.muted)),
+                          if ((r.quote ?? '').isNotEmpty) TextSpan(text: ' · ${r.quote}', style: const TextStyle(fontWeight: FontWeight.w600)),
                         ]),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1177,4 +1336,42 @@ class ChipLine extends StatelessWidget {
           for (var i = 0; i < children.length; i++) ...[if (i > 0) const SizedBox(width: 6), children[i]],
         ]),
       );
+}
+
+/// A WEBWEB Facts post as a data card (web post-card.tsx FactCard): the big figure, what it counts, the fact and why it
+/// matters, on a soft gold glow.
+class FactCard extends StatelessWidget {
+  final PostFact fact;
+  const FactCard(this.fact, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kGold.withValues(alpha: .4)),
+        gradient: RadialGradient(center: const Alignment(1, -1), radius: 1.2, colors: [kGold.withValues(alpha: .28), kGold.withValues(alpha: 0)], stops: const [0, .6]),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('📊 ${t('Facts & figures near you')}'.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.3, color: p.tagText)),
+        const SizedBox(height: 8),
+        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(fact.emoji, style: const TextStyle(fontSize: 36, height: 1)),
+          const SizedBox(width: 12),
+          Expanded(child: Text(fact.figure, style: TextStyle(fontSize: 40, fontWeight: FontWeight.w800, height: 1, letterSpacing: -1, color: p.text))),
+        ]),
+        const SizedBox(height: 6),
+        Text(fact.label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3)),
+        const SizedBox(height: 12),
+        Text(fact.title, style: const TextStyle(fontSize: 15, height: 1.35)),
+        if ((fact.body ?? '').isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(fact.body!, style: TextStyle(fontSize: 14, height: 1.35, color: p.text.withValues(alpha: .7))),
+        ],
+      ]),
+    );
+  }
 }

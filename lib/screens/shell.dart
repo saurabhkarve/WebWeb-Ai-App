@@ -22,6 +22,8 @@ import 'ask.dart';
 import 'connect.dart';
 import 'edit_profile.dart';
 import 'find.dart';
+import 'leads.dart';
+import 'p2.dart';
 import 'post_detail.dart';
 import 'profile.dart';
 import 'service_contacts_sheet.dart';
@@ -118,7 +120,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       _i = 0;
       _topTick++;
     });
-    Tours.start(context, 'connect', kConnectTour);
+    Tours.start(context, kConnectTourId, kConnectTour);
   }
 
   void _go(int k) {
@@ -286,8 +288,13 @@ class _AppHeader extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(children: [
-            Padding(padding: const EdgeInsets.only(left: 4), child: LogoInline(size: 30, markSize: 44, tagline: true, onTap: onHome)),
-            const Spacer(),
+            // with the BUSINESS NETWORK slogan, as on the web; shrinks rather than crowd the bell on the narrowest phones
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4, right: 8),
+                child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: LogoInline(size: 28, markSize: 36, tagline: true, onTap: onHome)),
+              ),
+            ),
             _Bell(notes: notes),
             const SizedBox(width: 8),
             Builder(
@@ -460,6 +467,10 @@ class _AccountMenu extends StatelessWidget {
             child: ListView(padding: const EdgeInsets.all(8), children: [
               item(WI.user, 'View profile', () => push(const ProfileScreen())),
               item(WI.edit, 'Edit profile', () => push(EditProfileScreen(profile: me))),
+              item(WI.sparkle, 'Leads for you', () => push(SubPage(title: t('Leads for you'), body: const LeadsScreen()))),
+              item(WI.sun, 'Today in your area', () => push(SubPage(title: t('Today in your area'), body: const TodayScreen()))),
+              item(WI.bell, 'Alerts', () => push(SubPage(title: t('Alerts'), body: const AlertsScreen()))),
+              item(WI.deals, 'Your week', () => push(SubPage(title: t('Your week'), body: const WeekScreen()))),
               item(WI.bookmark, 'Saved asks', () => push(const SavedPostsScreen())),
               // help lives on the website so articles stay current without an app update
               item(WI.help, 'Help & Support', () {

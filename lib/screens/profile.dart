@@ -28,6 +28,7 @@ import '../share_log.dart';
 import '../widgets/picture_picker.dart';
 import '../widgets/resume.dart';
 import '../widgets/upi.dart';
+import '../widgets/p1.dart' show OfferChips;
 import '../widgets/area_map.dart' show AreaMap;
 
 /// One profile for everyone (web profile-view.tsx): your own page ([handle] == null) and any member's.
@@ -53,6 +54,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// direction of the last tab change (1 = to the right), for the slide
   int _tabDir = 1;
   List<Post>? _posts;
+  // text updates (posts that aren't asks) live under Updates, with the 24-hour photo updates
+  List<Post>? _textUpdates;
   List<Deal>? _deals;
   List<AskItem> _asks = [];
   List<StoryItem>? _updates;
@@ -96,10 +99,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }).catchError((_) {
       if (mounted) setState(() => _products = []);
     });
-    api.get('/posts', {'authorId': u.uid, 'limit': 30}).then((d) {
+    api.get('/posts', {'authorId': u.uid, 'limit': 30, 'kind': 'requirement'}).then((d) {
       if (mounted) setState(() => _posts = (d as List).map((e) => Post.fromJson(e as Map)).toList());
     }).catchError((_) {
       if (mounted) setState(() => _posts = []);
+    });
+    api.get('/posts', {'authorId': u.uid, 'limit': 30, 'kind': 'update'}).then((d) {
+      if (mounted) setState(() => _textUpdates = (d as List).map((e) => Post.fromJson(e as Map)).toList());
+    }).catchError((_) {
+      if (mounted) setState(() => _textUpdates = []);
     });
     api.get('/users/${u.uid}/updates').then((d) {
       if (mounted) setState(() => _updates = (d as List).map((e) => StoryItem.fromJson(e as Map)).toList());
@@ -436,6 +444,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   stat(u.statShared?.toString(), 'Connects'),
                   const TextSpan(text: ' · '),
                   stat('${u.contributions}', 'Contributions'),
+                  // deals won: asks whose owner chose them (only once there is one)
+                  if (u.statWon > 0) ...[const TextSpan(text: ' · 🏆 '), stat('${u.statWon}', u.statWon == 1 ? 'deal won' : 'deals won')],
                 ]),
                 textAlign: TextAlign.right,
                 style: TextStyle(fontSize: 12, height: 1.25, color: p.muted),
@@ -599,8 +609,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       case _Tab.deals:
         return _dealsBody(p);
       case _Tab.updates:
-        if (_updates == null) return _loading();
-        if (_updates!.isEmpty) return EmptyState(title: t('No updates yet'));
+        if (_updates == null || _textUpdates == null) return _loading();
+        if (_updates!.isEmpty && _textUpdates!.isEmpty) return EmptyState(title: t('No updates yet'));
+        // every update as a tile, newest first: the 24-hour photo updates open the viewer, text updates their own page
+        final tiles = <({DateTime at, String? imageUrl, String? text, VoidCallback onTap})>[
+          for (final s in _updates!) (at: s.createdAt, imageUrl: s.imageUrl, text: s.text, onTap: () => _openUpdates(_updates!)),
+          for (final x in _textUpdates!)
+            (
+              at: x.createdAt,
+              imageUrl: x.images.isEmpty ? null : x.images.first,
+              text: x.description,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: x.id))),
+            ),
+        ]..sort((a, b) => b.at.compareTo(a.at));
         return GridView.count(
           crossAxisCount: 3,
           shrinkWrap: true,
@@ -610,9 +631,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           crossAxisSpacing: 4,
           childAspectRatio: 3 / 4,
           children: [
-            for (final s in _updates!)
+            for (final s in tiles)
               GestureDetector(
-                onTap: () => _openUpdates(_updates!),
+                onTap: s.onTap,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Stack(fit: StackFit.expand, children: [
@@ -630,7 +651,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         decoration: BoxDecoration(color: kInk.withValues(alpha: .7), borderRadius: BorderRadius.circular(4)),
-                        child: Text(timeAgo(s.createdAt), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+                        child: Text(timeAgo(s.at), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
                       ),
                     ),
                   ]),
@@ -684,28 +705,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       else if (_deals!.isEmpty)
         EmptyState(title: t('No connects yet'), hint: t('Contacts shared in closed loop show up here, without the contact itself.'))
       else
-        for (var i = 0; i < _deals!.length; i++)
-          Builder(builder: (_) {
-            final d = _deals![i];
-            return InkWell(
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: d.postId))),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: i == 0 ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border))),
-                child: Row(children: [
-                  const WIcon(WI.checkCircle, size: 24, color: Color(0xFF059669)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(d.postTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                      Text('Shared ${_kindText[d.kind] ?? d.kind} with ${d.ownerName} · ${timeAgo(d.createdAt)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
-                    ]),
-                  ),
-                  Text('${d.rating == 1 ? '👍' : d.rating == -1 ? '👎' : ''}${d.reaction == null ? '' : kReactionEmoji[d.reaction] ?? ''}', style: const TextStyle(fontSize: 18)),
-                ]),
-              ),
-            );
-          }),
+        _ConnectList(deals: _deals!, own: _own, name: _u == null ? '' : (_u!.userType == 'entrepreneur' && _u!.company.isNotEmpty ? _u!.company : _u!.name)),
     ]);
   }
 
@@ -1556,4 +1556,99 @@ class SavedPostsScreenState extends State<SavedPostsScreen> {
                 ),
               ),
       );
+}
+
+
+/// A profile's Connects (web connect-list.tsx): the asks this member answered. A line says what the list is (and, to
+/// the owner, that only the asker sees their contact), then one row per ask: who asked and what, how this member
+/// answered (never the contact), the asker's feedback and how the ask ended. The whole row opens the ask.
+class _ConnectList extends StatelessWidget {
+  final List<Deal> deals;
+  final bool own;
+  final String name;
+  const _ConnectList({required this.deals, required this.own, required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final won = deals.where((d) => d.won).length;
+    final liked = deals.where((d) => d.rating == 1).length;
+    Widget pill(String text, {Color? bg, Color? fg, FontWeight w = FontWeight.w600, Widget? lead}) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(color: bg ?? p.chip, borderRadius: BorderRadius.circular(99)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (lead != null) ...[lead, const SizedBox(width: 3)],
+            Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: w, color: fg ?? p.muted))),
+          ]),
+        );
+    final goldText = p.dark ? kGold : const Color(0xFF7A5A00);
+    final green = p.dark ? const Color(0xFF34D399) : const Color(0xFF059669);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text(own ? t('Asks you answered. Only the asker sees your contact.') : t('Asks {name} answered. Contacts stay private between them and the asker.', {'name': name}),
+          style: TextStyle(fontSize: 12, color: p.muted)),
+      const SizedBox(height: 6),
+      Wrap(spacing: 6, runSpacing: 4, children: [
+        pill(t('{n} answered', {'n': deals.length}), fg: p.text),
+        if (won > 0) pill('🏆 ${t('{n} won', {'n': won})}', bg: kGold.withValues(alpha: .25), fg: goldText),
+        if (liked > 0) pill('👍 $liked', fg: p.text),
+      ]),
+      const SizedBox(height: 4),
+      for (var i = 0; i < deals.length; i++)
+        Builder(builder: (_) {
+          final d = deals[i];
+          final feedback = '${d.rating == 1 ? '👍 ' : d.rating == -1 ? '👎 ' : ''}${d.reaction == null ? '' : '${kReactionEmoji[d.reaction] ?? ''} '}';
+          return InkWell(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: d.postId))),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: i == 0 ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border))),
+              child: Row(children: [
+                Avatar(name: d.askerName, photoUrl: d.ownerPhotoUrl, size: 36),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    // who asked, what kind of ask, when this member answered
+                    Row(children: [
+                      Flexible(child: Text(t("{name}'s ask", {'name': d.askerName}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .85)))),
+                      if (d.ownerVerification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: d.ownerVerification, size: 12)],
+                      if (d.category != null) ...[
+                        Text('  ·  ', style: TextStyle(fontSize: 11, color: p.muted)),
+                        WIcon(categoryIcon(d.category), size: 12, color: p.link, still: true),
+                        const SizedBox(width: 3),
+                        Flexible(child: Text(t(d.categoryText).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.link))),
+                      ],
+                      const Spacer(),
+                      Text(timeAgo(d.createdAt), style: TextStyle(fontSize: 11, color: p.muted)),
+                    ]),
+                    const SizedBox(height: 2),
+                    Text(d.postTitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.3)),
+                    const SizedBox(height: 6),
+                    // how they answered, how the asker took it, how the ask ended
+                    Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                      if (d.kind == 'contact')
+                        pill(t('Shared a contact privately'), bg: Colors.transparent, lead: WIcon(WI.lock, size: 12, color: p.muted))
+                      else if (d.kind == 'media')
+                        pill(t('Sent a photo'))
+                      else if (d.canDo || (d.quote ?? '').isNotEmpty || d.readyWhen != null)
+                        OfferChips(canDo: d.canDo, quote: d.quote, readyWhen: d.readyWhen)
+                      else
+                        pill(t('Replied')),
+                      if (d.won)
+                        pill('🏆 ${t(own ? 'You won this job' : 'Won this job')}', bg: kGold.withValues(alpha: .3), fg: goldText, w: FontWeight.w700)
+                      else if (d.outcome != null)
+                        pill(t('Closed'))
+                      else
+                        pill(t('Open'), bg: green.withValues(alpha: .12), fg: green),
+                      if (feedback.isNotEmpty) pill('$feedback${t('from the asker')}'),
+                    ]),
+                  ]),
+                ),
+                const SizedBox(width: 6),
+                Text('›', style: TextStyle(fontSize: 18, color: p.muted)),
+              ]),
+            ),
+          );
+        }),
+    ]);
+  }
 }
