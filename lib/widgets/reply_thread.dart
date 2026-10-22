@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../api.dart';
 import '../auth_provider.dart';
 import '../i18n.dart';
+import '../links.dart';
 import '../models.dart';
 import '../screens/profile.dart';
 import '../screens/talk.dart' show ChatThread;
@@ -337,6 +338,7 @@ class _ThreadReplyState extends State<_ThreadReply> {
               if (widget.mine) _textButton(context, t('Delete'), widget.onDelete),
             ]),
             Padding(padding: const EdgeInsets.only(right: 6), child: HashtagText(c.text, style: const TextStyle(fontSize: 12, height: 1.35))),
+            if (firstLink([c.text]) case final link?) Padding(padding: const EdgeInsets.only(right: 6), child: LinkPreviewCard(link, key: ValueKey(link), compact: true, margin: const EdgeInsets.only(top: 6))),
           ]),
         ),
       ),

@@ -266,6 +266,8 @@ class Post {
   /// on "Leads for you": why it fits, and whether the member has seen it yet
   final String? leadReason;
   final bool leadNew;
+  /// a WEBWEB Facts post: the figure and its source (GET /posts/facts), drawn as a data card
+  final PostFact? fact;
 
   Post({
     required this.id, required this.kind, required this.authorUid, required this.authorName, required this.authorCompany,
@@ -273,7 +275,7 @@ class Post {
     this.urgency, this.matchReason, this.slug, this.categoryLabel, this.authorType = 'entrepreneur', this.authorVerification = 1, this.authorPremium = false, this.authorPlan, this.distanceM, this.radiusM, this.lat, this.lng, this.editedAt, this.repostedByName, this.repostedByHandle, this.repostedBy, this.repostedAt, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
     this.recentResponses = const [], this.latestReplies = const [], this.referrers = const [], this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0, this.viewsCount = 0,
     this.reacted = false, this.reposted = false, this.bookmarked = false, this.myReaction,
-    this.outcome, this.wonBy, this.leadReason, this.leadNew = false,
+    this.outcome, this.wonBy, this.leadReason, this.leadNew = false, this.fact,
   });
 
   bool get closed => outcome != null;
@@ -306,7 +308,68 @@ class Post {
         referralsCount: (j['referralsCount'] as num?)?.toInt() ?? 0, reacted: j['reacted'] == true, reposted: j['reposted'] == true,
         bookmarked: j['bookmarked'] == true, myReaction: j['myReaction'] as String? ?? (j['reacted'] == true ? 'heart' : null),
         outcome: j['outcome'] as String?, wonBy: j['wonBy'] as String?, leadReason: j['leadReason'] as String?, leadNew: j['leadNew'] == true,
+        fact: j['fact'] is Map ? PostFact.fromJson(j['fact'] as Map) : null,
       );
+}
+
+/// A WEBWEB Facts post's figure (web Post["fact"]): "532 factories", what it counts, the fact, and its source.
+class PostFact {
+  final String figure, label, emoji, title, sourceUrl;
+  final String? body, sourceName;
+  const PostFact({required this.figure, required this.label, required this.emoji, required this.title, required this.sourceUrl, this.body, this.sourceName});
+  factory PostFact.fromJson(Map j) => PostFact(
+        figure: '${j['figure'] ?? ''}', label: '${j['label'] ?? ''}', emoji: '${j['emoji'] ?? '📊'}', title: '${j['title'] ?? ''}',
+        sourceUrl: '${j['sourceUrl'] ?? ''}', body: j['body'] as String?, sourceName: j['sourceName'] as String?,
+      );
+}
+
+/// A WEBWEB house card between asks on Connect (web HouseCard, GET /feed/cards): always from a house account, with
+/// something to do in it. Stored cards carry the real post behind them ([post]), so React · Reply · Refer · Views ·
+/// Share work as on any update.
+class HouseCard {
+  final String key, type;
+  final Peer account;
+  final bool ai;
+  final String? title, body, sourceUrl, sourceName;
+  final Map<String, dynamic> data;
+  final Map<String, dynamic>? mine, results;
+  final Post? post;
+  HouseCard({required this.key, required this.type, required this.account, this.ai = false, this.title, this.body, this.sourceUrl, this.sourceName, this.data = const {}, this.mine, this.results, this.post});
+  factory HouseCard.fromJson(Map j) {
+    final a = (j['account'] as Map?) ?? const {};
+    final src = j['source'] as Map?;
+    return HouseCard(
+      key: '${j['key']}',
+      type: '${j['type']}',
+      account: Peer(uid: '${a['uid'] ?? ''}', name: '${a['name'] ?? ''}', company: '', handle: '${a['handle'] ?? ''}', userType: 'entrepreneur'),
+      ai: j['ai'] == true,
+      title: j['title'] as String?,
+      body: j['body'] as String?,
+      sourceUrl: src?['url'] as String?,
+      sourceName: src?['name'] as String?,
+      data: j['data'] is Map ? Map<String, dynamic>.from(j['data'] as Map) : const {},
+      mine: j['mine'] is Map ? Map<String, dynamic>.from(j['mine'] as Map) : null,
+      results: j['results'] is Map ? Map<String, dynamic>.from(j['results'] as Map) : null,
+      post: j['post'] is Map ? Post.fromJson(j['post'] as Map) : null,
+    );
+  }
+}
+
+/// An item from a business, as WEBWEB Sourcing shows it (one per business).
+class SourcingItem extends Product {
+  final Peer owner;
+  final int verification;
+  final String? location;
+  SourcingItem({required super.id, required super.name, required super.kind, super.price, super.imageUrl, super.slug, required this.owner, this.verification = 1, this.location});
+  factory SourcingItem.fromJson(Map j) {
+    final o = (j['owner'] as Map?) ?? const {};
+    return SourcingItem(
+      id: '${j['id']}', name: '${j['name']}', kind: '${j['kind'] ?? 'product'}', price: j['price'] as String?, imageUrl: j['imageUrl'] as String?, slug: j['slug'] as String?,
+      owner: Peer.fromJson(o),
+      verification: (o['verification'] as num?)?.toInt() ?? 1,
+      location: o['location'] as String?,
+    );
+  }
 }
 
 /// What the viewer already did on someone's ask (GET /posts/:id/share/me).

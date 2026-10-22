@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../auth_provider.dart';
 import '../i18n.dart';
+import '../links.dart';
 import '../models.dart';
 import '../safety.dart';
 import '../screens/ask.dart';
@@ -106,7 +107,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
   /// Reply stays in the feed: asks open the respond sheet, updates start a chat with the post attached.
   Future<void> _reply() async {
     if (widget.detail && widget.onReply != null) return widget.onReply!();
-    if (_isOwner) return toast(context, t('Responses to your ask are on its page'));
+    if (_isOwner) return post.isRequirement ? toast(context, t('Responses to your ask are on its page')) : _openDetail();
     // the owner found someone (or no longer needs it): no new replies
     if (post.isRequirement && post.closed) return toast(context, t('This ask is closed'));
     if (post.isRequirement) {
@@ -177,6 +178,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         wonBy: p.wonBy,
         leadReason: p.leadReason,
         leadNew: p.leadNew,
+        fact: p.fact,
       );
 
   /// "Alert me for similar asks": the alert sheet, with this ask's category and place.
@@ -273,7 +275,9 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         )
       else if (isAsk)
         HashtagText(post.title ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.375, letterSpacing: -0.18)),
-      if ((post.description ?? '').isNotEmpty)
+      if (post.fact != null)
+        FactCard(post.fact!)
+      else if ((post.description ?? '').isNotEmpty)
         Padding(
           padding: EdgeInsets.only(top: isAsk ? 4 : 0),
           child: HashtagText(
@@ -285,6 +289,27 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         ),
       ImageGrid(post.images, shareUrl: post.webUrl, shareRef: post.id),
     ]);
+    // the first link in the text gets a preview card (not a fact's: its source shows under it; not inside a repost's quote)
+    final link = post.fact != null || post.repostedByName != null ? null : firstLink([post.title, post.description]);
+    final extra = <Widget>[
+      if (link != null) LinkPreviewCard(link, key: ValueKey(link)),
+      if (post.fact != null && post.fact!.sourceUrl.isNotEmpty)
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => openExternal(context, post.fact!.sourceUrl),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(children: [
+              WIcon(WI.link, size: 13, color: p.muted),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text('${t('Source')}: ${(post.fact!.sourceName ?? '').isNotEmpty ? post.fact!.sourceName : hostOf(post.fact!.sourceUrl)}',
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+              ),
+            ]),
+          ),
+        ),
+    ];
 
     // ⋯: my own ask's menu (save, edit, delete), or save / report / block on someone else's
     final more = <Widget>[
@@ -410,6 +435,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               ]),
               const SizedBox(height: 4),
               tappable,
+              ...extra,
               // where, budget, time left, reach, photos as chips (the category is shown above)
               Padding(
                 key: widget.tourTarget ? Tours.key('chips') : null,
@@ -451,8 +477,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     }
 
     final card = Container(
-      padding: framed ? const EdgeInsets.all(12) : const EdgeInsets.symmetric(vertical: 16),
-      foregroundDecoration: framed ? null : _HairlineDecoration(kGold.withValues(alpha: .6)),
+      padding: framed ? const EdgeInsets.all(12) : EdgeInsets.zero,
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         GestureDetector(
           onTap: _openAuthor,
@@ -494,6 +519,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
             if (mine && isAsk) Padding(padding: const EdgeInsets.only(top: 6), child: GoldTag(t('Your ask'))),
             const SizedBox(height: 8),
             tappable,
+            ...extra,
             // the essentials as chips: what, where (and how far), budget, timing, reach, photos
             if (isAsk)
               Padding(
@@ -550,18 +576,23 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                 hideHeader: mine,
                 onMore: () => _openDetail(expandResponses: true),
               ),
-            // quoted in a repost: the controls are the repost's
-            if (!framed)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child:
-                    Transform.translate(offset: const Offset(-6, 0), child: PostActions(key: _actionsKey, post: post, onReply: _reply, onChanged: () => setState(() {}), tourTarget: widget.tourTarget)),
-              ),
           ]),
         ),
       ]),
     );
-    if (!framed) return card;
+    // an update has the same five controls as an ask (React · Reply · Refer · Views · Share), across the row's full
+    // width under it, as on the web; quoted in a repost, the controls are the repost's
+    if (!framed) {
+      return Container(
+        padding: const EdgeInsets.only(top: 16, bottom: 16),
+        foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          card,
+          const SizedBox(height: 12),
+          PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
+        ]),
+      );
+    }
     return _quoteRepost(p, card, more, ask: false);
   }
 
@@ -619,11 +650,10 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
           LatestReplies(post: post, hideEmpty: true, onMore: () => _openDetail(expandResponses: true)),
           const SizedBox(height: 12),
           PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
-        ] else
-          Padding(
-            padding: const EdgeInsets.only(top: 6, left: 50),
-            child: Transform.translate(offset: const Offset(-6, 0), child: PostActions(key: _actionsKey, post: post, onReply: _reply, onChanged: () => setState(() {}), tourTarget: widget.tourTarget)),
-          ),
+        ] else ...[
+          const SizedBox(height: 12),
+          PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
+        ],
       ]),
     );
   }
@@ -741,7 +771,13 @@ class PostActionsState extends State<PostActions> {
   @override
   Widget build(BuildContext context) => _actions(Pal.of(context), post.isRequirement, _isOwner);
 
-  String get _subject => post.title ?? (post.isRequirement ? 'WebWeb AI ask' : 'WebWeb AI update');
+  String get _subject => post.title ?? post.fact?.title ?? (post.isRequirement ? 'WebWeb AI ask' : 'WebWeb AI update');
+
+  /// Refer on an update: pass it on to someone over WhatsApp.
+  Future<void> _whatsApp() async {
+    final ok = await launchUrl(Uri.parse('https://wa.me/?text=${Uri.encodeComponent('$_subject\n${post.webUrl}')}'), mode: LaunchMode.externalApplication).catchError((_) => false);
+    if (ok) logShare(_api, 'post', post.id, channel: 'whatsapp');
+  }
 
   /// Share: repost to your page, WhatsApp, the phone's share sheet, copy link.
   Future<void> _share() async {
@@ -876,13 +912,13 @@ class PostActionsState extends State<PostActions> {
             color: reacted ? p.text : p.muted,
           ),
         ),
-        if (mine)
+        if (mine && isAsk)
           pill(label: 'Review responses', icon: WIcon(WI.talk, size: 18, color: p.tagText), count: post.sharesCount, badge: p.tagBg, color: p.tagText, edge: kGold.withValues(alpha: .45), fill: kGold.withValues(alpha: .1), onTap: widget.onReview ?? widget.onReply)
         else ...[
           tour('reply', pill(label: 'Reply', icon: WIcon(WI.talk, size: 18, color: p.muted), count: isAsk ? post.sharesCount : 0, color: p.muted, onTap: widget.onReply)),
-          if (isAsk)
-            // plain like the rest, in deep gold so it still leads (as on the web)
-            tour(
+          // plain like the rest, in deep gold so it still leads (as on the web). An update has no one to put a contact in
+          // touch with, so there Refer passes it on to someone over WhatsApp
+          tour(
               'refer',
               pill(
                 label: 'Refer',
@@ -893,7 +929,7 @@ class PostActionsState extends State<PostActions> {
                 splash: kGold.withValues(alpha: .15),
                 edge: kGold.withValues(alpha: .45),
                 fill: kGold.withValues(alpha: .1),
-                onTap: _refer,
+                onTap: isAsk ? _refer : _whatsApp,
               ),
             ),
         ],
@@ -1105,6 +1141,8 @@ class ReplyBubble extends StatelessWidget {
                       // the bubble is ReplySocial's, with the name and time on top
                       if ((r.text ?? '').isNotEmpty)
                         HashtagText(r.text!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, height: 1.35, color: p.text.withValues(alpha: .75))),
+                      // a link in the reply: its small preview card
+                      if (firstLink([r.text]) case final link?) LinkPreviewCard(link, key: ValueKey(link), compact: true, margin: const EdgeInsets.only(top: 6)),
                       // a photo sent with the note
                       if ((r.imageUrl ?? '').isNotEmpty)
                         Padding(padding: const EdgeInsets.only(top: 4), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: NetImg(r.imageUrl!, width: 96, height: 64))),
@@ -1298,4 +1336,42 @@ class ChipLine extends StatelessWidget {
           for (var i = 0; i < children.length; i++) ...[if (i > 0) const SizedBox(width: 6), children[i]],
         ]),
       );
+}
+
+/// A WEBWEB Facts post as a data card (web post-card.tsx FactCard): the big figure, what it counts, the fact and why it
+/// matters, on a soft gold glow.
+class FactCard extends StatelessWidget {
+  final PostFact fact;
+  const FactCard(this.fact, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kGold.withValues(alpha: .4)),
+        gradient: RadialGradient(center: const Alignment(1, -1), radius: 1.2, colors: [kGold.withValues(alpha: .28), kGold.withValues(alpha: 0)], stops: const [0, .6]),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('📊 ${t('Facts & figures near you')}'.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.3, color: p.tagText)),
+        const SizedBox(height: 8),
+        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(fact.emoji, style: const TextStyle(fontSize: 36, height: 1)),
+          const SizedBox(width: 12),
+          Expanded(child: Text(fact.figure, style: TextStyle(fontSize: 40, fontWeight: FontWeight.w800, height: 1, letterSpacing: -1, color: p.text))),
+        ]),
+        const SizedBox(height: 6),
+        Text(fact.label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3)),
+        const SizedBox(height: 12),
+        Text(fact.title, style: const TextStyle(fontSize: 15, height: 1.35)),
+        if ((fact.body ?? '').isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(fact.body!, style: TextStyle(fontSize: 14, height: 1.35, color: p.text.withValues(alpha: .7))),
+        ],
+      ]),
+    );
+  }
 }
