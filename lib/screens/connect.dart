@@ -660,7 +660,7 @@ class _UpdateTile extends StatelessWidget {
                     clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(shape: BoxShape.circle, color: p.chip),
                     child: (photoUrl ?? '').isNotEmpty
-                        ? Image.network(mediaUrl(photoUrl!), width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_, __, ___) => ini)
+                        ? NetImg(mediaUrl(photoUrl!), width: 64, height: 64, fallback: ini) // NetImg also draws SVG pictures (the WEBWEB accounts')
                         : ini,
                   ),
                 ),

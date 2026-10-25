@@ -18,6 +18,25 @@ import '../share_log.dart';
 /// Full-screen update player (web update-viewer.tsx): tap right / left to move, auto-advances every
 /// 5 s. Others' updates get a right rail (react, repost, share) and a message field that replies in
 /// chat; your own show views and let you delete.
+/// Each WEBWEB account's text Updates on its own colour, the one behind its picture (web/public/house/<handle>.svg,
+/// scripts/make-house-avatars.mjs); everyone else's on the dark grey.
+const _houseColours = <String, List<Color>>{
+  'webwebquiz': [Color(0xFF8B5CF6), Color(0xFF4C1D95)],
+  'webwebtenders': [Color(0xFF3B82F6), Color(0xFF1E3A8A)],
+  'webwebnews': [Color(0xFFEF4444), Color(0xFF7F1D1D)],
+  'webwebtips': [Color(0xFF22C55E), Color(0xFF14532D)],
+  'webwebevents': [Color(0xFFEC4899), Color(0xFF831843)],
+  'webwebjobs': [Color(0xFF14B8A6), Color(0xFF134E4A)],
+  'webwebfacts': [Color(0xFF0EA5E9), Color(0xFF0C4A6E)],
+  'webwebdirectory': [Color(0xFFF97316), Color(0xFF7C2D12)],
+  'webwebsourcing': [Color(0xFFA16207), Color(0xFF422006)],
+  'webwebbazaar': [Color(0xFFD946EF), Color(0xFF701A75)],
+  'webwebspotlight': [Color(0xFFF59E0B), Color(0xFF78350F)],
+  'webwebai': [Color(0xFFD9B53A), Color(0xFF7A5B00)],
+};
+
+List<Color> updateBackground(String handle) => _houseColours[handle] ?? const [Color(0xFF3A3A3A), kInk];
+
 class StoryViewer extends StatefulWidget {
   final List<StoryGroup> groups;
   final int startGroup;
@@ -344,7 +363,7 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
               child: it.imageUrl != null
                   ? NetImg(it.imageUrl!, fit: BoxFit.contain, fallback: const SizedBox())
                   : Container(
-                      decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF3A3A3A), kInk], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+                      decoration: BoxDecoration(gradient: LinearGradient(colors: updateBackground(g.handle), begin: Alignment.topLeft, end: Alignment.bottomRight)),
                       alignment: Alignment.center,
                       padding: const EdgeInsets.all(32),
                       child: Text(it.text ?? '', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700, height: 1.33)),

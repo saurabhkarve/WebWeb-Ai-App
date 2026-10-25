@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
+import 'config.dart';
 import 'crash_reporter.dart';
 import 'offline_cache.dart';
 import 'outbox.dart';
@@ -41,7 +42,10 @@ class AuthProvider extends ChangeNotifier {
   bool _loggingOut = false;
 
   Future<void> init() async {
-    final saved = (await SharedPreferences.getInstance()).getString('token');
+    final prefs = await SharedPreferences.getInstance();
+    // for the iPhone's own code (AppDelegate.onDecline), which tells the API a call was declined when the app is closed
+    prefs.setString('apiUrl', apiUrl);
+    final saved = prefs.getString('token');
     if (saved != null) {
       token = saved;
       await loadProfile(silent: true);

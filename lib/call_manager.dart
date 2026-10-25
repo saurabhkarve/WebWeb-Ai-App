@@ -407,9 +407,12 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
     _finish(note ?? 'Call ended');
   }
 
-  /// Over the socket, or over REST when it is down (e.g. declined on the lock screen right after waking).
+  /// Over the socket, or over REST when it is down (e.g. declined on the lock screen right after waking). A decline
+  /// always goes over REST too: a phone that was asleep can have a socket that looks open but delivers nothing, and
+  /// the caller kept ringing; the API acts on whichever arrives first.
   void _signalEnd(String id, {required bool decline}) {
-    if (rt.send({'type': decline ? 'call_reject' : 'call_end', 'callId': id})) return;
+    final sent = rt.send({'type': decline ? 'call_reject' : 'call_end', 'callId': id});
+    if (sent && !decline) return;
     api.post('/app/calls/$id/${decline ? 'decline' : 'end'}', {}).catchError((_) => null);
   }
 

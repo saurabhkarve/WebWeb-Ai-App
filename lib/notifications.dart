@@ -533,6 +533,38 @@ Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
   if (message.data['type'] == 'call' && (await SharedPreferences.getInstance()).getString('token') == null) return;
   await initFirebase();
   await handleCallData(message.data);
+  // the main app may not be running to hear the phone's Decline: wait here for this call's answer
+  if (message.data['type'] == 'call' && NativeCalls.supported) await _declineWhenDeclined('${message.data['callId']}');
+}
+
+/// Until the call shown from a background push is answered, declined or gone (45 s ring + a margin): a Decline
+/// goes to the API from here, so the caller stops ringing at once.
+Future<void> _declineWhenDeclined(String callId) async {
+  final done = Completer<void>();
+  final sub = NativeCalls.events.listen((ev) async {
+    switch (ev) {
+      case CallEventActionCallDecline(:final callKitParams) when callKitParams.id == callId:
+        await declineCallOnServer(callId);
+        if (!done.isCompleted) done.complete();
+      case CallEventActionCallAccept(:final callKitParams) when callKitParams.id == callId:
+      case CallEventActionCallEnded(:final callKitParams) when callKitParams.id == callId:
+        if (!done.isCompleted) done.complete();
+      case CallEventActionCallTimeout(:final id) when id == callId:
+        if (!done.isCompleted) done.complete();
+      default:
+        break;
+    }
+  });
+  await done.future.timeout(const Duration(seconds: 55), onTimeout: () {});
+  await sub.cancel();
+}
+
+/// Tells the API a call was declined, with the saved sign-in (works in the background isolate, which has no
+/// AuthProvider). The API takes the first of this and the socket's call_reject; a second one is a harmless 404.
+Future<void> declineCallOnServer(String callId) async {
+  final token = (await SharedPreferences.getInstance()).getString('token');
+  if (token == null) return;
+  await Api(() => token).post('/app/calls/$callId/decline', {}).catchError((_) => null);
 }
 
 /// Android reads android/app/google-services.json. iOS takes its Firebase app from build-time
