@@ -775,7 +775,11 @@ class PostActionsState extends State<PostActions> {
 
   /// Refer on an update: pass it on to someone over WhatsApp.
   Future<void> _whatsApp() async {
-    final ok = await launchUrl(Uri.parse('https://wa.me/?text=${Uri.encodeComponent('$_subject\n${post.webUrl}')}'), mode: LaunchMode.externalApplication).catchError((_) => false);
+    // for an ask, a group message that says what is wanted, where, and that replying is free
+    final text = post.isRequirement
+        ? '🔎 $_subject${(post.locationPref ?? '').isNotEmpty ? '\n📍 ${post.locationPref}' : ''}${(post.budget ?? '').isNotEmpty ? ' · ${post.budget}' : ''}\n${t('Can you help? Reply free on WEBWEB:')}\n${post.webUrl}'
+        : '$_subject\n${post.webUrl}';
+    final ok = await launchUrl(Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}'), mode: LaunchMode.externalApplication).catchError((_) => false);
     if (ok) logShare(_api, 'post', post.id, channel: 'whatsapp');
   }
 

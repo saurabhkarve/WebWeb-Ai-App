@@ -7,6 +7,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/post_card.dart';
+import 'catalog.dart';
 import 'edit_profile.dart';
 import 'p2.dart';
 
@@ -195,6 +196,30 @@ class _LeadsScreenState extends State<LeadsScreen> {
           ]),
           const SizedBox(height: 2),
           Text(t('Asks that fit what you do. Reply early: the first few replies get the most attention.'), style: TextStyle(fontSize: 14, color: p.muted)),
+          // the investment that pays back: a fuller catalog is what asks find
+          if (_sum?.catalogAdd != null)
+            GestureDetector(
+              onTap: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogScreen()));
+                _load();
+              },
+              child: Container(
+                margin: const EdgeInsets.only(top: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(color: kGold.withValues(alpha: .15), border: Border.all(color: kGold.withValues(alpha: .5)), borderRadius: BorderRadius.circular(12)),
+                child: Row(children: [
+                  Expanded(
+                    child: Text(
+                      _sum!.category != null && _sum!.category!.isNotEmpty
+                          ? t('Add {n} more catalog items so asks for {c} find you', {'n': _sum!.catalogAdd!, 'c': _sum!.category!})
+                          : t('Add {n} more catalog items so the right asks find you', {'n': _sum!.catalogAdd!}),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const Text('→'),
+                ]),
+              ),
+            ),
           if (_saved != null)
             Container(
               margin: const EdgeInsets.only(top: 12),

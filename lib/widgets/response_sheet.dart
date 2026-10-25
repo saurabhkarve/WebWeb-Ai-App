@@ -54,6 +54,33 @@ class _ResponseSheetState extends State<_ResponseSheet> {
   late String? _kept = widget.existing?.imageUrl;
   bool _busy = false;
   String? _error;
+  // my catalog items for this ask: the best fit is picked for me, one tap to change or drop it
+  List<Map> _items = const [];
+  String? _itemId;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.existing == null) _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    try {
+      final r = await context.read<AuthProvider>().api.get('/posts/${widget.postId}/my-items') as Map;
+      final list = [for (final x in (r['items'] as List? ?? const [])) x as Map];
+      if (!mounted) return;
+      setState(() => _items = list);
+      final best = list.where((x) => x['suggested'] == true).firstOrNull;
+      if (best != null) _pick(best);
+    } catch (_) {}
+  }
+
+  void _pick(Map? it) {
+    setState(() {
+      _itemId = it == null ? null : '${it['id']}';
+      if (it != null) _quote.text = '${it['price'] ?? ''}';
+    });
+  }
 
   bool get _editing => widget.existing != null;
   bool get _hasPhoto => _file != null || _kept != null;
@@ -77,6 +104,7 @@ class _ResponseSheetState extends State<_ResponseSheet> {
         body['canDo'] = true;
         if (_quote.text.trim().isNotEmpty) body['quote'] = _quote.text.trim();
         if (_when != null) body['readyWhen'] = _when;
+        if (_itemId != null) body['itemId'] = _itemId;
       }
       final imageUrl = _file != null ? await api.uploadImage(await _file!.readAsBytes(), _file!.name) : _kept;
       if (imageUrl != null) body['imageUrl'] = imageUrl;
@@ -138,6 +166,31 @@ class _ResponseSheetState extends State<_ResponseSheet> {
                 ),
             ]),
           ),
+          if (_canDo && _items.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(t('From your catalog'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final it in _items)
+                GestureDetector(
+                  onTap: () => _pick(_itemId == '${it['id']}' ? null : it),
+                  child: Container(
+                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width - 64),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _itemId == '${it['id']}' ? kGold.withValues(alpha: .25) : null,
+                      border: Border.all(color: _itemId == '${it['id']}' ? kGold : p.border),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text('${it['suggested'] == true ? '✨ ' : ''}${it['name']}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _itemId == '${it['id']}' ? p.text : p.muted)),
+                  ),
+                ),
+            ]),
+            if (_itemId != null && _items.any((x) => '${x['id']}' == _itemId && x['suggested'] == true))
+              Padding(padding: const EdgeInsets.only(top: 4), child: Text(t('Picked for this ask. Tap it to remove.'), style: TextStyle(fontSize: 12, color: p.muted))),
+          ],
           if (_canDo) ...[
             const SizedBox(height: 12),
             Text(t('Price (optional)'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),

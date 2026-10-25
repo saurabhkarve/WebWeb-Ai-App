@@ -476,6 +476,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Wrap(spacing: 6, runSpacing: 6, children: [
         // WEBWEB Premium, or a paid plan below it, first (web PremiumChip): ink, with the tier's metal for crown and words
         if (u.premium || u.plan == 'pro' || u.plan == 'plus') PremiumChip(tier: u.premium ? 'premium' : u.plan!),
+        // proof from how they reply: shown once there is enough behind it
+        if ((u.statHelped ?? 0) > 0)
+          tag(text: '🤝 ${u.location.isNotEmpty && u.location != 'Other' ? t('Helped {n} businesses in {area}', {'n': u.statHelped!, 'area': u.location}) : t('Helped {n} businesses', {'n': u.statHelped!})}'),
+        if ((u.statReplyMins ?? 0) > 0) tag(text: '⚡ ${t('Usually replies in {t}', {'t': _replyTime(u.statReplyMins!)})}'),
+        if (u.statReplyRate != null) tag(text: '✓ ${t('Answers {n}% of asks that fit', {'n': u.statReplyRate!})}'),
         if (u.location.isNotEmpty) tag(icon: WI.pin, text: u.location == 'Other' ? t('Other') : u.location),
         if (u.category.isNotEmpty) tag(text: t(labelOf(kProfileCategories, u.category))),
         // a GSTIN is public record: tap to check it on the GST portal
@@ -1651,4 +1656,11 @@ class _ConnectList extends StatelessWidget {
         }),
     ]);
   }
+}
+
+/// "20 min", "3 hr", "2 days"
+String _replyTime(int mins) {
+  if (mins < 60) return t('{n} min', {'n': mins});
+  final h = (mins / 60).round();
+  return h < 48 ? t('{n} hr', {'n': h}) : t('{n} days', {'n': (h / 24).round()});
 }

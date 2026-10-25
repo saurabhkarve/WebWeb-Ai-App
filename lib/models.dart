@@ -133,6 +133,8 @@ class Profile {
   final int? statPosts, statShared;
   /// asks whose owner chose them ("deals won")
   final int statWon;
+  /// from how they reply: businesses helped (shown from 3), % of fitting asks answered, median minutes to reply
+  final int? statHelped, statReplyRate, statReplyMins;
   /// 0 none, 1 mobile verified, 2 documents, 3 owner verified
   final int verification;
   /// WEBWEB Premium: given only by an admin, shown next to the earned badge
@@ -149,7 +151,7 @@ class Profile {
     required this.uid, required this.handle, required this.name, required this.company, required this.userType,
     required this.category, required this.location, this.photoUrl, this.bannerUrl, this.gstin, this.completion, this.bio, this.experience, this.education,
     this.contactMasked, this.services = const [], this.skills = const [], this.contributions = 0,
-    this.statPosts, this.statShared, this.statWon = 0, this.verification = 1, this.premium = false, this.plan, this.hasUpdate = false, this.upi = const [], required this.createdAt,
+    this.statPosts, this.statShared, this.statWon = 0, this.statHelped, this.statReplyRate, this.statReplyMins, this.verification = 1, this.premium = false, this.plan, this.hasUpdate = false, this.upi = const [], required this.createdAt,
   });
 
   bool get isEntrepreneur => userType == 'entrepreneur';
@@ -168,6 +170,7 @@ class Profile {
       services: _strings(j['services']), skills: _strings(j['skills']),
       contributions: (j['contributions'] as num?)?.toInt() ?? (stats?['contributions'] as num?)?.toInt() ?? 0,
       statPosts: (stats?['posts'] as num?)?.toInt(), statShared: (stats?['shared'] as num?)?.toInt(), statWon: (stats?['won'] as num?)?.toInt() ?? 0,
+      statHelped: (stats?['helped'] as num?)?.toInt(), statReplyRate: (stats?['replyRate'] as num?)?.toInt(), statReplyMins: (stats?['replyMins'] as num?)?.toInt(),
       verification: (j['verificationLevel'] as num?)?.toInt() ?? 1, premium: j['premium'] == true, plan: j['plan'] as String?, hasUpdate: stats?['hasUpdate'] == true,
       upi: [for (final u in (j['upi'] as List?) ?? const []) UpiId.fromJson(u as Map)],
       createdAt: _ms(j['createdAt']),
@@ -479,10 +482,13 @@ class LeadSummary {
   final String? category, location;
   /// false: nothing to match on yet, so the header asks what they do
   final bool hasTrade;
-  const LeadSummary({this.unseen = 0, this.open = 0, this.week = 0, this.category, this.location, this.hasTrade = true});
+  /// a thin catalog: how many items to add to widen what asks can find (null once there are 3)
+  final int? catalogAdd;
+  const LeadSummary({this.unseen = 0, this.open = 0, this.week = 0, this.category, this.location, this.hasTrade = true, this.catalogAdd});
   factory LeadSummary.fromJson(Map j) => LeadSummary(
         unseen: (j['unseen'] as num?)?.toInt() ?? 0, open: (j['open'] as num?)?.toInt() ?? 0, week: (j['week'] as num?)?.toInt() ?? 0,
         category: j['category'] as String?, location: j['location'] as String?, hasTrade: j['hasTrade'] != false,
+        catalogAdd: ((j['catalogNudge'] as Map?)?['add'] as num?)?.toInt(),
       );
 }
 
