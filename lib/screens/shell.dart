@@ -383,19 +383,20 @@ class _AccountMenu extends StatelessWidget {
       nav.push(MaterialPageRoute(builder: (_) => page));
     }
 
+    // compact rows (32 icon box, 42 a row) so the whole menu fits on a phone without scrolling
     Widget iconBox(WI icon, {Color? bg, Color? fg}) => Container(
-          width: 40,
-          height: 40,
+          width: 32,
+          height: 32,
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: bg ?? p.chip, borderRadius: BorderRadius.circular(12)),
-          child: WIcon(icon, size: 20, color: fg ?? p.muted, strokeWidth: 1.8),
+          decoration: BoxDecoration(color: bg ?? p.chip, borderRadius: BorderRadius.circular(10)),
+          child: WIcon(icon, size: 18, color: fg ?? p.muted, strokeWidth: 1.8),
         );
     Widget row(WI icon, Widget label, VoidCallback? onTap, {Color? bg, Color? fg, Widget? trailing}) => InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(children: [iconBox(icon, bg: bg, fg: fg), const SizedBox(width: 16), Expanded(child: label), if (trailing != null) trailing]),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            child: Row(children: [iconBox(icon, bg: bg, fg: fg), const SizedBox(width: 12), Expanded(child: label), if (trailing != null) trailing]),
           ),
         );
     Text label(String s, {Color? color}) => Text(s, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: color));
@@ -639,18 +640,18 @@ class _ServiceContactsRowState extends State<_ServiceContactsRow> {
     final on = _on == true;
     return InkWell(
       onTap: _toggle,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         child: Row(children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 32,
+            height: 32,
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(12)),
-            child: WIcon(WI.contactCard, size: 20, color: p.muted, strokeWidth: 1.8),
+            decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(10)),
+            child: WIcon(WI.contactCard, size: 18, color: p.muted, strokeWidth: 1.8),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(t('Service contacts'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
