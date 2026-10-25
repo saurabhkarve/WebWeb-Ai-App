@@ -1381,13 +1381,6 @@ class _CardActionsState extends State<_CardActions> {
         },
       ),
     ];
-    final row = Row(spacing: 6, children: [for (final k in kids) Expanded(child: k)]);
-    return LayoutBuilder(
-      builder: (_, box) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        clipBehavior: Clip.none,
-        child: ConstrainedBox(constraints: BoxConstraints(minWidth: box.maxWidth), child: IntrinsicWidth(child: row)),
-      ),
-    );
+    return FitRow(children: kids);
   }
 }

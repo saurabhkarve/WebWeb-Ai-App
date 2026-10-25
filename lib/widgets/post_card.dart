@@ -949,18 +949,8 @@ class PostActionsState extends State<PostActions> {
           onTap: _share,
         ),
       ];
-      // equal shares: every control is as wide as the widest needs (IntrinsicWidth), spread over the full width
-      final row = Row(spacing: 6, children: [for (final k in kids) Expanded(child: k)]);
-      // scrolls sideways when it is wider than the screen (a narrow phone, a long translation); at least the full width,
-      // so the spacing still spreads the buttons when they fit
-      return LayoutBuilder(
-        builder: (_, box) => SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          // the tiles' shadow shows below the row
-          clipBehavior: Clip.none,
-          child: ConstrainedBox(constraints: BoxConstraints(minWidth: box.maxWidth), child: IntrinsicWidth(child: row)),
-        ),
-      );
+      // the full width, scrolling sideways only when the controls can't fit at all (FitRow)
+      return FitRow(children: kids);
     }
     return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       ReactionPicker(

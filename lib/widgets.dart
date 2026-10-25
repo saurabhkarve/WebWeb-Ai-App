@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart' show TextInputFormatter;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -980,4 +981,109 @@ class SubPage extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// A row of controls across the full width that scrolls only when it has to: every control as wide as the widest when
+/// that fits, otherwise each at its own width with the room left shared out, and only when even that is too wide
+/// (a very narrow phone, a long translation) does the row scroll sideways.
+class FitRow extends StatelessWidget {
+  final List<Widget> children;
+  final double spacing;
+  const FitRow({super.key, required this.children, this.spacing = 6});
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (_, box) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          // the tiles' shadow shows below the row
+          clipBehavior: Clip.none,
+          child: _FitRowBody(width: box.maxWidth, spacing: spacing, children: children),
+        ),
+      );
+}
+
+class _FitRowBody extends MultiChildRenderObjectWidget {
+  final double width, spacing;
+  const _FitRowBody({required this.width, required this.spacing, required super.children});
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderFitRow(width, spacing);
+  @override
+  void updateRenderObject(BuildContext context, _RenderFitRow r) => r
+    ..width = width
+    ..spacing = spacing;
+}
+
+class _FitRowParent extends ContainerBoxParentData<RenderBox> {}
+
+class _RenderFitRow extends RenderBox
+    with ContainerRenderObjectMixin<RenderBox, _FitRowParent>, RenderBoxContainerDefaultsMixin<RenderBox, _FitRowParent> {
+  _RenderFitRow(this._width, this._spacing);
+  double _width, _spacing;
+  set width(double v) {
+    if (v == _width) return;
+    _width = v;
+    markNeedsLayout();
+  }
+
+  set spacing(double v) {
+    if (v == _spacing) return;
+    _spacing = v;
+    markNeedsLayout();
+  }
+
+  @override
+  void setupParentData(RenderBox child) {
+    if (child.parentData is! _FitRowParent) child.parentData = _FitRowParent();
+  }
+
+  List<RenderBox> get _kids {
+    final out = <RenderBox>[];
+    var c = firstChild;
+    while (c != null) {
+      out.add(c);
+      c = childAfter(c);
+    }
+    return out;
+  }
+
+  /// The width of each child: equal, natural plus a share of the room left, or natural (and the row scrolls).
+  List<double> _widths(List<RenderBox> kids) {
+    final n = kids.length;
+    if (n == 0) return const [];
+    final gaps = _spacing * (n - 1);
+    final natural = [for (final k in kids) k.getMaxIntrinsicWidth(double.infinity)];
+    final widest = natural.reduce(math.max);
+    if (widest * n + gaps <= _width) return List.filled(n, (_width - gaps) / n);
+    final sum = natural.fold<double>(0, (a, b) => a + b) + gaps;
+    if (sum <= _width) return [for (final w in natural) w + (_width - sum) / n];
+    return natural;
+  }
+
+  @override
+  void performLayout() {
+    final kids = _kids;
+    final widths = _widths(kids);
+    var h = 0.0;
+    for (var i = 0; i < kids.length; i++) {
+      kids[i].layout(BoxConstraints(minWidth: widths[i], maxWidth: widths[i], maxHeight: constraints.maxHeight), parentUsesSize: true);
+      h = math.max(h, kids[i].size.height);
+    }
+    var x = 0.0;
+    for (var i = 0; i < kids.length; i++) {
+      (kids[i].parentData! as _FitRowParent).offset = Offset(x, (h - kids[i].size.height) / 2);
+      x += widths[i] + _spacing;
+    }
+    final total = kids.isEmpty ? 0.0 : x - _spacing;
+    size = constraints.constrain(Size(math.max(total, _width), h));
+  }
+
+  @override
+  double computeMinIntrinsicHeight(double width) => _kids.fold(0.0, (a, k) => math.max(a, k.getMinIntrinsicHeight(double.infinity)));
+  @override
+  double computeMaxIntrinsicHeight(double width) => _kids.fold(0.0, (a, k) => math.max(a, k.getMaxIntrinsicHeight(double.infinity)));
+
+  @override
+  void paint(PaintingContext context, Offset offset) => defaultPaint(context, offset);
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) => defaultHitTestChildren(result, position: position);
 }
