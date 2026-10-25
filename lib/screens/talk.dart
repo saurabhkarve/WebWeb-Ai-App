@@ -29,6 +29,18 @@ import 'contact_picker.dart';
 import 'post_detail.dart';
 import 'profile.dart';
 
+/// The Talk tab's badge: conversations with something unread, leaving out blocked people as the Talk list does.
+/// Re-counted whenever the chat list loads, and when a conversation is closed (opening one marks it read).
+final unreadChats = ValueNotifier<int>(0);
+
+Future<void> refreshUnreadChats(Api api, String me) async {
+  try {
+    final c = await api.get('/chats') as List;
+    final blocked = await loadBlocked(api);
+    unreadChats.value = c.map((e) => ChatSummary.fromJson(e as Map, me)).where((x) => x.unread && !blocked.contains(x.peer.uid)).length;
+  } catch (_) {}
+}
+
 /// Opens (or creates) the 1:1 chat with [peer]. [attachment] (an ask / update being replied to, an
 /// item enquiry) waits above the composer and goes out with the next message, like the web.
 Future<void> openChat(BuildContext context, Peer peer, {Map<String, dynamic>? attachment, String? draft}) async {
@@ -200,6 +212,7 @@ class _TalkScreenState extends State<TalkScreen> {
         _chats = c.map((e) => ChatSummary.fromJson(e as Map, _me)).where((x) => !blocked.contains(x.peer.uid)).toList();
         _calls = k.map((e) => CallLog.fromJson(e as Map)).toList();
       });
+      unreadChats.value = _chats!.where((x) => x.unread).length;
     } catch (_) {
       if (mounted) setState(() => _chats ??= []);
     }
@@ -554,10 +567,16 @@ class _ChatThreadState extends State<ChatThread> {
   Api get _api => context.read<AuthProvider>().api;
   Peer get _peer => widget.peer;
 
+  // kept for dispose, where the context can no longer be read
+  late final Api _apiKept = context.read<AuthProvider>().api;
+  late final String _meKept = _me;
+
   @override
   void initState() {
     super.initState();
     NotificationService.activeChat = widget.chatId;
+    _apiKept;
+    _meKept;
     _load();
     _sub = _rt.events.listen(_onEvent);
     _outboxSub = Outbox.results.listen(_onOutbox);
@@ -836,6 +855,8 @@ class _ChatThreadState extends State<ChatThread> {
   @override
   void dispose() {
     if (NotificationService.activeChat == widget.chatId) NotificationService.activeChat = null;
+    // the conversation was read here: the Talk badge drops it now, not at the next new message
+    refreshUnreadChats(_apiKept, _meKept);
     _setTyping(false);
     _sub?.cancel();
     _outboxSub?.cancel();

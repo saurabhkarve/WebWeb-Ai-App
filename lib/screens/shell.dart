@@ -43,7 +43,6 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int _i = 0;
   int _feedTick = 0; // reload the feed
   int _topTick = 0; // scroll the feed to the top
-  int _unread = 0;
   int _askSpin = 0;
   StreamSubscription? _sub, _pushSub;
   Timer? _poll, _svcTimer;
@@ -55,6 +54,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unreadChats.addListener(_unreadChanged);
     _loadUnread();
     _notes.refresh(context.read<AuthProvider>());
     _poll = Timer.periodic(const Duration(seconds: 30), (_) => _notes.refresh(context.read<AuthProvider>()));
@@ -94,16 +94,18 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   }
 
   Future<void> _loadUnread() async {
-    try {
-      final d = await context.read<AuthProvider>().api.get('/chats') as List;
-      final n = d.where((c) => c['unread'] == true).length;
-      if (mounted && n != _unread) setState(() => _unread = n);
-    } catch (_) {}
+    final auth = context.read<AuthProvider>();
+    await refreshUnreadChats(auth.api, auth.profile?.uid ?? '');
+  }
+
+  void _unreadChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unreadChats.removeListener(_unreadChanged);
     _sub?.cancel();
     _pushSub?.cancel();
     _poll?.cancel();
@@ -210,7 +212,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             if (k > 0) const SizedBox(width: 4),
             k == 0
                 ? _islandItem(p, k, badge: _notes.unseen)
-                : KeyedSubtree(key: Tours.key(const ['', 'nav-find', 'nav-talk', 'nav-ask'][k]), child: _islandItem(p, k, badge: k == 2 ? _unread : 0)),
+                : KeyedSubtree(key: Tours.key(const ['', 'nav-find', 'nav-talk', 'nav-ask'][k]), child: _islandItem(p, k, badge: k == 2 ? unreadChats.value : 0)),
           ],
         ]),
       ),
