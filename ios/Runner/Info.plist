@@ -51,6 +51,12 @@
 	<string>Pick people from your phone book to refer them on an ask, or to share a contact in a chat. If you turn on Service contacts, contacts saved with a service word (like plumber or electrician) are also shared. The rest of your phone book is never uploaded.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>WEBWEB is a local network: your location connects you with asks and members near you, sets the area of your asks and page, and lets you share a pin in a chat. It is used only while you use the app, never in the background.</string>
+	<!-- Required by App Store Connect because the location plugin can ask for "Always" access; WEBWEB never does
+	     (permissions.dart asks for While Using only), so these say the same as the key above. -->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>WEBWEB is a local network: your location connects you with asks and members near you, sets the area of your asks and page, and lets you share a pin in a chat. It is used only while you use the app, never in the background.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>WEBWEB is a local network: your location connects you with asks and members near you, sets the area of your asks and page, and lets you share a pin in a chat. It is used only while you use the app, never in the background.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take photos for your asks, updates and catalog, and make video calls.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
