@@ -254,5 +254,10 @@ WI categoryIcon(String? category) => switch (category) {
       'tender' => WI.tender,
       'digital' => WI.digital,
       'repair' => WI.repair,
+      'daily' => WI.service,
+      'events' => WI.users,
+      'rental' => WI.truck,
+      'wellness' => WI.smile,
+      'printing' => WI.file,
       _ => WI.other,
     };

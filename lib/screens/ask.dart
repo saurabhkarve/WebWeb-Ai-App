@@ -44,6 +44,11 @@ const _tips = <String, (String, List<String>)>{
   'tender': ('Mention registrations (GeM, Udyam) and what you can supply.', []),
   'digital': ('Share your business type and what you want built or run.', ['₹5,000 - ₹15,000', '₹15,000 - ₹50,000', '₹10,000 / month']),
   'repair': ('Make, model and the fault help technicians quote and visit faster.', ['₹2,000 - ₹5,000 / visit', 'Yearly AMC']),
+  'daily': ('Say how often and from which date, and give your area or society name.', ['₹1,000 - ₹3,000 / month', '₹3,000 - ₹8,000 / month']),
+  'events': ('Date, number of guests and venue help vendors quote quickly.', ['₹300 - ₹600 / plate', '₹10,000 - ₹50,000', '₹50,000 - ₹2 lakh']),
+  'rental': ('Dates, location and whether you need a driver or operator help owners quote faster.', ['₹2,000 - ₹5,000 / day', '₹30,000 - ₹80,000 / month']),
+  'wellness': ('Mention timing and whether you want a home visit or to visit a clinic.', ['₹500 - ₹1,500 / session', '₹3,000 - ₹8,000 / month']),
+  'printing': ('Size, quantity and a sample or design file get you accurate rates.', ['₹5,000 - ₹20,000', '₹20,000 - ₹1 lakh']),
   'other': ('Mention quantity, area and timing to get faster replies.', []),
 };
 
@@ -124,6 +129,27 @@ const _samples = <String, List<(String, String, String)>>{
     ('Machine repair', 'Need a technician for [machine] repair in [area]', 'Machine and make: [machine, make, model]\nProblem: [what is happening]\nLocation: [area]\nUrgency: [today / this week]'),
     ('AMC', 'Looking for yearly AMC for [AC / CCTV / compressor] in [area]', 'Equipment: [type, number of units]\nLocation: [area]\nVisits needed: [per year]\nBudget: ₹[amount] per year'),
   ],
+  'daily': [
+    ('Milk delivery', 'Need daily milk delivery at [society / area]', 'Quantity: [litres per day]\nType: [cow / buffalo / packet]\nLocation: [society, area]\nStart from: [date]'),
+    ('Housekeeping', 'Need housekeeping or cleaning service for [home / office] in [area]', 'Place: [home / office, size]\nFrequency: [daily / weekly]\nLocation: [area]\nStart from: [date]'),
+    ('Tiffin', 'Looking for a tiffin service in [area]', 'Meals: [lunch / dinner]\nPeople: [number]\nPreference: [veg / non-veg]\nLocation: [area]'),
+  ],
+  'events': [
+    ('Caterer', 'Need a caterer for [event] in [area]', 'Event and date: [event, date]\nGuests: [number]\nMenu: [veg / non-veg, cuisine]\nVenue: [area]'),
+    ('Decorator or photographer', 'Looking for a [decorator / photographer] for [event] on [date]', 'Event and date: [event, date]\nVenue: [area]\nWhat I need: [details]\nBudget: ₹[amount]'),
+  ],
+  'rental': [
+    ('Vehicle on hire', 'Need a [tempo / bus / cab] on hire for [days] in [area]', 'Vehicle: [type, capacity]\nDates: [from, to]\nRoute or area: [details]\nWith driver: [yes / no]'),
+    ('Equipment on rent', 'Need [crane / JCB / generator / scaffolding] on rent in [area]', 'Equipment: [type, capacity]\nDays: [number]\nSite: [area]\nOperator needed: [yes / no]'),
+  ],
+  'wellness': [
+    ('Physio or yoga', 'Looking for a [physiotherapist / yoga trainer] near [area]', 'For: [self / family]\nNeed: [details]\nTiming: [morning / evening]\nHome visit: [yes / no]'),
+    ('Diagnostic or health camp', 'Need [diagnostic lab / health check-up camp] for [staff / society] in [area]', 'People: [number]\nTests: [details]\nLocation: [area]\nDate: [date]'),
+  ],
+  'printing': [
+    ('Flex or signage', 'Need [flex / signboard] made for my shop in [area]', 'Size: [width x height]\nMaterial: [flex / acrylic / LED]\nQuantity: [number]\nNeeded by: [date]'),
+    ('Boxes and labels', 'Need [number] [boxes / labels / brochures] printed', 'Item: [type, size]\nQuantity: [number]\nPaper or material: [details]\nNeeded by: [date]'),
+  ],
   'other': [
     ('General ask', 'Looking for [what you need] in [area]', 'What I need: [details]\nQuantity: [number]\nArea: [area]\nNeeded by: [date]'),
   ],
@@ -132,6 +158,11 @@ const _samples = <String, List<(String, String, String)>>{
 /// Keyword rules: a light nudge toward the right category (web HINTS).
 final _hints = <(String, RegExp)>[
   ('job', RegExp(r'\b(hire|hiring|vacanc|job|salary|operator|driver|helper|worker|staff|manpower|accountant|salesman|fresher|recruit)', caseSensitive: false)),
+  ('daily', RegExp(r'\b(milk|dairy|newspaper|water cans?|water jars?|tiffin|laundry|housekeeping|maid|cleaning|security guard|gardener|door ?step|home delivery|pest control)', caseSensitive: false)),
+  ('events', RegExp(r'\b(wedding|caterer|catering|decorat|event planner|party|dj|sound system|photograph|mandap|birthday)', caseSensitive: false)),
+  ('wellness', RegExp(r'\b(clinic|doctor|physio|dentist|diagnostic|lab test|yoga|gym|fitness|diet|counsell?ing|therapy|massage)', caseSensitive: false)),
+  ('printing', RegExp(r'\b(print|printing|flex|signage|visiting cards?|brochure|sticker|label|banner|standee)', caseSensitive: false)),
+  ('rental', RegExp(r'\b(cab|bus|tempo|truck|crane|jcb|generator|scaffolding|vehicle|excavator|forklift)\b.{0,40}\b(rent|rental|hire|on hire)\b|\b(rent|rental|hire)\b.{0,40}\b(cab|bus|tempo|truck|crane|jcb|generator|scaffolding|vehicle|excavator|forklift)\b', caseSensitive: false)),
   ('logistics', RegExp(r'\b(transport|truck|tempo|courier|cargo|shipping|delivery|pickup|container|freight)', caseSensitive: false)),
   ('funding', RegExp(r'\b(loan|fund|investor|investment|capital|finance|credit|mudra)', caseSensitive: false)),
   ('machinery', RegExp(r'\b(machine|cnc|lathe|press|equipment|compressor|generator|rent)\b', caseSensitive: false)),
@@ -147,7 +178,7 @@ final _hints = <(String, RegExp)>[
   ('export', RegExp(r'\b(export|import|iec|dgft|customs|freight forward)', caseSensitive: false)),
   ('tender', RegExp(r'\b(tender|gem|government order|psu|vendor registration)', caseSensitive: false)),
   ('digital', RegExp(r'\b(website|app development|seo|digital marketing|instagram|google ads|logo|branding)', caseSensitive: false)),
-  ('repair', RegExp(r'\b(repair|service|amc|maintenance|technician|breakdown)', caseSensitive: false)),
+  ('repair', RegExp(r'\b(repair|amc|maintenance|servicing|technician|breakdown)', caseSensitive: false)),
 ];
 
 String? _detectCategory(String text) {
@@ -159,7 +190,7 @@ String? _detectCategory(String text) {
 }
 
 /// The types whose first example is offered before a type is known: the asks members post most.
-const _starterCategories = ['job', 'supplier', 'buyer', 'logistics', 'space', 'jobwork', 'repair', 'machinery', 'compliance', 'consultant', 'digital'];
+const _starterCategories = ['job', 'supplier', 'buyer', 'logistics', 'space', 'jobwork', 'repair', 'daily', 'events', 'rental', 'machinery', 'compliance', 'consultant', 'digital'];
 
 /// Reach radius steps (web/src/lib/geo.ts RADIUS_STEPS); the last one covers all of India.
 const _radii = [5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 3000000];

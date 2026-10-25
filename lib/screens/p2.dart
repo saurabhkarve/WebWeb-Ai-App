@@ -896,14 +896,14 @@ class _PushNudgeState extends State<PushNudge> {
 const kCategoryEmoji = {
   'job': '👷', 'supplier': '📦', 'buyer': '🛒', 'logistics': '🚚', 'funding': '💰', 'advice': '💡', 'mentorship': '🧭', 'partnership': '🤝',
   'machinery': '⚙️', 'space': '🏢', 'training': '🎓', 'jobwork': '🏭', 'compliance': '📑', 'consultant': '🧑‍💼', 'export': '🌍', 'tender': '📄',
-  'digital': '💻', 'repair': '🔧', 'other': '✨',
+  'digital': '💻', 'repair': '🔧', 'daily': '🥛', 'events': '🎉', 'rental': '🚜', 'wellness': '🩺', 'printing': '🖨️', 'other': '✨',
 };
 
 /// Short names under the circles (the long ones don't fit 84 px).
 const _categoryTile = {
   'job': 'Jobs', 'supplier': 'Suppliers', 'buyer': 'Buyers', 'logistics': 'Logistics', 'funding': 'Funding', 'advice': 'Advice', 'mentorship': 'Mentors',
   'partnership': 'Partners', 'machinery': 'Machinery', 'space': 'Space', 'training': 'Training', 'jobwork': 'Job work', 'compliance': 'GST / Legal',
-  'consultant': 'Consultants', 'export': 'Export', 'tender': 'Tenders', 'digital': 'Digital', 'repair': 'Repairs', 'other': 'Other',
+  'consultant': 'Consultants', 'export': 'Export', 'tender': 'Tenders', 'digital': 'Digital', 'repair': 'Repairs', 'daily': 'Daily', 'events': 'Events', 'rental': 'Rentals', 'wellness': 'Wellness', 'printing': 'Printing', 'other': 'Other',
 };
 
 const _bg = {

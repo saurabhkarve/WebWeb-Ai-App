@@ -42,6 +42,11 @@ const kPostCategories = [
   Option('tender', 'Tender / Government Order'),
   Option('digital', 'Website / Digital Marketing'),
   Option('repair', 'Repair / Maintenance Service'),
+  Option('daily', 'Daily & Home Services'),
+  Option('events', 'Events / Catering'),
+  Option('rental', 'Vehicle / Equipment Rental'),
+  Option('wellness', 'Health / Wellness Services'),
+  Option('printing', 'Printing / Packaging'),
   Option('other', 'Other'),
 ];
 
@@ -50,7 +55,7 @@ const kCategoryShort = {
   'funding': 'Funding', 'advice': 'Advice', 'mentorship': 'Mentorship', 'partnership': 'Partnership',
   'machinery': 'Machinery', 'space': 'Space / Godown', 'training': 'Training', 'jobwork': 'Job work',
   'compliance': 'GST / Legal', 'consultant': 'Consultant / Advisor', 'export': 'Export / Import', 'tender': 'Tenders', 'digital': 'Digital',
-  'repair': 'Repair / AMC', 'other': 'Other',
+  'repair': 'Repair / AMC', 'daily': 'Daily & home services', 'events': 'Events / Catering', 'rental': 'Rentals', 'wellness': 'Wellness', 'printing': 'Printing / Packaging', 'other': 'Other',
 };
 
 const kUrgencies = [Option('immediate', 'Immediate'), Option('7_days', 'Within 7 days'), Option('30_days', 'Within 30 days'), Option('flexible', 'Flexible')];
