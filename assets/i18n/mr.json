@@ -2223,13 +2223,13 @@
   "{n} min": "{n} मिनिटे",
   "{n} hr": "{n} तास",
   "{n} days": "{n} दिवस",
-  "Add {n} more catalog items so asks for {c} find you": "{c} साठीचे ॲस्क तुमच्यापर्यंत पोहोचावेत म्हणून आणखी {n} कॅटलॉग आयटम जोडा",
-  "Add {n} more catalog items so the right asks find you": "योग्य ॲस्क तुमच्यापर्यंत पोहोचावेत म्हणून आणखी {n} कॅटलॉग आयटम जोडा",
   "Can you help? Reply free on WEBWEB:": "तुम्ही मदत करू शकता का? WEBWEB वर मोफत उत्तर द्या:",
   "Allow the microphone to speak your ask.": "तुमचा ॲस्क बोलण्यासाठी मायक्रोफोनची परवानगी द्या.",
   "Could not hear that. Try again.": "ऐकू आले नाही. पुन्हा प्रयत्न करा.",
   "Listening… tap to stop": "ऐकत आहे… थांबवण्यासाठी टॅप करा",
   "Speak your ask": "तुमचा ॲस्क बोला",
   "Listening…": "ऐकत आहे…",
-  "Speak": "बोला"
+  "Speak": "बोला",
+  "Add {n} more to your catalog so asks for {c} find you": "{c} साठीचे ॲस्क तुमच्यापर्यंत पोहोचावेत म्हणून कॅटलॉगमध्ये आणखी {n} जोडा",
+  "Add {n} more to your catalog so the right asks find you": "योग्य ॲस्क तुमच्यापर्यंत पोहोचावेत म्हणून कॅटलॉगमध्ये आणखी {n} जोडा"
 }

@@ -211,8 +211,8 @@ class _LeadsScreenState extends State<LeadsScreen> {
                   Expanded(
                     child: Text(
                       _sum!.category != null && _sum!.category!.isNotEmpty
-                          ? t('Add {n} more catalog items so asks for {c} find you', {'n': _sum!.catalogAdd!, 'c': _sum!.category!})
-                          : t('Add {n} more catalog items so the right asks find you', {'n': _sum!.catalogAdd!}),
+                          ? t('Add {n} more to your catalog so asks for {c} find you', {'n': _sum!.catalogAdd!, 'c': _sum!.category!})
+                          : t('Add {n} more to your catalog so the right asks find you', {'n': _sum!.catalogAdd!}),
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ),

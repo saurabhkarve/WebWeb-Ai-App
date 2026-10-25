@@ -2223,13 +2223,13 @@
   "{n} min": "{n} मिनटां",
   "{n} hr": "{n} वरां",
   "{n} days": "{n} दीस",
-  "Add {n} more catalog items so asks for {c} find you": "{c} खातीरचे ॲस्क तुमचेपर्यंत पावचे म्हणून आनीक {n} कॅटलॉग आयटम जोडात",
-  "Add {n} more catalog items so the right asks find you": "फावो ते ॲस्क तुमचेपर्यंत पावचे म्हणून आनीक {n} कॅटलॉग आयटम जोडात",
   "Can you help? Reply free on WEBWEB:": "तुमी आदार करूंक शकता? WEBWEB वर मोफत जाप दियात:",
   "Allow the microphone to speak your ask.": "तुमचो ॲस्क उलोवपाक मायक्रोफोनाची परवानगी दियात.",
   "Could not hear that. Try again.": "आयकूंक ना. परत यत्न करात.",
   "Listening… tap to stop": "आयकता… थांबोवपाक टॅप करात",
   "Speak your ask": "तुमचो ॲस्क उलोयात",
   "Listening…": "आयकता…",
-  "Speak": "उलोयात"
+  "Speak": "उलोयात",
+  "Add {n} more to your catalog so asks for {c} find you": "{c} खातीरचे ॲस्क तुमचेपर्यंत पावचे म्हणून कॅटलॉगांत आनीक {n} जोडात",
+  "Add {n} more to your catalog so the right asks find you": "फावो ते ॲस्क तुमचेपर्यंत पावचे म्हणून कॅटलॉगांत आनीक {n} जोडात"
 }
