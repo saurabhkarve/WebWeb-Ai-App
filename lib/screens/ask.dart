@@ -1092,6 +1092,79 @@ class _AskFormState extends State<_AskForm> {
                   ]),
                   const SizedBox(height: 8),
                 ],
+                KeyedSubtree(
+                  key: _tk('ask-details'),
+                  child: Wrap(spacing: 6, runSpacing: 6, children: [
+                    KeyedSubtree(
+                      key: _tk('ask-category'),
+                      child: chip(
+                        'type',
+                        categoryIcon(askTypeDef(_askType)?.icon ?? (_category.isEmpty ? 'other' : _category)),
+                        _category.isEmpty ? t('What is your ask') : (_category == 'other' && _other.text.trim().isNotEmpty ? _other.text.trim() : t(askTypeDef(_askType)?.short ?? kCategoryShort[_category] ?? 'Other')),
+                        _category.isNotEmpty,
+                        auto: _category.isNotEmpty && !_typeChosen,
+                      ),
+                    ),
+                    // where and how far, one chip: "Vashi · 25 km"
+                    chip('where', WI.pin, '${_location.isEmpty ? t('Where') : t(_location)}${_geo != null ? ' · ${_radiusLabel(_geo!.radiusM)}' : ''}', _location.isNotEmpty || _geo != null),
+                    chip('budget', WI.rupee, _budget.isEmpty ? t('Budget') : _budget, _budget.isNotEmpty),
+                    chip('when', WI.clock, _urgency.isEmpty ? t('When') : t(labelOf(kUrgencies, _urgency)), _urgency.isNotEmpty),
+                  ]),
+                ),
+                if (panel != null)
+                  GestureDetector(
+                    // taps inside the choices never close them (a tap elsewhere on the page does)
+                    onTap: () {},
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(12), border: Border.all(color: p.border)),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      panel,
+                      if (_open == 'where' || _open == 'budget') ...[
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: GestureDetector(onTap: () => setState(() => _open = null), child: Text(t('Done'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
+                        ),
+                      ],
+                    ]),
+                  ),
+                  ),
+                if (_askType == 'poll') ...[
+                  const SizedBox(height: 10),
+                  Text(t('Options to vote on'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
+                  for (var i = 0; i < _pollOpts.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(children: [
+                        Container(width: 28, height: 28, alignment: Alignment.center, decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle), child: Text('ABCD'[i], style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: p.muted))),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            key: ValueKey('opt$i-${_pollOpts.length}'),
+                            initialValue: _pollOpts[i],
+                            maxLength: 60,
+                            buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
+                            onChanged: (v) => setState(() => _pollOpts[i] = v),
+                            decoration: _input(p, t('Option {n}', {'n': '${i + 1}'})),
+                          ),
+                        ),
+                        if (_pollOpts.length > 2) IconButton(onPressed: () => setState(() => _pollOpts.removeAt(i)), icon: WIcon(WI.close, size: 16, color: p.muted)),
+                      ]),
+                    ),
+                  if (_pollOpts.length < 4)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: GestureDetector(onTap: () => setState(() => _pollOpts.add('')), child: Text('+ ${t('Add an option')}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
+                    ),
+                ],
+                if (_category == 'other') ...[
+                  const SizedBox(height: 8),
+                  TextField(controller: _other, maxLength: 40, onChanged: (_) => setState(() {}), decoration: _input(p, t('What is this about? e.g. Event stall, Legal help, Insurance'))),
+                ],
+                const SizedBox(height: 8),
                 TextField(
                   key: _tk('ask-title'),
                   controller: _title,
@@ -1232,78 +1305,6 @@ class _AskFormState extends State<_AskForm> {
                       ),
                   ]),
                 ),
-                KeyedSubtree(
-                  key: _tk('ask-details'),
-                  child: Wrap(spacing: 6, runSpacing: 6, children: [
-                    KeyedSubtree(
-                      key: _tk('ask-category'),
-                      child: chip(
-                        'type',
-                        categoryIcon(askTypeDef(_askType)?.icon ?? (_category.isEmpty ? 'other' : _category)),
-                        _category.isEmpty ? t('What is your ask') : (_category == 'other' && _other.text.trim().isNotEmpty ? _other.text.trim() : t(askTypeDef(_askType)?.short ?? kCategoryShort[_category] ?? 'Other')),
-                        _category.isNotEmpty,
-                        auto: _category.isNotEmpty && !_typeChosen,
-                      ),
-                    ),
-                    // where and how far, one chip: "Vashi · 25 km"
-                    chip('where', WI.pin, '${_location.isEmpty ? t('Where') : t(_location)}${_geo != null ? ' · ${_radiusLabel(_geo!.radiusM)}' : ''}', _location.isNotEmpty || _geo != null),
-                    chip('budget', WI.rupee, _budget.isEmpty ? t('Budget') : _budget, _budget.isNotEmpty),
-                    chip('when', WI.clock, _urgency.isEmpty ? t('When') : t(labelOf(kUrgencies, _urgency)), _urgency.isNotEmpty),
-                  ]),
-                ),
-                if (panel != null)
-                  GestureDetector(
-                    // taps inside the choices never close them (a tap elsewhere on the page does)
-                    onTap: () {},
-                    behavior: HitTestBehavior.opaque,
-                    child: Container(
-                    margin: const EdgeInsets.only(top: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(12), border: Border.all(color: p.border)),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      panel,
-                      if (_open == 'where' || _open == 'budget') ...[
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: GestureDetector(onTap: () => setState(() => _open = null), child: Text(t('Done'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
-                        ),
-                      ],
-                    ]),
-                  ),
-                  ),
-                if (_askType == 'poll') ...[
-                  const SizedBox(height: 10),
-                  Text(t('Options to vote on'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
-                  for (var i = 0; i < _pollOpts.length; i++)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Row(children: [
-                        Container(width: 28, height: 28, alignment: Alignment.center, decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle), child: Text('ABCD'[i], style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: p.muted))),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextFormField(
-                            key: ValueKey('opt$i-${_pollOpts.length}'),
-                            initialValue: _pollOpts[i],
-                            maxLength: 60,
-                            buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
-                            onChanged: (v) => setState(() => _pollOpts[i] = v),
-                            decoration: _input(p, t('Option {n}', {'n': '${i + 1}'})),
-                          ),
-                        ),
-                        if (_pollOpts.length > 2) IconButton(onPressed: () => setState(() => _pollOpts.removeAt(i)), icon: WIcon(WI.close, size: 16, color: p.muted)),
-                      ]),
-                    ),
-                  if (_pollOpts.length < 4)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: GestureDetector(onTap: () => setState(() => _pollOpts.add('')), child: Text('+ ${t('Add an option')}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
-                    ),
-                ],
-                if (_category == 'other') ...[
-                  const SizedBox(height: 8),
-                  TextField(controller: _other, maxLength: 40, onChanged: (_) => setState(() {}), decoration: _input(p, t('What is this about? e.g. Event stall, Legal help, Insurance'))),
-                ],
               ]),
             ),
           ]),
