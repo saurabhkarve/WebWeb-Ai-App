@@ -750,6 +750,16 @@ class _AskTile extends StatelessWidget {
     return kCardColors.keys.elementAt(h % kCardColors.length);
   }
 
+  /// the day a "Within 7 / 30 days" ask closes, as "24 Nov"
+  String? _until() {
+    final u = a['urgency'] as String?;
+    final days = u == '7_days' ? 7 : (u == '30_days' ? 30 : null);
+    if (days == null) return null;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final d = DateTime.fromMillisecondsSinceEpoch((a['createdAt'] as num).toInt()).add(Duration(days: days));
+    return '${d.day} ${months[d.month - 1]}';
+  }
+
   String? _left() {
     final u = a['urgency'] as String?;
     if (u == null || u.isEmpty) return null;
@@ -827,10 +837,18 @@ class _AskTile extends StatelessWidget {
           const SizedBox(height: 4),
           Text('${a['title']}', maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: big ? 19 : 15, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -.2)),
           const SizedBox(height: 10),
-          Wrap(spacing: 4, runSpacing: 4, children: [
-            if ('${a['location'] ?? ''}'.isNotEmpty) chip(WI.pin, t('${a['location']}')),
-            if ('${a['budget'] ?? ''}'.isNotEmpty) chip(WI.rupee, '${a['budget']}'),
-            if (left != null) chip(WI.clock, left),
+          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Expanded(
+              child: Wrap(spacing: 4, runSpacing: 4, children: [
+                if ('${a['location'] ?? ''}'.isNotEmpty) chip(WI.pin, t('${a['location']}')),
+                if ('${a['budget'] ?? ''}'.isNotEmpty) chip(WI.rupee, '${a['budget']}'),
+                if (left != null) chip(WI.clock, left),
+                if (left != null && _until() != null) chip(WI.calendar, _until()!),
+              ]),
+            ),
+            const SizedBox(width: 6),
+            // a small arrow: the whole ask is one tap away
+            Container(width: 24, height: 24, decoration: const BoxDecoration(color: kGold, shape: BoxShape.circle), child: const WIcon(WI.arrow, size: 13, color: kInk, still: true)),
           ]),
         ]),
       ),
