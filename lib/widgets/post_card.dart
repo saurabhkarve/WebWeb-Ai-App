@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
+import '../ask_types.dart';
 import '../card_colors.dart';
 import '../i18n.dart';
 import '../links.dart';
@@ -27,6 +28,7 @@ import 'reaction_picker.dart';
 import 'reply_thread.dart';
 import 'p1.dart';
 import 'response_sheet.dart';
+import 'poll_vote.dart';
 import 'tour.dart';
 import '../share_log.dart';
 import '../views.dart';
@@ -51,6 +53,19 @@ class PostCard extends StatefulWidget {
   const PostCard({super.key, required this.post, this.onChanged, this.detail = false, this.onReply, this.onBlocked, this.tourTarget = false});
   @override
   State<PostCard> createState() => _PostCardState();
+}
+
+/// "HIRE", "BUY / QUOTE · REPAIR": the ask's type, with its topic when that says more
+String _typeLabel(Post post) {
+  final type = askTypeDef(askTypeOf(post)) ?? kAskTypes.last;
+  if (post.category == 'other' && (post.categoryLabel ?? '').isNotEmpty) return post.categoryLabel!;
+  final topic = post.category != null && post.category != type.forced && typeOfCategory(post.category) == type.value ? kCategoryShort[post.category] : null;
+  return [t(type.short), if (topic != null) t(topic)].join(' · ');
+}
+
+String _sentence(Post post) {
+  final s = askSentence(post);
+  return t(s.key, {...s.vars, if (s.vars['what'] != null) 'what': t(s.vars['what']!)});
 }
 
 class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin {
@@ -420,10 +435,10 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               const SizedBox(height: 10),
               // the category as a small heading, why you see this ask on the right
               Row(children: [
-                WIcon(categoryIcon(post.category), size: 14, color: p.link, still: true),
+                WIcon(categoryIcon(askTypeDef(askTypeOf(post))?.icon ?? post.category), size: 14, color: p.link, still: true),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(t(post.categoryText).toUpperCase(),
+                  child: Text(_typeLabel(post).toUpperCase(),
                       maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.link)),
                 ),
                 // "Near you" opens the ask's area map, like its place chip
@@ -437,8 +452,20 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                   ),
                 ],
               ]),
+              // who wants what, in a line (the idea of the ask before its details)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(children: [
+                  Text(askTypeDef(askTypeOf(post))?.emoji ?? '💬', style: const TextStyle(fontSize: 15)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(_sentence(post), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .75))),
+                  ),
+                ]),
+              ),
               const SizedBox(height: 4),
               tappable,
+              if (post.pollOptions.length > 1) PollVote(post: post, mine: mine, onVoted: (v) => setState(() => post = v)),
               ...extra,
               // where, budget, time left, reach, photos as chips (the category is shown above)
               Padding(

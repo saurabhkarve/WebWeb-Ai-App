@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../ask_types.dart';
 import '../card_colors.dart';
 import '../i18n.dart';
 import '../icons.dart';
@@ -6,7 +7,7 @@ import '../models.dart';
 import '../theme.dart';
 import 'area_map.dart' show askTimeLeft;
 
-enum DeckKind { headline, photos, details, glance, act }
+enum DeckKind { headline, poll, photos, details, glance, act }
 
 /// An ask as a short deck of cards you swipe (web ask-deck.tsx): the headline with its essentials, the photos, the
 /// details, a glance at budget, place and timing, and a last card that asks "Can you help?". One swipe moves one card.
@@ -37,7 +38,8 @@ class _AskDeckState extends State<AskDeck> {
     final p = Pal.of(context);
     final post = widget.post;
     final tint = kCardColors[cardColorOf(post)]!;
-    const kinds = DeckKind.values;
+    // a poll ask has its options as the second card; the others skip it
+    final kinds = [for (final k in DeckKind.values) if (k != DeckKind.poll || post.pollOptions.length > 1) k];
     return Column(children: [
       SizedBox(
         height: 236,
@@ -95,22 +97,32 @@ class _AskDeckState extends State<AskDeck> {
     final left = askTimeLeft(post);
     switch (kind) {
       case DeckKind.headline:
-        final cat = post.categoryText;
+        final type = askTypeDef(askTypeOf(post)) ?? kAskTypes.last;
+        final topic = post.category != null && post.category != 'other' && typeOfCategory(post.category) == type.value && post.category != type.forced ? kCategoryShort[post.category] : null;
+        final cat = post.category == 'other' && (post.categoryLabel ?? '').isNotEmpty ? post.categoryLabel! : [t(type.short), if (topic != null) t(topic)].join(' · ');
+        final sentence = askSentence(post);
         return Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              WIcon(categoryIcon(post.category), size: 14, color: p.link, still: true),
+              WIcon(categoryIcon(type.icon), size: 14, color: p.link, still: true),
               const SizedBox(width: 6),
-              Flexible(child: Text(t(cat).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link))),
+              Flexible(child: Text(cat.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link))),
             ]),
             const SizedBox(height: 8),
+            // who wants what, in a line: the idea of the ask before its details
+            Row(children: [
+              Text(type.emoji, style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 6),
+              Expanded(child: Text(t(sentence.key, {...sentence.vars, if (sentence.vars['what'] != null) 'what': t(sentence.vars['what']!)}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .75)))),
+            ]),
+            const SizedBox(height: 6),
             Expanded(
               child: Text(
                 (post.title ?? '').isEmpty ? t('Your title shows here') : post.title!,
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 21, height: 1.2, fontWeight: FontWeight.w800, color: (post.title ?? '').isEmpty ? p.muted : p.text),
+                style: TextStyle(fontSize: 20, height: 1.2, fontWeight: FontWeight.w800, color: (post.title ?? '').isEmpty ? p.muted : p.text),
               ),
             ),
             Wrap(spacing: 6, runSpacing: 6, children: [
@@ -119,6 +131,26 @@ class _AskDeckState extends State<AskDeck> {
               if ((post.budget ?? '').isNotEmpty) _chip(p, WI.rupee, post.budget!),
               if (widget.reachLabel != null) _chip(p, WI.locate, widget.reachLabel!),
             ]),
+          ]),
+        );
+      case DeckKind.poll:
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _label(p, t('Tap to vote')),
+            const SizedBox(height: 8),
+            for (var k = 0; k < post.pollOptions.length; k++)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                decoration: BoxDecoration(color: p.canvas.withValues(alpha: .7), borderRadius: BorderRadius.circular(12)),
+                child: Row(children: [
+                  Container(width: 20, height: 20, alignment: Alignment.center, decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle), child: Text('ABCD'[k % 4], style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800))),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(post.pollOptions[k], maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+                ]),
+              ),
           ]),
         );
       case DeckKind.photos:

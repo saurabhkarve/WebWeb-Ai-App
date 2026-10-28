@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../auth_provider.dart';
+import '../ask_types.dart';
 import '../card_colors.dart';
 import '../widgets/ask_deck.dart';
 import 'dart:io' show File;
@@ -283,6 +284,9 @@ class _AskFormState extends State<_AskForm> {
   /// the local AI's reading of the category (web: aiCategory), asked once the title is written and details typed
   Timer? _aiCatTimer;
   String? _aiCat;
+  String? _aiType;
+  String _askType = ''; // what the ask wants from members (kAskTypes)
+  List<String> _pollOpts = ['', ''];
   /// editing: the stored pin is only sent again when the member moves it (the one we get back is rounded)
   bool _geoMoved = false;
   bool get _editing => widget.edit != null;
@@ -317,7 +321,7 @@ class _AskFormState extends State<_AskForm> {
   void _maybeTour() {
     if (!widget.active || _editing) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && widget.active) Tours.maybeShow(context, 'ask', kAskTour);
+      if (mounted && widget.active) Tours.maybeShow(context, 'ask2', kAskTour);
     });
   }
 
@@ -327,9 +331,16 @@ class _AskFormState extends State<_AskForm> {
     if (!_typeChosen) {
       final title = _title.text.trim();
       final found = (title.length >= 5 ? _aiCat : null) ?? _detectCategory('${_title.text} ${_desc.text}');
-      if (found != null) _category = found;
+      final type = (title.length >= 5 ? _aiType : null) ?? (found != null ? typeOfCategory(found) : null);
+      if (type != null) {
+        _askType = type;
+        _category = categoryForType(type, found);
+      } else if (found != null) {
+        _category = found;
+      }
       _aiCatTimer?.cancel();
-      if (title.length >= 5 && _desc.text.trim().isNotEmpty) {
+      // the title is enough: the local AI reads what kind of ask it is from it
+      if (title.length >= 5) {
         _aiCatTimer = Timer(const Duration(milliseconds: 700), () => _askAiCategory(title, _desc.text.trim()));
       }
     }
@@ -342,11 +353,18 @@ class _AskFormState extends State<_AskForm> {
     try {
       final r = await context.read<AuthProvider>().api.post('/ai/category', {'title': title, 'description': description}) as Map;
       final c = r['category'] as String?;
+      final ty = r['type'] as String?;
       // a newer edit or the member's own pick wins
-      if (!mounted || c == null || _typeChosen || _title.text.trim() != title || _desc.text.trim() != description) return;
+      if (!mounted || (c == null && ty == null) || _typeChosen || _title.text.trim() != title || _desc.text.trim() != description) return;
       setState(() {
         _aiCat = c;
-        _category = c;
+        _aiType = ty;
+        if (ty != null) {
+          _askType = ty;
+          _category = categoryForType(ty, c);
+        } else if (c != null) {
+          _category = c;
+        }
       });
     } catch (_) {}
   }
@@ -376,6 +394,8 @@ class _AskFormState extends State<_AskForm> {
   void _fillFromEdit(Post e) {
     _category = e.category ?? 'other';
     _typeChosen = true;
+    _askType = e.askType ?? typeOfCategory(e.category);
+    _pollOpts = e.pollOptions.length >= 2 ? [...e.pollOptions] : ['', ''];
     _title.text = e.title ?? '';
     _desc.text = e.description ?? '';
     _other.text = e.categoryLabel ?? '';
@@ -507,6 +527,7 @@ class _AskFormState extends State<_AskForm> {
       _undoTpl = (_title.text, _desc.text, _category, _typeChosen);
       _aiUndo = null;
       _category = category;
+      _askType = typeOfCategory(category);
       _typeChosen = true;
       _title.text = t(title);
       _desc.text = t(desc);
@@ -571,6 +592,7 @@ class _AskFormState extends State<_AskForm> {
     return Post(
       id: 'preview', kind: 'requirement', authorUid: me?.uid ?? '', authorName: me?.name ?? '', authorCompany: me?.company ?? '', authorHandle: me?.handle ?? '',
       title: _title.text.trim(), description: _desc.text, category: _category.isEmpty ? 'other' : _category,
+      askType: _askType.isEmpty ? null : _askType, pollOptions: _askType == 'poll' ? _pollOpts.where((o) => o.trim().isNotEmpty).toList() : const [],
       categoryLabel: _other.text.trim().isEmpty ? null : _other.text.trim(), cardColor: _color,
       locationPref: _location.isEmpty ? null : _location, budget: _budget.isEmpty ? null : _budget, urgency: _urgency.isEmpty ? null : _urgency,
       radiusM: _geo?.radiusM, createdAt: DateTime.now(),
@@ -589,6 +611,7 @@ class _AskFormState extends State<_AskForm> {
       case DeckKind.glance:
         setState(() => _open = 'where');
       case DeckKind.act:
+      case DeckKind.poll:
         break;
     }
   }
@@ -610,6 +633,8 @@ class _AskFormState extends State<_AskForm> {
           'title': title,
           'description': desc,
           'category': _category,
+          'askType': _askType,
+          if (_askType == 'poll') 'pollOptions': _pollOpts.map((o) => o.trim()).where((o) => o.isNotEmpty).toList(),
           'categoryLabel': _category == 'other' ? _other.text.trim() : '',
           'locationPref': _location,
           'budget': _budget,
@@ -625,6 +650,8 @@ class _AskFormState extends State<_AskForm> {
         'title': title,
         'description': desc,
         'category': _category,
+        if (_askType.isNotEmpty) 'askType': _askType,
+        if (_askType == 'poll') 'pollOptions': _pollOpts.map((o) => o.trim()).where((o) => o.isNotEmpty).toList(),
         if (_category == 'other' && _other.text.trim().isNotEmpty) 'categoryLabel': _other.text.trim(),
         if (_location.isNotEmpty) 'locationPref': _location,
         if (_budget.isNotEmpty) 'budget': _budget,
@@ -650,6 +677,8 @@ class _AskFormState extends State<_AskForm> {
         _undoTpl = null;
         _aiUndo = null;
         _category = '';
+        _askType = '';
+        _pollOpts = ['', ''];
         _typeChosen = false;
         _open = null;
       });
@@ -796,7 +825,8 @@ class _AskFormState extends State<_AskForm> {
     }
     final titleOk = title.trim().length >= 5;
     final descOk = desc.trim().length >= 20;
-    final typeOk = _category.isNotEmpty && (_category != 'other' || _other.text.trim().length >= 2);
+    final pollOk = _askType != 'poll' || _pollOpts.where((o) => o.trim().isNotEmpty).length >= 2;
+    final typeOk = _category.isNotEmpty && (_category != 'other' || _other.text.trim().length >= 2) && pollOk;
     final titleBlank = _blank.hasMatch(title), descBlank = _blank.hasMatch(desc);
     final ready = titleOk && descOk && typeOk && !titleBlank && !descBlank && !_photos.any((ph) => ph.failed);
     final missing = !titleOk
@@ -807,7 +837,9 @@ class _AskFormState extends State<_AskForm> {
                 ? 'Replace the [brackets] with your details'
                 : _category.isEmpty
                     ? 'Choose a type'
-                    : !typeOk
+                    : !pollOk
+                        ? 'Add at least 2 options to vote on'
+                        : !typeOk
                         ? 'Say what this ask is about'
                         : '';
     final score = [titleOk, desc.trim().length >= 60, _location.isNotEmpty, _urgency.isNotEmpty, _budget.isNotEmpty, _photos.isNotEmpty].where((x) => x).length;
@@ -866,29 +898,36 @@ class _AskFormState extends State<_AskForm> {
     Widget? panel;
     switch (_open) {
       case 'type':
-        panel = Wrap(spacing: 6, runSpacing: 6, children: [
-          for (final o in kPostCategories)
-            GestureDetector(
-              onTap: () => setState(() {
-                _category = o.value;
-                _typeChosen = true;
-                _open = null;
-              }),
-              child: Container(
-                height: 32,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: _category == o.value ? p.ink : p.canvas,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _category == o.value ? Colors.transparent : p.border.withValues(alpha: .7)),
+        panel = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(t('What is your ask'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
+          const SizedBox(height: 6),
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            for (final o in kAskTypes)
+              GestureDetector(
+                onTap: () => setState(() {
+                  _askType = o.value;
+                  _category = categoryForType(o.value, _category);
+                  if (o.value == 'poll' && _pollOpts.where((x) => x.trim().isNotEmpty).length < 2) _pollOpts = ['', ''];
+                  _typeChosen = true;
+                  _open = null;
+                }),
+                child: Container(
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: _askType == o.value ? p.ink : p.canvas,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _askType == o.value ? Colors.transparent : p.border.withValues(alpha: .7)),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    WIcon(categoryIcon(o.icon), size: 14, color: _askType == o.value ? p.onInk : p.muted, still: true),
+                    const SizedBox(width: 4),
+                    Text(t(o.short), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _askType == o.value ? p.onInk : p.muted)),
+                  ]),
                 ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  WIcon(categoryIcon(o.value), size: 14, color: _category == o.value ? p.onInk : p.muted, still: true),
-                  const SizedBox(width: 4),
-                  Text(t(kCategoryShort[o.value] ?? o.label), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _category == o.value ? p.onInk : p.muted)),
-                ]),
               ),
-            ),
+          ]),
+          if (askTypeDef(_askType) != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('${t(askTypeDef(_askType)!.label)}: ${t(askTypeDef(_askType)!.hint)}', style: TextStyle(fontSize: 12, color: p.muted))),
         ]);
       case 'where':
         panel = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -1197,8 +1236,8 @@ class _AskFormState extends State<_AskForm> {
                       key: _tk('ask-category'),
                       child: chip(
                         'type',
-                        categoryIcon(_category.isEmpty ? 'other' : _category),
-                        _category.isEmpty ? t('Category') : (_category == 'other' && _other.text.trim().isNotEmpty ? _other.text.trim() : t(kCategoryShort[_category] ?? labelOf(kPostCategories, _category))),
+                        categoryIcon(askTypeDef(_askType)?.icon ?? (_category.isEmpty ? 'other' : _category)),
+                        _category.isEmpty ? t('What is your ask') : (_category == 'other' && _other.text.trim().isNotEmpty ? _other.text.trim() : t(askTypeDef(_askType)?.short ?? kCategoryShort[_category] ?? 'Other')),
                         _category.isNotEmpty,
                         auto: _category.isNotEmpty && !_typeChosen,
                       ),
@@ -1230,6 +1269,34 @@ class _AskFormState extends State<_AskForm> {
                     ]),
                   ),
                   ),
+                if (_askType == 'poll') ...[
+                  const SizedBox(height: 10),
+                  Text(t('Options to vote on'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
+                  for (var i = 0; i < _pollOpts.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(children: [
+                        Container(width: 28, height: 28, alignment: Alignment.center, decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle), child: Text('ABCD'[i], style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: p.muted))),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            key: ValueKey('opt$i-${_pollOpts.length}'),
+                            initialValue: _pollOpts[i],
+                            maxLength: 60,
+                            buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
+                            onChanged: (v) => setState(() => _pollOpts[i] = v),
+                            decoration: _input(p, t('Option {n}', {'n': '${i + 1}'})),
+                          ),
+                        ),
+                        if (_pollOpts.length > 2) IconButton(onPressed: () => setState(() => _pollOpts.removeAt(i)), icon: WIcon(WI.close, size: 16, color: p.muted)),
+                      ]),
+                    ),
+                  if (_pollOpts.length < 4)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: GestureDetector(onTap: () => setState(() => _pollOpts.add('')), child: Text('+ ${t('Add an option')}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
+                    ),
+                ],
                 if (_category == 'other') ...[
                   const SizedBox(height: 8),
                   TextField(controller: _other, maxLength: 40, onChanged: (_) => setState(() {}), decoration: _input(p, t('What is this about? e.g. Event stall, Legal help, Insurance'))),
@@ -1242,6 +1309,7 @@ class _AskFormState extends State<_AskForm> {
         // live preview: the deck of cards members swipe on Connect; tap one to edit that part
         const SizedBox(height: 14),
         Container(
+          key: _tk('ask-preview'),
           padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
           decoration: BoxDecoration(color: p.chip.withValues(alpha: .4), borderRadius: BorderRadius.circular(16)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

@@ -22,35 +22,27 @@ class TourStep {
 /// translations are shared), then the tabs and the account menu, where "Take the app tour" replays it.
 /// Its id changes when it gains new stops, so members who saw the earlier one see it once more ("connect2":
 /// leads, I can do this, closing an ask, your week; "connect3": Today in your area, show your work, alerts).
-const kConnectTourId = 'connect4';
+const kConnectTourId = 'connect5';
 const kConnectTour = [
-  TourStep('Welcome to WebWeb', 'Businesses and job seekers near you ask for what they need here, and others answer with a contact. Here is a 30-second look around.'),
-  TourStep('Give and Take: how business grows here', 'Take: you need something, so you post an ask and pick who helps. Give: you can help, so you answer asks that fit you. Do both, and your name and rank grow.', null, 'give-take'),
-  TourStep('Leads for you', 'Asks that fit your business, picked for you every day. The number shows the new ones: tap to see them, and reply early.', 'today'),
-  TourStep('Today in your area', "Rates, notices, tenders and events near you, new every morning, and a quick question. A gold ring means there's something new.", 'today-area'),
-  TourStep('Show your work', "Post a photo of a job you finished or new stock. It stays up for 24 hours, and we'll tell you how many businesses saw it.", 'updates'),
-  TourStep('This is an ask', 'Someone needs something: staff, a supplier, a buyer or space. Tap it to read the full ask.', 'first-ask'),
-  TourStep('The essentials at a glance', "What it is, where (and how far from you), the budget and how soon it's needed. Tap a chip to find similar asks.", 'chips'),
-  TourStep('Say "I can do this"', 'Reply opens with I can do this: add your price and when you can do it, so the asker can compare. A note or photo is optional.', 'reply'),
-  TourStep('Know someone who can help?', 'Refer shares a contact from your phone book for this ask, so the right person gets the work.', 'refer'),
-  TourStep('Find', 'Search members, businesses and asks by what they do and where.', 'nav-find'),
-  TourStep('Need something yourself?', 'Tap Ask to post what you need. When you find someone, close your ask and pick who you chose: they hear they won the job.', 'nav-ask'),
-  TourStep('Talk', 'Your chats and calls. Message @webwebai, the WebWeb AI assistant, for contacts or to post an ask for you.', 'nav-talk'),
-  TourStep('Alerts, your week, and this tour', 'Set alerts for the asks you want first. Every Monday, Your week shows your leads, replies, jobs won and your rank. Find them here, with this tour.', 'account'),
+  TourStep('Welcome to WebWeb: Give and Take', 'Take: post what you need and pick who helps. Give: answer asks that fit you. Do both and your name and rank grow.', null, 'give-take'),
+  TourStep('Leads for you', 'Asks that fit your business, picked for you every day. Reply early.', 'today'),
+  TourStep('Every ask says who wants what', 'Like "SkyQ is looking for a space". Swipe its cards for photos, details and the budget.', 'first-ask'),
+  TourStep('Say "I can help"', 'Add your price and when. The asker compares and picks.', 'reply'),
+  TourStep('Need something yourself?', 'Tap Ask. Choose Hire, Buy, Sell, Advice, a Poll and more: it takes a minute.', 'nav-ask'),
+  TourStep('Alerts, your week, and this tour', 'Set alerts for the asks you want first. Your week shows your leads, jobs won and rank.', 'account'),
 ];
 
 /// "Take the app tour" in the account menu: the shell switches to Connect and starts the tour.
 final tourRequest = ValueNotifier<int>(0);
 
 const kAskTour = [
-  TourStep('Post your first ask', "An ask tells nearby businesses and workers what you need. They answer with their contact, so you can call them directly. It's free."),
-  TourStep('Write it as members will see it', 'This is your ask as it will look on Connect. Fill in each part.', 'ask-card'),
-  TourStep('Say it in one line', 'For example: Need 5 CNC operators in Turbhe.', 'ask-title'),
-  TourStep('Add the details', 'Quantity, quality, timing. The more specific you are, the better the answers.', 'ask-description'),
-  TourStep('The category is picked for you', 'It follows your words and decides who gets your ask: job seekers for jobs, suppliers for supplies. Tap it to change it.', 'ask-category'),
-  TourStep('Or start from an example', 'Tap one to fill in an example, then change the details to yours.', 'ask-templates'),
-  TourStep('Where, when and budget', 'Set the area and how far your ask reaches, how soon you need it, and your budget. All optional.', 'ask-details'),
-  TourStep('See who it reaches, then publish', 'This shows how many members your ask will reach. Responses appear on your ask and in your notifications.', 'ask-publish'),
+  TourStep('What is your ask?', 'Hire, buy, sell, ask advice, run a poll. Your ask reaches the members who can help.', null, 'ask-types'),
+  TourStep('Say it in one line', 'For example: Need 5 CNC operators in Turbhe. The kind of ask is picked from it.', 'ask-title'),
+  TourStep('Add the details', 'Quantity, quality, timing. The more specific, the better the answers.', 'ask-description'),
+  TourStep('Not right? Tap to change', 'This is what your ask is. Tap it to pick another, or Other to say it in your own words.', 'ask-category'),
+  TourStep('Where, when and budget', 'All optional. They show as cards your members can swipe.', 'ask-details'),
+  TourStep('See your cards', 'This is how members will see your ask. Add photos and watch it come alive.', 'ask-preview'),
+  TourStep('Publish', 'See who it reaches, then publish. Replies arrive in your notifications.', 'ask-publish'),
 ];
 
 /// First-visit guided tours. Shown once per member: the server keeps the log per tour (shared with the
@@ -206,6 +198,7 @@ class _TourOverlayState extends State<_TourOverlay> {
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .8, color: p.muted)),
           const SizedBox(height: 4),
           if (step.visual == 'give-take') ...[const _GiveTake(), const SizedBox(height: 10)],
+          if (step.visual == 'ask-types') ...[const _AskTypesDemo(), const SizedBox(height: 10)],
           Text(t(step.title), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
           Text(t(step.body), style: TextStyle(fontSize: 14, height: 1.4, color: p.text)),
@@ -303,7 +296,7 @@ class _HolePainter extends CustomPainter {
 /// [Take] = I need something: ask, replies come in, pick one. [Give] = I can do it: a lead arrives, I reply, I'm chosen.
 const _scenes = {
   'take': [
-    ('📣', 'You post an ask', 'Need 5 CNC operators in Turbhe'),
+    ('📣', 'You post what you need', 'SkyQ is looking for a space'),
     ('💬', 'Members reply with a price', '₹18,000 · ₹16,500 · ₹17,200'),
     ('🏆', 'You pick one, they win the job', 'Close your ask, they hear it'),
   ],
@@ -408,6 +401,91 @@ class _GiveTakeState extends State<_GiveTake> {
             ),
         ]),
         Text(t('Every reply you give builds your name. Every ask you take makes your business grow.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .7))),
+      ]),
+    );
+  }
+}
+
+/// The kinds of ask, tappable: each shows how it reads on a card, in the asker's name
+const _typeDemo = [
+  ('👷', 'Hire', 'Saurabh is looking to hire someone', '5 CNC operators, Turbhe'),
+  ('🔎', 'Buy / Quote', 'SkyQ is looking for a space', '450 sq ft, Vashi'),
+  ('🏷️', 'Sell / Offer', 'Rahul has something to offer', '2 VMC machines on rent'),
+  ('💡', 'Advice', 'Neha wants your advice', 'GST on export invoices?'),
+  ('🗳️', 'Poll', 'Amit wants your vote', 'Open on Sunday: yes or no?'),
+  ('⭐', 'Recommend', 'Pooja wants a recommendation', 'A trusted electrician, Nerul'),
+];
+
+class _AskTypesDemo extends StatefulWidget {
+  const _AskTypesDemo();
+  @override
+  State<_AskTypesDemo> createState() => _AskTypesDemoState();
+}
+
+class _AskTypesDemoState extends State<_AskTypesDemo> {
+  int _k = 0;
+  bool _auto = true;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 2200), (_) {
+      if (_auto && mounted) setState(() => _k = (_k + 1) % _typeDemo.length);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final d = _typeDemo[_k];
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [kGold.withValues(alpha: .22), kGold.withValues(alpha: .06)]), borderRadius: BorderRadius.circular(14)),
+      child: Column(children: [
+        Wrap(alignment: WrapAlignment.center, spacing: 6, runSpacing: 6, children: [
+          for (var i = 0; i < _typeDemo.length; i++)
+            GestureDetector(
+              onTap: () => setState(() {
+                _k = i;
+                _auto = false;
+              }),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(gradient: i == _k ? kGoldGradient : null, color: i == _k ? null : p.canvas.withValues(alpha: .7), borderRadius: BorderRadius.circular(20)),
+                child: Text('${_typeDemo[i].$1} ${t(_typeDemo[i].$2)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: i == _k ? kInk : p.muted)),
+              ),
+            ),
+        ]),
+        const SizedBox(height: 10),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 350),
+          transitionBuilder: (c, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, .15), end: Offset.zero).animate(a), child: c)),
+          child: Container(
+            key: ValueKey(_k),
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(12)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Text(d.$1, style: const TextStyle(fontSize: 20)),
+                const SizedBox(width: 8),
+                Expanded(child: Text(t(d.$3), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, height: 1.25))),
+              ]),
+              const SizedBox(height: 4),
+              Text(t(d.$4), style: TextStyle(fontSize: 12, color: p.muted)),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(t('Pick what you want. WebWeb finds the right members.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .7))),
       ]),
     );
   }
