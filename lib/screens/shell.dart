@@ -380,17 +380,17 @@ class _AccountMenu extends StatelessWidget {
 
     // compact rows (32 icon box, 42 a row) so the whole menu fits on a phone without scrolling
     Widget iconBox(WI icon, {Color? bg, Color? fg}) => Container(
-          width: 32,
-          height: 32,
+          width: 28,
+          height: 28,
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: bg ?? p.chip, borderRadius: BorderRadius.circular(10)),
-          child: WIcon(icon, size: 18, color: fg ?? p.muted, strokeWidth: 1.8),
+          decoration: BoxDecoration(color: bg ?? p.chip, borderRadius: BorderRadius.circular(9)),
+          child: WIcon(icon, size: 17, color: fg ?? p.muted, strokeWidth: 1.8),
         );
     Widget row(WI icon, Widget label, VoidCallback? onTap, {Color? bg, Color? fg, Widget? trailing}) => InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
             child: Row(children: [iconBox(icon, bg: bg, fg: fg), const SizedBox(width: 12), Expanded(child: label), if (trailing != null) trailing]),
           ),
         );
@@ -440,10 +440,10 @@ class _AccountMenu extends StatelessWidget {
           InkWell(
             onTap: () => push(const ProfileScreen()),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(color: p.chip.withValues(alpha: .5), border: Border(top: BorderSide(color: p.border.withValues(alpha: .6)), bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
               child: Row(children: [
-                Avatar(name: me.name, photoUrl: me.photoUrl, size: 56, ring: me.hasUpdate, type: me.userType, badge: 18, uid: me.uid),
+                Avatar(name: me.name, photoUrl: me.photoUrl, size: 48, ring: me.hasUpdate, type: me.userType, badge: 18, uid: me.uid),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -462,8 +462,7 @@ class _AccountMenu extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: ListView(padding: const EdgeInsets.all(8), children: [
-              item(WI.user, 'View profile', () => push(const ProfileScreen())),
+            child: ListView(padding: const EdgeInsets.all(6), children: [
               item(WI.edit, 'Edit profile', () => push(EditProfileScreen(profile: me))),
               item(WI.sparkle, 'Leads for you', () => push(SubPage(title: t('Leads for you'), body: const LeadsScreen()))),
               item(WI.sun, 'Today in your area', () => push(SubPage(title: t('Today in your area'), body: const TodayScreen()))),
@@ -496,9 +495,9 @@ class _AccountMenu extends StatelessWidget {
                 Navigator.of(context).pop();
                 showSupportSheet(context);
               }),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               divider,
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               // two-step verification, blocked people, sign out everywhere, delete account: a tab of Edit profile
               item(WI.lock, 'Account and privacy', () => push(EditProfileScreen(profile: me, tab: 'account'))),
               if (ContactSync.supported) const _ServiceContactsRow(),
@@ -506,7 +505,7 @@ class _AccountMenu extends StatelessWidget {
           ),
           divider,
           Padding(
-            padding: EdgeInsets.fromLTRB(8, 8, 8, 8 + mq.padding.bottom),
+            padding: EdgeInsets.fromLTRB(8, 4, 8, 4 + mq.padding.bottom),
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               // language and theme in one row
               Padding(
