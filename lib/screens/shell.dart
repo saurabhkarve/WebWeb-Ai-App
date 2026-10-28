@@ -1,3 +1,4 @@
+import 'dart:ui' show ImageFilter;
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -17,6 +18,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/active_call_banner.dart';
 import '../widgets/connection_pill.dart';
+import '../widgets/notify_banner.dart';
 import '../widgets/tour.dart';
 import 'ask.dart';
 import 'connect.dart';
@@ -182,6 +184,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             ),
             // "Waiting for network…" / "Connecting…" under the header, WhatsApp-style
             Positioned(top: top + header + 8, left: 0, right: 0, child: const ConnectionPill()),
+            // a message or a new ask while the app is open: a banner with Reply (and Refer) right on it
+            const NotifyBannerHost(),
             // floating island; on Ask it steps aside so the ask's Publish bar has the bottom edge
             if (_i != _ask) Positioned(
               left: 0,
@@ -201,15 +205,25 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   }
 
   Widget _island(Pal p) {
-    return Container(
-      padding: const EdgeInsets.all(6),
+    // smaller than before and see-through, with the page softly blurred behind it
+    final box = BoxDecoration(
+      color: p.canvas.withValues(alpha: .6),
+      borderRadius: BorderRadius.circular(26),
+      border: Border.all(color: p.border.withValues(alpha: .7)),
+    );
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: p.canvas.withValues(alpha: .92),
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: p.border.withValues(alpha: .7)),
+        borderRadius: BorderRadius.circular(26),
         boxShadow: [BoxShadow(color: (p.dark ? Colors.black : const Color(0xFF1E1E1E)).withValues(alpha: p.dark ? .6 : .35), blurRadius: 30, spreadRadius: -6, offset: const Offset(0, 8))],
       ),
-      child: AnimatedBuilder(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: box,
+            child: AnimatedBuilder(
         animation: _notes,
         builder: (_, __) => Row(mainAxisSize: MainAxisSize.min, children: [
           for (var k = 0; k < _items.length; k++) ...[
@@ -222,6 +236,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
           ],
         ]),
       ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -229,7 +246,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     final active = _i == k;
     // Ask is the one action: always gold, with a ring when it is the open page
     final isAsk = k == _ask;
-    final fg = isAsk ? kInk : active ? p.onInk : p.muted;
+    // on the Ask page the button turns dark with gold text and a gold ring, so it reads as open
+    final fg = isAsk ? (active ? kGold : kInk) : active ? p.onInk : p.muted;
     return Semantics(
       button: true,
       selected: active,
@@ -239,17 +257,17 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         onTap: () => _go(k),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          width: isAsk ? 72 : 60,
-          height: isAsk ? 60 : 56,
+          width: isAsk ? 64 : 52,
+          height: isAsk ? 52 : 46,
           decoration: BoxDecoration(
-            color: isAsk ? null : active ? p.ink : Colors.transparent,
-            gradient: isAsk ? kGoldGradient : null,
-            borderRadius: BorderRadius.circular(24),
-            border: isAsk && active ? Border.all(color: p.ink, width: 2) : null,
+            color: isAsk ? (active ? p.ink : null) : active ? p.ink : Colors.transparent,
+            gradient: isAsk && !active ? kGoldGradient : null,
+            borderRadius: BorderRadius.circular(20),
+            border: isAsk && active ? Border.all(color: kGold, width: 2) : null,
           ),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Stack(clipBehavior: Clip.none, children: [
-              WIcon(_items[k].$1, size: isAsk ? 28 : 24, color: fg, strokeWidth: active || isAsk ? 2.2 : 1.9, spinKey: isAsk ? _askSpin : 0),
+              WIcon(_items[k].$1, size: isAsk ? 24 : 21, color: fg, strokeWidth: active || isAsk ? 2.2 : 1.9, spinKey: isAsk ? _askSpin : 0),
               if (badge > 0)
                 Positioned(
                   right: -8,
@@ -267,7 +285,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             const SizedBox(height: 2),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: FittedBox(fit: BoxFit.scaleDown, child: Text(t(_items[k].$2), maxLines: 1, style: TextStyle(fontSize: 10, fontWeight: isAsk ? FontWeight.w700 : FontWeight.w500, height: 1, color: fg))),
+              child: FittedBox(fit: BoxFit.scaleDown, child: Text(t(_items[k].$2), maxLines: 1, style: TextStyle(fontSize: 9, fontWeight: isAsk ? FontWeight.w700 : FontWeight.w500, height: 1, color: fg))),
             ),
           ]),
         ),
@@ -320,7 +338,7 @@ class _AppHeader extends StatelessWidget {
                   button: true,
                   label: t('Account menu'),
                   child: Avatar(
-                    key: Tours.key('account'),name: me?.name ?? 'Me', photoUrl: me?.photoUrl, size: 32, ring: me?.hasUpdate ?? false, type: me?.userType, badge: 14),
+                    key: Tours.key('account'),name: me?.name ?? 'Me', photoUrl: me?.photoUrl, size: 32, ring: me?.hasUpdate ?? false, framed: true, type: me?.userType, badge: 14),
                 ),
               ),
             ),

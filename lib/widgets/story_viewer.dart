@@ -10,6 +10,7 @@ import '../config.dart';
 import '../i18n.dart';
 import '../models.dart';
 import '../screens/profile.dart';
+import '../card_colors.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'reaction_picker.dart' show ReactionGlyph;
@@ -35,7 +36,20 @@ const _houseColours = <String, List<Color>>{
   'webwebai': [Color(0xFFD9B53A), Color(0xFF7A5B00)],
 };
 
-List<Color> updateBackground(String handle) => _houseColours[handle] ?? const [Color(0xFF3A3A3A), kInk];
+/// The gradients a member can give a text update (the ask card colours), light at the top left
+const _updateColours = <String, List<Color>>{
+  'gold': [Color(0xFFF2C230), Color(0xFF7A5B00)],
+  'emerald': [Color(0xFF2FB37A), Color(0xFF0B3A29)],
+  'sky': [Color(0xFF4A8EE0), Color(0xFF0F2C55)],
+  'violet': [Color(0xFFB25FE0), Color(0xFF36124F)],
+  'rose': [Color(0xFFEF5A8A), Color(0xFF5A1230)],
+  'orange': [Color(0xFFF58A2E), Color(0xFF6A2F06)],
+  'teal': [Color(0xFF2DB8B0), Color(0xFF0A3D3A)],
+  'slate': [Color(0xFF6B7A90), Color(0xFF1C2433)],
+};
+
+/// a text update's background: its own colour when it has one, else the account's
+List<Color> updateBackground(String handle, [String? color]) => _updateColours[color] ?? _houseColours[handle] ?? const [Color(0xFF3A3A3A), kInk];
 
 class StoryViewer extends StatefulWidget {
   final List<StoryGroup> groups;
@@ -363,7 +377,7 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
               child: it.imageUrl != null
                   ? NetImg(it.imageUrl!, fit: BoxFit.contain, fallback: const SizedBox())
                   : Container(
-                      decoration: BoxDecoration(gradient: LinearGradient(colors: updateBackground(g.handle), begin: Alignment.topLeft, end: Alignment.bottomRight)),
+                      decoration: BoxDecoration(gradient: LinearGradient(colors: updateBackground(g.handle, it.color), begin: Alignment.topLeft, end: Alignment.bottomRight)),
                       alignment: Alignment.center,
                       padding: const EdgeInsets.all(32),
                       child: Text(it.text ?? '', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700, height: 1.33)),
@@ -470,6 +484,22 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
                         child: GestureDetector(
                           onTap: () async {
                             _progress.stop();
+                            // a question first: deleting is for good, and it removes the views and reactions too
+                            final yes = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: Text(t('Delete this update?')),
+                                content: Text(t('It is removed for everyone, and its views and reactions go with it.')),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('Keep'))),
+                                  TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('Delete'), style: const TextStyle(color: Colors.red))),
+                                ],
+                              ),
+                            );
+                            if (yes != true) {
+                              if (mounted) _progress.forward();
+                              return;
+                            }
                             await widget.onDelete!(it.id);
                             if (context.mounted) Navigator.of(context).pop(true);
                           },
@@ -679,6 +709,8 @@ class _StoryComposerState extends State<_StoryComposer> {
   XFile? _file;
   bool _busy = false;
   String? _error;
+  // the colour behind a text update, final once it is posted (a photo needs none)
+  String _color = 'gold';
   // a different prompt on different days
   late final List<(String, String)> _list = _prompts[context.read<AuthProvider>().profile?.userType == 'job_seeker' ? 'seeker' : 'business']!;
   late int _pi = DateTime.now().day % _list.length;
@@ -698,6 +730,7 @@ class _StoryComposerState extends State<_StoryComposer> {
         if (_text.text.trim().isNotEmpty) 'text': _text.text.trim(),
         'type': _type,
         'prompt': _list[_pi].$1,
+        if (url == null) 'color': _color,
       });
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -796,6 +829,30 @@ class _StoryComposerState extends State<_StoryComposer> {
               ]),
             ),
           ),
+        // a text update is a coloured card, like a status: pick its colour, see it as you type
+        if (_file == null) ...[
+          const SizedBox(height: 12),
+          Row(children: [
+            Text(t('Card colour'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+            const SizedBox(width: 8),
+            for (final c in kCardColors.keys)
+              Semantics(
+                button: true,
+                selected: _color == c,
+                label: c,
+                child: GestureDetector(
+                  onTap: () => setState(() => _color = c),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
+                    margin: const EdgeInsets.only(right: 8),
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(color: kCardColors[c], shape: BoxShape.circle, border: Border.all(color: _color == c ? p.text : Colors.transparent, width: 2)),
+                  ),
+                ),
+              ),
+          ]),
+        ],
         const SizedBox(height: 12),
         TextField(
           controller: _text,
@@ -803,13 +860,13 @@ class _StoryComposerState extends State<_StoryComposer> {
           minLines: 2,
           maxLines: 4,
           onChanged: (_) => setState(() {}),
-          style: const TextStyle(fontSize: 16),
+          style: TextStyle(fontSize: 16, color: _file == null ? Colors.white : null, fontWeight: _file == null ? FontWeight.w700 : null),
           decoration: InputDecoration(
             hintText: t('Write something... (disappears in 24 hours)'),
-            hintStyle: TextStyle(color: p.muted),
+            hintStyle: TextStyle(color: _file == null ? Colors.white70 : p.muted),
             counterText: '',
             filled: true,
-            fillColor: p.field,
+            fillColor: _file == null ? (_updateColours[_color]![1]) : p.field,
             contentPadding: const EdgeInsets.all(12),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: p.border)),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: p.border)),

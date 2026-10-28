@@ -579,14 +579,16 @@ class CatalogGroup {
 class StoryItem {
   final String id;
   final String? imageUrl, text;
+  /// the colour behind a text update (one of the card colours), chosen when it was posted
+  final String? color;
   final DateTime createdAt;
   int reactionsCount;
   String? myReaction;
   /// set when this update is a repost of someone else's: {handle, name}
   final Map<String, dynamic>? repostedFrom;
-  StoryItem({required this.id, this.imageUrl, this.text, required this.createdAt, this.reactionsCount = 0, this.myReaction, this.repostedFrom});
+  StoryItem({required this.id, this.imageUrl, this.text, this.color, required this.createdAt, this.reactionsCount = 0, this.myReaction, this.repostedFrom});
   factory StoryItem.fromJson(Map j) => StoryItem(
-        id: '${j['id']}', imageUrl: j['imageUrl'] as String?, text: j['text'] as String?, createdAt: _ms(j['createdAt']),
+        id: '${j['id']}', imageUrl: j['imageUrl'] as String?, text: j['text'] as String?, color: j['color'] as String?, createdAt: _ms(j['createdAt']),
         reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, myReaction: j['myReaction'] as String?,
         repostedFrom: j['repostedFrom'] == null ? null : Map<String, dynamic>.from(j['repostedFrom'] as Map),
       );

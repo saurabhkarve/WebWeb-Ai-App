@@ -43,6 +43,8 @@ class NotificationService with WidgetsBindingObserver {
 
   /// Id of the chat currently on screen (set by ChatThread) — no notifications for it.
   static String? activeChat;
+  /// the shell shows messages and activity itself, as a banner, while the app is in front
+  static bool inAppBanners = false;
 
   /// Fires when a push arrives while the app is open, so the header's bell updates at once.
   static final activity = StreamController<void>.broadcast();
@@ -223,6 +225,7 @@ class NotificationService with WidgetsBindingObserver {
         if (m['senderUid'] == me) return;
         final chatId = '${e['chatId']}';
         if (_foreground && activeChat == chatId) return;
+        if (_foreground && inAppBanners) return;
         // in the background the server sends a push for it (the app told it so); avoid showing it twice
         if (!_foreground && _ready && rt.serverPush) return;
         final name = await _chatPeerName(chatId);
@@ -233,6 +236,7 @@ class NotificationService with WidgetsBindingObserver {
       case 'notify':
         // the API decided this is worth showing; it chose the socket because the app is connected and in front
         if (!_foreground && _ready && rt.serverPush) return;
+        if (_foreground && inAppBanners) return;
         final data = Map<String, dynamic>.from(e['data'] ?? {});
         await showActivity(data, title: '${e['title'] ?? ''}', body: '${e['body'] ?? ''}');
         break;

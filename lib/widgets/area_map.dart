@@ -354,3 +354,137 @@ class _Pin extends CustomPainter {
   @override
   bool shouldRepaint(_Pin old) => false;
 }
+
+/// Where an ask is, on a map you can drag, pinch and zoom (buttons too) but not change: view only. The ask's reach is
+/// drawn around its pin (web map-viewer.tsx).
+Future<void> showAreaViewer(BuildContext context, {required double lat, required double lng, required double radiusM, String? label}) =>
+    Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => _AreaViewer(lat: lat, lng: lng, radiusM: radiusM, label: label)));
+
+class _AreaViewer extends StatefulWidget {
+  final double lat, lng, radiusM;
+  final String? label;
+  const _AreaViewer({required this.lat, required this.lng, required this.radiusM, this.label});
+  @override
+  State<_AreaViewer> createState() => _AreaViewerState();
+}
+
+class _AreaViewerState extends State<_AreaViewer> {
+  static const _tile = 256.0;
+  late double _zf;
+  // the map's centre, as a share of the whole world (0..1) so it survives zooming
+  late double _mx, _my;
+  double _zf0 = 0;
+
+  static (double, double) _norm(double lat, double lng) {
+    final s = math.sin(lat * math.pi / 180);
+    return ((lng + 180) / 360, 0.5 - math.log((1 + s) / (1 - s)) / (4 * math.pi));
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final c = _norm(widget.lat, widget.lng);
+    _mx = c.$1;
+    _my = c.$2;
+    final cosLat = math.cos(widget.lat * math.pi / 180);
+    final want = widget.radiusM / (300 * .45);
+    _zf = (math.log(156543.03 * cosLat / want) / math.ln2).floor().clamp(3, 17).toDouble();
+  }
+
+  void _zoom(double d) => setState(() => _zf = (_zf + d).clamp(3, 18));
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final pin = _norm(widget.lat, widget.lng);
+    return Scaffold(
+      backgroundColor: const Color(0xFFEDEAE3),
+      body: LayoutBuilder(builder: (context, box) {
+        final w = box.maxWidth, h = box.maxHeight;
+        final world = _tile * math.pow(2, _zf);
+        final zl = _zf.floor();
+        final n = math.pow(2, zl).toInt();
+        final ts = _tile * math.pow(2, _zf - zl);
+        final cx = _mx * n, cy = _my * n;
+        final tiles = <Widget>[];
+        for (var tx = (cx - w / 2 / ts).floor(); tx <= (cx + w / 2 / ts).floor(); tx++) {
+          for (var ty = (cy - h / 2 / ts).floor(); ty <= (cy + h / 2 / ts).floor(); ty++) {
+            if (ty < 0 || ty >= n) continue;
+            final x = ((tx % n) + n) % n;
+            tiles.add(Positioned(
+              left: (tx - cx) * ts + w / 2,
+              top: (ty - cy) * ts + h / 2,
+              width: ts,
+              height: ts,
+              child: Image.network(
+                'https://tile.openstreetmap.org/$zl/$x/$ty.png',
+                headers: const {'User-Agent': 'WebWebAI-app/1.0 (+https://webweb.ai)'},
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFFEDEAE3)),
+              ),
+            ));
+          }
+        }
+        final px = (pin.$1 - _mx) * world + w / 2;
+        final py = (pin.$2 - _my) * world + h / 2;
+        final mpp = 156543.03 * math.cos(widget.lat * math.pi / 180) / math.pow(2, _zf);
+        final r = widget.radiusM / mpp;
+        Widget zoomBtn(String s, VoidCallback onTap) => GestureDetector(
+              onTap: onTap,
+              child: Container(
+                width: 42,
+                height: 42,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 2))]),
+                child: Text(s, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: p.text, height: 1)),
+              ),
+            );
+        return Stack(clipBehavior: Clip.hardEdge, children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onScaleStart: (_) => _zf0 = _zf,
+              onScaleUpdate: (d) => setState(() {
+                _zf = (_zf0 + math.log(d.scale) / math.ln2).clamp(3.0, 18.0);
+                final wd = _tile * math.pow(2, _zf);
+                _mx -= d.focalPointDelta.dx / wd;
+                _my = (_my - d.focalPointDelta.dy / wd).clamp(0.0, 1.0);
+              }),
+              onDoubleTap: () => _zoom(1),
+              child: Stack(clipBehavior: Clip.hardEdge, children: tiles),
+            ),
+          ),
+          if (r > 0) Positioned(left: px - r, top: py - r, width: r * 2, height: r * 2, child: IgnorePointer(child: DecoratedBox(decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFFD94B3A).withValues(alpha: .1), border: Border.all(color: const Color(0xFFD94B3A).withValues(alpha: .7), width: 2))))),
+          Positioned(left: px - 14, top: py - 34, child: IgnorePointer(child: CustomPaint(size: const Size(28, 36), painter: _Pin()))),
+          // the title bar
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 8, 8, 10),
+              decoration: BoxDecoration(color: p.canvas.withValues(alpha: .92)),
+              child: Row(children: [
+                const WIcon(WI.pin, size: 20, color: kGold),
+                const SizedBox(width: 8),
+                Expanded(child: Text(widget.label ?? t('Where'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+                IconButton(onPressed: () => Navigator.pop(context), icon: WIcon(WI.close, size: 24, color: p.text)),
+              ]),
+            ),
+          ),
+          Positioned(right: 12, top: MediaQuery.of(context).padding.top + 70, child: Column(children: [zoomBtn('+', () => _zoom(1)), const SizedBox(height: 8), zoomBtn('−', () => _zoom(-1))])),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              color: Colors.white.withValues(alpha: .8),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              child: const Text('© OpenStreetMap', style: TextStyle(fontSize: 10, color: Color(0xFF333333))),
+            ),
+          ),
+        ]);
+      }),
+    );
+  }
+}

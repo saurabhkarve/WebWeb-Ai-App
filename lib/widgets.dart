@@ -289,7 +289,9 @@ class Avatar extends StatelessWidget {
   final String? uid;
   /// names the role (and presence) in a tooltip when the type icon is tapped or hovered, e.g. on a profile
   final String? tip;
-  const Avatar({super.key, required this.name, this.size = 40, this.ring = false, this.type, this.photoUrl, this.badge = 16, this.uid, this.tip});
+  /// own picture with a complete profile: a light ring with a little space around the photo
+  final bool framed;
+  const Avatar({super.key, required this.name, this.size = 40, this.ring = false, this.framed = false, this.type, this.photoUrl, this.badge = 16, this.uid, this.tip});
 
   @override
   Widget build(BuildContext context) {
@@ -313,8 +315,15 @@ class Avatar extends StatelessWidget {
         child: Container(padding: const EdgeInsets.all(2), decoration: BoxDecoration(shape: BoxShape.circle, color: p.card), child: face),
       );
     }
+    if (framed && !ring) {
+      face = Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: p.text.withValues(alpha: .15), width: 2.5)),
+        child: face,
+      );
+    }
     if (type == null) return face;
-    final outer = size + (ring ? 9 : 0);
+    final outer = size + (ring ? 9 : framed ? 11 : 0);
     final b = (badge * .8).roundToDouble();
     final c = outer * .854;
     return SizedBox(
@@ -787,7 +796,9 @@ class ScopeChip extends StatelessWidget {
   final VoidCallback onTap;
   final WI? icon;
   final bool square;
-  const ScopeChip({super.key, required this.label, required this.selected, required this.onTap, this.icon, this.square = false});
+  /// a little smaller, for crowded filter rows
+  final bool dense;
+  const ScopeChip({super.key, required this.label, required this.selected, required this.onTap, this.icon, this.square = false, this.dense = false});
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
@@ -796,11 +807,11 @@ class ScopeChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: EdgeInsets.symmetric(horizontal: square ? 12 : 16, vertical: square ? 6 : 8),
+        padding: EdgeInsets.symmetric(horizontal: square ? 12 : (dense ? 14 : 16), vertical: square ? 6 : (dense ? 6 : 8)),
         decoration: BoxDecoration(color: selected ? p.ink : p.chip, borderRadius: BorderRadius.circular(square ? 10 : 30)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           if (icon != null) ...[WIcon(icon!, size: 16, color: fg), const SizedBox(width: 6)],
-          Text(label, style: TextStyle(fontSize: 14, height: 1.43, fontWeight: square ? FontWeight.w600 : FontWeight.w700, color: fg)),
+          Text(label, style: TextStyle(fontSize: dense ? 13 : 14, height: 1.43, fontWeight: square ? FontWeight.w600 : FontWeight.w700, color: fg)),
         ]),
       ),
     );
@@ -816,7 +827,9 @@ class SelectPill extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final double height;
   final bool rounded;
-  const SelectPill({super.key, required this.value, required this.placeholder, required this.options, required this.onChanged, this.height = 40, this.rounded = true});
+  /// a filter chip: short, soft, gold once something is chosen
+  final bool chip;
+  const SelectPill({super.key, required this.value, required this.placeholder, required this.options, required this.onChanged, this.height = 40, this.rounded = true, this.chip = false});
 
   @override
   Widget build(BuildContext context) {
@@ -846,11 +859,15 @@ class SelectPill extends StatelessWidget {
         if (picked != null) onChanged(picked);
       },
       child: Container(
-        height: height,
-        padding: const EdgeInsets.only(left: 14, right: 10),
-        decoration: BoxDecoration(color: p.card, border: Border.all(color: p.border), borderRadius: BorderRadius.circular(rounded ? height : 10)),
-        child: Row(children: [
-          Expanded(child: Text(value.isEmpty ? placeholder : label(value), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: p.text))),
+        height: chip ? 34 : height,
+        padding: EdgeInsets.only(left: chip ? 14 : 14, right: 10),
+        decoration: chip
+            ? BoxDecoration(color: value.isEmpty ? p.chip : kGold.withValues(alpha: .25), borderRadius: BorderRadius.circular(30))
+            : BoxDecoration(color: p.card, border: Border.all(color: p.border), borderRadius: BorderRadius.circular(rounded ? height : 10)),
+        child: Row(mainAxisSize: chip ? MainAxisSize.min : MainAxisSize.max, children: [
+          if (chip) Text(value.isEmpty ? placeholder : label(value), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: value.isEmpty ? p.muted : p.text))
+          else Expanded(child: Text(value.isEmpty ? placeholder : label(value), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: p.text))),
+          if (chip) const SizedBox(width: 6),
           WIcon(WI.chevronDown, size: 16, color: p.muted),
         ]),
       ),

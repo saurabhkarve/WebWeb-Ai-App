@@ -10,7 +10,7 @@ import '../icons.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../location.dart' show kNodeCoords;
-import 'area_map.dart' show AreaMap, askDeadline, askTimeLeft;
+import 'area_map.dart' show AreaMap, askDeadline, askTimeLeft, showAreaViewer;
 import 'image_grid.dart' show openImageViewer;
 import 'poll_vote.dart';
 
@@ -41,7 +41,10 @@ class AskDeck extends StatefulWidget {
 }
 
 class _AskDeckState extends State<AskDeck> {
-  final _page = PageController(viewportFraction: .88);
+  var _page = PageController(viewportFraction: .88);
+  double _fr = .88;
+  /// in the feed the swipe runs edge to edge (the page's side margin); the preview in the ask form stays inside its box
+  static const _bleed = 16.0;
   int _i = 0;
   Timer? _look;
 
@@ -93,6 +96,12 @@ class _AskDeckState extends State<AskDeck> {
 
   void _tap(DeckKind kind, int i) {
     if (widget.preview) return widget.onCardTap?.call(kind);
+    // the map card opens the map, view only: drag and zoom, nothing to change
+    if (kind == DeckKind.map && _mapPoint != null) {
+      final pt = _mapPoint!;
+      final pl = _post.locationPref ?? '';
+      return unawaited(showAreaViewer(context, lat: pt.lat, lng: pt.lng, radiusM: (_post.radiusM ?? 10000).toDouble(), label: pl.isEmpty ? null : t(pl)));
+    }
     if (_log) CardEvents.log(context.read<AuthProvider>().api, _post.id, 'cta', i, _kinds.length);
     widget.onOpen?.call();
   }
@@ -110,10 +119,24 @@ class _AskDeckState extends State<AskDeck> {
     final post = widget.post;
     final tint = kCardColors[cardColorOf(post)]!;
     final kinds = _kinds;
+    final bleed = widget.preview ? 0.0 : _bleed;
     return Column(children: [
       SizedBox(
         height: 236,
-        child: PageView.builder(
+        child: LayoutBuilder(builder: (context, box) {
+        final v = box.maxWidth + 2 * bleed;
+        final f = (.88 * box.maxWidth + bleed) / v;
+        if ((f - _fr).abs() > .002) {
+          final old = _page;
+          _page = PageController(viewportFraction: f, initialPage: _i);
+          _fr = f;
+          WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
+        }
+        return OverflowBox(
+        minWidth: v,
+        maxWidth: v,
+        child: SizedBox(width: v, child: PageView.builder(
+          key: ValueKey(_fr),
           controller: _page,
           padEnds: false,
           itemCount: kinds.length,
@@ -122,7 +145,7 @@ class _AskDeckState extends State<AskDeck> {
             _looked(i);
           },
           itemBuilder: (_, i) => Padding(
-            padding: const EdgeInsets.only(right: 10),
+            padding: EdgeInsets.only(left: bleed, right: 10),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => _tap(kinds[i], i),
@@ -137,7 +160,9 @@ class _AskDeckState extends State<AskDeck> {
               ),
             ),
           ),
-        ),
+        )),
+        );
+        }),
       ),
       const SizedBox(height: 2),
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [

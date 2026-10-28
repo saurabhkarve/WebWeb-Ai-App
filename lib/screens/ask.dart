@@ -195,8 +195,27 @@ String? _detectCategory(String text) {
 }
 
 /// The types whose first example is offered before a type is known: the asks members post most.
-const _starterCategories = ['job', 'supplier', 'buyer', 'logistics', 'space', 'jobwork', 'repair', 'daily', 'events', 'rental', 'machinery', 'compliance', 'consultant', 'digital'];
+typedef _Sample = (String cat, String name, String title, String desc, List<String>? opts);
+List<_Sample> _fromCat(String cat, [int n = 99]) => [for (final x in (_samples[cat] ?? const <(String, String, String)>[]).take(n)) (cat, x.$1, x.$2, x.$3, null)];
 
+/// Examples by what the ask wants from members (the ask types); the first of each shows until a type is chosen.
+final _typeSamples = <String, List<_Sample>>{
+  'hire': _fromCat('job'),
+  'quote': [..._fromCat('supplier', 1), ..._fromCat('logistics', 1), ..._fromCat('space', 1), ..._fromCat('jobwork', 1), ..._fromCat('digital', 1), ..._fromCat('repair', 1)],
+  'offer': [..._fromCat('buyer'), ..._fromCat('machinery', 1)],
+  'advice': _fromCat('advice'),
+  'poll': [
+    ('advice', 'Which one?', 'Which [option] should I choose for [purpose]?', 'Context: [what you are deciding]\nVote for the one you would pick.', ['[Option A]', '[Option B]', '[Option C]']),
+    ('advice', 'Best day or time', 'Which day suits [meeting / event] best?', 'What: [meeting / event]\nWhere: [place]\nPick the day that works for you.', ['[Saturday]', '[Sunday]', '[Weekday evening]']),
+  ],
+  'recommend': [
+    ('advice', 'A service', 'Who can you recommend for [service] in [area]?', 'What I need: [service]\nArea: [area]\nBudget: ₹[amount]\nNeeded by: [date]', null),
+    ('advice', 'A supplier', 'Can anyone recommend a reliable [supplier / vendor] for [item]?', 'Item: [item]\nQuantity: [quantity]\nDelivery to: [area]\nWhat matters: [price / quality / credit]', null),
+  ],
+  'partner': _fromCat('partnership'),
+  'funding': _fromCat('funding'),
+  'other': _fromCat('other'),
+};
 /// Reach radius steps (web/src/lib/geo.ts RADIUS_STEPS); the last one covers all of India.
 const _radii = [5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 3000000];
 String _radiusLabel(int m) => m >= 3000000 ? t('Pan-India') : '${m ~/ 1000} km';
@@ -272,7 +291,7 @@ class _AskFormState extends State<_AskForm> {
   String? _error;
   final List<_Photo> _photos = [];
   /// before an example was used: title, details, type, whether the type was chosen
-  (String, String, String, bool)? _undoTpl;
+  (String, String, String, bool, String)? _undoTpl;
   // Ask AI
   bool _aiOn = false;
   bool _aiBusy = false;
@@ -534,12 +553,13 @@ class _AskFormState extends State<_AskForm> {
     }
   }
 
-  void _applyTemplate(String category, String title, String desc) {
+  void _applyTemplate(String type, String category, String title, String desc, List<String>? opts) {
     setState(() {
-      _undoTpl = (_title.text, _desc.text, _category, _typeChosen);
+      _undoTpl = (_title.text, _desc.text, _category, _typeChosen, _askType);
       _aiUndo = null;
-      _category = category;
-      _askType = typeOfCategory(category);
+      _askType = type;
+      _category = categoryForType(type, category);
+      if (opts != null) _pollOpts = [for (final o in opts) t(o)];
       _typeChosen = true;
       _title.text = t(title);
       _desc.text = t(desc);
@@ -719,8 +739,9 @@ class _AskFormState extends State<_AskForm> {
   }
 
   /// An example as a card: category icon and the AI pill, its name, then the sample title with its [blanks] marked.
-  Widget _exampleCard(Pal p, (String, String, String, String) s) {
-    final sample = t(s.$3);
+  Widget _exampleCard(Pal p, (String type, _Sample x) e, double width) {
+    final x = e.$2;
+    final sample = t(x.$3);
     final spans = <InlineSpan>[];
     var at = 0;
     for (final m in _blank.allMatches(sample)) {
@@ -737,9 +758,9 @@ class _AskFormState extends State<_AskForm> {
     }
     if (at < sample.length) spans.add(TextSpan(text: sample.substring(at)));
     return GestureDetector(
-      onTap: () => _applyTemplate(s.$1, s.$3, s.$4),
+      onTap: () => _applyTemplate(e.$1, x.$1, x.$3, x.$4, x.$5),
       child: Container(
-        width: 176,
+        width: width,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border.withValues(alpha: .7))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -749,13 +770,13 @@ class _AskFormState extends State<_AskForm> {
               height: 30,
               alignment: Alignment.center,
               decoration: BoxDecoration(color: kGold.withValues(alpha: .18), shape: BoxShape.circle),
-              child: WIcon(categoryIcon(s.$1), size: 16, color: p.tagText, still: true),
+              child: WIcon(categoryIcon(x.$1), size: 16, color: p.tagText, still: true),
             ),
             const Spacer(),
             const AiPill(font: 8),
           ]),
           const SizedBox(height: 8),
-          Text(t(s.$2), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+          Text(t(x.$2), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
           const SizedBox(height: 3),
           Text.rich(TextSpan(children: spans), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, height: 1.35, color: p.muted)),
         ]),
@@ -829,10 +850,12 @@ class _AskFormState extends State<_AskForm> {
     final title = _title.text, desc = _desc.text;
     final tip = _tips[_category];
     final empty = title.trim().isEmpty && desc.trim().isEmpty;
-    // examples: the chosen type's, or one of each common type while none is known
-    final examples = _category.isNotEmpty && _samples[_category] != null
-        ? [for (final s in _samples[_category]!) (_category, s.$1, s.$2, s.$3)]
-        : [for (final c in _starterCategories) if (_samples[c] != null) (c, kCategoryShort[c] ?? c, _samples[c]!.first.$2, _samples[c]!.first.$3)];
+    // examples: the chosen type's, or the first of each type while none is chosen
+    final examples = _typeChosen && _typeSamples[_askType] != null
+        ? [for (final x in _typeSamples[_askType]!) (_askType, x)]
+        : [for (final ty in kAskTypes.map((e) => e.value)) if (_typeSamples[ty]?.isNotEmpty ?? false) (ty, _typeSamples[ty]!.first)];
+    // one card and a half shows, so the strip invites a swipe
+    final exW = ((MediaQuery.of(context).size.width - 16 - 10) / 1.5).clamp(150.0, 260.0);
     String? titleIdea;
     if (title.trim().isEmpty && desc.trim().length >= 20) {
       final first = desc.trim().split(RegExp(r'[.\n!?]')).first.trim();
@@ -1035,6 +1058,19 @@ class _AskFormState extends State<_AskForm> {
           ),
           const SizedBox(height: 12),
         ],
+        // examples: a starting point while the ask is empty, never filled in on their own
+        if (empty && !_editing) ...[
+          _caps(p, 'Start from an example'),
+          const SizedBox(height: 2),
+          Text(t('Tap one, then change the details to yours.'), style: TextStyle(fontSize: 12, color: p.muted)),
+          const SizedBox(height: 8),
+          KeyedSubtree(
+            key: _tk('ask-templates'),
+            // edge to edge, swiped sideways
+            child: hScroll(height: 124, [for (final e in examples) _exampleCard(p, e, exW)]),
+          ),
+          const SizedBox(height: 16),
+        ],
         // the ask laid out like its row on Connect: photo, name and time, then the title, details and chips as fields
         KeyedSubtree(
           key: _tk('ask-card'),
@@ -1043,7 +1079,7 @@ class _AskFormState extends State<_AskForm> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 if (me != null) ...[
                   // back (the island steps aside on Ask) and the photo share the name line, so the fields get the full width
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                     if (widget.onBack != null)
                       Semantics(
                         button: true,
@@ -1057,21 +1093,7 @@ class _AskFormState extends State<_AskForm> {
                           ),
                         ),
                       ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: Avatar(name: shownName, photoUrl: me.photoUrl, size: 38, type: me.userType, badge: 16, uid: me.uid),
-                    ),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Row(children: [
-                          Flexible(child: Text(shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
-                          if (me.verification > 0 || me.premium || me.plan != null) ...[const SizedBox(width: 4), VerifiedBadge(level: me.verification, premium: me.premium, plan: me.plan)],
-                          const SizedBox(width: 6),
-                          Text(t('just now'), style: TextStyle(fontSize: 12, color: p.muted)),
-                        ]),
-                        Text(me.isEntrepreneur ? me.name : me.company, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
-                      ]),
-                    ),
+                    const Spacer(),
                     // Ask AI, top right: on once the title has a few words
                     if (_aiOn)
                       Padding(
@@ -1248,38 +1270,6 @@ class _AskFormState extends State<_AskForm> {
                 ]),
                 const SizedBox(height: 10),
                 // the essentials as chips, as on Connect; each opens its choices
-                // the card's colour, as members will see it on Connect
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(children: [
-                    Text(t('Card colour'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
-                    const SizedBox(width: 10),
-                    for (final e in kCardColors.entries)
-                      Semantics(
-                        button: true,
-                        selected: _color == e.key,
-                        label: e.key,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => setState(() => _color = e.key),
-                          child: Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 150),
-                              width: 22,
-                              height: 22,
-                              decoration: BoxDecoration(
-                                color: e.value,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: _color == e.key ? p.text : Colors.transparent, width: 2),
-                              ),
-                              child: _color == e.key ? const Icon(Icons.check, size: 13, color: Colors.white) : null,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ]),
-                ),
                 const SizedBox(height: 8),
                 KeyedSubtree(
                   key: _tk('ask-details'),
@@ -1311,6 +1301,38 @@ class _AskFormState extends State<_AskForm> {
                     ]),
                   ),
                   ),
+                // the card's colour, as members will see it on Connect
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Row(children: [
+                    Text(t('Card colour'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+                    const SizedBox(width: 10),
+                    for (final e in kCardColors.entries)
+                      Semantics(
+                        button: true,
+                        selected: _color == e.key,
+                        label: e.key,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setState(() => _color = e.key),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                color: e.value,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: _color == e.key ? p.text : Colors.transparent, width: 2),
+                              ),
+                              child: _color == e.key ? const Icon(Icons.check, size: 13, color: Colors.white) : null,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ]),
+                ),
               ]),
             ),
           ]),
@@ -1326,6 +1348,26 @@ class _AskFormState extends State<_AskForm> {
             Text('👀 ${t('How members will see your ask')}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
             Text(t('Swipe the cards. Tap one to edit it.'), style: TextStyle(fontSize: 11, color: p.muted)),
             const SizedBox(height: 8),
+            if (me != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(children: [
+                  Avatar(name: shownName, photoUrl: me.photoUrl, size: 34, type: me.userType, badge: 14, uid: me.uid),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        Flexible(child: Text(shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+                        if (me.verification > 0 || me.premium || me.plan != null) ...[const SizedBox(width: 4), VerifiedBadge(level: me.verification, premium: me.premium, plan: me.plan)],
+                        const SizedBox(width: 6),
+                        Text(t('just now'), style: TextStyle(fontSize: 12, color: p.muted)),
+                      ]),
+                      Text(me.isEntrepreneur ? me.name : me.company, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+                    ]),
+                  ),
+                  GoldTag(t(_editing ? 'Editing your ask' : 'Your ask')),
+                ]),
+              ),
             AskDeck(
               preview: true,
               post: _draftPost(),
@@ -1351,6 +1393,7 @@ class _AskFormState extends State<_AskForm> {
                     _aiUndo = null;
                   } else if (_undoTpl != null) {
                     _typeChosen = _undoTpl!.$4;
+                    _askType = _undoTpl!.$5;
                     _category = _undoTpl!.$3;
                     _title.text = _undoTpl!.$1;
                     _desc.text = _undoTpl!.$2;
@@ -1376,19 +1419,6 @@ class _AskFormState extends State<_AskForm> {
                 child: Row(children: [WIcon(WI.close, size: 14, color: p.muted), const SizedBox(width: 4), Text(t('Clear'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted))]),
               ),
           ]),
-        ],
-        // examples: a starting point while the ask is empty, never filled in on their own
-        if (empty && !_editing) ...[
-          const SizedBox(height: 16),
-          _caps(p, 'Or start from an example'),
-          const SizedBox(height: 2),
-          Text(t('Tap one, then change the details to yours.'), style: TextStyle(fontSize: 12, color: p.muted)),
-          const SizedBox(height: 8),
-          KeyedSubtree(
-            key: _tk('ask-templates'),
-            // edge to edge, swiped sideways
-            child: hScroll(height: 124, [for (final e in examples) _exampleCard(p, e)]),
-          ),
         ],
         const SizedBox(height: 12),
         Text(t('Write in your own language: हिंदी, मराठी, ગુજરાતી, English or any other. It is posted as you write it.'), style: TextStyle(fontSize: 12, color: p.muted)),

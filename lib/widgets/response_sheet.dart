@@ -133,16 +133,22 @@ class _ResponseSheetState extends State<_ResponseSheet> {
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
+    // header and Send stay put while the middle scrolls
+    final bottom = MediaQuery.of(context).padding.bottom;
     return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .9),
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 24),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .92),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Center(child: Container(width: 40, height: 4, margin: const EdgeInsets.only(top: 8), decoration: BoxDecoration(color: p.border, borderRadius: BorderRadius.circular(2)))),
+        Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 8), child: Column(children: [
           Row(children: [
             Expanded(child: Text(t(_editing ? 'Edit your reply' : 'Reply to this ask'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
             GestureDetector(onTap: () => Navigator.pop(context), child: WIcon(WI.close, size: 24, color: p.text)),
           ]),
-          const SizedBox(height: 12),
+        ])),
+        Flexible(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.of(context).viewInsets.bottom + 12),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           // what kind of reply: an offer to do it, or just a note
           Container(
             padding: const EdgeInsets.all(4),
@@ -173,12 +179,13 @@ class _ResponseSheetState extends State<_ResponseSheet> {
             const SizedBox(height: 12),
             Text(t('From your catalog'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
             const SizedBox(height: 6),
-            Wrap(spacing: 8, runSpacing: 8, children: [
+            SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
               for (final it in _items)
                 GestureDetector(
                   onTap: () => _pick(_itemId == '${it['id']}' ? null : it),
                   child: Container(
-                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width - 64),
+                    margin: const EdgeInsets.only(right: 8),
+                    constraints: const BoxConstraints(maxWidth: 256),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: _itemId == '${it['id']}' ? kGold.withValues(alpha: .25) : null,
@@ -190,7 +197,7 @@ class _ResponseSheetState extends State<_ResponseSheet> {
                         style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _itemId == '${it['id']}' ? p.text : p.muted)),
                   ),
                 ),
-            ]),
+            ])),
             if (_itemId != null && _items.any((x) => '${x['id']}' == _itemId && x['suggested'] == true))
               Padding(padding: const EdgeInsets.only(top: 4), child: Text(t('Picked for this ask. Tap it to remove.'), style: TextStyle(fontSize: 12, color: p.muted))),
           ],
@@ -229,7 +236,7 @@ class _ResponseSheetState extends State<_ResponseSheet> {
                       border: Border.all(color: _when == e.key ? kGold : p.border),
                       borderRadius: BorderRadius.circular(99),
                     ),
-                    child: Text(t(e.value), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _when == e.key ? p.text : p.muted)),
+                    child: Text('${_when == e.key ? '✓ ' : ''}${t(e.value)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _when == e.key ? p.text : p.muted)),
                   ),
                 ),
             ]),
@@ -249,7 +256,7 @@ class _ResponseSheetState extends State<_ResponseSheet> {
               hintText: t(_canDo ? 'Add a note (optional)' : 'e.g. We can supply 2000 boxes/month at ₹18 each, delivery in 2 days.'),
               hintStyle: TextStyle(color: p.muted),
               // the count shows near the 300 limit
-              counterText: _text.text.length > 240 ? '${_text.text.length}/300' : '',
+              counterText: _text.text.length > 150 ? '${_text.text.length}/300' : '',
               filled: true,
               fillColor: p.field,
               contentPadding: const EdgeInsets.all(12),
@@ -306,8 +313,8 @@ class _ResponseSheetState extends State<_ResponseSheet> {
                       if (f != null) setState(() => _file = f);
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(99), border: Border.all(color: p.border)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(99), border: Border.all(color: p.border, width: 1.4)),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
                         WIcon(WI.camera, size: 16, color: p.muted),
                         const SizedBox(width: 8),
@@ -327,10 +334,15 @@ class _ResponseSheetState extends State<_ResponseSheet> {
                 style: TextStyle(fontSize: 12, color: p.muted),
               ),
             ),
-          const SizedBox(height: 16),
-          GoldButton(label: t(_editing ? 'Save changes' : 'Send'), loading: _busy, onPressed: _ready ? _submit : null),
-        ]),
-      ),
+            ]),
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.fromLTRB(16, 10, 16, MediaQuery.of(context).viewInsets.bottom > 0 ? 10 : bottom + 14),
+          decoration: BoxDecoration(color: p.canvas, border: Border(top: BorderSide(color: p.border.withValues(alpha: .7)))),
+          child: GoldButton(label: t(_editing ? 'Save changes' : 'Send'), loading: _busy, onPressed: _ready ? _submit : null),
+        ),
+      ]),
     );
   }
 }

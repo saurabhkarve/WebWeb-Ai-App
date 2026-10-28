@@ -36,7 +36,8 @@ class _FindScreenState extends State<FindScreen> {
   late String _scope = widget.initialScope ??
       ((widget.initialLocation ?? widget.initialBudget ?? widget.initialUrgency) != null ? 'asks' : 'all');
   late String _location = widget.initialLocation ?? '';
-  String _askCat = '';
+  final String _askCat = '';
+  String _askType = '';
   late String _budget = widget.initialBudget ?? '';
   late String _urgency = widget.initialUrgency ?? '';
 
@@ -77,7 +78,7 @@ class _FindScreenState extends State<FindScreen> {
 
   Future<void> _run() async {
     final q = _q.text.trim();
-    final filtered = _location.isNotEmpty || _askCat.isNotEmpty || _budget.isNotEmpty || _urgency.isNotEmpty;
+    final filtered = _location.isNotEmpty || _askCat.isNotEmpty || _askType.isNotEmpty || _budget.isNotEmpty || _urgency.isNotEmpty;
     final seq = ++_seq;
     if (q.length < 2 && !filtered) {
       setState(() {
@@ -100,6 +101,7 @@ class _FindScreenState extends State<FindScreen> {
       'kind': 'requirement',
       if (hasText) 'search': q,
       if (_askCat.isNotEmpty || _scope == 'jobs') 'category': _askCat.isNotEmpty ? _askCat : 'job',
+      if (_askType.isNotEmpty) 'askType': _askType,
       if (_location.isNotEmpty) 'location': _location,
       if (_budget.isNotEmpty) 'budget': _budget,
       if (_urgency.isNotEmpty) 'urgency': _urgency,
@@ -109,7 +111,7 @@ class _FindScreenState extends State<FindScreen> {
     try {
       final res = await Future.wait([
         // a category narrows asks only, so members and items drop out while it is set
-        wantUsers && hasText && _askCat.isEmpty && _budget.isEmpty && _urgency.isEmpty
+        wantUsers && hasText && _askCat.isEmpty && _askType.isEmpty && _budget.isEmpty && _urgency.isEmpty
             ? api.get('/users/search', {'q': q, if (_scope != 'all') 'type': _scope}).then((d) {
                 final all = (d as List).map((e) => Profile.fromJson(e as Map)).toList();
                 return _location.isEmpty ? all : all.where((m) => m.location == _location).toList();
@@ -118,7 +120,7 @@ class _FindScreenState extends State<FindScreen> {
         wantPosts
             ? api.get('/posts', {...postQuery, 'limit': '$_page'}).then((d) => (d as List).map((e) => Post.fromJson(e as Map)).toList())
             : Future.value(<Post>[]),
-        wantItems && hasText && _askCat.isEmpty && _location.isEmpty && _budget.isEmpty && _urgency.isEmpty
+        wantItems && hasText && _askCat.isEmpty && _askType.isEmpty && _location.isEmpty && _budget.isEmpty && _urgency.isEmpty
             ? api.get('/products/search', {'q': q}).then((d) => (d as List).map((e) => Map<String, dynamic>.from(e as Map)).toList())
             : Future.value(<Map<String, dynamic>>[]),
       ]);
@@ -224,18 +226,18 @@ class _FindScreenState extends State<FindScreen> {
       children: [
         // search box
         Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(30)),
           child: Row(children: [
-            WIcon(WI.search, size: 20, color: p.muted),
+            WIcon(WI.search, size: 18, color: p.muted),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
                 controller: _q,
                 onChanged: (_) => _changed(),
                 textInputAction: TextInputAction.search,
-                style: const TextStyle(fontSize: 16),
+                style: const TextStyle(fontSize: 15),
                 decoration: InputDecoration(
                   hintText: t('Search businesses, jobs, people, asks'),
                   hintStyle: TextStyle(color: p.muted, fontWeight: FontWeight.w500),
@@ -259,34 +261,33 @@ class _FindScreenState extends State<FindScreen> {
               ),
           ]),
         ),
-        const SizedBox(height: 16),
-        // scopes
+        const SizedBox(height: 10),
+        // scopes, then the two filters as chips in the same row
         SizedBox(
-          height: 36,
+          height: 34,
           child: OverflowBox(
             maxWidth: MediaQuery.of(context).size.width,
-            child: ListView.separated(
+            child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _scopes.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) => ScopeChip(label: t(_scopes[i].$2), selected: _scope == _scopes[i].$1, onTap: () => _set(() => _scope = _scopes[i].$1)),
+              children: [
+                for (final sc in _scopes) Padding(padding: const EdgeInsets.only(right: 6), child: ScopeChip(label: t(sc.$2), selected: _scope == sc.$1, onTap: () => _set(() => _scope = sc.$1), dense: true)),
+                Container(width: 1, margin: const EdgeInsets.fromLTRB(2, 4, 8, 4), color: p.border),
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: CityPill(value: _location, anyLabel: t('Any location'), chip: true, onChanged: (c) => _set(() => _location = c.name)),
+                ),
+                SelectPill(
+                  value: _askType,
+                  placeholder: t('Any kind of ask'),
+                  chip: true,
+                  options: [for (final o in kAskTypes) Option(o.value, t(o.short))],
+                  onChanged: (v) => _set(() => _askType = v),
+                ),
+              ],
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        Row(children: [
-          Expanded(child: CityPill(value: _location, anyLabel: t('Any location'), rounded: true, height: 40, onChanged: (c) => _set(() => _location = c.name))),
-          const SizedBox(width: 8),
-          Expanded(
-            child: SelectPill(
-              value: _askCat,
-              placeholder: t('Any ask category'),
-              options: [for (final c in kPostCategories) Option(c.value, t(kCategoryShort[c.value] ?? c.label))],
-              onChanged: (v) => _set(() => _askCat = v),
-            ),
-          ),
-        ]),
         if (_budget.isNotEmpty || _urgency.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 16),
@@ -295,11 +296,11 @@ class _FindScreenState extends State<FindScreen> {
               if (_urgency.isNotEmpty) goldChip(t(labelOf(kUrgencies, _urgency)), () => _set(() => _urgency = '')),
             ]),
           ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         if (idle) _Explore(key: _explore, scope: _scope),
         if (empty && !_loading) EmptyState(title: t('Nothing found'), hint: t('Try a different word or another tab.')),
         // a search for asks is a need they'll have again: let it become an alert (with or without results today)
-        if (!idle && _posts != null && !_loading && (_scope == 'all' || _scope == 'asks' || _scope == 'jobs') && (_q.text.trim().length >= 2 || _askCat.isNotEmpty))
+        if (!idle && _posts != null && !_loading && (_scope == 'all' || _scope == 'asks' || _scope == 'jobs') && (_q.text.trim().length >= 2 || _askCat.isNotEmpty || _askType.isNotEmpty))
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Material(
@@ -329,7 +330,7 @@ class _FindScreenState extends State<FindScreen> {
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text(t('Alert me for new asks like this'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                           Text(
-                            [if (_q.text.trim().isNotEmpty) _q.text.trim(), if (_askCat.isNotEmpty) t(kCategoryShort[_askCat] ?? ''), if (_location.isNotEmpty) _location].join(' · '),
+                            [if (_q.text.trim().isNotEmpty) _q.text.trim(), if (_askType.isNotEmpty) t(askTypeDef(_askType)?.short ?? ''), if (_askCat.isNotEmpty) t(kCategoryShort[_askCat] ?? ''), if (_location.isNotEmpty) _location].join(' · '),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontSize: 12, color: p.muted),
@@ -370,6 +371,8 @@ class _FindScreenState extends State<FindScreen> {
     // near the end of the list, fetch the next page
     final scrolling = NotificationListener<ScrollNotification>(
       onNotification: (n) {
+        // the trending tiles page in as their end comes into view
+        if (idle && n.depth == 0 && n.metrics.axis == Axis.vertical) _explore.currentState?.maybeLoadMore(MediaQuery.of(context).size.height);
         if (n.depth == 0 && n.metrics.axis == Axis.vertical && n.metrics.extentAfter < 600) {
           if (idle) {
             _loadLatest();
@@ -532,11 +535,36 @@ class _Explore extends StatefulWidget {
 class _ExploreState extends State<_Explore> {
   Map<String, dynamic>? _data;
   bool _failed = false;
+  // more trending asks as their end comes into view
+  final List<Map<String, dynamic>> _more = [];
+  bool _moreDone = false, _loadingMore = false;
+  final _end = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     load();
+  }
+
+  /// the end of the tiles is within a screen of the bottom: fetch the next 24
+  void maybeLoadMore(double screenHeight) {
+    if (_data == null || _moreDone || _loadingMore || widget.scope == 'business' || widget.scope == 'catalog' || widget.scope == 'people' || widget.scope == 'jobs') return;
+    final box = _end.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return;
+    if (box.localToGlobal(Offset.zero).dy > screenHeight + 600) return;
+    _loadingMore = true;
+    final have = ((_data?['asks'] as List?)?.length ?? 0) + _more.length;
+    context.read<AuthProvider>().api.get('/explore', {'offset': '$have'}).then((d) {
+      final list = ((d as Map)['asks'] as List? ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      final seen = {for (final a in [...((_data?['asks'] as List?) ?? const []), ..._more]) '${(a as Map)['id']}'};
+      if (!mounted) return;
+      setState(() {
+        _more.addAll(list.where((a) => !seen.contains('${a['id']}')));
+        if (list.length < 24) _moreDone = true;
+      });
+    }).catchError((_) {
+      if (mounted) setState(() => _moreDone = true);
+    }).whenComplete(() => _loadingMore = false);
   }
 
   Future<void> load() async {
@@ -546,6 +574,8 @@ class _ExploreState extends State<_Explore> {
         setState(() {
           _data = Map<String, dynamic>.from(d as Map);
           _failed = false;
+          _moreDone = ((_data!['asks'] as List?)?.length ?? 0) < 24;
+          _more.clear();
         });
       }
     } catch (_) {
@@ -561,13 +591,13 @@ class _ExploreState extends State<_Explore> {
     if (_failed) return Padding(padding: const EdgeInsets.symmetric(vertical: 32), child: Text(t('Could not load suggestions.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.muted)));
     if (_data == null) return const Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: LogoLoader(size: 32)));
     bool show(String s) => widget.scope == 'all' || widget.scope == s;
-    final asks = _list('asks'), hiring = _list('hiring'), products = _list('products');
+    final asks = [..._list('asks'), ..._more], hiring = _list('hiring'), products = _list('products');
     final businesses = _list('businesses').map(Profile.fromJson).toList();
     final people = _list('people').map(Profile.fromJson).toList();
 
     Widget heading(String s) => Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(t(s), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)));
     final sections = <Widget>[
-      if (show('asks') && asks.isNotEmpty) Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [heading('Trending asks'), _TrendingGrid(asks)]),
+      if (show('asks') && asks.isNotEmpty) Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [heading('Trending asks'), _TrendingGrid(asks), SizedBox(key: _end, height: _moreDone ? 0 : 24, child: _loadingMore ? const Center(child: LogoLoader(size: 22)) : null)]),
       if (show('business') && businesses.isNotEmpty)
         Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           heading('Businesses to connect with'),
@@ -685,53 +715,21 @@ class _ExploreState extends State<_Explore> {
 
 /// Find's default layout: asks as tiles, each the headline card of its ask (its colour, who wants what, the title and its
 /// essentials), with the kinds of ask as pills to narrow them down (web explore.tsx AskTiles).
-class _TrendingGrid extends StatefulWidget {
+class _TrendingGrid extends StatelessWidget {
   final List<Map<String, dynamic>> asks;
   const _TrendingGrid(this.asks);
-  @override
-  State<_TrendingGrid> createState() => _TrendingGridState();
-}
-
-class _TrendingGridState extends State<_TrendingGrid> {
-  String _type = 'all';
 
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final kinds = [for (final o in kAskTypes) if (widget.asks.any((a) => a['askType'] == o.value)) o];
-    final shown = _type == 'all' ? widget.asks : widget.asks.where((a) => a['askType'] == _type).toList();
-    Widget pill(String value, String label, String emoji) {
-      final on = _type == value;
-      return GestureDetector(
-        onTap: () => setState(() => _type = value),
-        child: Container(
-          height: 32,
-          margin: const EdgeInsets.only(right: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(color: on ? p.ink : p.chip.withValues(alpha: .7), borderRadius: BorderRadius.circular(16)),
-          child: Text('${emoji.isEmpty ? '' : '$emoji '}${t(label)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: on ? p.onInk : p.muted)),
-        ),
-      );
-    }
-
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SizedBox(
-        height: 32,
-        child: ListView(scrollDirection: Axis.horizontal, children: [pill('all', 'All', ''), for (final o in kinds) pill(o.value, o.short, o.emoji)]),
-      ),
-      const SizedBox(height: 12),
-      if (shown.isEmpty)
-        Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Text(t('Nothing here yet'), textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.muted)))
-      else
-        LayoutBuilder(builder: (context, c) {
-          const gap = 10.0;
-          final w = (c.maxWidth - gap) / 2;
-          return Wrap(spacing: gap, runSpacing: gap, children: [
-            for (var i = 0; i < shown.length; i++) SizedBox(width: i == 0 ? c.maxWidth : w, child: _AskTile(shown[i], big: i == 0)),
-          ]);
-        }),
-    ]);
+    if (asks.isEmpty) return Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Text(t('Nothing here yet'), textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.muted)));
+    return LayoutBuilder(builder: (context, c) {
+      const gap = 10.0;
+      final w = (c.maxWidth - gap) / 2;
+      return Wrap(spacing: gap, runSpacing: gap, children: [
+        for (var i = 0; i < asks.length; i++) SizedBox(width: i == 0 ? c.maxWidth : w, child: _AskTile(asks[i], big: i == 0)),
+      ]);
+    });
   }
 }
 
@@ -815,8 +813,8 @@ class _AskTile extends StatelessWidget {
     return GestureDetector(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${a['id']}'))),
       child: Container(
-        constraints: const BoxConstraints(minHeight: 176),
-        padding: const EdgeInsets.all(12),
+        constraints: BoxConstraints(minHeight: big ? 176 : 150),
+        padding: EdgeInsets.all(big ? 12 : 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: tone.withValues(alpha: .38)),
@@ -835,15 +833,15 @@ class _AskTile extends StatelessWidget {
             Expanded(child: Text(t(s.key, s.vars), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .7)))),
           ]),
           const SizedBox(height: 4),
-          Text('${a['title']}', maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: big ? 19 : 15, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -.2)),
+          Text('${a['title']}', maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: big ? 18 : 14, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -.2)),
           const SizedBox(height: 10),
           Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Expanded(
               child: Wrap(spacing: 4, runSpacing: 4, children: [
                 if ('${a['location'] ?? ''}'.isNotEmpty) chip(WI.pin, t('${a['location']}')),
-                if ('${a['budget'] ?? ''}'.isNotEmpty) chip(WI.rupee, '${a['budget']}'),
+                if (big && '${a['budget'] ?? ''}'.isNotEmpty) chip(WI.rupee, '${a['budget']}'),
                 if (left != null) chip(WI.clock, left),
-                if (left != null && _until() != null) chip(WI.calendar, _until()!),
+                if (big && left != null && _until() != null) chip(WI.calendar, _until()!),
               ]),
             ),
             const SizedBox(width: 6),

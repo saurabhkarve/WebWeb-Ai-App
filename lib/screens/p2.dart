@@ -1035,7 +1035,7 @@ const _categoryTile = {
 };
 
 const _bg = {
-  'ink': [Color(0xFF6B5410), Color(0xFF2A2208), Color(0xFF141414)],
+  'ink': [Color(0xFFF2C230), Color(0xFFB8860B), Color(0xFF6B4F06)],
   'poll': [Color(0xFFC99400), Color(0xFF5A4710), Color(0xFF1E1E1E)],
   'rates': [Color(0xFF22875C), Color(0xFF0F3A29), Color(0xFF0B1F17)],
   'notice': [Color(0xFFD9700F), Color(0xFF5A2F08), Color(0xFF1F1206)],

@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
-import '../ask_types.dart';
 import '../card_colors.dart';
 import 'ask_deck.dart';
 import '../i18n.dart';
@@ -29,7 +28,6 @@ import 'reaction_picker.dart';
 import 'reply_thread.dart';
 import 'p1.dart';
 import 'response_sheet.dart';
-import 'poll_vote.dart';
 import 'tour.dart';
 import '../share_log.dart';
 import '../views.dart';
@@ -54,14 +52,6 @@ class PostCard extends StatefulWidget {
   const PostCard({super.key, required this.post, this.onChanged, this.detail = false, this.onReply, this.onBlocked, this.tourTarget = false});
   @override
   State<PostCard> createState() => _PostCardState();
-}
-
-/// "HIRE", "BUY / QUOTE · REPAIR": the ask's type, with its topic (the same as on its first card)
-String _typeLabel(Post post) => askLabel(post);
-
-String _sentence(Post post) {
-  final s = askSentence(post);
-  return t(s.key, {...s.vars, if (s.vars['what'] != null) 'what': t(s.vars['what']!)});
 }
 
 class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin {
@@ -429,62 +419,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                 if (!framed) ...more,
               ]),
               const SizedBox(height: 10),
-              if (framed) ...[
-                // the category as a small heading, why you see this ask on the right
-                Row(children: [
-                  WIcon(categoryIcon(askTypeDef(askTypeOf(post))?.icon ?? post.category), size: 14, color: p.link, still: true),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(_typeLabel(post).toUpperCase(),
-                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.link)),
-                  ),
-                  // "Near you" opens the ask's area map, like its place chip
-                  if (post.closed) ...[const SizedBox(width: 8), Flexible(child: ClosedChip(post))]
-                  else if (why != null) ...[
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: !mine && match != null && post.leadReason == null && ((post.locationPref ?? '').isNotEmpty || post.lat != null)
-                          ? GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showAskAreaSheet(context, post), child: GoldTag(why))
-                          : GoldTag(why),
-                    ),
-                  ],
-                ]),
-                // who wants what, in a line (the idea of the ask before its details)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Row(children: [
-                    Text(askTypeDef(askTypeOf(post))?.emoji ?? '💬', style: const TextStyle(fontSize: 15)),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(_sentence(post), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .75))),
-                    ),
-                  ]),
-                ),
-                const SizedBox(height: 4),
-                tappable,
-                if (post.pollOptions.length > 1) PollVote(post: post, mine: mine, onVoted: (v) => setState(() => post = v)),
-                ...extra,
-                // where, budget, time left, reach, photos as chips (the category is shown above)
-                Padding(
-                  key: widget.tourTarget ? Tours.key('chips') : null,
-                  padding: const EdgeInsets.only(top: 10),
-                  child: ChipLine(children: [
-                    if ((post.locationPref ?? '').isNotEmpty)
-                      InfoPill(
-                        small: true,
-                        wi: WI.pin,
-                        text: '${t(post.locationPref!)}${post.distanceM == null ? '' : ' · ${formatDistance(post.distanceM!)}'}',
-                        onTap: () => showAskAreaSheet(context, post),
-                      ),
-                    if ((post.budget ?? '').isNotEmpty) InfoPill(small: true, gold: true, wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
-                    if (urgency != null) InfoPill(small: true, gold: true, wi: WI.clock, text: urgency),
-                    if (urgency != null && askDeadline(post) != null) InfoPill(small: true, gold: true, wi: WI.calendar, text: askDeadline(post)!),
-                    if ((post.radiusM ?? 0) > 0) InfoPill(small: true, gold: true, wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)}), onTap: () => showAskAreaSheet(context, post)),
-                    if (post.images.isNotEmpty) InfoPill(small: true, gold: true, wi: WI.camera, text: t(post.images.length == 1 ? '1 photo' : '{n} photos', {'n': post.images.length})),
-                  ]),
-                ),
-
-              ] else ...[
+              ...[
                 // why you see this ask (or that it is closed), then the ask as swipeable cards
                 if (post.closed || why != null)
                   Padding(
@@ -713,15 +648,15 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
           ...more,
         ]),
         Padding(
-          padding: const EdgeInsets.only(left: 50, top: 4),
+          padding: EdgeInsets.only(left: ask ? 0 : 50, top: ask ? 8 : 4),
           // as on x.com (and the web) the whole quote is one link to the ask: a tap anywhere in it, the name and chips
-          // included, opens the ask, so the quote's own taps are absorbed
+          // included, opens the ask, so the quote's own taps are absorbed (an ask's cards still swipe, their taps open the ask)
           child: Material(
             color: Colors.transparent,
             // clipped, so the chips stay inside the frame
             clipBehavior: Clip.antiAlias,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: p.border)),
-            child: InkWell(onTap: _openDetail, child: AbsorbPointer(child: quote)),
+            child: ask ? quote : InkWell(onTap: _openDetail, child: AbsorbPointer(child: quote)),
           ),
         ),
         if (ask) ...[
@@ -1115,7 +1050,7 @@ class LatestReplies extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
+        Padding(padding: const EdgeInsets.only(left: 20), child: Row(children: [
           WIcon(WI.talk, size: 16, color: kGold.withValues(alpha: .8)),
           const SizedBox(width: 8),
           Text(any ? t('Latest replies') : ResponseActivity.countLabel(post.sharesCount, post.referralsCount), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
@@ -1129,7 +1064,7 @@ class LatestReplies extends StatelessWidget {
           ],
           const SizedBox(width: 8),
           Expanded(child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [kGold.withValues(alpha: .3), p.border, p.border.withValues(alpha: 0)])))),
-        ]),
+        ])),
         Padding(
           // set in less on a phone, as on the web
           padding: const EdgeInsets.only(left: 20),
@@ -1249,14 +1184,57 @@ class ReplyBubble extends StatelessWidget {
 
 /// Every reply and referral on an ask ("Show all n" on the card opens it on the ask page; web AllReplies), drawn like
 /// the card's latest replies: the same heading, the replies as bubbles members can react and reply to, and who referred.
-class AllReplies extends StatelessWidget {
+/// 10 at a time: the next two pages load as the end comes into view, after that a button asks for each 10 more.
+class AllReplies extends StatefulWidget {
   final Post post;
   final List<ResponseLog> items;
   const AllReplies({super.key, required this.post, required this.items});
 
   @override
+  State<AllReplies> createState() => _AllRepliesState();
+}
+
+class _AllRepliesState extends State<AllReplies> {
+  static const _page = 10, _autoPages = 3;
+  int _shown = _page;
+  final _end = GlobalKey();
+  ScrollPosition? _pos;
+
+  bool get _auto => _shown < _page * _autoPages;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _pos?.removeListener(_check);
+    _pos = Scrollable.maybeOf(context)?.position;
+    _pos?.addListener(_check);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _check());
+  }
+
+  @override
+  void dispose() {
+    _pos?.removeListener(_check);
+    super.dispose();
+  }
+
+  /// the end marker is within 300 px of the screen: show the next page
+  void _check() {
+    if (!mounted || !_auto || _shown >= widget.items.length) return;
+    final box = _end.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached) return;
+    final y = box.localToGlobal(Offset.zero).dy;
+    if (y < MediaQuery.of(context).size.height + 300) {
+      setState(() => _shown += _page);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _check());
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final post = widget.post;
+    final items = widget.items;
     if (items.isEmpty) return const SizedBox.shrink();
+    final rest = items.length - _shown;
     final p = Pal.of(context);
     void openProfile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
     String shown(ResponseLog r) => r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name;
@@ -1273,7 +1251,7 @@ class AllReplies extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(left: 20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            for (final r in items)
+            for (final r in items.take(_shown))
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: r.kind == 'referral'
@@ -1294,6 +1272,16 @@ class AllReplies extends StatelessWidget {
                       ])
                     : ReplyBubble(post: post, r: r),
               ),
+            if (rest > 0)
+              _auto
+                  ? SizedBox(key: _end, height: 24)
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 8, left: 8),
+                      child: GestureDetector(
+                        onTap: () => setState(() => _shown += _page),
+                        child: Text(t('Show {n} more replies', {'n': rest < _page ? rest : _page}), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kGold)),
+                      ),
+                    ),
           ]),
         ),
       ]),

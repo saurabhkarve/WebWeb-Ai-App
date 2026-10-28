@@ -56,7 +56,7 @@ const Map<WI, (String, double?)> _body = {
   WI.calendar: (r'<rect x="3.8" y="5.2" width="16.4" height="14.8" rx="2.6" /> <path d="M3.8 10h16.4M8.2 3.4v3.6M15.8 3.4v3.6" />', null),
   WI.eye: (r'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /> <circle cx="12" cy="12" r="3" />', null),
   WI.file: (r'<path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8l-5-5z" /> <path d="M14 3v5h5M9 13h6M9 17h6" />', null),
-  WI.funding: (r'<ellipse cx="12" cy="6.5" rx="6.5" ry="2.8" /> <path d="M5.5 6.5v5c0 1.5 2.9 2.8 6.5 2.8s6.5-1.3 6.5-2.8v-5" /> <path d="M5.5 11.5v5c0 1.5 2.9 2.8 6.5 2.8s6.5-1.3 6.5-2.8v-5" />', null),
+  WI.funding: (r'<circle cx="12" cy="12" r="9" /> <path d="M8.8 7.8h6.4M8.8 11h6.4M8.8 7.8c3.6 0 3.6 6 0 6l4.4 3.2" />', null),
   WI.globe: (r'<circle cx="12" cy="12" r="8.6" /> <path d="M3.5 12h17M12 3.4c2.4 2.4 3.5 5.3 3.5 8.6s-1.1 6.2-3.5 8.6c-2.4-2.4-3.5-5.3-3.5-8.6S9.6 5.8 12 3.4z" />', null),
   WI.grid: (r'<rect x="4" y="4" width="6.5" height="6.5" rx="1.8" /> <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8" /> <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8" /> <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8" />', null),
   WI.heart: (r'<path d="M12 20s-8.2-4.9-8.2-10.7A4.5 4.5 0 0 1 12 6.8a4.5 4.5 0 0 1 8.2 2.5C20.2 15.1 12 20 12 20z" />', null),

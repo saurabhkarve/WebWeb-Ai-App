@@ -22,8 +22,10 @@ class CityPill extends StatelessWidget {
   final void Function(PickedCity city) onChanged;
   final double height;
   final bool rounded;
+  /// a filter chip: short, soft, gold once a city is chosen
+  final bool chip;
   final ({double lat, double lng})? near;
-  const CityPill({super.key, required this.value, required this.onChanged, this.placeholder = 'Choose your city', this.anyLabel, this.height = 44, this.rounded = false, this.near});
+  const CityPill({super.key, required this.value, required this.onChanged, this.placeholder = 'Choose your city', this.anyLabel, this.height = 44, this.rounded = false, this.chip = false, this.near});
 
   @override
   Widget build(BuildContext context) {
@@ -35,13 +37,16 @@ class CityPill extends StatelessWidget {
         if (c != null) onChanged(c);
       },
       child: Container(
-        height: height,
+        height: chip ? 34 : height,
         padding: const EdgeInsets.only(left: 12, right: 10),
-        decoration: BoxDecoration(color: p.card, border: Border.all(color: p.border), borderRadius: BorderRadius.circular(rounded ? height : 10)),
-        child: Row(children: [
+        decoration: chip
+            ? BoxDecoration(color: value.isEmpty ? p.chip : kGold.withValues(alpha: .25), borderRadius: BorderRadius.circular(30))
+            : BoxDecoration(color: p.card, border: Border.all(color: p.border), borderRadius: BorderRadius.circular(rounded ? height : 10)),
+        child: Row(mainAxisSize: chip ? MainAxisSize.min : MainAxisSize.max, children: [
           WIcon(WI.pin, size: 16, color: p.muted),
           const SizedBox(width: 6),
-          Expanded(
+          Flexible(
+            fit: chip ? FlexFit.loose : FlexFit.tight,
             child: Text.rich(
               TextSpan(children: [
                 TextSpan(text: value.isEmpty ? (anyLabel ?? t(placeholder)) : (value == 'Other' ? t('Other') : value)),
@@ -49,7 +54,7 @@ class CityPill extends StatelessWidget {
               ]),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: value.isEmpty ? p.muted : p.text),
+              style: TextStyle(fontSize: chip ? 13 : 14, fontWeight: chip ? FontWeight.w700 : FontWeight.w500, color: value.isEmpty ? p.muted : p.text),
             ),
           ),
           WIcon(WI.chevronDown, size: 16, color: p.muted),

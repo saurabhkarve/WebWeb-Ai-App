@@ -7,7 +7,7 @@ import '../location.dart' show kNodeCoords;
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'area_map.dart' show AreaMap, askTimeLeft;
+import 'area_map.dart' show AreaMap, askTimeLeft, showAreaViewer;
 import 'hashtag_text.dart';
 import 'image_grid.dart';
 
@@ -101,7 +101,9 @@ class AskCards extends StatelessWidget {
         ])),
       if (point != null)
         card(
-          SizedBox(
+          GestureDetector(
+            onTap: () => showAreaViewer(context, lat: point.lat, lng: point.lng, radiusM: (post.radiusM ?? 10000).toDouble(), label: (post.locationPref ?? '').isEmpty ? null : t(post.locationPref!)),
+            child: SizedBox(
             height: 176,
             child: Stack(fit: StackFit.expand, children: [
               AreaMap(lat: point.lat, lng: point.lng, radiusM: (post.radiusM ?? 10000).toDouble()),
@@ -119,7 +121,7 @@ class AskCards extends StatelessWidget {
                 ),
               ),
             ]),
-          ),
+          )),
           pad: EdgeInsets.zero,
         ),
     ]);
