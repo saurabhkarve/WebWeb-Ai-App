@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 
 import '../api.dart' show smallImage;
 import '../auth_provider.dart';
+import '../card_colors.dart';
+import '../ask_types.dart';
 import '../i18n.dart';
 import '../models.dart';
 import '../theme.dart';
@@ -681,33 +683,55 @@ class _ExploreState extends State<_Explore> {
   }
 }
 
-/// Instagram-style grid: the first ask takes a 2x2 block, the rest fill three across.
-class _TrendingGrid extends StatelessWidget {
+/// Find's default layout: asks as tiles, each the headline card of its ask (its colour, who wants what, the title and its
+/// essentials), with the kinds of ask as pills to narrow them down (web explore.tsx AskTiles).
+class _TrendingGrid extends StatefulWidget {
   final List<Map<String, dynamic>> asks;
   const _TrendingGrid(this.asks);
   @override
+  State<_TrendingGrid> createState() => _TrendingGridState();
+}
+
+class _TrendingGridState extends State<_TrendingGrid> {
+  String _type = 'all';
+
+  @override
   Widget build(BuildContext context) {
-    const gap = 4.0;
-    return LayoutBuilder(builder: (context, c) {
-      final w = (c.maxWidth - 2 * gap) / 3;
-      Widget tile(int i) => SizedBox.square(dimension: i == 0 ? 2 * w + gap : w, child: _AskTile(asks[i], big: i == 0));
-      final rows = <Widget>[
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          tile(0),
-          if (asks.length > 1) ...[
-            const SizedBox(width: gap),
-            Column(children: [tile(1), if (asks.length > 2) ...[const SizedBox(height: gap), tile(2)]]),
-          ],
-        ]),
-      ];
-      for (var i = 3; i < asks.length; i += 3) {
-        rows.add(const SizedBox(height: gap));
-        rows.add(Row(children: [
-          for (var j = i; j < i + 3 && j < asks.length; j++) ...[if (j > i) const SizedBox(width: gap), tile(j)],
-        ]));
-      }
-      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
-    });
+    final p = Pal.of(context);
+    final kinds = [for (final o in kAskTypes) if (widget.asks.any((a) => a['askType'] == o.value)) o];
+    final shown = _type == 'all' ? widget.asks : widget.asks.where((a) => a['askType'] == _type).toList();
+    Widget pill(String value, String label, String emoji) {
+      final on = _type == value;
+      return GestureDetector(
+        onTap: () => setState(() => _type = value),
+        child: Container(
+          height: 32,
+          margin: const EdgeInsets.only(right: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: on ? p.ink : p.chip.withValues(alpha: .7), borderRadius: BorderRadius.circular(16)),
+          child: Text('${emoji.isEmpty ? '' : '$emoji '}${t(label)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: on ? p.onInk : p.muted)),
+        ),
+      );
+    }
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      SizedBox(
+        height: 32,
+        child: ListView(scrollDirection: Axis.horizontal, children: [pill('all', 'All', ''), for (final o in kinds) pill(o.value, o.short, o.emoji)]),
+      ),
+      const SizedBox(height: 12),
+      if (shown.isEmpty)
+        Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Text(t('Nothing here yet'), textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.muted)))
+      else
+        LayoutBuilder(builder: (context, c) {
+          const gap = 10.0;
+          final w = (c.maxWidth - gap) / 2;
+          return Wrap(spacing: gap, runSpacing: gap, children: [
+            for (var i = 0; i < shown.length; i++) SizedBox(width: i == 0 ? c.maxWidth : w, child: _AskTile(shown[i], big: i == 0)),
+          ]);
+        }),
+    ]);
   }
 }
 
@@ -715,44 +739,99 @@ class _AskTile extends StatelessWidget {
   final Map<String, dynamic> a;
   final bool big;
   const _AskTile(this.a, {this.big = false});
+
+  static String _colorOf(Map<String, dynamic> a) {
+    final c = a['cardColor'] as String?;
+    if (c != null && kCardColors.containsKey(c)) return c;
+    var h = 0;
+    for (final u in '${a['id']}'.codeUnits) {
+      h = (h * 31 + u) & 0xFFFFFFFF;
+    }
+    return kCardColors.keys.elementAt(h % kCardColors.length);
+  }
+
+  String? _left() {
+    final u = a['urgency'] as String?;
+    if (u == null || u.isEmpty) return null;
+    final days = u == '7_days' ? 7 : (u == '30_days' ? 30 : null);
+    if (days == null) return t(labelOf(kUrgencies, u));
+    final at = DateTime.fromMillisecondsSinceEpoch((a['createdAt'] as num).toInt());
+    final n = (at.add(Duration(days: days)).difference(DateTime.now()).inMinutes / 1440).ceil();
+    return n > 1 ? t('{n} days left', {'n': n}) : (n == 1 ? t('Last day') : t('Deadline passed'));
+  }
+
+  ({String key, Map<String, String> vars}) _sentence(String type) {
+    final name = a['authorType'] == 'entrepreneur' && '${a['authorCompany'] ?? ''}'.isNotEmpty ? '${a['authorCompany']}' : '${a['authorName'] ?? a['by']}'.split(' ').first;
+    final noun = kCategoryNoun['${a['category'] ?? ''}'];
+    final v = {'name': name};
+    switch (type) {
+      case 'hire':
+        return (key: '{name} is looking to hire someone', vars: v);
+      case 'quote':
+        return noun != null ? (key: '{name} is looking for {what}', vars: {...v, 'what': t(noun)}) : (key: '{name} needs something and wants quotes', vars: v);
+      case 'offer':
+        return (key: '{name} has something to offer', vars: v);
+      case 'advice':
+        return (key: '{name} wants your advice', vars: v);
+      case 'poll':
+        return (key: '{name} wants your vote', vars: v);
+      case 'recommend':
+        return (key: '{name} wants a recommendation', vars: v);
+      case 'partner':
+        return (key: '{name} is looking for a partner', vars: v);
+      case 'funding':
+        return (key: '{name} is looking for funding', vars: v);
+      default:
+        return (key: '{name} has an ask for you', vars: v);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final cat = a['category'] as String?;
-    final img = a['image'] as String?;
+    final p = Pal.of(context);
+    final type = askTypeDef(a['askType'] as String?) ?? kAskTypes.last;
+    final tone = kCardColors[_colorOf(a)]!;
+    final s = _sentence(type.value);
+    final left = _left();
+    Widget chip(WI icon, String text) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(color: p.canvas.withValues(alpha: .7), borderRadius: BorderRadius.circular(99), border: Border.all(color: p.border.withValues(alpha: .6))),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            WIcon(icon, size: 11, color: p.muted, still: true),
+            const SizedBox(width: 4),
+            Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600))),
+          ]),
+        );
     return GestureDetector(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${a['id']}'))),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: Stack(fit: StackFit.expand, children: [
-          if ((img ?? '').isNotEmpty) NetImg(img!) else CoverPattern(seed: '${a['id']}'),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xB3000000), Color(0x1A000000), Color(0x00000000)]),
-            ),
-          ),
-          if (cat != null)
-            Positioned(
-              left: 6,
-              top: 6,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: Colors.black.withValues(alpha: .55), borderRadius: BorderRadius.circular(10)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  WIcon(categoryIcon(cat), size: 10, color: Colors.white),
-                  const SizedBox(width: 4),
-                  Text((a['categoryLabel'] as String?) ?? t(kCategoryShort[cat] ?? 'Ask'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
-                ]),
-              ),
-            ),
-          Positioned(
-            left: 6,
-            right: 6,
-            bottom: 6,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${a['title']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: big ? 14 : 11, fontWeight: FontWeight.w700, height: 1.25, color: Colors.white)),
-              if (big) Padding(padding: const EdgeInsets.only(top: 2), child: Text('${a['by']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: .8)))),
-            ]),
-          ),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 176),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: tone.withValues(alpha: .38)),
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [tone.withValues(alpha: .26), tone.withValues(alpha: .08), Colors.transparent]),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            WIcon(categoryIcon(type.icon), size: 13, color: p.link, still: true),
+            const SizedBox(width: 4),
+            Flexible(child: Text(((a['categoryLabel'] as String?) ?? t(type.short)).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link))),
+          ]),
+          const SizedBox(height: 6),
+          Row(children: [
+            Text(type.emoji, style: const TextStyle(fontSize: 13)),
+            const SizedBox(width: 4),
+            Expanded(child: Text(t(s.key, s.vars), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .7)))),
+          ]),
+          const SizedBox(height: 4),
+          Text('${a['title']}', maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: big ? 19 : 15, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -.2)),
+          const SizedBox(height: 10),
+          Wrap(spacing: 4, runSpacing: 4, children: [
+            if ('${a['location'] ?? ''}'.isNotEmpty) chip(WI.pin, t('${a['location']}')),
+            if ('${a['budget'] ?? ''}'.isNotEmpty) chip(WI.rupee, '${a['budget']}'),
+            if (left != null) chip(WI.clock, left),
+          ]),
         ]),
       ),
     );
