@@ -16,6 +16,7 @@ import 'screens/shell.dart';
 import 'theme.dart';
 import 'update_check.dart';
 import 'widgets.dart';
+import 'widgets/splash_screen.dart';
 
 final navKey = GlobalKey<NavigatorState>();
 
@@ -97,8 +98,26 @@ class _KeyboardDismissOnScroll extends StatelessWidget {
 }
 
 /// Logged out -> login / OTP. Logged in without a profile -> onboarding. Otherwise the 5-tab app.
-class Gate extends StatelessWidget {
+/// the opening screen stays at least this long once per launch, so it is seen rather than flashed
+bool _splashSeen = false;
+
+class Gate extends StatefulWidget {
   const Gate({super.key});
+  @override
+  State<Gate> createState() => _GateState();
+}
+
+class _GateState extends State<Gate> {
+  @override
+  void initState() {
+    super.initState();
+    if (!_splashSeen) {
+      Future.delayed(const Duration(milliseconds: 1400), () {
+        _splashSeen = true;
+        if (mounted) setState(() {});
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -114,18 +133,12 @@ class Gate extends StatelessWidget {
         rt.disconnect();
       }
     });
-    if (!auth.ready) return const _Splash();
+    if (!auth.ready || !_splashSeen) return const SplashScreen();
     if (!auth.isLoggedIn) return const LoginScreen();
     if (!auth.profileLoaded) return const _ProfileLoading();
     if (auth.profile == null) return const OnboardingFlow();
     return const Shell();
   }
-}
-
-class _Splash extends StatelessWidget {
-  const _Splash();
-  @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: LogoLoader(size: 56)));
 }
 
 class _ProfileLoading extends StatelessWidget {
