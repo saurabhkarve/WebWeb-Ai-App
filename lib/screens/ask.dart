@@ -896,12 +896,9 @@ class _AskFormState extends State<_AskForm> {
       );
     }
 
-    Widget? panel;
-    switch (_open) {
-      case 'type':
-        panel = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(t('What is your ask'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
-          const SizedBox(height: 6),
+    final typePills = KeyedSubtree(
+      key: _tk('ask-category'),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Wrap(spacing: 6, runSpacing: 6, children: [
             for (final o in kAskTypes)
               GestureDetector(
@@ -910,7 +907,6 @@ class _AskFormState extends State<_AskForm> {
                   _category = categoryForType(o.value, _category);
                   if (o.value == 'poll' && _pollOpts.where((x) => x.trim().isNotEmpty).length < 2) _pollOpts = ['', ''];
                   _typeChosen = true;
-                  _open = null;
                 }),
                 child: Container(
                   height: 32,
@@ -928,8 +924,12 @@ class _AskFormState extends State<_AskForm> {
                 ),
               ),
           ]),
-          if (askTypeDef(_askType) != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('${t(askTypeDef(_askType)!.label)}: ${t(askTypeDef(_askType)!.hint)}', style: TextStyle(fontSize: 12, color: p.muted))),
-        ]);
+          if (askTypeDef(_askType) != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('${t(askTypeDef(_askType)!.label)}: ${t(askTypeDef(_askType)!.hint)}${_category.isNotEmpty && !_typeChosen ? ' · ${t('Picked from your words. Tap to change.')}' : ''}', style: TextStyle(fontSize: 12, color: p.muted))),
+        ]),
+    );
+
+    Widget? panel;
+    switch (_open) {
       case 'where':
         panel = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
@@ -1092,39 +1092,7 @@ class _AskFormState extends State<_AskForm> {
                   ]),
                   const SizedBox(height: 8),
                 ],
-                Wrap(spacing: 6, runSpacing: 6, children: [
-                    KeyedSubtree(
-                      key: _tk('ask-category'),
-                      child: chip(
-                        'type',
-                        categoryIcon(askTypeDef(_askType)?.icon ?? (_category.isEmpty ? 'other' : _category)),
-                        _category.isEmpty ? t('What is your ask') : (_category == 'other' && _other.text.trim().isNotEmpty ? _other.text.trim() : t(askTypeDef(_askType)?.short ?? kCategoryShort[_category] ?? 'Other')),
-                        _category.isNotEmpty,
-                        auto: _category.isNotEmpty && !_typeChosen,
-                      ),
-                    ),
-                  ]),
-                if (panel != null && _open == 'type')
-                  GestureDetector(
-                    // taps inside the choices never close them (a tap elsewhere on the page does)
-                    onTap: () {},
-                    behavior: HitTestBehavior.opaque,
-                    child: Container(
-                    margin: const EdgeInsets.only(top: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(12), border: Border.all(color: p.border)),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      panel,
-                      if (_open == 'where' || _open == 'budget') ...[
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: GestureDetector(onTap: () => setState(() => _open = null), child: Text(t('Done'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
-                        ),
-                      ],
-                    ]),
-                  ),
-                  ),
+                typePills,
                 if (_askType == 'poll') ...[
                   const SizedBox(height: 10),
                   Text(t('Options to vote on'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
