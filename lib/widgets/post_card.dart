@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
+import '../card_colors.dart';
 import '../i18n.dart';
 import '../links.dart';
 import '../models.dart';
@@ -384,9 +385,12 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     if (isAsk && !widget.detail) {
       // on "Leads for you" the card says why it is a lead for this member
       final why = mine ? t('Your ask') : ((post.leadReason ?? '').isNotEmpty ? leadReasonText(post.leadReason!) : (match == null ? null : t(match)));
+      final tint = kCardColors[cardColorOf(post)]!;
       final spotlight = Container(
         padding: framed ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12) : const EdgeInsets.symmetric(vertical: 20),
-        foregroundDecoration: framed ? null : _HairlineDecoration(kGold.withValues(alpha: .6)),
+        // the asker's colour: a soft wash from the top-left corner and a hairline in the same colour
+        decoration: framed ? null : BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [tint.withValues(alpha: .16), tint.withValues(alpha: 0)], stops: const [0, .55])),
+        foregroundDecoration: framed ? null : _HairlineDecoration(tint.withValues(alpha: .6)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(
             padding: EdgeInsets.zero,

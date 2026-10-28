@@ -48,7 +48,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   Timer? _poll, _svcTimer;
   final _notes = NotificationsModel();
 
-  static const _items = [(WI.connect, 'Connect'), (WI.search, 'Find'), (WI.talk, 'Talk'), (WI.askPlus, 'Ask')];
+  // Home -> Find -> Ask (create, in the middle of the island) -> Notifications -> Talk, as on the web phone menu
+  static const _items = [(WI.home, 'Home'), (WI.search, 'Find'), (WI.connect, 'Ask'), (WI.bell, 'Notifications'), (WI.talk, 'Talk')];
+  static const _ask = 2, _notesTab = 3, _talk = 4;
 
   @override
   void initState() {
@@ -126,8 +128,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   }
 
   void _go(int k) {
-    if (k == 3) _askSpin++;
-    if (k == _i && k == 0) _topTick++; // tapping Connect again scrolls the feed to the top
+    if (k == _ask) _askSpin++;
+    if (k == _notesTab) _notes.refresh(context.read<AuthProvider>());
+    if (k == _i && k == 0) _topTick++; // tapping Home again scrolls the feed to the top
     setState(() => _i = k);
   }
 
@@ -136,11 +139,11 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     final p = Pal.of(context);
     final top = MediaQuery.of(context).padding.top;
     const header = 56.0;
-    // without the island on Ask, back returns to Connect
+    // without the island on Ask, back returns to Home
     return PopScope(
-      canPop: _i != 3,
+      canPop: _i != _ask,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _i == 3) _go(0);
+        if (!didPop && _i == _ask) _go(0);
       },
       child: Scaffold(
       body: Column(children: [
@@ -155,13 +158,14 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                   context: context,
                   removeTop: true,
                   child: IndexedStack(index: _i, children: [
-                    ConnectScreen(refreshTick: _feedTick, topTick: _topTick, onGoAsk: () => _go(3)),
+                    ConnectScreen(refreshTick: _feedTick, topTick: _topTick, onGoAsk: () => _go(_ask)),
                     const FindScreen(),
-                    if (_i == 2) const TalkScreen() else const SizedBox.shrink(), // reload conversations each time it opens
-                    AskScreen(active: _i == 3, onBack: () => _go(0), onPosted: () => setState(() {
+                    AskScreen(active: _i == _ask, onBack: () => _go(0), onPosted: () => setState(() {
                           _feedTick++;
                           _i = 0;
                         })),
+                    _NotesPanel(notes: _notes, page: true),
+                    if (_i == _talk) const TalkScreen() else const SizedBox.shrink(), // reload conversations each time it opens
                   ]),
                 ),
               ),
@@ -179,7 +183,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             // "Waiting for network…" / "Connecting…" under the header, WhatsApp-style
             Positioned(top: top + header + 8, left: 0, right: 0, child: const ConnectionPill()),
             // floating island; on Ask it steps aside so the ask's Publish bar has the bottom edge
-            if (_i != 3) Positioned(
+            if (_i != _ask) Positioned(
               left: 0,
               right: 0,
               bottom: 0,
@@ -211,8 +215,10 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
           for (var k = 0; k < _items.length; k++) ...[
             if (k > 0) const SizedBox(width: 4),
             k == 0
-                ? _islandItem(p, k, badge: _notes.unseen)
-                : KeyedSubtree(key: Tours.key(const ['', 'nav-find', 'nav-talk', 'nav-ask'][k]), child: _islandItem(p, k, badge: k == 2 ? unreadChats.value : 0)),
+                ? _islandItem(p, k)
+                : KeyedSubtree(
+                    key: Tours.key(const ['', 'nav-find', 'nav-ask', 'nav-notes', 'nav-talk'][k]),
+                    child: _islandItem(p, k, badge: k == _notesTab ? _notes.unseen : k == _talk ? unreadChats.value : 0)),
           ],
         ]),
       ),
@@ -221,7 +227,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
 
   Widget _islandItem(Pal p, int k, {int badge = 0}) {
     final active = _i == k;
-    final fg = active ? p.onInk : p.muted;
+    // Ask is the one action: always gold, with a ring when it is the open page
+    final isAsk = k == _ask;
+    final fg = isAsk ? kInk : active ? p.onInk : p.muted;
     return Semantics(
       button: true,
       selected: active,
@@ -231,12 +239,17 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         onTap: () => _go(k),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          width: 68,
+          width: 60,
           height: 56,
-          decoration: BoxDecoration(color: active ? p.ink : Colors.transparent, borderRadius: BorderRadius.circular(24)),
+          decoration: BoxDecoration(
+            color: isAsk ? null : active ? p.ink : Colors.transparent,
+            gradient: isAsk ? kGoldGradient : null,
+            borderRadius: BorderRadius.circular(24),
+            border: isAsk && active ? Border.all(color: p.ink, width: 2) : null,
+          ),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Stack(clipBehavior: Clip.none, children: [
-              WIcon(_items[k].$1, size: 24, color: fg, strokeWidth: active ? 2.2 : 1.9, spinKey: k == 3 ? _askSpin : 0),
+              WIcon(_items[k].$1, size: 24, color: fg, strokeWidth: active || isAsk ? 2.2 : 1.9, spinKey: isAsk ? _askSpin : 0),
               if (badge > 0)
                 Positioned(
                   right: -8,
@@ -246,13 +259,16 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                     constraints: const BoxConstraints(minWidth: 16),
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(8)),
-                    child: Text(badge > 9 && k == 0 ? '9+' : '$badge', style: const TextStyle(color: kInk, fontSize: 10, fontWeight: FontWeight.w700, height: 1)),
+                    decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 3)]),
+                    child: Text(badge > 9 && k == _notesTab ? '9+' : '$badge', style: const TextStyle(color: kInk, fontSize: 10, fontWeight: FontWeight.w700, height: 1)),
                   ),
                 ),
             ]),
             const SizedBox(height: 2),
-            Text(t(_items[k].$2), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, height: 1, color: fg)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: FittedBox(fit: BoxFit.scaleDown, child: Text(t(_items[k].$2), maxLines: 1, style: TextStyle(fontSize: 10, fontWeight: isAsk ? FontWeight.w700 : FontWeight.w500, height: 1, color: fg))),
+            ),
           ]),
         ),
       ),
@@ -297,8 +313,6 @@ class _AppHeader extends StatelessWidget {
                 child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: LogoInline(size: 28, markSize: 36, tagline: true, onTap: onHome)),
               ),
             ),
-            _Bell(notes: notes),
-            const SizedBox(width: 8),
             Builder(
               builder: (ctx) => GestureDetector(
                 onTap: () => _openAccountMenu(ctx),
@@ -315,25 +329,6 @@ class _AppHeader extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Dropdown panels (account menu, notifications) open with the web's `menu-in`: fade + 6 px rise + 0.98 scale.
-Future<void> _showPanel(BuildContext context, Widget Function(BuildContext) builder) {
-  return showGeneralDialog(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: 'Close',
-    barrierColor: Colors.transparent,
-    transitionDuration: const Duration(milliseconds: 140),
-    pageBuilder: (ctx, _, __) => builder(ctx),
-    transitionBuilder: (_, a, __, child) {
-      final v = Curves.easeOut.transform(a.value);
-      return Opacity(
-        opacity: v,
-        child: Transform.translate(offset: Offset(0, 6 * (1 - v)), child: Transform.scale(scale: .98 + .02 * v, alignment: Alignment.topRight, child: child)),
-      );
-    },
-  );
 }
 
 BoxDecoration _panelDecoration(Pal p, {double radius = 14}) => BoxDecoration(
@@ -723,58 +718,13 @@ class NotificationsModel extends ChangeNotifier {
   }
 }
 
-class _Bell extends StatelessWidget {
-  final NotificationsModel notes;
-  const _Bell({required this.notes});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Pal.of(context);
-    return AnimatedBuilder(
-      animation: notes,
-      builder: (ctx, _) => Semantics(
-        button: true,
-        label: t('Notifications'),
-        child: InkResponse(
-          onTap: () {
-            notes.refresh(ctx.read<AuthProvider>());
-            final top = MediaQuery.of(ctx).padding.top + 60;
-            _showPanel(ctx, (c) => Stack(children: [Positioned(top: top, left: 12, right: 12, child: _NotesPanel(notes: notes))]));
-          },
-          radius: 20,
-          child: SizedBox(
-            width: 36,
-            height: 36,
-            child: Center(
-              child: Stack(clipBehavior: Clip.none, children: [
-                WIcon(WI.bell, size: 22, color: p.text),
-                if (notes.unseen > 0)
-                  Positioned(
-                    right: -8,
-                    top: -6,
-                    child: Container(
-                      height: 16,
-                      constraints: const BoxConstraints(minWidth: 16),
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 3)]),
-                      child: Text(notes.unseen > 9 ? '9+' : '${notes.unseen}', style: const TextStyle(color: kInk, fontSize: 10, fontWeight: FontWeight.w700, height: 1)),
-                    ),
-                  ),
-              ]),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Notifications panel (web notification-bell.tsx): All / Unread / Read, "Mark all as read", a row to
 /// turn on phone alerts when they are off, then "who did what on which ask".
 class _NotesPanel extends StatefulWidget {
   final NotificationsModel notes;
-  const _NotesPanel({required this.notes});
+  /// true: the Notifications tab (fills the page, no pop on tap); false: a floating panel
+  final bool page;
+  const _NotesPanel({required this.notes, this.page = false});
   @override
   State<_NotesPanel> createState() => _NotesPanelState();
 }
@@ -805,9 +755,9 @@ class _NotesPanelState extends State<_NotesPanel> {
           final n = widget.notes;
           final shown = n.items.where((i) => _filter == 'all' || (_filter == 'unread' ? i.unseen : !i.unseen)).toList();
           return Container(
-            decoration: _panelDecoration(p, radius: 16),
+            decoration: widget.page ? BoxDecoration(color: p.canvas) : _panelDecoration(p, radius: 16),
             clipBehavior: Clip.antiAlias,
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            child: Column(mainAxisSize: widget.page ? MainAxisSize.max : MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border))),
@@ -865,8 +815,8 @@ class _NotesPanelState extends State<_NotesPanel> {
                     ),
                   ]),
                 ),
-              ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .62),
+              _bound(
+                context,
                 child: !n.loaded
                     ? const Padding(padding: EdgeInsets.all(24), child: Center(child: LogoLoader(size: 28)))
                     : n.items.isEmpty
@@ -874,8 +824,8 @@ class _NotesPanelState extends State<_NotesPanel> {
                         : shown.isEmpty
                             ? _empty(p, t(_filter == 'unread' ? "You're all caught up." : 'Nothing read yet.'))
                             : ListView.builder(
-                                shrinkWrap: true,
-                                padding: EdgeInsets.zero,
+                                shrinkWrap: !widget.page,
+                                padding: EdgeInsets.only(bottom: widget.page ? 100 : 0),
                                 itemCount: shown.length,
                                 itemBuilder: (_, i) {
                                   final x = shown[i];
@@ -884,7 +834,7 @@ class _NotesPanelState extends State<_NotesPanel> {
                                     onTap: () {
                                       n.markSeen(auth);
                                       final nav = Navigator.of(context);
-                                      nav.pop();
+                                      if (!widget.page) nav.pop();
                                       nav.push(MaterialPageRoute(builder: (_) => PostDetailScreen(postId: x.postId)));
                                     },
                                     child: Container(
@@ -923,6 +873,10 @@ class _NotesPanelState extends State<_NotesPanel> {
       ),
     );
   }
+
+  /// the list: filling the rest of the page on the tab, a capped height in the floating panel
+  Widget _bound(BuildContext context, {required Widget child}) =>
+      widget.page ? Expanded(child: child) : ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .62), child: child);
 
   Widget _empty(Pal p, String text) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),

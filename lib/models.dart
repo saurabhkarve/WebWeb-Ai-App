@@ -274,6 +274,8 @@ class Post {
   /// on "Leads for you": why it fits, and whether the member has seen it yet
   final String? leadReason;
   final bool leadNew;
+  /// the colour the asker gave the card (one of kCardColors); null on older asks
+  final String? cardColor;
   /// a WEBWEB Facts post: the figure and its source (GET /posts/facts), drawn as a data card
   final PostFact? fact;
 
@@ -283,7 +285,7 @@ class Post {
     this.urgency, this.matchReason, this.slug, this.categoryLabel, this.authorType = 'entrepreneur', this.authorVerification = 1, this.authorPremium = false, this.authorPlan, this.distanceM, this.radiusM, this.lat, this.lng, this.editedAt, this.repostedByName, this.repostedByHandle, this.repostedBy, this.repostedAt, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
     this.recentResponses = const [], this.latestReplies = const [], this.referrers = const [], this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0, this.viewsCount = 0,
     this.reacted = false, this.reposted = false, this.bookmarked = false, this.myReaction,
-    this.outcome, this.wonBy, this.leadReason, this.leadNew = false, this.fact,
+    this.outcome, this.wonBy, this.leadReason, this.leadNew = false, this.fact, this.cardColor,
   });
 
   bool get closed => outcome != null;
@@ -315,7 +317,7 @@ class Post {
         reactionsCount: (j['reactionsCount'] as num?)?.toInt() ?? 0, viewsCount: (j['viewsCount'] as num?)?.toInt() ?? 0, repostsCount: (j['repostsCount'] as num?)?.toInt() ?? 0,
         referralsCount: (j['referralsCount'] as num?)?.toInt() ?? 0, reacted: j['reacted'] == true, reposted: j['reposted'] == true,
         bookmarked: j['bookmarked'] == true, myReaction: j['myReaction'] as String? ?? (j['reacted'] == true ? 'heart' : null),
-        outcome: j['outcome'] as String?, wonBy: j['wonBy'] as String?, leadReason: j['leadReason'] as String?, leadNew: j['leadNew'] == true,
+        outcome: j['outcome'] as String?, wonBy: j['wonBy'] as String?, leadReason: j['leadReason'] as String?, leadNew: j['leadNew'] == true, cardColor: j['cardColor'] as String?,
         fact: j['fact'] is Map ? PostFact.fromJson(j['fact'] as Map) : null,
       );
 }

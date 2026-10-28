@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../auth_provider.dart';
+import '../card_colors.dart';
 import '../i18n.dart';
 import '../location.dart';
 import '../models.dart';
@@ -255,6 +256,7 @@ class _AskFormState extends State<_AskForm> {
   String _location = '';
   String _urgency = '7_days';
   String _budget = '';
+  String _color = randomCardColor(); // the card's colour: random until the member picks one
   int _budgetKey = 0; // rebuilds the budget fields when the value is set from outside
   ({double lat, double lng, int radiusM})? _geo;
   bool _locating = false;
@@ -378,6 +380,7 @@ class _AskFormState extends State<_AskForm> {
     _location = e.locationPref ?? '';
     _urgency = e.urgency ?? '';
     _budget = e.budget ?? '';
+    _color = cardColorOf(e);
     final c = findPlace(_location);
     final lat = e.lat ?? c?.lat, lng = e.lng ?? c?.lng;
     if (lat != null && lng != null) _geo = (lat: lat, lng: lng, radiusM: e.radiusM?.toInt() ?? (c == null ? 100000 : _cityRadius(c)));
@@ -581,6 +584,7 @@ class _AskFormState extends State<_AskForm> {
           'locationPref': _location,
           'budget': _budget,
           'urgency': _urgency,
+          'cardColor': _color,
           if (_geo != null) ...{'radiusM': _geo!.radiusM, if (_geoMoved) ...{'lat': _geo!.lat, 'lng': _geo!.lng}},
           'images': images,
         });
@@ -595,6 +599,7 @@ class _AskFormState extends State<_AskForm> {
         if (_location.isNotEmpty) 'locationPref': _location,
         if (_budget.isNotEmpty) 'budget': _budget,
         if (_urgency.isNotEmpty) 'urgency': _urgency,
+        'cardColor': _color,
         if (_geo != null) ...{'lat': _geo!.lat, 'lng': _geo!.lng, 'radiusM': _geo!.radiusM},
         'images': images,
       }) as Map;
@@ -610,6 +615,7 @@ class _AskFormState extends State<_AskForm> {
         _budget = '';
         _budgetKey++;
         _urgency = '7_days';
+        _color = randomCardColor();
         _savedDraft = null;
         _undoTpl = null;
         _aiUndo = null;
@@ -1122,6 +1128,38 @@ class _AskFormState extends State<_AskForm> {
                 ]),
                 const SizedBox(height: 10),
                 // the essentials as chips, as on Connect; each opens its choices
+                // the card's colour, as members will see it on Connect
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(children: [
+                    Text(t('Card colour'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+                    const SizedBox(width: 10),
+                    for (final e in kCardColors.entries)
+                      Semantics(
+                        button: true,
+                        selected: _color == e.key,
+                        label: e.key,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setState(() => _color = e.key),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                color: e.value,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: _color == e.key ? p.text : Colors.transparent, width: 2),
+                              ),
+                              child: _color == e.key ? const Icon(Icons.check, size: 13, color: Colors.white) : null,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ]),
+                ),
                 KeyedSubtree(
                   key: _tk('ask-details'),
                   child: Wrap(spacing: 6, runSpacing: 6, children: [

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -12,16 +13,19 @@ class TourStep {
   final String? target;
   final String title;
   final String body;
-  const TourStep(this.title, this.body, [this.target]);
+  /// an animated picture above the text in a centred card ('give-take')
+  final String? visual;
+  const TourStep(this.title, this.body, [this.target, this.visual]);
 }
 
 /// The first-login tour of the app: the feed (same wording as the web's components/tour.tsx, so the
 /// translations are shared), then the tabs and the account menu, where "Take the app tour" replays it.
 /// Its id changes when it gains new stops, so members who saw the earlier one see it once more ("connect2":
 /// leads, I can do this, closing an ask, your week; "connect3": Today in your area, show your work, alerts).
-const kConnectTourId = 'connect3';
+const kConnectTourId = 'connect4';
 const kConnectTour = [
   TourStep('Welcome to WebWeb', 'Businesses and job seekers near you ask for what they need here, and others answer with a contact. Here is a 30-second look around.'),
+  TourStep('Give and Take: how business grows here', 'Take: you need something, so you post an ask and pick who helps. Give: you can help, so you answer asks that fit you. Do both, and your name and rank grow.', null, 'give-take'),
   TourStep('Leads for you', 'Asks that fit your business, picked for you every day. The number shows the new ones: tap to see them, and reply early.', 'today'),
   TourStep('Today in your area', "Rates, notices, tenders and events near you, new every morning, and a quick question. A gold ring means there's something new.", 'today-area'),
   TourStep('Show your work', "Post a photo of a job you finished or new stock. It stays up for 24 hours, and we'll tell you how many businesses saw it.", 'updates'),
@@ -30,8 +34,8 @@ const kConnectTour = [
   TourStep('Say "I can do this"', 'Reply opens with I can do this: add your price and when you can do it, so the asker can compare. A note or photo is optional.', 'reply'),
   TourStep('Know someone who can help?', 'Refer shares a contact from your phone book for this ask, so the right person gets the work.', 'refer'),
   TourStep('Find', 'Search members, businesses and asks by what they do and where.', 'nav-find'),
-  TourStep('Talk', 'Your chats and calls. Message @webwebai, the WebWeb AI assistant, for contacts or to post an ask for you.', 'nav-talk'),
   TourStep('Need something yourself?', 'Tap Ask to post what you need. When you find someone, close your ask and pick who you chose: they hear they won the job.', 'nav-ask'),
+  TourStep('Talk', 'Your chats and calls. Message @webwebai, the WebWeb AI assistant, for contacts or to post an ask for you.', 'nav-talk'),
   TourStep('Alerts, your week, and this tour', 'Set alerts for the asks you want first. Every Monday, Your week shows your leads, replies, jobs won and your rank. Find them here, with this tour.', 'account'),
 ];
 
@@ -201,6 +205,7 @@ class _TourOverlayState extends State<_TourOverlay> {
           Text(t('{n} of {total}', {'n': '${_i + 1}', 'total': '${widget.steps.length}'}).toUpperCase(),
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .8, color: p.muted)),
           const SizedBox(height: 4),
+          if (step.visual == 'give-take') ...[const _GiveTake(), const SizedBox(height: 10)],
           Text(t(step.title), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
           Text(t(step.body), style: TextStyle(fontSize: 14, height: 1.4, color: p.text)),
@@ -293,4 +298,117 @@ class _HolePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_HolePainter old) => old.hole != hole || old.color != color;
+}
+
+/// [Take] = I need something: ask, replies come in, pick one. [Give] = I can do it: a lead arrives, I reply, I'm chosen.
+const _scenes = {
+  'take': [
+    ('📣', 'You post an ask', 'Need 5 CNC operators in Turbhe'),
+    ('💬', 'Members reply with a price', '₹18,000 · ₹16,500 · ₹17,200'),
+    ('🏆', 'You pick one, they win the job', 'Close your ask, they hear it'),
+  ],
+  'give': [
+    ('🔔', 'A lead arrives that fits you', 'Asks matching your business'),
+    ('🙋', 'You tap "I can do this"', 'Add your price and when'),
+    ('⭐', 'They choose you', 'Jobs won build your rank'),
+  ],
+};
+
+class _GiveTake extends StatefulWidget {
+  const _GiveTake();
+  @override
+  State<_GiveTake> createState() => _GiveTakeState();
+}
+
+class _GiveTakeState extends State<_GiveTake> {
+  String _mode = 'take';
+  int _n = 0;
+  bool _auto = true;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 2200), (_) {
+      if (_auto && mounted) setState(() => _n = (_n + 1) % 3);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final scenes = _scenes[_mode]!;
+    Widget tab(String m, String label) => Expanded(
+          child: GestureDetector(
+            onTap: () => setState(() {
+              _mode = m;
+              _n = 0;
+              _auto = true;
+            }),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(gradient: _mode == m ? kGoldGradient : null, borderRadius: BorderRadius.circular(99)),
+              child: Text(t(label), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _mode == m ? kInk : p.muted)),
+            ),
+          ),
+        );
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [kGold.withValues(alpha: .22), kGold.withValues(alpha: .06)]), borderRadius: BorderRadius.circular(14)),
+      child: Column(children: [
+        Container(
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(color: p.canvas.withValues(alpha: .7), borderRadius: BorderRadius.circular(99)),
+          child: Row(children: [tab('take', 'I need something (Take)'), tab('give', 'I can help (Give)')]),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 80,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 400),
+            transitionBuilder: (c, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, .2), end: Offset.zero).animate(a), child: c)),
+            child: Container(
+              key: ValueKey('$_mode$_n'),
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(12)),
+              child: Row(children: [
+                Container(width: 46, height: 46, alignment: Alignment.center, decoration: BoxDecoration(color: kGold.withValues(alpha: .25), shape: BoxShape.circle), child: Text(scenes[_n].$1, style: const TextStyle(fontSize: 24))),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(t(scenes[_n].$2), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25)),
+                    Text(t(scenes[_n].$3), style: TextStyle(fontSize: 12, color: p.muted)),
+                  ]),
+                ),
+              ]),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          for (var k = 0; k < 3; k++)
+            GestureDetector(
+              onTap: () => setState(() {
+                _n = k;
+                _auto = false;
+              }),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: AnimatedContainer(duration: const Duration(milliseconds: 200), width: k == _n ? 22 : 8, height: 8, decoration: BoxDecoration(color: k == _n ? kGold : p.border, borderRadius: BorderRadius.circular(4))),
+              ),
+            ),
+        ]),
+        Text(t('Every reply you give builds your name. Every ask you take makes your business grow.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .7))),
+      ]),
+    );
+  }
 }

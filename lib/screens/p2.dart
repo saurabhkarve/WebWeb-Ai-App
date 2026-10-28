@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'package:share_plus/share_plus.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -321,7 +323,10 @@ class _PollCardState extends State<PollCard> {
   late Poll _poll = widget.poll;
   final _value = TextEditingController();
   bool _busy = false;
+  int? _picked;
   String? _error;
+
+  static const _letters = ['A', 'B', 'C', 'D'];
 
   @override
   void dispose() {
@@ -332,16 +337,31 @@ class _PollCardState extends State<PollCard> {
   Future<void> _send({int? option, num? value}) async {
     setState(() {
       _busy = true;
+      _picked = option;
       _error = null;
     });
     try {
       final r = Poll.fromJson(await context.read<AuthProvider>().api.post('/polls/${_poll.id}/answer', {if (option != null) 'option': option, if (value != null) 'value': value}) as Map);
       if (mounted) setState(() => _poll = r);
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (mounted) {
+        setState(() {
+          _error = '$e';
+          _picked = null;
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// "Closes in 3 hr" for the strip under the question
+  String _closesIn() {
+    final left = _poll.closesAt.difference(DateTime.now());
+    if (left.isNegative) return t('Closed');
+    if (left.inHours >= 48) return t('Closes in {n} days', {'n': (left.inHours / 24).round()});
+    if (left.inMinutes >= 60) return t('Closes in {n} hr', {'n': (left.inMinutes / 60).round()});
+    return t('Closes in {n} min', {'n': left.inMinutes < 1 ? 1 : left.inMinutes});
   }
 
   @override
@@ -358,16 +378,18 @@ class _PollCardState extends State<PollCard> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // a story card names it in its own strip
         if (!bare) ...[
-          Row(children: [
-            Expanded(child: Text('❓ ${t(q.kind == 'rate' ? 'Rate check' : "Today's question").toUpperCase()}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.tagText))),
-            Text(answers, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: p.muted)),
-          ]),
+          Text('❓ ${t(q.kind == 'rate' ? 'Rate check' : "Today's question").toUpperCase()}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.tagText)),
           const SizedBox(height: 4),
         ],
-        Text(_question(q), style: bare ? const TextStyle(fontSize: 22, height: 1.2, fontWeight: FontWeight.w800) : const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        if (bare) Padding(padding: const EdgeInsets.only(top: 4), child: Text('👥 $answers', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted))),
-        if (open && q.kind == 'rate') ...[
-          const SizedBox(height: 12),
+        Text(_question(q), style: bare ? const TextStyle(fontSize: 22, height: 1.2, fontWeight: FontWeight.w800) : const TextStyle(fontSize: 18, height: 1.3, fontWeight: FontWeight.w700)),
+        Padding(
+          padding: const EdgeInsets.only(top: 6, bottom: 12),
+          child: Wrap(spacing: 12, runSpacing: 2, children: [
+            Text('👥 $answers', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+            if (!q.closed) Text('⏳ ${_closesIn()}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+          ]),
+        ),
+        if (open && q.kind == 'rate')
           Row(children: [
             Expanded(
               child: AppField(
@@ -388,88 +410,194 @@ class _PollCardState extends State<PollCard> {
               onPressed: _value.text.trim().isEmpty ? null : () => _send(value: num.tryParse(_value.text.trim())),
             ),
           ]),
-        ],
-        if (open && q.kind == 'poll') ...[
-          const SizedBox(height: 12),
+        // big tappable choices with letter badges
+        if (open && q.kind == 'poll')
           for (var i = 0; i < q.options.length; i++)
             Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: SizedBox(width: double.infinity, child: GoldButton(label: q.options[i], outlined: true, height: 40, onPressed: _busy ? null : () => _send(option: i))),
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Opacity(
+                opacity: _busy && _picked != i ? .45 : 1,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _busy ? null : () => _send(option: i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: _picked == i ? kGold.withValues(alpha: .15) : p.canvas,
+                      border: Border.all(color: _picked == i ? kGold : p.border, width: 2),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(color: _picked == i ? kGold : p.chip, shape: BoxShape.circle),
+                        child: Text(_busy && _picked == i ? '…' : _letters[i % 4], style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: _picked == i ? kInk : p.muted)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(q.options[i], style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
+                    ]),
+                  ),
+                ),
+              ),
             ),
-        ],
-        if (open) Padding(padding: const EdgeInsets.only(top: 8), child: Text(t('Answers are anonymous. See what others said after you answer.'), style: TextStyle(fontSize: 12, color: p.muted))),
+        if (open) Padding(padding: const EdgeInsets.only(top: 2), child: Text('🔒 ${t('Answers are anonymous. See what others said after you answer.')}', style: TextStyle(fontSize: 12, color: p.muted))),
         if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: TextStyle(fontSize: 12, color: p.danger))),
         if (!open)
           if (res == null || !res.ready)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text(t("Results at 5 answers · {n} so far. We'll tell you when they're in.", {'n': res?.n ?? q.answers}), style: TextStyle(fontSize: 14, color: p.muted)),
-            )
-          else if (q.kind == 'rate')
-            _rateResult(p, q, res)
-          else
-            _pollResult(p, q, res),
+            _locked(p, q, res)
+          else ...[
+            if (q.kind == 'rate') _rateResult(p, q, res) else _pollResult(p, q, res),
+            _shareButton(p, q),
+          ],
       ]),
     );
   }
+
+  /// Until 5 answers: thanks, and how close it is
+  Widget _locked(Pal p, Poll q, PollResult? res) {
+    final n = res?.n ?? q.answers;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: p.chip.withValues(alpha: .6), borderRadius: BorderRadius.circular(14)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(q.answered ? '✓ ${t('Thanks, your answer is in')}' : t('Closed'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Row(children: [
+          for (var k = 0; k < 5; k++) Expanded(child: Container(height: 8, margin: EdgeInsets.only(right: k < 4 ? 6 : 0), decoration: BoxDecoration(color: k < n ? kGold : p.border, borderRadius: BorderRadius.circular(99)))),
+        ]),
+        const SizedBox(height: 6),
+        Text(t("Results at 5 answers · {n} so far. We'll tell you when they're in.", {'n': n}), style: TextStyle(fontSize: 12, color: p.muted)),
+      ]),
+    );
+  }
+
+  Widget _shareButton(Pal p, Poll q) => Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: GestureDetector(
+          onTap: () => SharePlus.instance.share(ShareParams(text: '${_question(q)}\n$siteUrl/today?poll=${q.id}')),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(border: Border.all(color: p.border), borderRadius: BorderRadius.circular(99)),
+            child: Text('📤 ${t('Share with a group')}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
+          ),
+        ),
+      );
 
   Widget _rateResult(Pal p, Poll q, PollResult res) {
     final low = res.low ?? 0, high = res.high ?? 0;
     double at(num v) => ((v - low) / (high - low == 0 ? 1 : high - low)).clamp(0, 1).toDouble();
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
+    final med = res.median, mine = q.myValue;
+    String? vs;
+    if (mine != null && med != null) {
+      vs = mine == med
+          ? t('You said {v}: right on the median', {'v': _money(mine)})
+          : mine > med
+              ? t('You said {v}: {d} above the median', {'v': _money(mine), 'd': _money(mine - med)})
+              : t('You said {v}: {d} below the median', {'v': _money(mine), 'd': _money(med - mine)});
+    }
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: p.chip.withValues(alpha: .5), borderRadius: BorderRadius.circular(14)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Wrap(crossAxisAlignment: WrapCrossAlignment.end, spacing: 12, runSpacing: 4, children: [
-          Text(_money(res.median), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
-          Text('${t('median')}${(q.unit ?? '').isEmpty ? '' : ' /${q.unit}'}', style: TextStyle(fontSize: 14, color: p.muted)),
-          Text.rich(TextSpan(children: [
-            TextSpan(text: '${t('Range')} '),
-            TextSpan(text: '${_money(res.low)} – ${_money(res.high)}', style: TextStyle(fontWeight: FontWeight.w700, color: p.text)),
-          ]), style: TextStyle(fontSize: 14, color: p.muted)),
+        Text(t('What members say').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.muted)),
+        const SizedBox(height: 4),
+        Wrap(crossAxisAlignment: WrapCrossAlignment.end, spacing: 10, children: [
+          Text(_money(med), style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800)),
+          Padding(padding: const EdgeInsets.only(bottom: 5), child: Text('${t('median')}${(q.unit ?? '').isEmpty ? '' : ' /${q.unit}'}', style: TextStyle(fontSize: 14, color: p.muted))),
         ]),
-        const SizedBox(height: 12),
-        // where the member's own answer sits in the range
-        LayoutBuilder(builder: (_, c) {
-          Widget dot(num v, Color color) => Positioned(left: at(v) * (c.maxWidth - 14), top: -3, child: Container(width: 14, height: 14, decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: p.canvas, width: 2))));
-          return SizedBox(
-            height: 8,
-            child: Stack(clipBehavior: Clip.none, children: [
-              Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(99), gradient: LinearGradient(colors: [kGold.withValues(alpha: .25), kGold.withValues(alpha: .7)]))),
-              if (res.median != null) dot(res.median!, p.text),
-              if (q.myValue != null) dot(q.myValue!, p.link),
-            ]),
-          );
-        }),
-        if (q.myValue != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(t('You said {v}', {'v': _money(q.myValue)}), style: TextStyle(fontSize: 12, color: p.muted))),
-        if (res.places.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(res.places.map((x) => '${x.place} ${_money(x.median)}').join(' · '), style: TextStyle(fontSize: 12, color: p.muted))),
+        const SizedBox(height: 16),
+        // where the member's own answer sits in the range; the dots slide in
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1),
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.easeOut,
+          builder: (_, k, __) => LayoutBuilder(builder: (_, c) {
+            Widget dot(num v, Color color) => Positioned(left: at(v) * k * (c.maxWidth - 16), top: -3, child: Container(width: 16, height: 16, decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: p.canvas, width: 2))));
+            return SizedBox(
+              height: 10,
+              child: Stack(clipBehavior: Clip.none, children: [
+                Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(99), gradient: LinearGradient(colors: [kGold.withValues(alpha: .25), kGold.withValues(alpha: .75)]))),
+                if (med != null) dot(med, p.text),
+                if (mine != null) dot(mine, p.link),
+              ]),
+            );
+          }),
+        ),
+        const SizedBox(height: 6),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text('${t('Low')} ${_money(res.low)}', style: TextStyle(fontSize: 12, color: p.muted)),
+          Text('${t('High')} ${_money(res.high)}', style: TextStyle(fontSize: 12, color: p.muted)),
+        ]),
+        if (vs != null) Padding(padding: const EdgeInsets.only(top: 10), child: Text(vs, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+        if (res.places.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(res.places.map((x) => '${x.place} ${_money(x.median)}').join(' · '), style: TextStyle(fontSize: 12, color: p.muted))),
       ]),
     );
   }
 
-  Widget _pollResult(Pal p, Poll q, PollResult res) => Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: Column(children: [
-          for (var i = 0; i < q.options.length; i++)
-            Builder(builder: (_) {
-              final pct = ((res.counts?.elementAtOrNull(i) ?? 0) / (res.n == 0 ? 1 : res.n) * 100).round();
-              return Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                decoration: BoxDecoration(border: Border.all(color: p.border), borderRadius: BorderRadius.circular(8)),
-                clipBehavior: Clip.antiAlias,
-                child: Stack(children: [
-                  Positioned.fill(child: FractionallySizedBox(alignment: Alignment.centerLeft, widthFactor: pct / 100, child: Container(color: kGold.withValues(alpha: .25)))),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    child: Row(children: [
-                      Expanded(child: Text('${q.options[i]}${q.myOption == i ? ' ✓' : ''}', style: TextStyle(fontSize: 14, fontWeight: q.myOption == i ? FontWeight.w700 : FontWeight.w400))),
-                      Text('$pct%', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+  Widget _pollResult(Pal p, Poll q, PollResult res) {
+    final counts = res.counts ?? const <int>[];
+    final most = counts.isEmpty ? 0 : counts.reduce(math.max);
+    return Column(children: [
+      for (var i = 0; i < q.options.length; i++)
+        Builder(builder: (_) {
+          final count = counts.elementAtOrNull(i) ?? 0;
+          final pct = (count / (res.n == 0 ? 1 : res.n) * 100).round();
+          final top = count > 0 && count == most, mine = q.myOption == i;
+          Widget tag(String text, Color bg, Color fg) => Container(
+                margin: const EdgeInsets.only(left: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(99)),
+                child: Text(text, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: fg)),
+              );
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(color: mine ? null : p.chip.withValues(alpha: .5), border: Border.all(color: mine ? kGold : Colors.transparent, width: 2), borderRadius: BorderRadius.circular(14)),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(children: [
+              // the bar grows in, each a little after the one above
+              Positioned.fill(
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: pct / 100),
+                  duration: Duration(milliseconds: 600 + i * 90),
+                  curve: Curves.easeOut,
+                  builder: (_, w, __) => FractionallySizedBox(alignment: Alignment.centerLeft, widthFactor: w, child: Container(color: kGold.withValues(alpha: top ? .55 : .25))),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: mine ? kGold : p.canvas.withValues(alpha: .8), shape: BoxShape.circle),
+                    child: Text(mine ? '✓' : _letters[i % 4], style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: mine ? kInk : p.muted)),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, runSpacing: 2, children: [
+                      Text(q.options[i], style: TextStyle(fontSize: 14, fontWeight: top || mine ? FontWeight.w700 : FontWeight.w500)),
+                      if (top) tag('👑 ${t('Most picked')}', kGold, kInk),
+                      if (mine) tag(t('Your pick'), p.text, p.canvas),
                     ]),
                   ),
+                  const SizedBox(width: 8),
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text('$pct%', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, height: 1.1)),
+                    Text(t(count == 1 ? '1 vote' : '{n} votes', {'n': count}), style: TextStyle(fontSize: 10.5, color: p.muted)),
+                  ]),
                 ]),
-              );
-            }),
-        ]),
-      );
+              ),
+            ]),
+          );
+        }),
+    ]);
+  }
 }
 
 // ===================== alerts =====================
