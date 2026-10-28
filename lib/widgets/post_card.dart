@@ -879,7 +879,8 @@ class PostActionsState extends State<PostActions> {
           constraints: BoxConstraints(minWidth: wide ? 0 : 56, minHeight: wide ? 32 : 0),
           padding: wide ? const EdgeInsets.symmetric(horizontal: 10) : const EdgeInsets.fromLTRB(10, 6, 10, 4),
           decoration: BoxDecoration(
-            color: fill ?? p.card,
+            // dark mode on a phone: no fill or outline at all, seamless as in light mode
+            color: !wide && p.dark ? null : fill ?? p.card,
             borderRadius: radius,
             // on a phone no outline or shadow (Refer keeps its gold fill), as on the web
             border: wide ? Border.all(color: edge ?? p.border) : null,
