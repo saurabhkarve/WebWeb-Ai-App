@@ -671,7 +671,9 @@ class ChatSummary {
   final String? lastMessage;
   final DateTime? lastMessageAt;
   final bool unread;
-  ChatSummary({required this.id, required this.peer, this.lastMessage, this.lastMessageAt, this.unread = false});
+  /// ticks of my last message (sent | delivered | read); null when the last message is not mine
+  final String? lastStatus;
+  ChatSummary({required this.id, required this.peer, this.lastMessage, this.lastMessageAt, this.unread = false, this.lastStatus});
 
   factory ChatSummary.fromJson(Map j, String meUid) {
     final info = Map<String, dynamic>.from(j['participantInfo'] as Map);
@@ -681,7 +683,7 @@ class ChatSummary {
       id: '${j['id']}',
       peer: Peer(uid: other, name: '${p['name'] ?? ''}', company: '${p['company'] ?? ''}', handle: '${p['handle'] ?? ''}', userType: '${p['userType'] ?? 'entrepreneur'}', photoUrl: p['photoURL'] as String?,
           verification: (p['verification'] as num?)?.toInt() ?? 0, premium: p['premium'] == true, plan: p['plan'] as String?),
-      lastMessage: j['lastMessage'] as String?, lastMessageAt: _msOpt(j['lastMessageAt']), unread: j['unread'] == true,
+      lastMessage: j['lastMessage'] as String?, lastMessageAt: _msOpt(j['lastMessageAt']), unread: j['unread'] == true, lastStatus: j['lastStatus'] as String?,
     );
   }
 }

@@ -466,6 +466,7 @@ class _TalkScreenState extends State<TalkScreen> {
               ),
           ]),
           bottom: Row(children: [
+            if (c.lastStatus != null) Padding(padding: const EdgeInsets.only(right: 4), child: WIcon(c.lastStatus == 'sent' ? WI.tick : WI.tickDouble, size: 16, color: c.lastStatus == 'read' ? const Color(0xFF0EA5E9) : p.muted, strokeWidth: 1.8)),
             Expanded(
               child: Text(c.lastMessage ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, height: 1.25, fontWeight: c.unread ? FontWeight.w700 : FontWeight.w500, color: c.unread ? p.text : p.muted)),
             ),
