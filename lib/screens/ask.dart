@@ -282,6 +282,7 @@ class _AskFormState extends State<_AskForm> {
   /// before an AI suggestion was used: title, details
   (String, String)? _aiUndo;
   Timer? _draftTimer;
+  bool _hadText = false;
   /// the local AI's reading of the category (web: aiCategory), asked once the title is written and details typed
   Timer? _aiCatTimer;
   String? _aiCat;
@@ -437,7 +438,17 @@ class _AskFormState extends State<_AskForm> {
   }
 
   Future<void> _saveDraft() async {
-    if (_editing || (_title.text.isEmpty && _desc.text.isEmpty)) return;
+    if (_editing) return;
+    if (_title.text.isEmpty && _desc.text.isEmpty) {
+      // everything typed was deleted: nothing to continue next time
+      if (_hadText) {
+        try {
+          (await SharedPreferences.getInstance()).remove(_draftKey);
+        } catch (_) {}
+      }
+      return;
+    }
+    _hadText = true;
     try {
       (await SharedPreferences.getInstance()).setString(_draftKey, jsonEncode({
         'category': _category, 'title': _title.text, 'description': _desc.text, 'locationPref': _location, 'urgency': _urgency, 'budget': _budget,
