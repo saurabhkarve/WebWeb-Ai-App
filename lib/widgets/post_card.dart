@@ -56,13 +56,8 @@ class PostCard extends StatefulWidget {
   State<PostCard> createState() => _PostCardState();
 }
 
-/// "HIRE", "BUY / QUOTE · REPAIR": the ask's type, with its topic when that says more
-String _typeLabel(Post post) {
-  final type = askTypeDef(askTypeOf(post)) ?? kAskTypes.last;
-  if (post.category == 'other' && (post.categoryLabel ?? '').isNotEmpty) return post.categoryLabel!;
-  final topic = post.category != null && post.category != type.forced && typeOfCategory(post.category) == type.value ? kCategoryShort[post.category] : null;
-  return [t(type.short), if (topic != null) t(topic)].join(' · ');
-}
+/// "HIRE", "BUY / QUOTE · REPAIR": the ask's type, with its topic (the same as on its first card)
+String _typeLabel(Post post) => askLabel(post);
 
 String _sentence(Post post) {
   final s = askSentence(post);
@@ -513,6 +508,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                         mine: mine,
                         onOpen: _openDetail,
                         onReply: _reply,
+                        onQuickReact: _quickReact,
                         onVoted: (v) => setState(() => post = v),
                       ),
                     ),

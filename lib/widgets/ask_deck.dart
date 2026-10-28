@@ -11,6 +11,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../location.dart' show kNodeCoords;
 import 'area_map.dart' show AreaMap, askTimeLeft;
+import 'image_grid.dart' show openImageViewer;
 import 'poll_vote.dart';
 
 enum DeckKind { headline, poll, photos, details, budget, map, glance, act }
@@ -31,8 +32,10 @@ class AskDeck extends StatefulWidget {
   final void Function(DeckKind kind)? onCardTap;
   final bool mine;
   final VoidCallback? onOpen, onReply;
+  /// double tap on the photos: the quick reaction
+  final VoidCallback? onQuickReact;
   final void Function(Post voted)? onVoted;
-  const AskDeck({super.key, required this.post, this.preview = false, this.images = const [], this.reachLabel, this.onCardTap, this.mine = false, this.onOpen, this.onReply, this.onVoted});
+  const AskDeck({super.key, required this.post, this.preview = false, this.images = const [], this.reachLabel, this.onCardTap, this.mine = false, this.onOpen, this.onReply, this.onQuickReact, this.onVoted});
   @override
   State<AskDeck> createState() => _AskDeckState();
 }
@@ -168,16 +171,16 @@ class _AskDeckState extends State<AskDeck> {
     switch (kind) {
       case DeckKind.headline:
         final type = askTypeDef(askTypeOf(post)) ?? kAskTypes.last;
-        final topic = post.category != null && post.category != 'other' && typeOfCategory(post.category) == type.value && post.category != type.forced ? kCategoryShort[post.category] : null;
-        final cat = post.category == 'other' && (post.categoryLabel ?? '').isNotEmpty ? post.categoryLabel! : [t(type.short), if (topic != null) t(topic)].join(' · ');
+        final cat = askLabel(post);
         final sentence = askSentence(post);
-        return Padding(
+        final thumbs = !widget.preview && post.images.isNotEmpty;
+        final card = Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               WIcon(categoryIcon(type.icon), size: 14, color: p.link, still: true),
               const SizedBox(width: 6),
-              Flexible(child: Text(cat.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link))),
+              Flexible(child: Padding(padding: EdgeInsets.only(right: thumbs ? 118 : 0), child: Text(cat.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link)))),
             ]),
             const SizedBox(height: 8),
             // who wants what, in a line: the idea of the ask before its details
@@ -225,6 +228,37 @@ class _AskDeckState extends State<AskDeck> {
             ]),
           ]),
         );
+        if (!thumbs) return card;
+        // the photos, small: a tap opens them big, a double tap is the quick reaction
+        final urls = post.images;
+        return Stack(children: [
+          card,
+          Positioned(
+            right: 12,
+            top: 12,
+            child: Row(children: [
+              for (var k = 0; k < urls.length && k < 3; k++)
+                Padding(
+                  padding: EdgeInsets.only(left: k == 0 ? 0 : 4),
+                  child: GestureDetector(
+                    onTap: () => openImageViewer(context, urls, k, shareUrl: post.webUrl, shareRef: post.id),
+                    onDoubleTap: widget.mine ? null : widget.onQuickReact,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white.withValues(alpha: .25)), color: p.chip),
+                      clipBehavior: Clip.antiAlias,
+                      child: Stack(fit: StackFit.expand, children: [
+                        Image.network(urls[k], fit: BoxFit.cover, errorBuilder: (_, __, ___) => ColoredBox(color: p.chip)),
+                        if (k == 2 && urls.length > 3)
+                          Container(color: kInk.withValues(alpha: .55), alignment: Alignment.center, child: Text('+${urls.length - 3}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
+                      ]),
+                    ),
+                  ),
+                ),
+            ]),
+          ),
+        ]);
       case DeckKind.poll:
         if (!widget.preview) {
           // vote right on the card; the bars show what members chose once you have (or on your own poll)
@@ -395,7 +429,19 @@ class _AskDeckState extends State<AskDeck> {
         ),
       );
     }
-    Widget img(ImageProvider i) => Image(image: i, fit: BoxFit.cover, width: double.infinity, height: double.infinity, errorBuilder: (_, __, ___) => ColoredBox(color: p.chip));
+    var at = 0;
+    Widget img(ImageProvider i) {
+      final idx = at++;
+      final w = Image(image: i, fit: BoxFit.cover, width: double.infinity, height: double.infinity, errorBuilder: (_, __, ___) => ColoredBox(color: p.chip));
+      if (widget.preview) return w;
+      // a tap opens the photos big; a double tap is the quick reaction
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => openImageViewer(context, _post.images, idx, shareUrl: _post.webUrl, shareRef: _post.id),
+        onDoubleTap: widget.mine ? null : widget.onQuickReact,
+        child: w,
+      );
+    }
     const gap = 2.0;
     Widget body;
     if (imgs.length == 1) {

@@ -1,3 +1,4 @@
+import 'i18n.dart';
 import 'models.dart';
 
 /// What an ask wants from members (web constants.ts ASK_TYPES): the one thing the asker picks, "What is your ask".
@@ -25,6 +26,15 @@ AskTypeDef? askTypeDef(String? v) {
     if (t.value == v) return t;
   }
   return null;
+}
+
+/// The label of an ask, the same on the card's category line and on its first card: its type, then its topic ("Sell / Offer · Jobs / Manpower").
+String askLabel(Post post) {
+  final type = askTypeDef(askTypeOf(post)) ?? kAskTypes.last;
+  if (post.category == 'other' && (post.categoryLabel ?? '').isNotEmpty) return post.categoryLabel!;
+  final c = post.category;
+  final topic = c != null && c != 'other' && c != type.forced ? kCategoryShort[c] : null;
+  return [t(type.short), if (topic != null && topic != type.short) t(topic)].join(' · ');
 }
 
 /// an older ask (or one from before types) has the type its category implies
