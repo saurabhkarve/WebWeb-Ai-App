@@ -22,6 +22,16 @@ String? askTimeLeft(Post post) {
   return left > 1 ? t('{n} days left', {'n': left}) : (left == 1 ? t('Last day') : t('Deadline passed'));
 }
 
+/// The day a "Within 7 / 30 days" ask closes, as "24 Nov" (null for Immediate, Flexible or none).
+String? askDeadline(Post post) {
+  final u = post.urgency;
+  final days = u == '7_days' ? 7 : (u == '30_days' ? 30 : null);
+  if (days == null) return null;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  final d = post.createdAt.add(Duration(days: days));
+  return '${d.day} ${months[d.month - 1]}';
+}
+
 /// "Edited 14:05" today, else "Edited 12 Oct" (web utils.ts editedLabel).
 String editedLabel(DateTime d) {
   final now = DateTime.now();

@@ -10,7 +10,7 @@ import '../icons.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../location.dart' show kNodeCoords;
-import 'area_map.dart' show AreaMap, askTimeLeft;
+import 'area_map.dart' show AreaMap, askDeadline, askTimeLeft;
 import 'image_grid.dart' show openImageViewer;
 import 'poll_vote.dart';
 
@@ -204,6 +204,7 @@ class _AskDeckState extends State<AskDeck> {
                 child: Wrap(spacing: 6, runSpacing: 6, children: [
                   if ((post.locationPref ?? '').isNotEmpty) _chip(p, WI.pin, t(post.locationPref!)),
                   if (left != null) _chip(p, WI.clock, left),
+                  if (left != null && askDeadline(post) != null) _chip(p, WI.calendar, askDeadline(post)!),
                   if ((post.budget ?? '').isNotEmpty) _chip(p, WI.rupee, post.budget!),
                   if (widget.reachLabel != null) _chip(p, WI.locate, widget.reachLabel!),
                 ]),

@@ -342,6 +342,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 if ((post.budget ?? '').isNotEmpty) InfoPill(gold: true, wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
                 if ((post.urgency ?? '').isNotEmpty)
                   InfoPill(gold: true, wi: WI.clock, text: askTimeLeft(post)!, onTap: () => _openFind(urgency: post.urgency)),
+                if (askDeadline(post) != null) InfoPill(gold: true, wi: WI.calendar, text: askDeadline(post)!),
                 if ((post.radiusM ?? 0) > 0) InfoPill(gold: true, wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)}), onTap: () => showAskAreaSheet(context, post)),
               ]),
             ],

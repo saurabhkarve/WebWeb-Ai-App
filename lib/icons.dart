@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-enum WI { home, refresh, check, lock, qr, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, consultant, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, link, logout, machinery, mentor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, views, website }
+enum WI { calendar, home, refresh, check, lock, qr, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, consultant, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, link, logout, machinery, mentor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, views, website }
 
 /// SVG body per icon. {C} = colour, {SW/x} = stroke width divided by x (scaled groups).
 const Map<WI, (String, double?)> _body = {
@@ -53,6 +53,7 @@ const Map<WI, (String, double?)> _body = {
   WI.digital: (r'<rect x="3.5" y="4.5" width="17" height="12" rx="2" /> <path d="M8 20h8M12 16.5V20M10 8.5 8 10.5l2 2M14 8.5l2 2-2 2" />', null),
   WI.edit: (r'<path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z" /> <path d="M13.5 7.5l3 3" />', null),
   WI.export: (r'<circle cx="11" cy="12" r="7.6" /> <path d="M3.4 12h15.2M11 4.4c2.4 2.2 3.4 4.7 3.4 7.6s-1 5.4-3.4 7.6c-2.4-2.2-3.4-4.7-3.4-7.6s1-5.4 3.4-7.6z" /> <path d="M17.5 4.5h3v3M20.5 4.5l-4 4" />', null),
+  WI.calendar: (r'<rect x="3.8" y="5.2" width="16.4" height="14.8" rx="2.6" /> <path d="M3.8 10h16.4M8.2 3.4v3.6M15.8 3.4v3.6" />', null),
   WI.eye: (r'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /> <circle cx="12" cy="12" r="3" />', null),
   WI.file: (r'<path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8l-5-5z" /> <path d="M14 3v5h5M9 13h6M9 17h6" />', null),
   WI.funding: (r'<ellipse cx="12" cy="6.5" rx="6.5" ry="2.8" /> <path d="M5.5 6.5v5c0 1.5 2.9 2.8 6.5 2.8s6.5-1.3 6.5-2.8v-5" /> <path d="M5.5 11.5v5c0 1.5 2.9 2.8 6.5 2.8s6.5-1.3 6.5-2.8v-5" />', null),
