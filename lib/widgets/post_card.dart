@@ -541,8 +541,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               // quoted in a repost: the replies and the controls are the repost's (below)
               if (!framed) ...[
                 // on a lead the competition line above already invites the first reply
-                LatestReplies(post: post, hideEmpty: post.leadReason != null, onMore: () => _openDetail(expandResponses: true)),
-                const SizedBox(height: 12),
+                LatestReplies(post: post, hideEmpty: true, onMore: () => _openDetail(expandResponses: true)),
+                const SizedBox(height: 6),
                 PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
               ],
             ]),

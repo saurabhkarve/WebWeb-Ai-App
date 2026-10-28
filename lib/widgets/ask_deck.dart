@@ -125,13 +125,13 @@ class _AskDeckState extends State<AskDeck> {
           ),
         ),
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 2),
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         for (var k = 0; k < kinds.length; k++)
           GestureDetector(
             onTap: () => _page.animateToPage(k, duration: const Duration(milliseconds: 250), curve: Curves.easeOut),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
               child: AnimatedContainer(duration: const Duration(milliseconds: 200), width: k == _i ? 20 : 6, height: 6, decoration: BoxDecoration(color: k == _i ? kGold : p.border, borderRadius: BorderRadius.circular(3))),
             ),
           ),
