@@ -190,6 +190,23 @@ class _AskDeckState extends State<AskDeck> {
               if ((post.budget ?? '').isNotEmpty) _chip(p, WI.rupee, post.budget!),
               if (widget.reachLabel != null) _chip(p, WI.locate, widget.reachLabel!),
             ]),
+            // the answer is one tap away from the first card too
+            if (!widget.mine && !widget.preview) ...[
+              const SizedBox(height: 10),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  if (_log) CardEvents.log(context.read<AuthProvider>().api, post.id, 'cta', 0, _kinds.length);
+                  widget.onReply?.call();
+                },
+                child: Container(
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(18)),
+                  child: Text(t('I can help'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kInk)),
+                ),
+              ),
+            ],
           ]),
         );
       case DeckKind.poll:
