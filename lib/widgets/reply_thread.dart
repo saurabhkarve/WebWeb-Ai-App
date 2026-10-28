@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'mention_suggest.dart';
 import '../api.dart';
 import '../auth_provider.dart';
 import '../i18n.dart';
@@ -234,7 +235,7 @@ class _ReplySocialState extends State<ReplySocial> {
             Avatar(name: me.name, photoUrl: me.photoUrl, size: 24, uid: me.uid),
             const SizedBox(width: 8),
             Expanded(
-              child: TextField(
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [TextField(
                 controller: _text,
                 focusNode: _focus,
                 maxLength: 300,
@@ -255,6 +256,8 @@ class _ReplySocialState extends State<ReplySocial> {
                   focusedBorder: OutlineInputBorder(borderRadius: _bubble, borderSide: BorderSide(color: p.border)),
                 ),
               ),
+              MentionSuggest(controller: _text, focus: _focus),
+            ]),
             ),
             const SizedBox(width: 8),
             ListenableBuilder(

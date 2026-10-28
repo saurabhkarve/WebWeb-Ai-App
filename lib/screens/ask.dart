@@ -1182,7 +1182,7 @@ class _AskFormState extends State<_AskForm> {
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Expanded(child: Text(t('Add #tags like #plumber or #Vashi so the right people find it.'), style: TextStyle(fontSize: 12, color: p.muted))),
+                    Expanded(child: Text(t('Add #tags like #plumber or #Vashi, or @ a member, so the right people find it.'), style: TextStyle(fontSize: 12, color: p.muted))),
                     if (title.length > 80 || desc.length > 240)
                       Padding(
                         padding: const EdgeInsets.only(left: 8),

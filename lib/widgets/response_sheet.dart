@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import 'mention_suggest.dart';
 import '../auth_provider.dart';
 import '../i18n.dart';
 import '../theme.dart';
@@ -44,6 +45,7 @@ class _ResponseSheet extends StatefulWidget {
 }
 
 class _ResponseSheetState extends State<_ResponseSheet> {
+  final _noteFocus = FocusNode();
   late final _text = TextEditingController(text: widget.existing?.text ?? '');
   // a new reply starts as an offer; an edited one keeps what it was
   late bool _canDo = widget.existing == null || widget.existing!.canDo;
@@ -122,6 +124,7 @@ class _ResponseSheetState extends State<_ResponseSheet> {
 
   @override
   void dispose() {
+    _noteFocus.dispose();
     _text.dispose();
     _quote.dispose();
     super.dispose();
@@ -235,6 +238,7 @@ class _ResponseSheetState extends State<_ResponseSheet> {
             const SizedBox(height: 12),
           TextField(
             controller: _text,
+            focusNode: _noteFocus,
             autofocus: !_canDo,
             minLines: _canDo ? 2 : 4,
             maxLines: 6,
@@ -254,6 +258,7 @@ class _ResponseSheetState extends State<_ResponseSheet> {
               focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: p.text)),
             ),
           ),
+          MentionSuggest(controller: _text, focus: _noteFocus),
           const SizedBox(height: 8),
           // the photo rides along with the note: product, brochure or proof
           Align(
