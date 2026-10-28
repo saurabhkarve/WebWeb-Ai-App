@@ -607,7 +607,7 @@ class _AskFormState extends State<_AskForm> {
       askType: _askType.isEmpty ? null : _askType, pollOptions: _askType == 'poll' ? _pollOpts.where((o) => o.trim().isNotEmpty).toList() : const [],
       categoryLabel: _other.text.trim().isEmpty ? null : _other.text.trim(), cardColor: _color,
       locationPref: _location.isEmpty ? null : _location, budget: _budget.isEmpty ? null : _budget, urgency: _urgency.isEmpty ? null : _urgency,
-      radiusM: _geo?.radiusM, createdAt: DateTime.now(),
+      radiusM: _geo?.radiusM, lat: _geo?.lat, lng: _geo?.lng, createdAt: DateTime.now(),
     );
   }
 
@@ -620,6 +620,9 @@ class _AskFormState extends State<_AskForm> {
         _descFocus.requestFocus();
       case DeckKind.photos:
         _addPhotos();
+      case DeckKind.budget:
+        setState(() => _open = 'budget');
+      case DeckKind.map:
       case DeckKind.glance:
         setState(() => _open = 'where');
       case DeckKind.act:

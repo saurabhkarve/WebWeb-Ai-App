@@ -9,10 +9,11 @@ import '../i18n.dart';
 import '../icons.dart';
 import '../models.dart';
 import '../theme.dart';
-import 'area_map.dart' show askTimeLeft;
+import '../location.dart' show kNodeCoords;
+import 'area_map.dart' show AreaMap, askTimeLeft;
 import 'poll_vote.dart';
 
-enum DeckKind { headline, poll, photos, details, glance, act }
+enum DeckKind { headline, poll, photos, details, budget, map, glance, act }
 
 /// An ask as a short deck of cards you swipe (web ask-deck.tsx): the headline with its essentials, the photos, the
 /// details, a glance at budget, place and timing, and a last card that asks "Can you help?". One swipe moves one card.
@@ -45,6 +46,14 @@ class _AskDeckState extends State<AskDeck> {
   bool get _log => !widget.preview && !widget.mine;
 
   /// the cards this ask has: the feed leaves out the ones with nothing on them
+  /// where the ask is, for the map card: its own point, else the centre of the place it names
+  ({double lat, double lng})? get _mapPoint {
+    final post = _post;
+    if (post.lat != null && post.lng != null) return (lat: post.lat!, lng: post.lng!);
+    final c = kNodeCoords[post.locationPref];
+    return c == null ? null : (lat: c[0], lng: c[1]);
+  }
+
   List<DeckKind> get _kinds {
     final post = _post;
     final left = askTimeLeft(post);
@@ -53,7 +62,9 @@ class _AskDeckState extends State<AskDeck> {
       if (post.pollOptions.length > 1) DeckKind.poll,
       if (widget.preview || post.images.isNotEmpty) DeckKind.photos,
       if (widget.preview || (post.description ?? '').trim().isNotEmpty) DeckKind.details,
-      if (widget.preview || (post.budget ?? '').isNotEmpty || (post.locationPref ?? '').isNotEmpty || left != null || post.radiusM != null) DeckKind.glance,
+      if ((post.budget ?? '').isNotEmpty) DeckKind.budget,
+      if (_mapPoint != null) DeckKind.map,
+      if (widget.preview || (post.locationPref ?? '').isNotEmpty || left != null || post.radiusM != null) DeckKind.glance,
       DeckKind.act,
     ];
   }
@@ -255,8 +266,37 @@ class _AskDeckState extends State<AskDeck> {
             Text('${t('Read the full ask')} →', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link)),
           ]),
         );
+      case DeckKind.budget:
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _label(p, t('Budget')),
+            const Spacer(),
+            Text(post.budget ?? '', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, height: 1.15, letterSpacing: -.3)),
+            if (left != null) Padding(padding: const EdgeInsets.only(top: 6), child: Row(children: [WIcon(WI.clock, size: 14, color: p.muted, still: true), const SizedBox(width: 4), Text(left, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted))])),
+          ]),
+        );
+      case DeckKind.map:
+        final pt = _mapPoint!;
+        final place = (post.locationPref ?? '').isEmpty ? t('Where') : t(post.locationPref!);
+        return Stack(fit: StackFit.expand, children: [
+          AreaMap(lat: pt.lat, lng: pt.lng, radiusM: (post.radiusM ?? 10000).toDouble()),
+          Positioned(
+            left: 10,
+            top: 10,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(color: const Color(0xBF1E1E1E), borderRadius: BorderRadius.circular(99)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const WIcon(WI.pin, size: 14, color: Colors.white, still: true),
+                const SizedBox(width: 4),
+                Text(post.radiusM != null && widget.reachLabel != null ? '$place · ${widget.reachLabel}' : place, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+              ]),
+            ),
+          ),
+        ]);
       case DeckKind.glance:
-        final none = (post.budget ?? '').isEmpty && (post.locationPref ?? '').isEmpty && left == null && post.radiusM == null;
+        final none = (post.locationPref ?? '').isEmpty && left == null && post.radiusM == null;
         Widget tile(WI icon, String label, String value, [String? sub]) => Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(color: p.canvas.withValues(alpha: .7), borderRadius: BorderRadius.circular(12)),
@@ -272,7 +312,6 @@ class _AskDeckState extends State<AskDeck> {
               ]),
             );
         final tiles = [
-          if ((post.budget ?? '').isNotEmpty) tile(WI.rupee, t('Budget'), post.budget!),
           if ((post.locationPref ?? '').isNotEmpty) tile(WI.pin, t('Where'), t(post.locationPref!)),
           if (left != null) tile(WI.clock, t('When'), left),
           if (widget.reachLabel != null) tile(WI.locate, t('Reach'), widget.reachLabel!, t('around the place')),
@@ -312,7 +351,9 @@ class _AskDeckState extends State<AskDeck> {
             if (!widget.preview && post.closed)
               Text(t('This ask is closed'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.muted))
             else
-              GestureDetector(
+              Align(
+                alignment: Alignment.centerLeft,
+                child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 // the reply sheet right here: one tap to answer, no trip to the ask first
                 onTap: widget.preview
@@ -322,11 +363,13 @@ class _AskDeckState extends State<AskDeck> {
                         (widget.mine ? widget.onOpen : widget.onReply)?.call();
                       },
                 child: Container(
-                  height: 40,
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20)),
-                  child: Text(t(widget.mine ? 'Review responses' : 'I can help'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
+                  decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(18)),
+                  child: Text(t(widget.mine ? 'Review responses' : 'I can help'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kInk)),
                 ),
+              ),
               ),
           ]),
         );
