@@ -39,7 +39,7 @@ class _ReactButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           decoration: BoxDecoration(color: open ? _rose.withValues(alpha: .1) : null, borderRadius: BorderRadius.circular(99)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            value != null ? ReactionGlyph(value!, size: 13) : WIcon(WI.heart, size: 14, color: p.muted),
+            value != null ? ReactionGlyph(value!, size: 13) : WIcon(WI.thumbsUp, size: 14, color: p.muted),
             if (count > 0) ...[
               const SizedBox(width: 4),
               Text(compactCount(count), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: value != null ? p.text : p.muted)),

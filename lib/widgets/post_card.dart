@@ -992,7 +992,7 @@ class PostActionsState extends State<PostActions> {
           trigger: (open) => pill(
             label: 'React',
             fill: open ? const Color(0xFFF43F5E).withValues(alpha: .1) : null,
-            icon: reacted ? SizedBox(width: 18, height: 18, child: Center(child: ReactionGlyph(post.myReaction!, size: 15))) : WIcon(WI.heart, size: 18, color: p.muted),
+            icon: reacted ? SizedBox(width: 18, height: 18, child: Center(child: ReactionGlyph(post.myReaction!, size: 15))) : WIcon(WI.thumbsUp, size: 18, color: p.muted),
             count: post.reactionsCount,
             color: reacted ? p.text : p.muted,
           ),
@@ -1043,7 +1043,7 @@ class PostActionsState extends State<PostActions> {
         value: post.myReaction,
         onChange: react,
         trigger: (_) => btn(
-          icon: reacted ? SizedBox(width: 20, height: 20, child: Center(child: ReactionGlyph(post.myReaction!, size: 15))) : WIcon(WI.heart, size: 20, color: p.muted),
+          icon: reacted ? SizedBox(width: 20, height: 20, child: Center(child: ReactionGlyph(post.myReaction!, size: 15))) : WIcon(WI.thumbsUp, size: 20, color: p.muted),
           count: post.reactionsCount,
           label: 'React',
           color: reacted ? p.text : p.muted,

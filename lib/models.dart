@@ -77,7 +77,7 @@ const kVerificationHow = {
   3: 'Documents verified and a proven track record of 3+ positive ratings.',
 };
 
-const kReactions = ['heart', 'thumbs', 'namaskar'];
+const kReactions = ['thumbs', 'heart', 'namaskar'];
 const kReactionEmoji = {'heart': '❤️', 'thumbs': '👍', 'namaskar': '🙏'};
 
 // ===================== profile =====================

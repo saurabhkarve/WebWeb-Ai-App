@@ -1346,7 +1346,7 @@ class _CardActionsState extends State<_CardActions> {
         trigger: (open) => pill(
           label: 'React',
           fill: open ? const Color(0xFFF43F5E).withValues(alpha: .1) : null,
-          icon: _mine != null ? SizedBox(width: 18, height: 18, child: Center(child: ReactionGlyph(_mine!, size: 15))) : WIcon(WI.heart, size: 18, color: p.muted),
+          icon: _mine != null ? SizedBox(width: 18, height: 18, child: Center(child: ReactionGlyph(_mine!, size: 15))) : WIcon(WI.thumbsUp, size: 18, color: p.muted),
           color: _mine != null ? p.text : p.muted,
         ),
       ),

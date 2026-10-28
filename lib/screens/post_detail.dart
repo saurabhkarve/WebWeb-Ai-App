@@ -717,7 +717,7 @@ class _ShareTileState extends State<_ShareTile> {
               alignment: Alignment.center,
               // the React heart used everywhere else (an emoji once a reaction is picked)
               child: s.ownerReaction == null || kReactionEmoji[s.ownerReaction] == null
-                  ? WIcon(WI.heart, size: 20, color: p.muted)
+                  ? WIcon(WI.thumbsUp, size: 20, color: p.muted)
                   : Text(kReactionEmoji[s.ownerReaction]!, style: const TextStyle(fontSize: 18)),
             ),
           ),
