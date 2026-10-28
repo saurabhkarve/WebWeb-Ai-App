@@ -37,10 +37,10 @@ final tourRequest = ValueNotifier<int>(0);
 
 const kAskTour = [
   TourStep('What is your ask?', 'Hire, buy, sell, ask advice, run a poll. Your ask reaches the members who can help.', null, 'ask-types'),
-  TourStep('Say it in one line', 'For example: Need 5 CNC operators in Turbhe. The kind of ask is picked from it.', 'ask-title'),
-  TourStep('Add the details', 'Quantity, quality, timing. The more specific, the better the answers.', 'ask-description'),
   TourStep('Not right? Tap to change', 'This is what your ask is. Tap it to pick another, or Other to say it in your own words.', 'ask-category'),
   TourStep('Where, when and budget', 'All optional. They show as cards your members can swipe.', 'ask-details'),
+  TourStep('Say it in one line', 'For example: Need 5 CNC operators in Turbhe. The kind of ask is picked from it.', 'ask-title'),
+  TourStep('Add the details', 'Quantity, quality, timing. The more specific, the better the answers.', 'ask-description'),
   TourStep('See your cards', 'This is how members will see your ask. Add photos and watch it come alive.', 'ask-preview'),
   TourStep('Publish', 'See who it reaches, then publish. Replies arrive in your notifications.', 'ask-publish'),
 ];
