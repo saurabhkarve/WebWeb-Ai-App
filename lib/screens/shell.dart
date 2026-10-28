@@ -239,8 +239,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         onTap: () => _go(k),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          width: 60,
-          height: 56,
+          width: isAsk ? 72 : 60,
+          height: isAsk ? 60 : 56,
           decoration: BoxDecoration(
             color: isAsk ? null : active ? p.ink : Colors.transparent,
             gradient: isAsk ? kGoldGradient : null,
@@ -249,7 +249,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
           ),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Stack(clipBehavior: Clip.none, children: [
-              WIcon(_items[k].$1, size: 24, color: fg, strokeWidth: active || isAsk ? 2.2 : 1.9, spinKey: isAsk ? _askSpin : 0),
+              WIcon(_items[k].$1, size: isAsk ? 28 : 24, color: fg, strokeWidth: active || isAsk ? 2.2 : 1.9, spinKey: isAsk ? _askSpin : 0),
               if (badge > 0)
                 Positioned(
                   right: -8,
