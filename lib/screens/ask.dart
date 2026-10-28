@@ -1092,9 +1092,7 @@ class _AskFormState extends State<_AskForm> {
                   ]),
                   const SizedBox(height: 8),
                 ],
-                KeyedSubtree(
-                  key: _tk('ask-details'),
-                  child: Wrap(spacing: 6, runSpacing: 6, children: [
+                Wrap(spacing: 6, runSpacing: 6, children: [
                     KeyedSubtree(
                       key: _tk('ask-category'),
                       child: chip(
@@ -1105,13 +1103,8 @@ class _AskFormState extends State<_AskForm> {
                         auto: _category.isNotEmpty && !_typeChosen,
                       ),
                     ),
-                    // where and how far, one chip: "Vashi · 25 km"
-                    chip('where', WI.pin, '${_location.isEmpty ? t('Where') : t(_location)}${_geo != null ? ' · ${_radiusLabel(_geo!.radiusM)}' : ''}', _location.isNotEmpty || _geo != null),
-                    chip('budget', WI.rupee, _budget.isEmpty ? t('Budget') : _budget, _budget.isNotEmpty),
-                    chip('when', WI.clock, _urgency.isEmpty ? t('When') : t(labelOf(kUrgencies, _urgency)), _urgency.isNotEmpty),
                   ]),
-                ),
-                if (panel != null)
+                if (panel != null && _open == 'type')
                   GestureDetector(
                     // taps inside the choices never close them (a tap elsewhere on the page does)
                     onTap: () {},
@@ -1305,6 +1298,37 @@ class _AskFormState extends State<_AskForm> {
                       ),
                   ]),
                 ),
+                const SizedBox(height: 8),
+                KeyedSubtree(
+                  key: _tk('ask-details'),
+                  child: Wrap(spacing: 6, runSpacing: 6, children: [
+                    // where and how far, one chip: "Vashi · 25 km"
+                    chip('where', WI.pin, '${_location.isEmpty ? t('Where') : t(_location)}${_geo != null ? ' · ${_radiusLabel(_geo!.radiusM)}' : ''}', _location.isNotEmpty || _geo != null),
+                    chip('budget', WI.rupee, _budget.isEmpty ? t('Budget') : _budget, _budget.isNotEmpty),
+                    chip('when', WI.clock, _urgency.isEmpty ? t('When') : t(labelOf(kUrgencies, _urgency)), _urgency.isNotEmpty),
+                  ]),
+                ),
+                if (panel != null && _open != 'type')
+                  GestureDetector(
+                    // taps inside the choices never close them (a tap elsewhere on the page does)
+                    onTap: () {},
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(12), border: Border.all(color: p.border)),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      panel,
+                      if (_open == 'where' || _open == 'budget') ...[
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: GestureDetector(onTap: () => setState(() => _open = null), child: Text(t('Done'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link))),
+                        ),
+                      ],
+                    ]),
+                  ),
+                  ),
               ]),
             ),
           ]),
