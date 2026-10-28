@@ -9,6 +9,7 @@ import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' hide AndroidAudioMode;
 
 import 'api.dart';
+import 'device.dart';
 import 'i18n.dart';
 import 'native_calls.dart';
 import 'permissions.dart';
@@ -63,8 +64,12 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     NativeCalls.events.listen(_onNative);
     _adoptNativeAccepted();
+    _endStaleNative();
     rt.addListener(() {
-      if (rt.connected) _adoptNativeAccepted();
+      if (rt.connected) {
+        _adoptNativeAccepted();
+        _endStaleNative();
+      }
     });
     // back online mid-call: the old network path is gone, so restart ICE right away
     rt.onReconnect.listen((_) {
@@ -121,6 +126,18 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _adoptNativeAccepted() async {
     for (final c in await NativeCalls.active()) {
       if (c.isAccepted && current?.id != c.id) _nativeAccepted.add(c.id);
+    }
+  }
+
+  /// A call the phone still shows as ringing but the server no longer has: the caller hung up, another phone answered
+  /// or declined, or the phone restarted while it rang. The server re-sends the offer of a call that is still ringing as
+  /// soon as the socket is up, so what has no offer a few seconds later is stale and its native screen / notification
+  /// is closed here (a push that could do it may have been missed with the phone off).
+  Future<void> _endStaleNative() async {
+    await Future<void>.delayed(const Duration(seconds: 5));
+    for (final c in await NativeCalls.active()) {
+      if (current?.id == c.id || c.isAccepted || _nativeAccepted.contains(c.id)) continue;
+      await NativeCalls.end(c.id);
     }
   }
 
@@ -413,7 +430,7 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
   void _signalEnd(String id, {required bool decline}) {
     final sent = rt.send({'type': decline ? 'call_reject' : 'call_end', 'callId': id});
     if (sent && !decline) return;
-    api.post('/app/calls/$id/${decline ? 'decline' : 'end'}', {}).catchError((_) => null);
+    api.post('/app/calls/$id/${decline ? 'decline' : 'end'}', {if (Device.id != null) 'deviceId': Device.id}).catchError((_) => null);
   }
 
   // ---------- the phone's own call UI ----------

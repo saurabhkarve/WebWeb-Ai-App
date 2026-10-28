@@ -562,9 +562,11 @@ Future<void> _declineWhenDeclined(String callId) async {
 /// Tells the API a call was declined, with the saved sign-in (works in the background isolate, which has no
 /// AuthProvider). The API takes the first of this and the socket's call_reject; a second one is a harmless 404.
 Future<void> declineCallOnServer(String callId) async {
-  final token = (await SharedPreferences.getInstance()).getString('token');
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('token');
   if (token == null) return;
-  await Api(() => token).post('/app/calls/$callId/decline', {}).catchError((_) => null);
+  final device = prefs.getString('device_id');
+  await Api(() => token).post('/app/calls/$callId/decline', {if (device != null) 'deviceId': device}).catchError((_) => null);
 }
 
 /// Android reads android/app/google-services.json. iOS takes its Firebase app from build-time
