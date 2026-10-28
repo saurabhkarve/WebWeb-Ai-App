@@ -12,6 +12,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/city_picker.dart';
 import '../widgets/area_map.dart';
+import '../widgets/ask_cards.dart';
 import '../widgets/image_grid.dart';
 import '../widgets/p1.dart';
 import '../widgets/post_card.dart';
@@ -98,7 +99,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         _shares = shares;
         _referrals = refs;
       });
-      if (widget.expandResponses && _allResponses == null && p.isRequirement && p.authorUid != _me) _loadAllResponses();
+      if (_allResponses == null && p.isRequirement && p.authorUid != _me) _loadAllResponses();
       if (widget.askOutcome && !_scrolledToOutcome && p.authorUid == _me) {
         _scrolledToOutcome = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -308,30 +309,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               ],
             ]),
             SizedBox(height: isAsk ? 12 : 20),
-            if (isAsk) ...[
-              // the category as a small heading, why you see this ask on the right
-              Row(children: [
-                WIcon(categoryIcon(post.category), size: 14, color: p.link, still: true),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(t(post.categoryText).toUpperCase(),
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.link)),
-                ),
-                if (post.closed) ...[const SizedBox(width: 8), Flexible(child: ClosedChip(post))]
-                else if (why != null) ...[const SizedBox(width: 8), Flexible(child: GoldTag(why))],
-              ]),
-              const SizedBox(height: 4),
-              HashtagText(post.title ?? '', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, height: 1.3)),
-              const SizedBox(height: 4),
-            ],
-            if ((post.description ?? '').isNotEmpty)
-              HashtagText(post.description!, selectable: true,
-                  style: isAsk ? TextStyle(fontSize: 15, height: 1.375, color: p.text.withValues(alpha: .75)) : const TextStyle(fontSize: 18, height: 1.375)),
-            ImageGrid(post.images, shareUrl: post.webUrl, shareRef: post.id),
-            // the essentials as chips, like the feed card (the category is the heading above)
-            if (hasDetails || (post.radiusM ?? 0) > 0) ...[
-              const SizedBox(height: 12),
-              ChipLine(children: [
+            if (isAsk)
+              // the ask in the same cards as the feed, all open one under the other
+              AskCards(
+                post: post,
+                chip: post.closed ? ClosedChip(post) : (why != null ? GoldTag(why) : null),
+                chips: (hasDetails || (post.radiusM ?? 0) > 0)
+                    ? ChipLine(children: [
                 if ((post.locationPref ?? '').isNotEmpty)
                   InfoPill(
                     gold: true,
@@ -344,14 +328,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   InfoPill(gold: true, wi: WI.clock, text: askTimeLeft(post)!, onTap: () => _openFind(urgency: post.urgency)),
                 if (askDeadline(post) != null) InfoPill(gold: true, wi: WI.calendar, text: askDeadline(post)!),
                 if ((post.radiusM ?? 0) > 0) InfoPill(gold: true, wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)}), onTap: () => showAskAreaSheet(context, post)),
-              ]),
+              ]) : null,
+              )
+            else ...[
+              if ((post.description ?? '').isNotEmpty)
+                HashtagText(post.description!, selectable: true, style: const TextStyle(fontSize: 18, height: 1.375)),
+              ImageGrid(post.images, shareUrl: post.webUrl, shareRef: post.id),
             ],
             if (won) ...[const SizedBox(height: 12), WinnerBanner(ownerName: post.shownName)],
-            if (isAsk) ...[
-              // the latest replies in public, as on the card; "Show all" opens every reply and referral in the same style
-              if (!owner && _allResponses == null) LatestReplies(post: post, onMore: _loadAllResponses),
-              if (!owner && _allResponses != null) AllReplies(post: post, items: _allResponses!),
-            ],
             SizedBox(height: isAsk ? 12 : 20),
             if (isAsk)
               PostActions(
@@ -388,6 +372,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 },
               ),
             ),
+            // every reply in public, shown right here (the feed card has the latest few)
+            if (isAsk && !owner) ...[
+              const SizedBox(height: 14),
+              if (_allResponses == null) LatestReplies(post: post, onMore: _loadAllResponses) else AllReplies(post: post, items: _allResponses!),
+            ],
             const SizedBox(height: 20),
             // updates have no response flow: just offer a message
             if (!owner && !isAsk)
