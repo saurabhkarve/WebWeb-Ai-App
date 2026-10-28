@@ -12,6 +12,7 @@ import '../models.dart';
 import '../safety.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../widgets/invite_card.dart';
 import '../widgets/catalog_strip.dart';
 import '../widgets/house_card.dart';
 import '../widgets/post_card.dart';
@@ -225,6 +226,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
           if (((i + 1) % 3 == 0 ? (i + 1) ~/ 3 - 1 : (posts.length < 3 && i == posts.length - 1 ? 0 : -1)) case final slot when slot >= 0 && slot < blocks.length) _block(blocks[slot]),
           // a short feed: WEBWEB cards that got no slot go after the last ask, up to 3 cards in all
           if (i == posts.length - 1) ...blocks.skip(slotCount).whereType<HouseCard>().take((3 - houseShown).clamp(0, 3)).map(_block),
+          // invite people you know, after the 15th ask
+          if (i == 14) const InviteCard(),
           // a fact after ask 10, 20, 30 ... (a short feed of 4+ asks gets one at its end)
           if ((i + 1) % 10 == 0 && (i + 1) ~/ 10 - 1 < _facts.length)
             PostCard(key: ValueKey('fact-${_facts[(i + 1) ~/ 10 - 1].id}'), post: _facts[(i + 1) ~/ 10 - 1])
