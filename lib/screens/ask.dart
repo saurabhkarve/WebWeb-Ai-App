@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../auth_provider.dart';
 import '../card_colors.dart';
+import '../widgets/ask_deck.dart';
+import 'dart:io' show File;
 import '../i18n.dart';
 import '../location.dart';
 import '../models.dart';
@@ -561,6 +563,34 @@ class _AskFormState extends State<_AskForm> {
       if ((d['description'] ?? '').isNotEmpty) _desc.text = d['description']!;
       _aiDraft = null;
     });
+  }
+
+  /// the ask as members will see it, rebuilt from the form
+  Post _draftPost() {
+    final me = context.read<AuthProvider>().profile;
+    return Post(
+      id: 'preview', kind: 'requirement', authorUid: me?.uid ?? '', authorName: me?.name ?? '', authorCompany: me?.company ?? '', authorHandle: me?.handle ?? '',
+      title: _title.text.trim(), description: _desc.text, category: _category.isEmpty ? 'other' : _category,
+      categoryLabel: _other.text.trim().isEmpty ? null : _other.text.trim(), cardColor: _color,
+      locationPref: _location.isEmpty ? null : _location, budget: _budget.isEmpty ? null : _budget, urgency: _urgency.isEmpty ? null : _urgency,
+      radiusM: _geo?.radiusM, createdAt: DateTime.now(),
+    );
+  }
+
+  /// a tap on a card of the preview goes to the part of the form that makes it
+  void _editCard(DeckKind k) {
+    switch (k) {
+      case DeckKind.headline:
+        _titleFocus.requestFocus();
+      case DeckKind.details:
+        _descFocus.requestFocus();
+      case DeckKind.photos:
+        _addPhotos();
+      case DeckKind.glance:
+        setState(() => _open = 'where');
+      case DeckKind.act:
+        break;
+    }
   }
 
   Future<void> _publish() async {
@@ -1209,6 +1239,26 @@ class _AskFormState extends State<_AskForm> {
           ]),
         ),
         _aiCard(p) ?? const SizedBox.shrink(),
+        // live preview: the deck of cards members swipe on Connect; tap one to edit that part
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
+          decoration: BoxDecoration(color: p.chip.withValues(alpha: .4), borderRadius: BorderRadius.circular(16)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('👀 ${t('How members will see your ask')}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+            Text(t('Swipe the cards. Tap one to edit it.'), style: TextStyle(fontSize: 11, color: p.muted)),
+            const SizedBox(height: 8),
+            AskDeck(
+              post: _draftPost(),
+              images: [
+                for (final ph in _photos.where((x) => !x.failed))
+                  if (ph.file != null) FileImage(File(ph.file!.path)) as ImageProvider else NetworkImage(ph.url!),
+              ],
+              reachLabel: _geo == null ? null : _radiusLabel(_geo!.radiusM),
+              onCardTap: _editCard,
+            ),
+          ]),
+        ),
         if (_aiError != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_aiError!, style: TextStyle(fontSize: 12, color: p.danger))),
         if ((_aiUndo != null && !_aiBusy) || _undoTpl != null || (!empty && !_editing)) ...[
           const SizedBox(height: 12),
