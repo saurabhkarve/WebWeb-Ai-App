@@ -19,6 +19,7 @@ import '../places.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/city_picker.dart';
+import '../widgets/mention_suggest.dart';
 import '../widgets/tour.dart';
 import 'post_detail.dart';
 
@@ -1104,6 +1105,7 @@ class _AskFormState extends State<_AskForm> {
                   style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.3),
                   decoration: _input(p, t('Title: e.g. Need 5 CNC operators in Turbhe')),
                 ),
+                MentionSuggest(controller: _title, focus: _titleFocus),
                 if (titleIdea != null)
                   GestureDetector(
                     onTap: () => _title.text = titleIdea!,
@@ -1130,6 +1132,7 @@ class _AskFormState extends State<_AskForm> {
                   style: const TextStyle(fontSize: 15, height: 1.4),
                   decoration: _input(p, t(tip?.$1 ?? 'Describe what you need: quantity, quality, area, timing')),
                 ),
+                MentionSuggest(controller: _desc, focus: _descFocus),
                 // hashtags in the title or description become links to every ask that carries them
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
