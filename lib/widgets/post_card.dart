@@ -9,6 +9,7 @@ import '../api.dart';
 import '../auth_provider.dart';
 import '../ask_types.dart';
 import '../card_colors.dart';
+import 'ask_deck.dart';
 import '../i18n.dart';
 import '../links.dart';
 import '../models.dart';
@@ -433,58 +434,106 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                 if (!framed) ...more,
               ]),
               const SizedBox(height: 10),
-              // the category as a small heading, why you see this ask on the right
-              Row(children: [
-                WIcon(categoryIcon(askTypeDef(askTypeOf(post))?.icon ?? post.category), size: 14, color: p.link, still: true),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(_typeLabel(post).toUpperCase(),
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.link)),
-                ),
-                // "Near you" opens the ask's area map, like its place chip
-                if (post.closed) ...[const SizedBox(width: 8), Flexible(child: ClosedChip(post))]
-                else if (why != null) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: !mine && match != null && post.leadReason == null && ((post.locationPref ?? '').isNotEmpty || post.lat != null)
-                        ? GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showAskAreaSheet(context, post), child: GoldTag(why))
-                        : GoldTag(why),
-                  ),
-                ],
-              ]),
-              // who wants what, in a line (the idea of the ask before its details)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(children: [
-                  Text(askTypeDef(askTypeOf(post))?.emoji ?? '💬', style: const TextStyle(fontSize: 15)),
+              if (framed) ...[
+                // the category as a small heading, why you see this ask on the right
+                Row(children: [
+                  WIcon(categoryIcon(askTypeDef(askTypeOf(post))?.icon ?? post.category), size: 14, color: p.link, still: true),
                   const SizedBox(width: 6),
                   Expanded(
-                    child: Text(_sentence(post), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .75))),
+                    child: Text(_typeLabel(post).toUpperCase(),
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.link)),
                   ),
-                ]),
-              ),
-              const SizedBox(height: 4),
-              tappable,
-              if (post.pollOptions.length > 1) PollVote(post: post, mine: mine, onVoted: (v) => setState(() => post = v)),
-              ...extra,
-              // where, budget, time left, reach, photos as chips (the category is shown above)
-              Padding(
-                key: widget.tourTarget ? Tours.key('chips') : null,
-                padding: const EdgeInsets.only(top: 10),
-                child: ChipLine(children: [
-                  if ((post.locationPref ?? '').isNotEmpty)
-                    InfoPill(
-                      small: true,
-                      wi: WI.pin,
-                      text: '${t(post.locationPref!)}${post.distanceM == null ? '' : ' · ${formatDistance(post.distanceM!)}'}',
-                      onTap: () => showAskAreaSheet(context, post),
+                  // "Near you" opens the ask's area map, like its place chip
+                  if (post.closed) ...[const SizedBox(width: 8), Flexible(child: ClosedChip(post))]
+                  else if (why != null) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: !mine && match != null && post.leadReason == null && ((post.locationPref ?? '').isNotEmpty || post.lat != null)
+                          ? GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showAskAreaSheet(context, post), child: GoldTag(why))
+                          : GoldTag(why),
                     ),
-                  if ((post.budget ?? '').isNotEmpty) InfoPill(small: true, gold: true, wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
-                  if (urgency != null) InfoPill(small: true, gold: true, wi: WI.clock, text: urgency),
-                  if ((post.radiusM ?? 0) > 0) InfoPill(small: true, gold: true, wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)}), onTap: () => showAskAreaSheet(context, post)),
-                  if (post.images.isNotEmpty) InfoPill(small: true, gold: true, wi: WI.camera, text: t(post.images.length == 1 ? '1 photo' : '{n} photos', {'n': post.images.length})),
+                  ],
                 ]),
-              ),
+                // who wants what, in a line (the idea of the ask before its details)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(children: [
+                    Text(askTypeDef(askTypeOf(post))?.emoji ?? '💬', style: const TextStyle(fontSize: 15)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(_sentence(post), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .75))),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 4),
+                tappable,
+                if (post.pollOptions.length > 1) PollVote(post: post, mine: mine, onVoted: (v) => setState(() => post = v)),
+                ...extra,
+                // where, budget, time left, reach, photos as chips (the category is shown above)
+                Padding(
+                  key: widget.tourTarget ? Tours.key('chips') : null,
+                  padding: const EdgeInsets.only(top: 10),
+                  child: ChipLine(children: [
+                    if ((post.locationPref ?? '').isNotEmpty)
+                      InfoPill(
+                        small: true,
+                        wi: WI.pin,
+                        text: '${t(post.locationPref!)}${post.distanceM == null ? '' : ' · ${formatDistance(post.distanceM!)}'}',
+                        onTap: () => showAskAreaSheet(context, post),
+                      ),
+                    if ((post.budget ?? '').isNotEmpty) InfoPill(small: true, gold: true, wi: WI.rupee, text: post.budget!, onTap: () => _openFind(budget: post.budget)),
+                    if (urgency != null) InfoPill(small: true, gold: true, wi: WI.clock, text: urgency),
+                    if ((post.radiusM ?? 0) > 0) InfoPill(small: true, gold: true, wi: WI.locate, text: t('{d} reach', {'d': formatDistance(post.radiusM!)}), onTap: () => showAskAreaSheet(context, post)),
+                    if (post.images.isNotEmpty) InfoPill(small: true, gold: true, wi: WI.camera, text: t(post.images.length == 1 ? '1 photo' : '{n} photos', {'n': post.images.length})),
+                  ]),
+                ),
+
+              ] else ...[
+                // why you see this ask (or that it is closed), then the ask as swipeable cards
+                if (post.closed || why != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: post.closed
+                          ? ClosedChip(post)
+                          : (!mine && match != null && post.leadReason == null && ((post.locationPref ?? '').isNotEmpty || post.lat != null)
+                              ? GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showAskAreaSheet(context, post), child: GoldTag(why!))
+                              : GoldTag(why!)),
+                    ),
+                  ),
+                // double tap gives it a thumbs up (with the burst), as on the text card
+                GestureDetector(
+                  onDoubleTap: _quickReact,
+                  child: Stack(children: [
+                    KeyedSubtree(
+                      key: widget.tourTarget ? Tours.key('chips') : null,
+                      child: AskDeck(
+                        post: post,
+                        mine: mine,
+                        onOpen: _openDetail,
+                        onReply: _reply,
+                        onVoted: (v) => setState(() => post = v),
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: AnimatedBuilder(
+                          animation: _burst,
+                          builder: (_, __) {
+                            if (!_burst.isAnimating) return const SizedBox.shrink();
+                            final v = _burst.value;
+                            final scale = v < .25 ? .4 + .85 * (v / .25) : (v < .6 ? 1.25 - .25 * ((v - .25) / .35) : 1 + .1 * ((v - .6) / .4));
+                            final opacity = v < .25 ? v / .25 : (v < .6 ? 1.0 : 1 - (v - .6) / .4);
+                            return Center(child: Opacity(opacity: opacity.clamp(0.0, 1.0), child: Transform.scale(scale: scale, child: const Text('👍', style: TextStyle(fontSize: 48)))));
+                          },
+                        ),
+                      ),
+                    ),
+                  ]),
+                ),
+                ...extra,
+              ],
               // a lead: how much competition there is, so the first few know to move
               if (!framed && post.leadReason != null) Competition(post.sharesCount),
               // my own ask, a few days in: "Did you find someone?"

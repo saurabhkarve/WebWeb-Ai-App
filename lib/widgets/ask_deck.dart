@@ -1,24 +1,37 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../ask_types.dart';
+import '../auth_provider.dart';
+import '../card_events.dart';
 import '../card_colors.dart';
 import '../i18n.dart';
 import '../icons.dart';
 import '../models.dart';
 import '../theme.dart';
 import 'area_map.dart' show askTimeLeft;
+import 'poll_vote.dart';
 
 enum DeckKind { headline, poll, photos, details, glance, act }
 
 /// An ask as a short deck of cards you swipe (web ask-deck.tsx): the headline with its essentials, the photos, the
 /// details, a glance at budget, place and timing, and a last card that asks "Can you help?". One swipe moves one card.
-/// Used by the ask composer as a live preview: every card is there (empty ones invite you to fill them) and a tap on
-/// a card goes to the part of the form that makes it.
+/// Two uses:
+/// - the feed (default): the cards the ask has (no empty ones), a tap opens the ask, "I can help" opens the reply
+///   sheet, a poll is voted on in place, and how far members read is logged (card events);
+/// - the composer's live preview ([preview]): every card is there (empty ones invite you to fill them) and a tap on a
+///   card goes to the part of the form that makes it.
 class AskDeck extends StatefulWidget {
   final Post post;
+  final bool preview;
+  /// the composer's local photos (the feed draws the ask's own)
   final List<ImageProvider> images;
   final String? reachLabel;
   final void Function(DeckKind kind)? onCardTap;
-  const AskDeck({super.key, required this.post, this.images = const [], this.reachLabel, this.onCardTap});
+  final bool mine;
+  final VoidCallback? onOpen, onReply;
+  final void Function(Post voted)? onVoted;
+  const AskDeck({super.key, required this.post, this.preview = false, this.images = const [], this.reachLabel, this.onCardTap, this.mine = false, this.onOpen, this.onReply, this.onVoted});
   @override
   State<AskDeck> createState() => _AskDeckState();
 }
@@ -26,9 +39,53 @@ class AskDeck extends StatefulWidget {
 class _AskDeckState extends State<AskDeck> {
   final _page = PageController(viewportFraction: .88);
   int _i = 0;
+  Timer? _look;
+
+  Post get _post => widget.post;
+  bool get _log => !widget.preview && !widget.mine;
+
+  /// the cards this ask has: the feed leaves out the ones with nothing on them
+  List<DeckKind> get _kinds {
+    final post = _post;
+    final left = askTimeLeft(post);
+    return [
+      DeckKind.headline,
+      if (post.pollOptions.length > 1) DeckKind.poll,
+      if (widget.preview || post.images.isNotEmpty) DeckKind.photos,
+      if (widget.preview || (post.description ?? '').trim().isNotEmpty) DeckKind.details,
+      if (widget.preview || (post.budget ?? '').isNotEmpty || (post.locationPref ?? '').isNotEmpty || left != null || post.radiusM != null) DeckKind.glance,
+      DeckKind.act,
+    ];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _looked(0);
+  }
+
+  /// a card on screen for a moment counts as read; a move to another card is a swipe; the last one, "complete"
+  void _looked(int i) {
+    _look?.cancel();
+    if (!_log) return;
+    final n = _kinds.length;
+    final api = context.read<AuthProvider>().api;
+    _look = Timer(const Duration(milliseconds: 700), () {
+      CardEvents.log(api, _post.id, 'view', i, n);
+      if (i > 0) CardEvents.log(api, _post.id, 'swipe', i, n);
+      if (i == n - 1) CardEvents.log(api, _post.id, 'complete', i, n);
+    });
+  }
+
+  void _tap(DeckKind kind, int i) {
+    if (widget.preview) return widget.onCardTap?.call(kind);
+    if (_log) CardEvents.log(context.read<AuthProvider>().api, _post.id, 'cta', i, _kinds.length);
+    widget.onOpen?.call();
+  }
 
   @override
   void dispose() {
+    _look?.cancel();
     _page.dispose();
     super.dispose();
   }
@@ -38,8 +95,7 @@ class _AskDeckState extends State<AskDeck> {
     final p = Pal.of(context);
     final post = widget.post;
     final tint = kCardColors[cardColorOf(post)]!;
-    // a poll ask has its options as the second card; the others skip it
-    final kinds = [for (final k in DeckKind.values) if (k != DeckKind.poll || post.pollOptions.length > 1) k];
+    final kinds = _kinds;
     return Column(children: [
       SizedBox(
         height: 236,
@@ -47,12 +103,15 @@ class _AskDeckState extends State<AskDeck> {
           controller: _page,
           padEnds: false,
           itemCount: kinds.length,
-          onPageChanged: (i) => setState(() => _i = i),
+          onPageChanged: (i) {
+            setState(() => _i = i);
+            _looked(i);
+          },
           itemBuilder: (_, i) => Padding(
             padding: const EdgeInsets.only(right: 10),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => widget.onCardTap?.call(kinds[i]),
+              onTap: () => _tap(kinds[i], i),
               child: Container(
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
@@ -134,6 +193,14 @@ class _AskDeckState extends State<AskDeck> {
           ]),
         );
       case DeckKind.poll:
+        if (!widget.preview) {
+          // vote right on the card; the bars show what members chose once you have (or on your own poll)
+          return SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+            child: PollVote(post: post, mine: widget.mine, onVoted: (v) => widget.onVoted?.call(v)),
+          );
+        }
         return Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -208,15 +275,37 @@ class _AskDeckState extends State<AskDeck> {
             Row(children: [
               WIcon(WI.talk, size: 16, color: p.link, still: true),
               const SizedBox(width: 6),
-              Text(t('No replies yet · be the first'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              Flexible(child: Text(post.sharesCount == 0 ? t('No replies yet · be the first') : t(post.sharesCount == 1 ? '{n} reply so far' : '{n} replies so far', {'n': post.sharesCount}), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
             ]),
+            if (post.viewsCount > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(children: [
+                  WIcon(WI.views, size: 14, color: p.muted, still: true),
+                  const SizedBox(width: 6),
+                  Text(t(post.viewsCount == 1 ? '{n} member has seen it' : '{n} members have seen it', {'n': post.viewsCount}), style: TextStyle(fontSize: 12, color: p.muted)),
+                ]),
+              ),
             const Spacer(),
-            Container(
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20)),
-              child: Text(t('I can help'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
-            ),
+            if (!widget.preview && post.closed)
+              Text(t('This ask is closed'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.muted))
+            else
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                // the reply sheet right here: one tap to answer, no trip to the ask first
+                onTap: widget.preview
+                    ? null
+                    : () {
+                        if (_log) CardEvents.log(context.read<AuthProvider>().api, post.id, 'cta', _kinds.length - 1, _kinds.length);
+                        (widget.mine ? widget.onOpen : widget.onReply)?.call();
+                      },
+                child: Container(
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20)),
+                  child: Text(t(widget.mine ? 'Review responses' : 'I can help'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
+                ),
+              ),
           ]),
         );
     }
@@ -224,7 +313,8 @@ class _AskDeckState extends State<AskDeck> {
 
   /// 1 photo full; 2 side by side; 3 one tall and two stacked; 4 in a grid. Empty: a dashed invitation.
   Widget _photos(Pal p) {
-    final imgs = widget.images.take(4).toList();
+    final all = widget.preview ? widget.images : [for (final u in _post.images) NetworkImage(u) as ImageProvider];
+    final imgs = all.take(4).toList();
     if (imgs.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(12),
@@ -262,14 +352,14 @@ class _AskDeckState extends State<AskDeck> {
     }
     return Stack(fit: StackFit.expand, children: [
       body,
-      if (widget.images.length > 1)
+      if (all.length > 1)
         Positioned(
           left: 8,
           bottom: 8,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(color: const Color(0xA61E1E1E), borderRadius: BorderRadius.circular(20)),
-            child: Text(t('{n} photos', {'n': widget.images.length}), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+            child: Text(t('{n} photos', {'n': all.length}), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
           ),
         ),
     ]);

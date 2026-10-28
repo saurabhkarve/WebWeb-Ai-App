@@ -1317,6 +1317,7 @@ class _AskFormState extends State<_AskForm> {
             Text(t('Swipe the cards. Tap one to edit it.'), style: TextStyle(fontSize: 11, color: p.muted)),
             const SizedBox(height: 8),
             AskDeck(
+              preview: true,
               post: _draftPost(),
               images: [
                 for (final ph in _photos.where((x) => !x.failed))
