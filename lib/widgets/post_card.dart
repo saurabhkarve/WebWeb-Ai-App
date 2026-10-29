@@ -452,6 +452,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                         mine: mine,
                         onOpen: _openDetail,
                         onReply: _reply,
+                        onReplies: () => _openDetail(expandResponses: true),
                         onQuickReact: _quickReact,
                         onVoted: (v) => setState(() => post = v),
                         typeAbove: true,

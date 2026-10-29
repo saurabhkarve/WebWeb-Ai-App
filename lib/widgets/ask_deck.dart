@@ -32,13 +32,15 @@ class AskDeck extends StatefulWidget {
   final void Function(DeckKind kind)? onCardTap;
   final bool mine;
   final VoidCallback? onOpen, onReply;
+  /// "View replies" on the last card: the ask, on its replies
+  final VoidCallback? onReplies;
   /// double tap on the photos: the quick reaction
   final VoidCallback? onQuickReact;
   final void Function(Post voted)? onVoted;
 
   /// the feed card pins the ask type above the deck, so the first card does not repeat it
   final bool typeAbove;
-  const AskDeck({super.key, required this.post, this.preview = false, this.images = const [], this.reachLabel, this.onCardTap, this.mine = false, this.onOpen, this.onReply, this.onQuickReact, this.onVoted, this.typeAbove = false});
+  const AskDeck({super.key, required this.post, this.preview = false, this.images = const [], this.reachLabel, this.onCardTap, this.mine = false, this.onOpen, this.onReply, this.onReplies, this.onQuickReact, this.onVoted, this.typeAbove = false});
   @override
   State<AskDeck> createState() => _AskDeckState();
 }
@@ -429,6 +431,15 @@ class _AskDeckState extends State<AskDeck> {
               const SizedBox(width: 6),
               Flexible(child: Text(post.sharesCount == 0 ? t('No replies yet · be the first') : t(post.sharesCount == 1 ? '{n} reply so far' : '{n} replies so far', {'n': post.sharesCount}), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
             ]),
+            if (post.sharesCount > 0 && !widget.preview && widget.onReplies != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: widget.onReplies,
+                  child: Text('${t('View replies')} →', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.link)),
+                ),
+              ),
             if (post.viewsCount > 0)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
