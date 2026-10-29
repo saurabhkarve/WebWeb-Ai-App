@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
+import '../card_colors.dart';
 import '../i18n.dart';
 import '../links.dart';
 import '../models.dart';
@@ -121,6 +122,20 @@ class HouseCardView extends StatefulWidget {
   State<HouseCardView> createState() => _HouseCardViewState();
 }
 
+/// Each house account's card colour, as the cards of an ask wear theirs (web house-card.tsx TONE).
+const _tone = {
+  'webwebai': 'gold',
+  'webwebbazaar': 'teal',
+  'webwebtenders': 'sky',
+  'webwebtips': 'orange',
+  'webwebnews': 'slate',
+  'webwebquiz': 'violet',
+  'webwebsourcing': 'orange',
+  'webwebevents': 'violet',
+  'webwebjobs': 'emerald',
+  'webwebspotlight': 'rose',
+};
+
 class _HouseCardViewState extends State<HouseCardView> {
   late HouseCard card = widget.card;
   Api get _api => context.read<AuthProvider>().api;
@@ -227,7 +242,19 @@ class _HouseCardViewState extends State<HouseCardView> {
           ),
         ]),
         const SizedBox(height: 12),
-        _body(),
+        // the body as a card, tinted like the cards of an ask
+        Builder(builder: (_) {
+          final tint = kCardColors[_tone[card.account.handle] ?? 'gold']!;
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [tint.withValues(alpha: .28), tint.withValues(alpha: 0)], stops: const [0, .8]),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: tint.withValues(alpha: .4)),
+            ),
+            child: _body(),
+          );
+        }),
         if ((card.sourceUrl ?? '').isNotEmpty && card.type != 'quiz')
           Align(
             alignment: Alignment.centerLeft,
