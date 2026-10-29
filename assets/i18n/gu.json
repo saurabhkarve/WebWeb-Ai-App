@@ -2392,5 +2392,9 @@
   "Item: [item]\nQuantity: [quantity]\nDelivery to: [area]\nWhat matters: [price / quality / credit]": "વસ્તુ: [વસ્તુ]\nજથ્થો: [જથ્થો]\nડિલિવરી: [વિસ્તાર]\nશું મહત્વનું: [ભાવ / ગુણવત્તા / ઉધાર]",
   "[Option A]": "[વિકલ્પ A]",
   "Show {n} more replies": "વધુ {n} જવાબ જુઓ",
-  "Device theme": "ડિવાઇસ મુજબ"
+  "Device theme": "ડિવાઇસ મુજબ",
+  "Your pages": "તમારા પેજ",
+  "Add a business page": "બિઝનેસ પેજ ઉમેરો",
+  "New business page": "નવું બિઝનેસ પેજ",
+  "Set up this page": "આ પેજ સેટ કરો"
 }

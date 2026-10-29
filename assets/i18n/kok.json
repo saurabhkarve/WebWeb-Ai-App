@@ -2392,5 +2392,9 @@
   "Item: [item]\nQuantity: [quantity]\nDelivery to: [area]\nWhat matters: [price / quality / credit]": "वस्त: [वस्त]\nप्रमाण: [प्रमाण]\nडिलिव्हरी: [वाठार]\nकितें म्हत्वाचें: [दर / दर्जो / उधार]",
   "[Option A]": "[पर्याय A]",
   "Show {n} more replies": "आनीक {n} जाप पळोवचे",
-  "Device theme": "डिव्हायसा प्रमाण"
+  "Device theme": "डिव्हायसा प्रमाण",
+  "Your pages": "तुमची पेजां",
+  "Add a business page": "बिझनेस पेज जोडचें",
+  "New business page": "नवें बिझनेस पेज",
+  "Set up this page": "हें पेज सेट करचें"
 }

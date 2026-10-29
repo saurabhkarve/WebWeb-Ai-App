@@ -377,6 +377,95 @@ void _openAccountMenu(BuildContext context) {
 /// The account menu from the web (account-menu.tsx) as a full-height drawer from the right: ⋯ (Log out) and
 /// close at the top, account card, View / Edit profile, Saved asks, Help & Support (opens the website),
 /// Account and privacy (a tab of Edit profile); language pills and the dark mode switch share the foot.
+/// The business pages of this sign-in: tap one to switch to it, or add another.
+class _PagesSwitcher extends StatefulWidget {
+  const _PagesSwitcher();
+  @override
+  State<_PagesSwitcher> createState() => _PagesSwitcherState();
+}
+
+class _PagesSwitcherState extends State<_PagesSwitcher> {
+  List<Map>? _pages;
+  bool _busy = false;
+  static const _max = 5;
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<AuthProvider>().accounts().then((l) {
+      if (mounted) setState(() => _pages = l);
+    }).catchError((_) {});
+  }
+
+  Future<void> _go(String? uid) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final nav = Navigator.of(context);
+    try {
+      await context.read<AuthProvider>().switchAccount(uid);
+      nav.popUntil((r) => r.isFirst);
+    } catch (_) {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = _pages;
+    if (pages == null) return const SizedBox.shrink();
+    final p = Pal.of(context);
+    final others = pages.where((a) => a['active'] != true).toList();
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+          child: Text(t('Your pages').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.3, color: p.muted)),
+        ),
+        for (final a in others)
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: _busy ? null : () => _go(a['uid'] as String),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(children: [
+                Avatar(name: '${a['name'] ?? ''}', photoUrl: a['photoURL'] as String?, size: 32, type: a['userType'] as String?),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(('${a['company'] ?? ''}').isNotEmpty ? '${a['company']}' : (('${a['name'] ?? ''}').isNotEmpty ? '${a['name']}' : t('New business page')),
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    Text(a['handle'] != null ? '@${a['handle']}' : t('Set up this page'), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+                  ]),
+                ),
+              ]),
+            ),
+          ),
+        if (pages.length < _max)
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: _busy ? null : () => _go(null),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: p.border)),
+                  child: Text('+', style: TextStyle(fontSize: 18, height: 1, color: p.muted)),
+                ),
+                const SizedBox(width: 12),
+                Text(t('Add a business page'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+              ]),
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
 class _AccountMenu extends StatelessWidget {
   const _AccountMenu();
 
@@ -478,6 +567,7 @@ class _AccountMenu extends StatelessWidget {
               ]),
             ),
           ),
+          const _PagesSwitcher(),
           Expanded(
             child: ListView(padding: const EdgeInsets.all(6), children: [
               item(WI.edit, 'Edit profile', () => push(EditProfileScreen(profile: me))),

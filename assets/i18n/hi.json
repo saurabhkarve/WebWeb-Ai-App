@@ -2392,5 +2392,9 @@
   "Item: [item]\nQuantity: [quantity]\nDelivery to: [area]\nWhat matters: [price / quality / credit]": "सामान: [सामान]\nमात्रा: [मात्रा]\nडिलीवरी: [इलाका]\nक्या ज़रूरी है: [दाम / क्वालिटी / उधार]",
   "[Option A]": "[विकल्प A]",
   "Show {n} more replies": "{n} और जवाब देखें",
-  "Device theme": "डिवाइस जैसा"
+  "Device theme": "डिवाइस जैसा",
+  "Your pages": "आपके पेज",
+  "Add a business page": "बिज़नेस पेज जोड़ें",
+  "New business page": "नया बिज़नेस पेज",
+  "Set up this page": "यह पेज सेट करें"
 }

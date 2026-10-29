@@ -202,6 +202,22 @@ class AuthProvider extends ChangeNotifier {
   Future<String> uploadAvatar(List<int> bytes, String filename, {String kind = 'avatar'}) async =>
       (await api.upload('/me/photo?kind=$kind', bytes, filename, Api.mimeOf(filename)))['url'] as String;
 
+  /// Business pages under this sign-in (GET /me/accounts): the page itself and the others.
+  Future<List<Map>> accounts() async => ((await api.get('/me/accounts') as Map)['accounts'] as List).cast<Map>();
+
+  /// A new session for another page of this sign-in ([uid]), or for a new empty page (null; onboarding opens next).
+  Future<void> switchAccount(String? uid) async {
+    final d = (uid == null ? await api.post('/me/accounts', {}) : await api.post('/me/accounts/switch', {'uid': uid})) as Map;
+    // nothing of the last page stays on screen, in the cache or in the live connection
+    profile = null;
+    profileLoaded = false;
+    notifyListeners();
+    await OfflineCache.clear();
+    await Outbox.clear();
+    await _signedIn(d['token'] as String);
+    notifyListeners();
+  }
+
   Future<void> logout() async {
     if (_loggingOut) return; // a 401 inside beforeLogout calls logout again
     _loggingOut = true;
