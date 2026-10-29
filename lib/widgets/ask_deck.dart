@@ -35,7 +35,10 @@ class AskDeck extends StatefulWidget {
   /// double tap on the photos: the quick reaction
   final VoidCallback? onQuickReact;
   final void Function(Post voted)? onVoted;
-  const AskDeck({super.key, required this.post, this.preview = false, this.images = const [], this.reachLabel, this.onCardTap, this.mine = false, this.onOpen, this.onReply, this.onQuickReact, this.onVoted});
+
+  /// the feed card pins the ask type above the deck, so the first card does not repeat it
+  final bool typeAbove;
+  const AskDeck({super.key, required this.post, this.preview = false, this.images = const [], this.reachLabel, this.onCardTap, this.mine = false, this.onOpen, this.onReply, this.onQuickReact, this.onVoted, this.typeAbove = false});
   @override
   State<AskDeck> createState() => _AskDeckState();
 }
@@ -202,12 +205,14 @@ class _AskDeckState extends State<AskDeck> {
         final card = Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              WIcon(categoryIcon(type.icon), size: 14, color: p.link, still: true),
-              const SizedBox(width: 6),
-              Flexible(child: Padding(padding: EdgeInsets.only(right: thumbs ? 118 : 0), child: Text(cat.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link)))),
-            ]),
-            const SizedBox(height: 8),
+            if (!widget.typeAbove) ...[
+              Row(children: [
+                WIcon(categoryIcon(type.icon), size: 14, color: p.link, still: true),
+                const SizedBox(width: 6),
+                Flexible(child: Padding(padding: EdgeInsets.only(right: thumbs ? 118 : 0), child: Text(cat.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link)))),
+              ]),
+              const SizedBox(height: 8),
+            ],
             // who wants what, in a line: the idea of the ask before its details
             Row(children: [
               Text(type.emoji, style: const TextStyle(fontSize: 16)),
