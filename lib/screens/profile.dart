@@ -396,7 +396,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _pictureRow(Pal p, Profile u, bool own) {
     final name = displayName(u.userType, u.name, u.company);
     TextSpan stat(String? v, String label) => TextSpan(children: [
-          TextSpan(text: v ?? '–', style: TextStyle(fontWeight: FontWeight.w700, color: p.text)),
+          TextSpan(text: v ?? '–', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00))),
           TextSpan(text: ' ${t(label)}'),
         ]);
     return Transform.translate(
