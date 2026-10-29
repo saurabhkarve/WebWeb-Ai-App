@@ -8,6 +8,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'area_map.dart' show AreaMap, askTimeLeft, showAreaViewer;
+import '../links.dart';
 import 'hashtag_text.dart';
 import 'image_grid.dart';
 
@@ -80,15 +81,17 @@ class AskCards extends StatelessWidget {
           Expanded(child: Text(t(s.key, {...s.vars, if (s.vars['what'] != null) 'what': t(s.vars['what']!)}), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .75)))),
         ]),
         const SizedBox(height: 6),
-        HashtagText(post.title ?? '', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -.3)),
+        HashtagText(askText(post.askType, post.title), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -.3)),
         if (chips != null) ...[const SizedBox(height: 12), chips!],
       ])),
-      if ((post.description ?? '').trim().isNotEmpty)
+      if (askText(post.askType, post.description).trim().isNotEmpty)
         card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           label(t('What is needed')),
           const SizedBox(height: 8),
-          HashtagText(post.description!, selectable: true, style: TextStyle(fontSize: 15, height: 1.4, color: p.text.withValues(alpha: .85))),
+          HashtagText(askText(post.askType, post.description), selectable: true, style: TextStyle(fontSize: 15, height: 1.4, color: p.text.withValues(alpha: .85))),
         ])),
+      if (post.askType == 'visit' && firstLink([post.title, post.description]) != null)
+        LinkPreviewCard(firstLink([post.title, post.description])!, key: ValueKey(post.id), visit: true, margin: EdgeInsets.zero),
       if (post.images.isNotEmpty) card(ImageGrid(post.images, shareUrl: post.webUrl, shareRef: post.id), pad: const EdgeInsets.all(8)),
       if (tiles.isNotEmpty)
         card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

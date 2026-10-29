@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -47,6 +48,25 @@ String? firstLink(List<String?> texts) {
   }
   return null;
 }
+
+/// The text of a Visit ask without its address: the link shows as a preview card (picture, title, the site) with a Visit
+/// button, not as a long URL. A line left holding only a label ("Link:") goes with it.
+String stripLinks(String text) {
+  var out = text;
+  for (final (s, e, _) in linkTokens(text).reversed) {
+    out = out.substring(0, s) + out.substring(e);
+  }
+  return out
+      .split('\n')
+      .where((l) => !RegExp(r'^\s*(link|website|site|url)\s*[:\-]?\s*$', caseSensitive: false).hasMatch(l))
+      .join('\n')
+      .replaceAll(RegExp(r'[ \t]+\n'), '\n')
+      .replaceAll(RegExp(r'[ \t]{2,}'), ' ')
+      .trim();
+}
+
+/// What to draw of an ask's title or details: a Visit ask has its link taken out (see [stripLinks]).
+String askText(String? askType, String? text) => askType == 'visit' ? stripLinks(text ?? '') : (text ?? '');
 
 /// "skyq.tech" from https://www.skyq.tech/about
 String hostOf(String href) {
@@ -137,8 +157,11 @@ Future<_Preview?> _load(Api api, String href) => _cache[href] ??= api.get('/link
 class LinkPreviewCard extends StatefulWidget {
   final String href;
   final bool compact;
+
+  /// A Visit ask: only the domain is named (never the address) and a Visit button shows, even with no preview data.
+  final bool visit;
   final EdgeInsets margin;
-  const LinkPreviewCard(this.href, {super.key, this.compact = false, this.margin = const EdgeInsets.only(top: 8)});
+  const LinkPreviewCard(this.href, {super.key, this.compact = false, this.visit = false, this.margin = const EdgeInsets.only(top: 8)});
   @override
   State<LinkPreviewCard> createState() => _LinkPreviewCardState();
 }
@@ -158,30 +181,41 @@ class _LinkPreviewCardState extends State<LinkPreviewCard> {
   @override
   Widget build(BuildContext context) {
     final p = _p;
-    if (p == null) return const SizedBox.shrink();
+    if (p == null && !widget.visit) return const SizedBox.shrink();
     final pal = Pal.of(context);
-    final site = (p.siteName ?? '').isNotEmpty ? p.siteName! : hostOf(widget.href);
+    final site = widget.visit || (p?.siteName ?? '').isEmpty ? hostOf(widget.href) : p!.siteName!;
     final c = widget.compact;
-    final picture = (p.image ?? '').isNotEmpty && _imgOk
-        ? Image.network(p.image!, fit: BoxFit.cover, errorBuilder: (_, __, ___) {
+    final picture = (p?.image ?? '').isNotEmpty && _imgOk
+        ? Image.network(p!.image!, fit: BoxFit.cover, errorBuilder: (_, __, ___) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted && _imgOk) setState(() => _imgOk = false);
             });
             return const SizedBox.shrink();
           })
         : null;
-    final words = Padding(
+    final text = Padding(
       padding: c ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8) : const EdgeInsets.fromLTRB(14, 10, 14, 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
         Text(site.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: .4, color: pal.muted)),
-        Text(p.title ?? '', maxLines: c ? 1 : 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: c ? 13 : 15, fontWeight: FontWeight.w700, height: 1.3)),
-        if ((p.description ?? '').isNotEmpty)
+        if ((p?.title ?? '').isNotEmpty) Text(p!.title!, maxLines: c ? 1 : 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: c ? 13 : 15, fontWeight: FontWeight.w700, height: 1.3)),
+        if ((p?.description ?? '').isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Text(p.description!, maxLines: c ? 1 : 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: c ? 12 : 13, color: pal.muted, height: 1.35)),
+            child: Text(p!.description!, maxLines: c ? 1 : 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: c ? 12 : 13, color: pal.muted, height: 1.35)),
           ),
       ]),
     );
+    final words = widget.visit
+        ? Row(children: [
+            Expanded(child: text),
+            Container(
+              margin: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(18)),
+              child: Text('${t('Visit')} →', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kInk)),
+            ),
+          ])
+        : text;
     return Padding(
       padding: widget.margin,
       child: Material(
@@ -204,5 +238,48 @@ class _LinkPreviewCardState extends State<LinkPreviewCard> {
         ),
       ),
     );
+  }
+}
+
+/// Text with only its links made live (a chat message): each opens the "You're leaving WEBWEB" check, then the browser.
+class LinkedText extends StatefulWidget {
+  final String text;
+  final TextStyle? style;
+  const LinkedText(this.text, {super.key, this.style});
+  @override
+  State<LinkedText> createState() => _LinkedTextState();
+}
+
+class _LinkedTextState extends State<LinkedText> {
+  final _taps = <TapGestureRecognizer>[];
+
+  @override
+  void dispose() {
+    for (final r in _taps) {
+      r.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = widget.text;
+    final links = linkTokens(text);
+    if (links.isEmpty) return Text(text, style: widget.style);
+    for (final r in _taps) {
+      r.dispose();
+    }
+    _taps.clear();
+    final spans = <InlineSpan>[];
+    var last = 0;
+    for (final (s, e, href) in links) {
+      if (s > last) spans.add(TextSpan(text: text.substring(last, s)));
+      final tap = TapGestureRecognizer()..onTap = () => openExternal(context, href);
+      _taps.add(tap);
+      spans.add(TextSpan(text: text.substring(s, e), recognizer: tap, style: const TextStyle(fontWeight: FontWeight.w700, decoration: TextDecoration.underline)));
+      last = e;
+    }
+    if (last < text.length) spans.add(TextSpan(text: text.substring(last)));
+    return Text.rich(TextSpan(style: widget.style, children: spans));
   }
 }

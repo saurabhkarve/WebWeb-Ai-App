@@ -12,6 +12,7 @@ import '../api.dart';
 import '../auth_provider.dart';
 import '../call_manager.dart';
 import '../i18n.dart';
+import '../links.dart';
 import '../permissions.dart';
 import '../location.dart';
 import '../models.dart';
@@ -1131,7 +1132,7 @@ class _ChatThreadState extends State<ChatThread> {
           if (m.text.isNotEmpty)
             Padding(
               padding: m.imageUrl != null ? const EdgeInsets.symmetric(horizontal: 12, vertical: 4) : (m.attachment != null ? const EdgeInsets.fromLTRB(6, 6, 6, 2) : EdgeInsets.zero),
-              child: Text(m.replyTo?.kind == 'contact_request' ? t(m.text) : m.text, style: TextStyle(fontSize: m.imageUrl == null && m.attachment == null && isSingleEmoji(m.text) ? 44 : 15, color: fg, height: m.imageUrl == null && m.attachment == null && isSingleEmoji(m.text) ? 1.15 : 1.4)),
+              child: LinkedText(m.replyTo?.kind == 'contact_request' ? t(m.text) : m.text, style: TextStyle(fontSize: m.imageUrl == null && m.attachment == null && isSingleEmoji(m.text) ? 44 : 15, color: fg, height: m.imageUrl == null && m.attachment == null && isSingleEmoji(m.text) ? 1.15 : 1.4)),
             ),
         ]),
       ),

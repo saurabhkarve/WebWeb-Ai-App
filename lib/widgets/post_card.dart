@@ -277,14 +277,14 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.375, letterSpacing: -0.18),
         )
       else if (isAsk)
-        HashtagText(post.title ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.375, letterSpacing: -0.18)),
+        HashtagText(askText(post.askType, post.title), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.375, letterSpacing: -0.18)),
       if (post.fact != null)
         FactCard(post.fact!)
       else if ((post.description ?? '').isNotEmpty)
         Padding(
           padding: EdgeInsets.only(top: isAsk ? 4 : 0),
           child: HashtagText(
-            post.description!,
+            isAsk ? askText(post.askType, post.description) : post.description!,
             maxLines: isAsk && !widget.detail ? 2 : null,
             overflow: isAsk && !widget.detail ? TextOverflow.ellipsis : null,
             style: TextStyle(fontSize: 15, height: isAsk ? 1.6 : 1.375, color: isAsk ? p.text.withValues(alpha: .7) : p.text),
@@ -295,7 +295,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     // the first link in the text gets a preview card (not a fact's: its source shows under it; not inside a repost's quote)
     final link = post.fact != null || post.repostedByName != null ? null : firstLink([post.title, post.description]);
     final extra = <Widget>[
-      if (link != null) LinkPreviewCard(link, key: ValueKey(link)),
+      if (link != null) LinkPreviewCard(link, key: ValueKey(link), visit: post.askType == 'visit'),
       if (post.fact != null && post.fact!.sourceUrl.isNotEmpty)
         GestureDetector(
           behavior: HitTestBehavior.opaque,
