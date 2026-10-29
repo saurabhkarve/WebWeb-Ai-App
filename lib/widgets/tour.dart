@@ -465,6 +465,8 @@ class _AskTypesDemoState extends State<_AskTypesDemo> {
             ),
         ]),
         const SizedBox(height: 10),
+        Align(alignment: Alignment.centerLeft, child: Text('${d.$1} ${t(d.$2)}'.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: .4, color: Color(0xFF7A5A00)))),
+        const SizedBox(height: 4),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 350),
           transitionBuilder: (c, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, .15), end: Offset.zero).animate(a), child: c)),
@@ -472,15 +474,40 @@ class _AskTypesDemoState extends State<_AskTypesDemo> {
             key: ValueKey(_k),
             width: double.infinity,
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [kGold.withValues(alpha: .3), kGold.withValues(alpha: .1), Colors.transparent]),
+              border: Border.all(color: kGold.withValues(alpha: .4)),
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Text(d.$1, style: const TextStyle(fontSize: 20)),
-                const SizedBox(width: 8),
-                Expanded(child: Text(t(d.$3), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, height: 1.25))),
+                Text(d.$1, style: const TextStyle(fontSize: 16)),
+                const SizedBox(width: 6),
+                Expanded(child: Text(t(d.$3), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .75)))),
               ]),
               const SizedBox(height: 4),
-              Text(t(d.$4), style: TextStyle(fontSize: 12, color: p.muted)),
+              Text(t(d.$4), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, height: 1.25)),
+              const SizedBox(height: 8),
+              if (d.$2 == 'Poll')
+                Row(children: [
+                  for (final o in [t('Yes'), t('No')])
+                    Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(color: p.canvas.withValues(alpha: .7), border: Border.all(color: p.border), borderRadius: BorderRadius.circular(20)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Container(width: 14, height: 14, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: p.muted.withValues(alpha: .6), width: 2))),
+                        const SizedBox(width: 6),
+                        Text(o, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      ]),
+                    ),
+                ])
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20)),
+                  child: Text(t(d.$2 == 'Advice' || d.$2 == 'Recommend' ? 'I can suggest' : 'I can help'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kInk)),
+                ),
             ]),
           ),
         ),

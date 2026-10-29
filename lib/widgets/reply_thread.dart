@@ -92,6 +92,16 @@ class _ReplySocialState extends State<ReplySocial> {
   Api get _api => context.read<AuthProvider>().api;
   String get _base => '/posts/${widget.postId}/replies/${widget.reply.uid}';
 
+  // up to two replies to a reply show open; more are behind "View n replies"
+  @override
+  void initState() {
+    super.initState();
+    if (_total > 0 && _total <= 2) {
+      _open = true;
+      _load();
+    }
+  }
+
   @override
   void dispose() {
     _text.dispose();
@@ -209,7 +219,7 @@ class _ReplySocialState extends State<ReplySocial> {
           Padding(padding: const EdgeInsets.only(right: 6), child: widget.child),
         ]),
       ),
-      if (_total > 0)
+      if (_total > 2)
         Transform.translate(
           offset: const Offset(-6, 0),
           child: _textButton(
