@@ -68,7 +68,7 @@ class _AskDeckState extends State<AskDeck> {
   }
 
   /// The cards' height follows the screen (about a third of it); the headline and the buttons follow the cards.
-  double get _deckH => (MediaQuery.sizeOf(context).height * .30).clamp(190.0, 300.0);
+  double get _deckH => (MediaQuery.sizeOf(context).height * .30).clamp(210.0, 300.0);
   double get _scale => _deckH / 240;
 
   List<DeckKind> get _kinds {
@@ -346,8 +346,8 @@ class _AskDeckState extends State<AskDeck> {
             for (var k = 0; k < post.pollOptions.length; k++)
               Container(
                 width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                margin: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(color: p.canvas.withValues(alpha: .7), borderRadius: BorderRadius.circular(12)),
                 child: Row(children: [
                   const OptionMark(OptionState.open),
