@@ -2440,5 +2440,11 @@
   "Why it helps": "यह क्यों काम आता है",
   "Open the official page": "आधिकारिक पेज खोलें",
   "{n} steps": "{n} चरण",
-  "See the steps": "चरण देखें"
+  "See the steps": "चरण देखें",
+  "Quantity": "मात्रा",
+  "Quality": "गुणवत्ता",
+  "By when": "कब तक",
+  "Shift": "शिफ़्ट",
+  "Condition": "स्थिति",
+  "Purpose": "उद्देश्य"
 }

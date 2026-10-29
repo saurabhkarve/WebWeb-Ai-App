@@ -916,6 +916,29 @@ class _AskFormState extends State<_AskForm> {
     );
   }
 
+  /// a field inside a card that has the border: no box of its own
+  InputDecoration _bare(Pal p, String hint) => InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: p.muted.withValues(alpha: .75), fontWeight: FontWeight.w600),
+        counterText: '',
+        filled: false,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(vertical: 6),
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+      );
+
+  /// a part worth saying goes on its own line, and the cursor waits after it
+  void _addPrompt(String label) {
+    final cur = _desc.text.replaceFirst(RegExp(r'\s+$'), '');
+    var next = '$cur${cur.isEmpty ? '' : '\n'}${t(label)}: ';
+    if (next.length > 300) next = next.substring(0, 300);
+    _desc.value = TextEditingValue(text: next, selection: TextSelection.collapsed(offset: next.length));
+    _descFocus.requestFocus();
+    setState(() {});
+  }
+
   InputDecoration _input(Pal p, String hint, {String? error}) {
     OutlineInputBorder b(Color c) => OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: c));
     return InputDecoration(
@@ -961,6 +984,11 @@ class _AskFormState extends State<_AskForm> {
     final tip = _tips[_category];
     final empty = title.trim().isEmpty && desc.trim().isEmpty;
     // the form opens in steps: the types first; once one is picked, the examples, the title and the details; once there is a title, the rest
+    // parts worth saying, by what the ask wants: one tap puts the part on its own line
+    final promptChips = [
+      for (final c in _askPrompts[_askType] ?? const <String>[])
+        if (!desc.toLowerCase().contains('${c.toLowerCase()}:') && !desc.toLowerCase().contains('${t(c).toLowerCase()}:')) c
+    ].take(4).toList();
     final typeReady = _editing || _typeChosen || _askType.isNotEmpty || !empty;
     final restReady = _editing || title.trim().isNotEmpty || desc.trim().isNotEmpty || _photos.isNotEmpty;
     // examples: the chosen type's, or the first of each type while none is chosen
@@ -1252,48 +1280,106 @@ class _AskFormState extends State<_AskForm> {
                   TextField(controller: _other, maxLength: 40, onChanged: (_) => setState(() {}), decoration: _input(p, t('What is this about? e.g. Event stall, Legal help, Insurance'))),
                 ],
                 const SizedBox(height: 8),
-                TextField(
-                  key: _tk('ask-title'),
-                  controller: _title,
-                  focusNode: _titleFocus,
-                  maxLength: 100,
-                  minLines: 1,
-                  maxLines: 3,
-                  textInputAction: TextInputAction.next,
-                  textCapitalization: TextCapitalization.sentences,
-                  onSubmitted: (_) => _descFocus.requestFocus(),
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.3),
-                  decoration: _input(p, t('Title: e.g. Need 5 CNC operators in Turbhe')),
-                ),
-                MentionSuggest(controller: _title, focus: _titleFocus),
-                if (titleIdea != null)
-                  GestureDetector(
-                    onTap: () => _title.text = titleIdea!,
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(8)),
-                      child: Row(children: [
-                        WIcon(WI.sparkle, size: 16, color: p.link),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text('${t('Use as title')}: “$titleIdea”', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14))),
+                // the title and the details in one card: it lights up while you write, and each part counts its letters
+                AnimatedBuilder(
+                  animation: Listenable.merge([_titleFocus, _descFocus]),
+                  builder: (context, child) {
+                    final on = _titleFocus.hasFocus || _descFocus.hasFocus;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      decoration: BoxDecoration(
+                        color: p.card,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: on ? kGold : p.border, width: on ? 1.5 : 1),
+                        boxShadow: on ? [BoxShadow(color: kGold.withValues(alpha: .22), spreadRadius: 3)] : null,
+                      ),
+                      child: child,
+                    );
+                  },
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        Row(children: [
+                          Text(t('Title').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.muted)),
+                          const Spacer(),
+                          if (titleOk && !titleBlank) ...[const Icon(Icons.check_rounded, size: 14, color: Color(0xFF2F9E6E)), const SizedBox(width: 3)],
+                          Text('${title.length}/100', style: TextStyle(fontSize: 11, color: title.length > 90 ? const Color(0xFFB45309) : p.muted, fontFeatures: const [FontFeature.tabularFigures()])),
+                        ]),
+                        TextField(
+                          key: _tk('ask-title'),
+                          controller: _title,
+                          focusNode: _titleFocus,
+                          maxLength: 100,
+                          minLines: 1,
+                          maxLines: 3,
+                          textInputAction: TextInputAction.next,
+                          textCapitalization: TextCapitalization.sentences,
+                          onSubmitted: (_) => _descFocus.requestFocus(),
+                          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, height: 1.3),
+                          decoration: _bare(p, t('Title: e.g. Need 5 CNC operators in Turbhe')),
+                        ),
+                        MentionSuggest(controller: _title, focus: _titleFocus),
+                        if (titleIdea != null)
+                          GestureDetector(
+                            onTap: () => _title.text = titleIdea!,
+                            child: Container(
+                              margin: const EdgeInsets.only(top: 4, bottom: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(8)),
+                              child: Row(children: [
+                                WIcon(WI.sparkle, size: 16, color: p.link),
+                                const SizedBox(width: 8),
+                                Expanded(child: Text('${t('Use as title')}: “$titleIdea”', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14))),
+                              ]),
+                            ),
+                          ),
+                        const SizedBox(height: 4),
                       ]),
                     ),
-                  ),
-                const SizedBox(height: 8),
-                TextField(
-                  key: _tk('ask-description'),
-                  controller: _desc,
-                  focusNode: _descFocus,
-                  minLines: 3,
-                  maxLines: 12,
-                  maxLength: 300,
-                  textCapitalization: TextCapitalization.sentences,
-                  style: const TextStyle(fontSize: 15, height: 1.4),
-                  decoration: _input(p, t(_askType == 'visit' ? 'What they will find there, and your website link' : (tip?.$1 ?? 'Describe what you need: quantity, quality, area, timing'))),
+                    Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 16), color: p.border),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        Row(children: [
+                          Text(t('Description').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.muted)),
+                          const Spacer(),
+                          Text('${desc.length}/300', style: TextStyle(fontSize: 11, color: desc.length > 270 ? const Color(0xFFB45309) : p.muted, fontFeatures: const [FontFeature.tabularFigures()])),
+                        ]),
+                        TextField(
+                          key: _tk('ask-description'),
+                          controller: _desc,
+                          focusNode: _descFocus,
+                          minLines: 3,
+                          maxLines: 8,
+                          maxLength: 300,
+                          textCapitalization: TextCapitalization.sentences,
+                          style: const TextStyle(fontSize: 16, height: 1.4),
+                          decoration: _bare(p, t(_askType == 'visit' ? 'What they will find there, and your website link' : (tip?.$1 ?? 'Describe what you need: quantity, quality, area, timing'))),
+                        ),
+                        // quick starts: tap to put the part on its own line and carry on writing
+                        if (promptChips.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                              Text('${t('Add')}:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+                              for (final c in promptChips)
+                                GestureDetector(
+                                  onTap: () => _addPrompt(c),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(color: kGold.withValues(alpha: .1), borderRadius: BorderRadius.circular(20), border: Border.all(color: kGold.withValues(alpha: .5))),
+                                    child: Text('+ ${t(c)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                  ),
+                                ),
+                            ]),
+                          ),
+                        if (_askType == 'visit') Padding(padding: const EdgeInsets.only(top: 4), child: Text(t('Paste your website link in the title or details. One link a day.'), style: TextStyle(fontSize: 12, color: p.muted))),
+                        MentionSuggest(controller: _desc, focus: _descFocus),
+                      ]),
+                    ),
+                  ]),
                 ),
-                if (_askType == 'visit') Padding(padding: const EdgeInsets.only(top: 4), child: Text(t('Paste your website link in the title or details. One link a day.'), style: TextStyle(fontSize: 12, color: p.muted))),
-                MentionSuggest(controller: _desc, focus: _descFocus),
                 // hashtags in the title or description become links to every ask that carries them
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
@@ -1780,3 +1866,15 @@ class _BudgetRangeState extends State<_BudgetRange> {
     ]);
   }
 }
+
+/// The parts worth saying in the details, by what the ask wants (English keys: translated where shown).
+const _askPrompts = <String, List<String>>{
+  'hire': ['Role', 'Experience', 'Pay', 'Shift'],
+  'quote': ['Quantity', 'Quality', 'Area', 'By when'],
+  'offer': ['Quantity', 'Price', 'Area', 'Condition'],
+  'advice': ['Area'],
+  'recommend': ['Area', 'By when'],
+  'partner': ['Area', 'Purpose'],
+  'funding': ['Amount', 'Purpose', 'By when'],
+  'other': ['Quantity', 'Area', 'By when'],
+};
