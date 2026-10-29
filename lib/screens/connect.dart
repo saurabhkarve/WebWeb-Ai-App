@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api.dart';
 import '../auth_provider.dart';
 import '../i18n.dart';
+import 'your_asks.dart';
 import '../models.dart';
 import '../safety.dart';
 import '../theme.dart';
@@ -212,7 +213,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       const SizedBox(height: 6),
       KeyedSubtree(key: Tours.key('updates'), child: _UpdatesBar(key: _updatesKey)),
       const SizedBox(height: 12),
-      RuleHeading(WI.ask, t('Asks')),
+      Row(children: [Expanded(child: RuleHeading(WI.ask, t('Asks'))), const SizedBox(width: 8), YourAsksPill(onOpen: widget.onGoAsk)]),
       if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
       if (posts == null && _error == null) const PageLoader(),
       if (posts != null && posts.isEmpty) _empty(p),

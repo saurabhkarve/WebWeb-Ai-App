@@ -13,6 +13,7 @@ import '../card_colors.dart';
 import '../widgets/ask_deck.dart';
 import 'dart:io' show File;
 import '../i18n.dart';
+import 'your_asks.dart';
 import '../location.dart';
 import '../models.dart';
 import '../places.dart';
@@ -226,8 +227,8 @@ Widget _caps(Pal p, String s, {WI? icon}) => Row(children: [
       Text(t(s).toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
     ]);
 
-/// Ask tab (web post/new): the ask, laid out like its row on Connect.
-class AskScreen extends StatelessWidget {
+/// Ask tab (web post/new): the ask, laid out like its row on Connect, with a second tab for the asks I have posted.
+class AskScreen extends StatefulWidget {
   final VoidCallback onPosted;
   /// the Ask tab is on screen (it stays mounted behind the others)
   final bool active;
@@ -237,7 +238,87 @@ class AskScreen extends StatelessWidget {
   final VoidCallback? onBack;
   const AskScreen({super.key, required this.onPosted, this.active = true, this.edit, this.onBack});
   @override
-  Widget build(BuildContext context) => _AskForm(onPosted: onPosted, active: active, edit: edit, onBack: onBack);
+  State<AskScreen> createState() => _AskScreenState();
+}
+
+class _AskScreenState extends State<AskScreen> with MyAskActivityLoader {
+  bool _yours = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.edit == null) {
+      initAskActivity();
+      yourAsksRequest.addListener(_onRequest);
+    }
+  }
+
+  @override
+  void dispose() {
+    yourAsksRequest.removeListener(_onRequest);
+    disposeAskActivity();
+    super.dispose();
+  }
+
+  void _onRequest() {
+    if (!yourAsksRequest.value) return;
+    yourAsksRequest.value = false;
+    loadAskActivity();
+    setState(() => _yours = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final form = _AskForm(onPosted: widget.onPosted, active: widget.active, edit: widget.edit, onBack: widget.onBack);
+    if (widget.edit != null) return form;
+    final p = Pal.of(context);
+    final fresh = (asks ?? const <MyAskActivity>[]).fold<int>(0, (n, a) => n + a.fresh);
+    Widget tab(String label, bool on, VoidCallback onTap, {Widget? badge}) => Expanded(
+          child: GestureDetector(
+            onTap: onTap,
+            child: Container(
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: on ? p.card : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                border: on ? Border.all(color: kGold) : null,
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(t(label), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: on ? p.text : p.muted)),
+                if (badge != null) ...[const SizedBox(width: 6), badge],
+              ]),
+            ),
+          ),
+        );
+    Widget count(String s, {bool gold = false}) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7),
+          decoration: BoxDecoration(color: gold ? kGold : p.text.withValues(alpha: .1), borderRadius: BorderRadius.circular(20)),
+          child: Text(s, style: TextStyle(fontSize: 11, height: 1.5, fontWeight: FontWeight.w800, color: gold ? const Color(0xFF1E1E1E) : p.text)),
+        );
+    return Column(children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(24)),
+          child: Row(children: [
+            tab('New ask', !_yours, () => setState(() => _yours = false)),
+            tab('Your asks', _yours, () {
+              loadAskActivity();
+              setState(() => _yours = true);
+            }, badge: (asks == null || asks!.isEmpty) ? null : Row(mainAxisSize: MainAxisSize.min, children: [count('${asks!.length}'), if (fresh > 0) ...[const SizedBox(width: 4), count('+$fresh', gold: true)]])),
+          ]),
+        ),
+      ),
+      Expanded(
+        child: IndexedStack(index: _yours ? 1 : 0, children: [
+          form,
+          YourAsksList(asks: asks, onRefresh: loadAskActivity),
+        ]),
+      ),
+    ]);
+  }
 }
 
 class _AskForm extends StatefulWidget {
@@ -1094,38 +1175,6 @@ class _AskFormState extends State<_AskForm> {
                           ),
                         ),
                       ),
-                    const Spacer(),
-                    // Ask AI, top right: on once the title has a few words
-                    if (_aiOn)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Semantics(
-                          button: true,
-                          enabled: canAskAi && !_aiBusy,
-                          child: GestureDetector(
-                            onTap: canAskAi && !_aiBusy ? _askAi : () => toast(context, t('Write a title first')),
-                            // "Ask" + the logo's AI pill, on a quiet gold-edged pill
-                            child: Opacity(
-                              opacity: canAskAi ? 1 : .5,
-                              child: Container(
-                                padding: const EdgeInsets.fromLTRB(12, 5, 6, 5),
-                                decoration: BoxDecoration(
-                                  color: p.card,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: const Color(0xFFC9AE24).withValues(alpha: .5)),
-                                ),
-                                child: _aiBusy
-                                    ? Row(mainAxisSize: MainAxisSize.min, children: [
-                                        Text(t('Thinking…'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text)),
-                                        const SizedBox(width: 5),
-                                        AiPill(font: 10, spin: _aiSpin),
-                                      ])
-                                    : withAiPill(t('Ask AI'), TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text), font: 10, spin: _aiSpin),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
                   ]),
                   const SizedBox(height: 8),
                 ],
@@ -1427,48 +1476,73 @@ class _AskFormState extends State<_AskForm> {
       ],
     );
 
+    // Ask AI, beside Publish in the bar: on once the title has a few words
+    final Widget aiButton = Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Semantics(
+        button: true,
+        enabled: canAskAi && !_aiBusy,
+        child: GestureDetector(
+          onTap: canAskAi && !_aiBusy ? _askAi : () => toast(context, t('Write a title first')),
+          // "Ask" + the logo's AI pill, on a quiet gold-edged pill
+          child: Opacity(
+            opacity: canAskAi ? 1 : .5,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 5, 6, 5),
+              decoration: BoxDecoration(
+                color: p.card,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFC9AE24).withValues(alpha: .5)),
+              ),
+              child: _aiBusy
+                  ? Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text(t('Thinking…'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text)),
+                      const SizedBox(width: 5),
+                      AiPill(font: 10, spin: _aiSpin),
+                    ])
+                  : withAiPill(t('Ask AI'), TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text), font: 10, spin: _aiSpin),
+            ),
+          ),
+        ),
+      ),
+    );
+
     return Column(children: [
       // a tap anywhere outside an open chip's choices closes them
       Expanded(child: _open == null ? form : GestureDetector(onTap: () => setState(() => _open = null), child: form)),
       // Publish in one bar on the bottom edge (the island steps aside on Ask): reach and strength, then the button
       Container(
         key: _tk('ask-publish'),
-        padding: EdgeInsets.fromLTRB(16, 10, 16, MediaQuery.of(context).padding.bottom + 10),
+        padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 10),
         decoration: BoxDecoration(color: p.canvas.withValues(alpha: .97), border: Border(top: BorderSide(color: p.border.withValues(alpha: .7)))),
-        child: Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-              Row(children: [
-                WIcon(WI.users, size: 14, color: p.muted),
-                const SizedBox(width: 5),
-                Expanded(
-                  child: Text(
-                    _reach != null ? '${t('Reaches')} $_reach ${t(_reach == 1 ? 'member' : 'members')}${_location.isNotEmpty ? ' ${t('in')} ${t(_location)}' : ''}' : t('Reaches nearby members'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted),
-                  ),
-                ),
-              ]),
-              if (ready || title.trim().isNotEmpty || desc.trim().isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(t(ready ? strength : missing),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ready ? const Color(0xFF059669) : p.muted)),
-                ),
-            ]),
-          ),
-          const SizedBox(width: 12),
-          GoldButton(label: t(_editing ? 'Save' : 'Publish'), wi: WI.askPlus, height: 44, loading: _busy, onPressed: ready ? _publish : null),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Row(children: [
+            WIcon(WI.users, size: 14, color: p.muted),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                _reach != null ? '${t('Reaches')} $_reach ${t(_reach == 1 ? 'member' : 'members')}${_location.isNotEmpty ? ' ${t('in')} ${t(_location)}' : ''}' : t('Reaches nearby members'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted),
+              ),
+            ),
+            if (ready || title.trim().isNotEmpty || desc.trim().isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Text(t(ready ? strength : missing), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ready ? const Color(0xFF059669) : p.muted)),
+            ],
+          ]),
+          const SizedBox(height: 6),
+          Row(children: [
+            if (_aiOn) aiButton,
+            Expanded(child: GoldButton(label: t(_editing ? 'Save' : 'Publish'), wi: WI.askPlus, height: 44, loading: _busy, onPressed: ready ? _publish : null)),
+          ]),
         ]),
       ),
     ]);
   }
 }
 
-/// Budget as From and an optional To plus a unit, with quick presets (web budget-range.tsx).
 class _BudgetRange extends StatefulWidget {
   final String value;
   final List<String> presets;

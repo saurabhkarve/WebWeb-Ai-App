@@ -2402,5 +2402,14 @@
   "Choose one answer": "एक उत्तर चुनें",
   "Choose one option": "एक विकल्प चुनें",
   "Yes": "हाँ",
-  "I can suggest": "मैं सुझाव दे सकता/सकती हूँ"
+  "I can suggest": "मैं सुझाव दे सकता/सकती हूँ",
+  "Your asks": "आपकी माँगें",
+  "New ask": "नई माँग",
+  "replies": "जवाब",
+  "referrals": "रेफ़रल",
+  "reactions": "प्रतिक्रियाएँ",
+  "views": "व्यू",
+  "You have not posted an ask yet": "आपने अभी कोई माँग पोस्ट नहीं की",
+  "Post what you need and the replies will show up here.": "जो चाहिए वह पोस्ट करें, जवाब यहाँ दिखेंगे।",
+  "Deals": "सौदे"
 }

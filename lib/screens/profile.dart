@@ -444,8 +444,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   stat(u.statShared?.toString(), 'Connects'),
                   const TextSpan(text: ' · '),
                   stat('${u.contributions}', 'Contributions'),
-                  // deals won: asks whose owner chose them (only once there is one)
-                  if (u.statWon > 0) ...[const TextSpan(text: ' · 🏆 '), stat('${u.statWon}', u.statWon == 1 ? 'deal won' : 'deals won')],
+                  // deals: asks whose owner chose them (only once there is one)
+                  if (u.statWon > 0) ...[
+                    const TextSpan(text: ' · '),
+                    WidgetSpan(alignment: PlaceholderAlignment.middle, child: Padding(padding: const EdgeInsets.only(right: 3), child: WIcon(WI.deals, size: 13, color: p.dark ? kGold : const Color(0xFF7A5A00), still: true))),
+                    stat('${u.statWon}', u.statWon == 1 ? 'Deal' : 'Deals'),
+                  ],
                 ]),
                 textAlign: TextAlign.right,
                 style: TextStyle(fontSize: 12, height: 1.25, color: p.muted),
