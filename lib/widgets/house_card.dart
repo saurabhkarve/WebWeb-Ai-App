@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'poll_vote.dart' show OptionMark, OptionState;
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1032,6 +1033,11 @@ class _QuizState extends State<_Quiz> {
       _title('${quiz ? '🧠' : '🗳️'} ${card.title ?? ''}'),
       if ((card.body ?? '').isNotEmpty) _hint(context, card.body!),
       const SizedBox(height: 12),
+      if (!answered)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(t(quiz ? 'Choose one answer' : 'Choose one option'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
+        ),
       for (var i = 0; i < options.length; i++) ...[
         Builder(builder: (_) {
           final pct = n > 0 && i < counts.length ? (counts[i] / n * 100).round() : 0;
@@ -1048,13 +1054,15 @@ class _QuizState extends State<_Quiz> {
                 if (answered)
                   FractionallySizedBox(
                     widthFactor: pct / 100,
-                    child: Container(color: isRight ? green.withValues(alpha: .2) : (wrongPick ? red.withValues(alpha: .15) : kGold.withValues(alpha: .2))),
+                    child: Container(color: isRight ? green.withValues(alpha: .2) : (wrongPick ? red.withValues(alpha: .15) : kGold.withValues(alpha: .25))),
                   ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   child: Row(children: [
-                    if (isRight) ...[const WIcon(WI.tick, size: 16, color: green), const SizedBox(width: 6)],
-                    Expanded(child: Text(options[i], maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
+                    OptionMark(!answered ? OptionState.open : wrongPick ? OptionState.wrong : isRight ? OptionState.right : i == mine ? OptionState.mine : OptionState.other),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(options[i], maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: i == mine ? FontWeight.w800 : FontWeight.w600))),
+                    if (answered && i == mine) Container(margin: const EdgeInsets.only(right: 8), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1), decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(99)), child: Text(t('Your pick').toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700))),
                     if (answered) Text('$pct%', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
                   ]),
                 ),

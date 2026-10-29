@@ -3,7 +3,32 @@ import 'package:provider/provider.dart';
 import '../auth_provider.dart';
 import '../i18n.dart';
 import '../models.dart';
+import '../icons.dart';
 import '../theme.dart';
+
+enum OptionState { open, other, mine, right, wrong }
+
+/// The mark at the start of a poll or quiz option: an empty ring to tap before answering; after, a tick or cross.
+class OptionMark extends StatelessWidget {
+  final OptionState state;
+  const OptionMark(this.state, {super.key});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    if (state == OptionState.open || state == OptionState.other) {
+      return Container(width: 22, height: 22, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: p.muted.withValues(alpha: state == OptionState.open ? .6 : .3), width: 2)));
+    }
+    final bg = state == OptionState.wrong ? const Color(0xFFEF4444) : (state == OptionState.right ? const Color(0xFF059669) : kGold);
+    final fg = state == OptionState.mine ? kInk : Colors.white;
+    return Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+      child: state == OptionState.wrong ? Text('✕', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: fg)) : WIcon(WI.tick, size: 14, color: fg),
+    );
+  }
+}
 
 /// The options of a poll ask, tappable; after a vote (or on your own poll) the bars show what members chose.
 class PollVote extends StatefulWidget {
@@ -39,7 +64,7 @@ class _PollVoteState extends State<PollVote> {
     return Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(t(show ? 'What members chose' : 'Tap to vote').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.muted)),
+        Text(t(show ? 'What members chose' : 'Choose one option').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.muted)),
         const SizedBox(height: 6),
         for (var k = 0; k < post.pollOptions.length; k++)
           Builder(builder: (_) {
@@ -66,7 +91,7 @@ class _PollVoteState extends State<PollVote> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     child: Row(children: [
-                      Container(width: 22, height: 22, alignment: Alignment.center, decoration: BoxDecoration(color: mineK ? kGold : p.canvas.withValues(alpha: .8), shape: BoxShape.circle), child: Text(mineK ? '✓' : 'ABCD'[k % 4], style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: mineK ? kInk : p.muted))),
+                      OptionMark(mineK ? OptionState.mine : (show ? OptionState.other : OptionState.open)),
                       const SizedBox(width: 10),
                       Expanded(child: Text(post.pollOptions[k], style: TextStyle(fontSize: 14, fontWeight: mineK ? FontWeight.w700 : FontWeight.w600))),
                       if (show) Text('$pct%', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),

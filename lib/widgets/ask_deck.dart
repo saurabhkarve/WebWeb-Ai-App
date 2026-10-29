@@ -326,7 +326,7 @@ class _AskDeckState extends State<AskDeck> {
         return Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _label(p, t('Tap to vote')),
+            _label(p, t('Choose one option')),
             const SizedBox(height: 8),
             for (var k = 0; k < post.pollOptions.length; k++)
               Container(
@@ -335,7 +335,7 @@ class _AskDeckState extends State<AskDeck> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                 decoration: BoxDecoration(color: p.canvas.withValues(alpha: .7), borderRadius: BorderRadius.circular(12)),
                 child: Row(children: [
-                  Container(width: 20, height: 20, alignment: Alignment.center, decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle), child: Text('ABCD'[k % 4], style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800))),
+                  const OptionMark(OptionState.open),
                   const SizedBox(width: 8),
                   Expanded(child: Text(post.pollOptions[k], maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
                 ]),
