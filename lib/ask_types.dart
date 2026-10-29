@@ -32,9 +32,7 @@ AskTypeDef? askTypeDef(String? v) {
 String askLabel(Post post) {
   final type = askTypeDef(askTypeOf(post)) ?? kAskTypes.last;
   if (post.category == 'other' && (post.categoryLabel ?? '').isNotEmpty) return post.categoryLabel!;
-  final c = post.category;
-  final topic = c != null && c != 'other' && c != type.forced ? kCategoryShort[c] : null;
-  return [t(type.short), if (topic != null && topic != type.short) t(topic)].join(' · ');
+  return t(type.short);
 }
 
 /// an older ask (or one from before types) has the type its category implies
