@@ -415,14 +415,9 @@ class _PagesSwitcherState extends State<_PagesSwitcher> {
     if (pages == null) return const SizedBox.shrink();
     final p = Pal.of(context);
     final others = pages.where((a) => a['active'] != true).toList();
-    return Container(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
-          child: Text(t('Your pages').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.3, color: p.muted)),
-        ),
         for (final a in others)
           InkWell(
             borderRadius: BorderRadius.circular(12),
@@ -542,12 +537,14 @@ class _AccountMenu extends StatelessWidget {
               IconButton(tooltip: t('Close'), onPressed: () => Navigator.of(context).pop(), icon: WIcon(WI.close, size: 22, color: p.text)),
             ]),
           ),
-          // account card
+          // account card: this page, then the other pages of the sign-in and Add, as one block
+          Container(
+            decoration: BoxDecoration(color: p.chip.withValues(alpha: .5), border: Border(top: BorderSide(color: p.border.withValues(alpha: .6)), bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           InkWell(
             onTap: () => push(const ProfileScreen()),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(color: p.chip.withValues(alpha: .5), border: Border(top: BorderSide(color: p.border.withValues(alpha: .6)), bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
               child: Row(children: [
                 Avatar(name: me.name, photoUrl: me.photoUrl, size: 48, ring: me.hasUpdate, type: me.userType, badge: 18, uid: me.uid),
                 const SizedBox(width: 16),
@@ -568,6 +565,8 @@ class _AccountMenu extends StatelessWidget {
             ),
           ),
           const _PagesSwitcher(),
+            ]),
+          ),
           Expanded(
             child: ListView(padding: const EdgeInsets.all(6), children: [
               item(WI.edit, 'Edit profile', () => push(EditProfileScreen(profile: me))),

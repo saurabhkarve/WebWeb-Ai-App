@@ -655,7 +655,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
             color: Colors.transparent,
             // clipped, so the chips stay inside the frame
             clipBehavior: Clip.antiAlias,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: p.border)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: ask ? BorderSide.none : BorderSide(color: p.border)),
             child: ask ? quote : InkWell(onTap: _openDetail, child: AbsorbPointer(child: quote)),
           ),
         ),

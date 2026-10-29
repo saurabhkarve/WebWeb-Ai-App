@@ -135,6 +135,7 @@ class _CreateStepState extends State<_CreateStep> {
   /// business sector (or a job seeker's field): optional, it picks the starter photo and cover
   String? _category;
   final _name = TextEditingController();
+  final _company = TextEditingController();
   final _handle = TextEditingController();
   bool _handleTouched = false;
   String _avail = 'idle'; // idle checking free taken reserved protected
@@ -143,18 +144,21 @@ class _CreateStepState extends State<_CreateStep> {
   Timer? _debounce;
   int _checkSeq = 0;
 
-  bool get _valid => _name.text.trim().length >= 2 && RegExp(r'^[a-z0-9]{5,20}$').hasMatch(_handle.text);
+  bool get _business => _type == 'entrepreneur';
+  bool get _valid => _name.text.trim().length >= 2 && (!_business || _company.text.trim().length >= 2) && RegExp(r'^[a-z0-9]{5,20}$').hasMatch(_handle.text);
 
   @override
   void dispose() {
     _debounce?.cancel();
     _name.dispose();
+    _company.dispose();
     _handle.dispose();
     super.dispose();
   }
 
-  void _nameChanged(String v) {
-    if (!_handleTouched) _setHandle(_linkFromName(v));
+  /// a business's link follows the business name (the person's name while there is none), until the person edits it
+  void _nameChanged([String? _]) {
+    if (!_handleTouched) _setHandle(_linkFromName(_business && _company.text.trim().isNotEmpty ? _company.text : _name.text));
     setState(() {});
   }
 
@@ -189,6 +193,7 @@ class _CreateStepState extends State<_CreateStep> {
     try {
       final pr = await context.read<AuthProvider>().createProfile({
         'name': _name.text.trim(),
+        if (_business) 'company': _company.text.trim(),
         'handle': _handle.text,
         'userType': _type,
         if (_category != null) 'category': _category,
@@ -233,7 +238,10 @@ class _CreateStepState extends State<_CreateStep> {
           if (i > 0) const SizedBox(width: 8),
           Expanded(
             child: GestureDetector(
-              onTap: () => setState(() => _type = o.$1),
+              onTap: () {
+                setState(() => _type = o.$1);
+                _nameChanged();
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 constraints: const BoxConstraints(minHeight: 56),
@@ -264,6 +272,25 @@ class _CreateStepState extends State<_CreateStep> {
           ),
         ],
       ]),
+      if (_business) ...[
+        const SizedBox(height: 20),
+        Text(t('Business name'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Container(
+          height: 48,
+          decoration: box(),
+          child: TextField(
+            controller: _company,
+            maxLength: 80,
+            textCapitalization: TextCapitalization.words,
+            autofillHints: const [AutofillHints.organizationName],
+            textInputAction: TextInputAction.next,
+            onChanged: _nameChanged,
+            style: const TextStyle(fontSize: 16),
+            decoration: deco(t('e.g. Sharma Traders')).copyWith(counterText: ''),
+          ),
+        ),
+      ],
       const SizedBox(height: 20),
       Text(t('Your name'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
       const SizedBox(height: 6),
