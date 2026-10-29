@@ -209,8 +209,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
       // at the start of the week, your week (leads and Today are circles in Updates)
       TodayStrip(key: _todayKey),
       const SizedBox(height: 12),
-      RuleHeading(WI.updates, t('Updates')),
-      const SizedBox(height: 6),
       KeyedSubtree(key: Tours.key('updates'), child: _UpdatesBar(key: _updatesKey)),
       const SizedBox(height: 12),
       Row(children: [Expanded(child: RuleHeading(WI.ask, t('Asks'))), const SizedBox(width: 8), YourAsksPill(onOpen: widget.onGoAsk)]),
@@ -267,6 +265,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   const RotatedBox(quarterTurns: 3, child: WIcon(WI.arrow, size: 16, color: kInk, strokeWidth: 2.2)),
+                  const SizedBox(width: 6),
+                  const WIcon(WI.ask, size: 16, color: kInk, still: true),
                   const SizedBox(width: 6),
                   Text(t(_fresh.length == 1 ? '{n} new ask' : '{n} new asks', {'n': _fresh.length}), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
                 ]),

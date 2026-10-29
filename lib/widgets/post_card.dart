@@ -630,10 +630,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         if (ask)
           // an ask: one slim line says who reposted it (the ask below has its own author row, so a second big avatar and
           // name would read as the same person twice)
-          Container(
-            padding: const EdgeInsets.only(bottom: 10),
-            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
-            child: Row(children: [
+          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
             WIcon(WI.repost, size: 16, color: ink),
             const SizedBox(width: 8),
             GestureDetector(onTap: open, child: Avatar(name: post.repostedByName ?? '', photoUrl: r['photoURL'] as String?, size: 20)),
@@ -656,7 +654,16 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
             ),
             ...more,
           ]),
-          )
+            // the line under it bends down at both ends, over the ask it quotes
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              height: 10,
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                border: Border(top: BorderSide(color: p.border.withValues(alpha: .7)), left: BorderSide(color: p.border.withValues(alpha: .7)), right: BorderSide(color: p.border.withValues(alpha: .7))),
+              ),
+            ),
+          ])
         else
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           GestureDetector(
@@ -686,7 +693,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
           ...more,
         ]),
         Padding(
-          padding: EdgeInsets.only(left: ask ? 0 : 50, top: ask ? 4 : 4),
+          padding: EdgeInsets.only(left: ask ? 0 : 50, top: ask ? 0 : 4),
           // as on x.com (and the web) the whole quote is one link to the ask: a tap anywhere in it, the name and chips
           // included, opens the ask, so the quote's own taps are absorbed (an ask's cards still swipe, their taps open the ask)
           child: Material(

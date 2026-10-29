@@ -205,49 +205,100 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   }
 
   Widget _island(Pal p) {
-    // smaller than before and see-through, with the page softly blurred behind it
-    final box = BoxDecoration(
-      color: p.canvas.withValues(alpha: .6),
-      borderRadius: BorderRadius.circular(26),
-      border: Border.all(color: p.border.withValues(alpha: .7)),
-    );
+    // see-through, with the page softly blurred behind it; the blur is a layer of its own so the Ask circle can stand out of the bar
+    final radius = BorderRadius.circular(28);
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [BoxShadow(color: (p.dark ? Colors.black : const Color(0xFF1E1E1E)).withValues(alpha: p.dark ? .6 : .35), blurRadius: 30, spreadRadius: -6, offset: const Offset(0, 8))],
+        borderRadius: radius,
+        boxShadow: [BoxShadow(color: (p.dark ? Colors.black : const Color(0xFF1E1E1E)).withValues(alpha: p.dark ? .6 : .3), blurRadius: 32, spreadRadius: -8, offset: const Offset(0, 10))],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(26),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: box,
-            child: AnimatedBuilder(
-        animation: _notes,
-        builder: (_, __) => Row(mainAxisSize: MainAxisSize.min, children: [
-          for (var k = 0; k < _items.length; k++) ...[
-            if (k > 0) const SizedBox(width: 4),
-            k == 0
-                ? _islandItem(p, k)
-                : KeyedSubtree(
-                    key: Tours.key(const ['', 'nav-find', 'nav-ask', 'nav-notes', 'nav-talk'][k]),
-                    child: _islandItem(p, k, badge: k == _notesTab ? _notes.unseen : k == _talk ? unreadChats.value : 0)),
-          ],
-        ]),
-      ),
+      child: Stack(clipBehavior: Clip.none, children: [
+        Positioned.fill(
+          child: ClipRRect(
+            borderRadius: radius,
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: p.canvas.withValues(alpha: .85), borderRadius: radius, border: Border.all(color: p.border.withValues(alpha: .5))),
+              ),
+            ),
           ),
         ),
-      ),
+        Padding(
+          padding: const EdgeInsets.all(6),
+          child: AnimatedBuilder(
+            animation: _notes,
+            builder: (_, __) => Row(mainAxisSize: MainAxisSize.min, children: [
+              for (var k = 0; k < _items.length; k++) ...[
+                if (k > 0) SizedBox(width: k == _ask || k == _ask + 1 ? 8 : 4),
+                k == 0
+                    ? _islandItem(p, k)
+                    : KeyedSubtree(
+                        key: Tours.key(const ['', 'nav-find', 'nav-ask', 'nav-notes', 'nav-talk'][k]),
+                        child: _islandItem(p, k, badge: k == _notesTab ? _notes.unseen : k == _talk ? unreadChats.value : 0)),
+              ],
+            ]),
+          ),
+        ),
+      ]),
     );
   }
 
   Widget _islandItem(Pal p, int k, {int badge = 0}) {
     final active = _i == k;
-    // Ask is the one action: always gold, with a ring when it is the open page
+    // Ask is the one action: a gold circle set in a notch that stands out of the bar at the top and the bottom
     final isAsk = k == _ask;
-    // on the Ask page the button turns dark with gold text and a gold ring, so it reads as open
-    final fg = isAsk ? (active ? kGold : kInk) : active ? p.onInk : p.muted;
+    final tone = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
+    final fg = isAsk ? kInk : active ? tone : p.muted;
+    final content = Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Stack(clipBehavior: Clip.none, children: [
+        WIcon(_items[k].$1, size: isAsk ? 24 : 21, color: fg, strokeWidth: active || isAsk ? 2.2 : 1.9, spinKey: isAsk ? _askSpin : 0),
+        if (badge > 0)
+          Positioned(
+            right: -8,
+            top: -6,
+            child: Container(
+              height: 16,
+              constraints: const BoxConstraints(minWidth: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 3)]),
+              child: Text(badge > 9 && k == _notesTab ? '9+' : '$badge', style: const TextStyle(color: kInk, fontSize: 10, fontWeight: FontWeight.w700, height: 1)),
+            ),
+          ),
+      ]),
+      const SizedBox(height: 2),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: FittedBox(fit: BoxFit.scaleDown, child: Text(t(_items[k].$2), maxLines: 1, style: TextStyle(fontSize: 10, fontWeight: isAsk ? FontWeight.w700 : FontWeight.w500, height: 1, color: fg))),
+      ),
+    ]);
+    final tile = isAsk
+        ? Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              gradient: kGoldGradient,
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFC9B93A).withValues(alpha: .5)),
+              boxShadow: [
+                BoxShadow(color: p.canvas.withValues(alpha: .9), spreadRadius: 5),
+                BoxShadow(color: const Color(0xFFD6AA00).withValues(alpha: .5), blurRadius: 20, spreadRadius: -4, offset: const Offset(0, 10)),
+              ],
+            ),
+            child: content,
+          )
+        : AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 56,
+            height: 46,
+            decoration: BoxDecoration(
+              color: active ? kGold.withValues(alpha: p.dark ? .25 : .2) : Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+              border: active ? Border.all(color: kGold.withValues(alpha: .7)) : null,
+            ),
+            child: content,
+          );
     return Semantics(
       button: true,
       selected: active,
@@ -255,40 +306,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => _go(k),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: isAsk ? 64 : 52,
-          height: isAsk ? 52 : 46,
-          decoration: BoxDecoration(
-            color: isAsk ? (active ? p.ink : null) : active ? p.ink : Colors.transparent,
-            gradient: isAsk && !active ? kGoldGradient : null,
-            borderRadius: BorderRadius.circular(20),
-            border: isAsk && active ? Border.all(color: kGold, width: 2) : null,
-          ),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Stack(clipBehavior: Clip.none, children: [
-              WIcon(_items[k].$1, size: isAsk ? 24 : 21, color: fg, strokeWidth: active || isAsk ? 2.2 : 1.9, spinKey: isAsk ? _askSpin : 0),
-              if (badge > 0)
-                Positioned(
-                  right: -8,
-                  top: -6,
-                  child: Container(
-                    height: 16,
-                    constraints: const BoxConstraints(minWidth: 16),
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 3)]),
-                    child: Text(badge > 9 && k == _notesTab ? '9+' : '$badge', style: const TextStyle(color: kInk, fontSize: 10, fontWeight: FontWeight.w700, height: 1)),
-                  ),
-                ),
-            ]),
-            const SizedBox(height: 2),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: FittedBox(fit: BoxFit.scaleDown, child: Text(t(_items[k].$2), maxLines: 1, style: TextStyle(fontSize: 9, fontWeight: isAsk ? FontWeight.w700 : FontWeight.w500, height: 1, color: fg))),
-            ),
-          ]),
-        ),
+        // the Ask circle is taller than the bar: the bar's height stays that of the other tiles
+        child: isAsk ? SizedBox(width: 64, height: 46, child: OverflowBox(maxHeight: 64, child: tile)) : tile,
       ),
     );
   }

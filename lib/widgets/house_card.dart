@@ -243,8 +243,8 @@ class _HouseCardViewState extends State<HouseCardView> {
           ),
         ]),
         const SizedBox(height: 12),
-        // the body as a card, tinted like the cards of an ask
-        Builder(builder: (_) {
+        // the body as a card, tinted like the cards of an ask (a row of items needs none: its item cards are the cards)
+        if (card.type == 'items') _body() else Builder(builder: (_) {
           final tint = kCardColors[_tone[card.account.handle] ?? 'gold']!;
           return Container(
             padding: const EdgeInsets.all(16),

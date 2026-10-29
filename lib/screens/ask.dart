@@ -1392,36 +1392,43 @@ class _AskFormState extends State<_AskForm> {
         _aiCard(p) ?? const SizedBox.shrink(),
         // live preview: the deck of cards members swipe on Connect; tap one to edit that part
         const SizedBox(height: 14),
-        Container(
+        Column(
           key: _tk('ask-preview'),
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
-          decoration: BoxDecoration(color: p.chip.withValues(alpha: .4), borderRadius: BorderRadius.circular(16)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Text('👀 ${t('How members will see your ask')}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
             Text(t('Swipe the cards. Tap one to edit it.'), style: TextStyle(fontSize: 11, color: p.muted)),
             const SizedBox(height: 8),
+            // the ask as the feed shows it: author line, the type above the cards, then the cards
             if (me != null)
               Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(children: [
-                  Avatar(name: shownName, photoUrl: me.photoUrl, size: 34, type: me.userType, badge: 14, uid: me.uid),
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Avatar(name: shownName, photoUrl: me.photoUrl, size: 40, type: me.userType, badge: 15, uid: me.uid),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(children: [
                         Flexible(child: Text(shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
                         if (me.verification > 0 || me.premium || me.plan != null) ...[const SizedBox(width: 4), VerifiedBadge(level: me.verification, premium: me.premium, plan: me.plan)],
-                        const SizedBox(width: 6),
-                        Text(t('just now'), style: TextStyle(fontSize: 12, color: p.muted)),
                       ]),
-                      Text(me.isEntrepreneur ? me.name : me.company, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+                      Text('${me.isEntrepreneur ? me.name : me.company} · ${t('just now')}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
                     ]),
                   ),
-                  GoldTag(t(_editing ? 'Editing your ask' : 'Your ask')),
                 ]),
               ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                WIcon(categoryIcon(askTypeDef(askTypeOf(_draftPost()))?.icon ?? _draftPost().category), size: 14, color: p.link, still: true),
+                const SizedBox(width: 6),
+                Expanded(child: Text(askLabel(_draftPost()).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link))),
+                GoldTag(t(_editing ? 'Editing your ask' : 'Your ask')),
+              ]),
+            ),
             AskDeck(
               preview: true,
+              typeAbove: true,
               post: _draftPost(),
               images: [
                 for (final ph in _photos.where((x) => !x.failed))
@@ -1430,7 +1437,7 @@ class _AskFormState extends State<_AskForm> {
               reachLabel: _geo == null ? null : _radiusLabel(_geo!.radiusM),
               onCardTap: _editCard,
             ),
-          ]),
+          ],
         ),
         if (_aiError != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_aiError!, style: TextStyle(fontSize: 12, color: p.danger))),
         if ((_aiUndo != null && !_aiBusy) || _undoTpl != null || (!empty && !_editing)) ...[
