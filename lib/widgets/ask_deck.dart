@@ -69,7 +69,9 @@ class _AskDeckState extends State<AskDeck> {
     return [
       DeckKind.headline,
       if (post.pollOptions.length > 1) DeckKind.poll,
-      if (widget.preview || post.images.isNotEmpty) DeckKind.photos,
+      // a card for each photo (up to five), each with the ask's title; the composer's preview has one to invite adding photos
+      if ((widget.preview ? widget.images.length : post.images.length) > 0) ...[for (var q = 0; q < (widget.preview ? widget.images.length : post.images.length) && q < 5; q++) DeckKind.photos]
+      else if (widget.preview) DeckKind.photos,
       if (widget.preview || (post.description ?? '').trim().isNotEmpty) DeckKind.details,
       if ((post.budget ?? '').isNotEmpty) DeckKind.budget,
       if (_mapPoint != null) DeckKind.map,
@@ -159,7 +161,7 @@ class _AskDeckState extends State<AskDeck> {
                   border: Border.all(color: tint.withValues(alpha: .4)),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: _card(p, kinds[i]),
+                child: _card(p, kinds[i], kinds.take(i).where((x) => x == DeckKind.photos).length),
               ),
             ),
           ),
@@ -193,7 +195,7 @@ class _AskDeckState extends State<AskDeck> {
         ]),
       );
 
-  Widget _card(Pal p, DeckKind kind) {
+  Widget _card(Pal p, DeckKind kind, [int photoAt = 0]) {
     final post = widget.post;
     final left = askTimeLeft(post);
     switch (kind) {
@@ -324,7 +326,7 @@ class _AskDeckState extends State<AskDeck> {
           ]),
         );
       case DeckKind.photos:
-        return _photos(p);
+        return _photos(p, photoAt);
       case DeckKind.details:
         final d = (post.description ?? '').trim();
         return Padding(
@@ -447,10 +449,9 @@ class _AskDeckState extends State<AskDeck> {
   }
 
   /// 1 photo full; 2 side by side; 3 one tall and two stacked; 4 in a grid. Empty: a dashed invitation.
-  Widget _photos(Pal p) {
+  Widget _photos(Pal p, int at) {
     final all = widget.preview ? widget.images : [for (final u in _post.images) NetworkImage(u) as ImageProvider];
-    final imgs = all.take(4).toList();
-    if (imgs.isEmpty) {
+    if (all.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(12),
         child: Container(
@@ -465,48 +466,41 @@ class _AskDeckState extends State<AskDeck> {
         ),
       );
     }
-    var at = 0;
-    Widget img(ImageProvider i) {
-      final idx = at++;
-      final w = Image(image: i, fit: BoxFit.cover, width: double.infinity, height: double.infinity, errorBuilder: (_, __, ___) => ColoredBox(color: p.chip));
-      if (widget.preview) return w;
-      // a tap opens the photos big; a double tap is the quick reaction
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => openImageViewer(context, _post.images, idx, shareUrl: _post.webUrl, shareRef: _post.id),
-        onDoubleTap: widget.mine ? null : widget.onQuickReact,
-        child: w,
-      );
-    }
-    const gap = 2.0;
-    Widget body;
-    if (imgs.length == 1) {
-      body = img(imgs[0]);
-    } else if (imgs.length == 2) {
-      body = Row(children: [Expanded(child: img(imgs[0])), const SizedBox(width: gap), Expanded(child: img(imgs[1]))]);
-    } else if (imgs.length == 3) {
-      body = Row(children: [
-        Expanded(child: img(imgs[0])),
-        const SizedBox(width: gap),
-        Expanded(child: Column(children: [Expanded(child: img(imgs[1])), const SizedBox(height: gap), Expanded(child: img(imgs[2]))])),
-      ]);
-    } else {
-      body = Column(children: [
-        Expanded(child: Row(children: [Expanded(child: img(imgs[0])), const SizedBox(width: gap), Expanded(child: img(imgs[1]))])),
-        const SizedBox(height: gap),
-        Expanded(child: Row(children: [Expanded(child: img(imgs[2])), const SizedBox(width: gap), Expanded(child: img(imgs[3]))])),
-      ]);
-    }
+    // one photo on its own card, the ask's title along the foot
+    final i = at.clamp(0, all.length - 1);
+    final w = Image(image: all[i], fit: BoxFit.cover, width: double.infinity, height: double.infinity, errorBuilder: (_, __, ___) => ColoredBox(color: p.chip));
+    final title = (_post.title ?? '').trim();
     return Stack(fit: StackFit.expand, children: [
-      body,
+      widget.preview
+          ? w
+          : GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              // a tap opens the photos big; a double tap is the quick reaction
+              onTap: () => openImageViewer(context, _post.images, i, shareUrl: _post.webUrl, shareRef: _post.id),
+              onDoubleTap: widget.mine ? null : widget.onQuickReact,
+              child: w,
+            ),
+      if (title.isNotEmpty)
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: IgnorePointer(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 36, 16, 12),
+              decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x00000000), Color(0xCC1E1E1E)])),
+              child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, height: 1.3, fontWeight: FontWeight.w700, color: Colors.white)),
+            ),
+          ),
+        ),
       if (all.length > 1)
         Positioned(
-          left: 8,
-          bottom: 8,
+          right: 8,
+          top: 8,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(color: const Color(0xA61E1E1E), borderRadius: BorderRadius.circular(20)),
-            child: Text(t('{n} photos', {'n': all.length}), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+            child: Text('${i + 1} / ${all.length}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white, fontFeatures: [FontFeature.tabularFigures()])),
           ),
         ),
     ]);
