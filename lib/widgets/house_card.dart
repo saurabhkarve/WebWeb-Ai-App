@@ -243,8 +243,9 @@ class _HouseCardViewState extends State<HouseCardView> {
           ),
         ]),
         const SizedBox(height: 12),
-        // the body as a card, tinted like the cards of an ask (a row of items needs none: its item cards are the cards)
-        if (card.type == 'items') _body() else Builder(builder: (_) {
+        // the posts that read come as a swipeable deck of small cards, as an ask does; the others are one tinted card
+        // (a row of items needs none: its item cards are the cards)
+        if (_deckTypes.contains(card.type)) _HouseDeck(card, (c) => setState(() => card = c), _tap) else if (card.type == 'items') _body() else Builder(builder: (_) {
           final tint = kCardColors[_tone[card.account.handle] ?? 'gold']!;
           return Container(
             padding: const EdgeInsets.all(16),
@@ -256,7 +257,7 @@ class _HouseCardViewState extends State<HouseCardView> {
             child: _body(),
           );
         }),
-        if ((card.sourceUrl ?? '').isNotEmpty && card.type != 'quiz')
+        if ((card.sourceUrl ?? '').isNotEmpty && card.type != 'quiz' && !_deckTypes.contains(card.type))
           Align(
             alignment: Alignment.centerLeft,
             child: GestureDetector(
@@ -278,7 +279,7 @@ class _HouseCardViewState extends State<HouseCardView> {
               ),
             ),
           ),
-        const SizedBox(height: 20),
+        SizedBox(height: _deckTypes.contains(card.type) ? 6 : 20),
         if (post != null) PostActions(post: post, spotlight: true, onReply: () => _replyPost(post), onChanged: () => setState(() {})) else _CardActions(card: card, tap: _tap),
       ]),
     );
@@ -1417,5 +1418,264 @@ class _CardActionsState extends State<_CardActions> {
       ),
     ];
     return FitRow(children: kids);
+  }
+}
+
+// ---------- the deck: news, tips, tenders, schemes, events and jobs as swipeable cards ----------
+
+const _deckTypes = {'news', 'tip', 'tender', 'scheme', 'event', 'job'};
+const _kindEmoji = {'news': '📰', 'tip': '💡', 'tender': '📄', 'scheme': '🏛️', 'event': '📅', 'job': '👷'};
+
+/// the first words of a text, ended at a word
+String _clip(String text, int max) {
+  final s = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (s.length <= max) return s;
+  final cut = s.substring(0, max);
+  final at = cut.lastIndexOf(' ');
+  return '${cut.substring(0, at > max - 20 ? at : max)}…';
+}
+
+class _HouseDeck extends StatefulWidget {
+  final HouseCard card;
+  final ValueChanged<HouseCard> set;
+  final VoidCallback tap;
+  const _HouseDeck(this.card, this.set, this.tap);
+  @override
+  State<_HouseDeck> createState() => _HouseDeckState();
+}
+
+class _HouseDeckState extends State<_HouseDeck> {
+  final _page = PageController(viewportFraction: .9);
+  int _i = 0;
+
+  @override
+  void dispose() {
+    _page.dispose();
+    super.dispose();
+  }
+
+  void _go(int i) => _page.animateToPage(i, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final card = widget.card;
+    final tap = widget.tap;
+    final d = card.data;
+    final tint = kCardColors[_tone[card.account.handle] ?? 'gold']!;
+    final deckH = (MediaQuery.sizeOf(context).height * .34).clamp(272.0, 340.0);
+    final emoji = _kindEmoji[card.type] ?? '✨';
+    final kind = t(_sub[card.type] ?? 'For you');
+    final left = _daysLeft(d['deadline'] as String?);
+    final interested = card.mine?['interested'] == true;
+    final count = (card.results?['interested'] as num?)?.toInt() ?? 0;
+    final mineUseful = card.mine?['useful'] as bool?;
+    final up = (card.results?['up'] as num?)?.toInt() ?? 0;
+    final steps = [for (final x in ((d['steps'] as List?) ?? const [])) '$x'].take(6).toList();
+    final notice = card.type != 'news' && card.type != 'tip';
+    final venue = (d['venue'] ?? '').toString();
+    final hasSource = (card.sourceUrl ?? '').isNotEmpty;
+    final facts = <(String, String, String)>[
+      if (left != null) ('⏳', t('Deadline'), left),
+      if ((d['startsAt'] ?? '').toString().isNotEmpty) ('🗓️', t('Starts'), '${d['startsAt']}'),
+      if (venue.isNotEmpty) ('📍', t('Where'), venue),
+      if ((d['who'] ?? '').toString().isNotEmpty) ('✅', t('Who can apply'), '${d['who']}'),
+    ];
+
+    Future<void> vote(bool v) async {
+      tap();
+      try {
+        widget.set(await _answer(context.read<AuthProvider>().api, card.key, {'useful': v}));
+      } catch (_) {}
+    }
+
+    Future<void> toggleInterested() async {
+      tap();
+      try {
+        widget.set(await _answer(context.read<AuthProvider>().api, card.key, {'interested': !interested}));
+      } catch (_) {}
+    }
+
+    final label = TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .6));
+    Widget head(String text) => Text(text, maxLines: 4, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: deckH * .095, fontWeight: FontWeight.w800, height: 1.15, letterSpacing: -.3));
+    Widget chip(String e, String text) => Container(
+          margin: const EdgeInsets.only(top: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [Text(e, style: const TextStyle(fontSize: 12)), const SizedBox(width: 4), Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)))]),
+        );
+    Widget thumb(Widget child, bool on, VoidCallback onTap, String semantics) => Semantics(
+          button: true,
+          label: semantics,
+          child: GestureDetector(
+            onTap: onTap,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(color: on ? kGold.withValues(alpha: .2) : p.card.withValues(alpha: .7), borderRadius: BorderRadius.circular(20), border: Border.all(color: on ? kGold : p.border)),
+              child: child,
+            ),
+          ),
+        );
+
+    // the cards of this post, each with one thing on it
+    final cards = <Widget>[
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        head(card.title ?? ''),
+        if (notice && left != null) Align(alignment: Alignment.centerLeft, child: chip('⏳', left)),
+        if (card.type == 'tip' && steps.isNotEmpty) Align(alignment: Alignment.centerLeft, child: chip('🪜', t('{n} steps', {'n': steps.length}))),
+        const Spacer(),
+        if (notice)
+          _Btn('${t(interested ? 'Interested' : "I'm interested")}${count > 0 ? ' · $count' : ''}', icon: interested ? WI.tick : null, soft: interested, active: interested, onTap: toggleInterested)
+        else if (card.type == 'tip' && steps.isNotEmpty)
+          _Btn('${t('See the steps')} →', onTap: () => _go((card.body ?? '').isNotEmpty ? 2 : 1))
+        else if (hasSource)
+          _Btn(t('Read more'), onTap: () {
+            tap();
+            openExternal(context, card.sourceUrl!);
+          })
+        else
+          _Btn('📤 ${t('Share on WhatsApp')}', onTap: () {
+            tap();
+            _launch(_wa(card.title ?? ''));
+          }),
+      ]),
+      if ((card.body ?? '').isNotEmpty)
+        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(t(card.type == 'tip' ? 'Why it helps' : 'In short'), style: label),
+          const SizedBox(height: 8),
+          Text(_clip(card.body!, 200), maxLines: 6, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500, height: 1.45)),
+          const Spacer(),
+          if (hasSource)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                tap();
+                openExternal(context, card.sourceUrl!);
+              },
+              child: Text('🔗 ${t('Source')}: ${(card.sourceName ?? '').isNotEmpty ? card.sourceName : hostOf(card.sourceUrl!)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.tagText)),
+            ),
+        ]),
+      if (card.type == 'tip')
+        for (var k = 0; k < steps.length; k++)
+          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(t('Step {n} of {m}', {'n': k + 1, 'm': steps.length}), style: label),
+            const SizedBox(height: 8),
+            Text(steps[k], maxLines: 5, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: deckH * .08, fontWeight: FontWeight.w700, height: 1.3)),
+            const Spacer(),
+            Row(children: [
+              for (var j = 0; j < steps.length; j++) Expanded(child: Container(height: 6, margin: EdgeInsets.only(right: j == steps.length - 1 ? 0 : 6), decoration: BoxDecoration(color: j <= k ? kGold : p.text.withValues(alpha: .1), borderRadius: BorderRadius.circular(3)))),
+            ]),
+          ]),
+      if (notice && facts.isNotEmpty)
+        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(t('At a glance'), style: label),
+          const SizedBox(height: 8),
+          Expanded(
+            child: GridView(
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 8, crossAxisSpacing: 8, mainAxisExtent: 76),
+              children: [
+                for (final f in facts.take(4))
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(color: p.card.withValues(alpha: .7), borderRadius: BorderRadius.circular(12), border: Border.all(color: p.border.withValues(alpha: .6))),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('${f.$1} ${f.$2}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: p.muted)),
+                      const SizedBox(height: 4),
+                      Text(f.$3, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.15)),
+                    ]),
+                  ),
+              ],
+            ),
+          ),
+        ]),
+      // the last card: what to do with it
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(t('What next'), style: label),
+        const SizedBox(height: 12),
+        if (notice && hasSource) ...[
+          _Btn(t(card.type == 'tender' ? 'Open tender' : 'Open the official page'), onTap: () {
+            tap();
+            openExternal(context, card.sourceUrl!);
+          }),
+          const SizedBox(height: 8),
+        ],
+        if (card.type == 'event' && venue.isNotEmpty) ...[
+          _Btn(t('Directions'), icon: WI.pin, soft: true, onTap: () {
+            tap();
+            _launch('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(venue)}');
+          }),
+          const SizedBox(height: 8),
+        ],
+        if (!notice && hasSource) ...[
+          _Btn(t('Read more'), onTap: () {
+            tap();
+            openExternal(context, card.sourceUrl!);
+          }),
+          const SizedBox(height: 8),
+        ],
+        if (card.post == null)
+          _Btn('📤 ${t('Share on WhatsApp')}', soft: true, onTap: () {
+            tap();
+            _launch(_wa(card.title ?? '', card.sourceUrl));
+          }),
+        const Spacer(),
+        Row(children: [
+          Flexible(child: Text(t('Was this useful?'), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted))),
+          const SizedBox(width: 8),
+          thumb(Row(mainAxisSize: MainAxisSize.min, children: [WIcon(WI.thumbsUp, size: 16, color: p.text), if (up > 0) ...[const SizedBox(width: 4), Text('$up', style: const TextStyle(fontWeight: FontWeight.w600))]]), mineUseful == true, () => vote(true), t('Useful')),
+          const SizedBox(width: 8),
+          thumb(WIcon(WI.thumbsDown, size: 16, color: p.text), mineUseful == false, () => vote(false), t('No')),
+        ]),
+      ]),
+    ];
+
+    final n = cards.length;
+    final start = (_i - 2).clamp(0, (n - 5).clamp(0, n));
+    return Column(children: [
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(children: [
+          Expanded(child: Text('$emoji ${kind.toUpperCase()}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link))),
+          if (n > 1)
+            for (var k = start; k < n && k < start + 5; k++)
+              GestureDetector(
+                onTap: () => _go(k),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 2),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: ((k == start && start > 0) || (k == start + 4 && start + 4 < n - 1)) ? 4 : 6,
+                    height: ((k == start && start > 0) || (k == start + 4 && start + 4 < n - 1)) ? 4 : 6,
+                    decoration: BoxDecoration(color: k == _i ? p.text : p.text.withValues(alpha: .25), shape: BoxShape.circle),
+                  ),
+                ),
+              ),
+        ]),
+      ),
+      SizedBox(
+        height: deckH,
+        child: PageView.builder(
+          controller: _page,
+          padEnds: false,
+          itemCount: n,
+          onPageChanged: (i) => setState(() => _i = i),
+          itemBuilder: (_, i) => Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [tint.withValues(alpha: .28), tint.withValues(alpha: 0)], stops: const [0, .8]),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: tint.withValues(alpha: .4)),
+              ),
+              child: cards[i],
+            ),
+          ),
+        ),
+      ),
+    ]);
   }
 }
