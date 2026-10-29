@@ -32,6 +32,7 @@ void main() {
   final notifications = NotificationService(auth, realtime, navKey);
   final i18n = I18n()..init();
   auth.beforeLogout = notifications.unregister;
+  realtime.onUnauthorized = () => auth.logout();
   auth.init();
   notifications.init();
   Outbox.start(auth.api, realtime); // messages written offline go out once the network is back

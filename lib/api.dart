@@ -39,7 +39,9 @@ class Api {
     return Uri.parse('$apiUrl$path').replace(queryParameters: query.isEmpty ? null : query);
   }
 
-  dynamic _decode(http.Response r) {
+  /// [sent] is the session the request carried: a 401 only ends the session it was sent with, never one that has
+  /// since been renewed or signed in again, and never a request made with none (the sign-in itself).
+  dynamic _decode(http.Response r, [String? sent]) {
     dynamic data;
     try {
       data = r.body.isEmpty ? null : jsonDecode(utf8.decode(r.bodyBytes));
@@ -47,7 +49,7 @@ class Api {
       data = null;
     }
     if (r.statusCode == 401) {
-      onUnauthorized?.call();
+      if (sent != null && sent == token()) onUnauthorized?.call();
       throw ApiException('Please sign in again.', 401);
     }
     if (r.statusCode >= 400) {
@@ -58,8 +60,9 @@ class Api {
   }
 
   Future<T> _send<T>(Future<http.Response> Function() call) async {
+    final sent = token();
     try {
-      return _decode(await call().timeout(const Duration(seconds: 25))) as T;
+      return _decode(await call().timeout(const Duration(seconds: 25)), sent) as T;
     } on ApiException {
       rethrow;
     } catch (_) {
@@ -96,12 +99,13 @@ class Api {
 
   /// Multipart upload (field name `file`). Returns the decoded JSON.
   Future<Json> upload(String path, List<int> bytes, String filename, String mime) async {
+    final sent = token();
     try {
       final req = http.MultipartRequest('POST', _u(path))
         ..headers.addAll(_headers())
         ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename, contentType: MediaType.parse(mime)));
       final res = await http.Response.fromStream(await req.send().timeout(const Duration(seconds: 60)));
-      return Map<String, dynamic>.from(_decode(res) as Map);
+      return Map<String, dynamic>.from(_decode(res, sent) as Map);
     } on ApiException {
       rethrow;
     } catch (_) {

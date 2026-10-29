@@ -78,6 +78,8 @@ class RealtimeService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   WebSocketChannel? _ch;
+  /// the live connection was refused because the session is over (signed out elsewhere, expired): sign out here too
+  VoidCallback? onUnauthorized;
   String? _token;
   Timer? _retry;
   int _attempt = 0;
@@ -163,6 +165,7 @@ class RealtimeService extends ChangeNotifier with WidgetsBindingObserver {
   void _closed(WebSocketChannel ch) {
     if (_ch != ch) return;
     _beat?.cancel();
+    final refused = ch.closeCode == 4001;
     try {
       ch.sink.close();
     } catch (_) {}
@@ -170,6 +173,7 @@ class RealtimeService extends ChangeNotifier with WidgetsBindingObserver {
     connected = false;
     online.clear();
     notifyListeners();
+    if (refused) return onUnauthorized?.call();
     _scheduleRetry();
   }
 
