@@ -389,7 +389,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       final why = mine ? t('Your ask') : ((post.leadReason ?? '').isNotEmpty ? leadReasonText(post.leadReason!) : (match == null ? null : t(match)));
       final tint = kCardColors[cardColorOf(post)]!;
       final spotlight = Container(
-        padding: framed ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12) : const EdgeInsets.symmetric(vertical: 20),
+        padding: framed ? const EdgeInsets.fromLTRB(12, 12, 12, 0) : const EdgeInsets.symmetric(vertical: 20),
         // the asker's colour: a soft wash from the top-left corner and a hairline in the same colour
         decoration: framed ? null : BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [tint.withValues(alpha: .16), tint.withValues(alpha: 0)], stops: const [0, .55])),
         foregroundDecoration: framed ? null : _HairlineDecoration(tint.withValues(alpha: .6)),
@@ -632,7 +632,10 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         if (ask)
           // an ask: one slim line says who reposted it (the ask below has its own author row, so a second big avatar and
           // name would read as the same person twice)
-          Row(children: [
+          Container(
+            padding: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
+            child: Row(children: [
             WIcon(WI.repost, size: 16, color: ink),
             const SizedBox(width: 8),
             GestureDetector(onTap: open, child: Avatar(name: post.repostedByName ?? '', photoUrl: r['photoURL'] as String?, size: 20)),
@@ -654,7 +657,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               ),
             ),
             ...more,
-          ])
+          ]),
+          )
         else
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           GestureDetector(
@@ -1084,7 +1088,7 @@ class LatestReplies extends StatelessWidget {
     // plus its 10 gap), and Show all n last, as on the web
     final any = replies.isNotEmpty || referrers.isNotEmpty;
     return Padding(
-      padding: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.only(top: 4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(padding: const EdgeInsets.only(left: 20), child: Row(children: [
           WIcon(WI.talk, size: 16, color: kGold.withValues(alpha: .8)),
