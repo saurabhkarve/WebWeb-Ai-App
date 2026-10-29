@@ -658,7 +658,7 @@ class _ExploreState extends State<_Explore> {
                     borderRadius: BorderRadius.circular(6),
                     child: Stack(fit: StackFit.expand, children: [
                       NetImg('${pr['imageUrl']}'),
-                      const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xB3000000), Color(0x00000000), Color(0x00000000)]))),
+                      const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xB31E1E1E), Color(0x001E1E1E), Color(0x001E1E1E)]))),
                       Positioned(
                         left: 6,
                         right: 6,

@@ -190,7 +190,7 @@ class _TourOverlayState extends State<_TourOverlay> {
       color: p.canvas,
       borderRadius: BorderRadius.circular(16),
       elevation: 12,
-      shadowColor: Colors.black54,
+      shadowColor: const Color(0x8A1E1E1E),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 12, 12),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [

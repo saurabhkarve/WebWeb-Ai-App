@@ -217,7 +217,7 @@ class _NotifyBannerHostState extends State<NotifyBannerHost> {
         color: Colors.transparent,
         child: Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 18, offset: Offset(0, 6))]),
+          decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border), boxShadow: const [BoxShadow(color: Color(0x331E1E1E), blurRadius: 18, offset: Offset(0, 6))]),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             GestureDetector(
               behavior: HitTestBehavior.opaque,

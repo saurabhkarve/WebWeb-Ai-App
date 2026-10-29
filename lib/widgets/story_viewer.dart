@@ -665,7 +665,7 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     decoration:
-                        BoxDecoration(color: Colors.white.withValues(alpha: .9), borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6)]),
+                        BoxDecoration(color: Colors.white.withValues(alpha: .9), borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x331E1E1E), blurRadius: 6)]),
                     child: Text(_note!, style: const TextStyle(color: kInk, fontSize: 12, fontWeight: FontWeight.w700)),
                   ),
                 ),

@@ -94,7 +94,7 @@ class _ReactionPickerState extends State<ReactionPicker> with SingleTickerProvid
                       color: p.card,
                       borderRadius: BorderRadius.circular(30),
                       border: Border.all(color: p.border),
-                      boxShadow: const [BoxShadow(color: Color(0x26000000), blurRadius: 15, offset: Offset(0, 6))],
+                      boxShadow: const [BoxShadow(color: Color(0x261E1E1E), blurRadius: 15, offset: Offset(0, 6))],
                     ),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       for (final r in kReactions)

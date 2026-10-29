@@ -342,7 +342,7 @@ class _Pin extends CustomPainter {
       ..cubicTo(21, 1, 26.5, 6.4, 26.5, 13.2)
       ..cubicTo(26.5, 22, 14, 35, 14, 35)
       ..close();
-    canvas.drawShadow(path, Colors.black, 3, false);
+    canvas.drawShadow(path, const Color(0xFF1E1E1E), 3, false);
     canvas.drawPath(path, Paint()..color = const Color(0xFF1E1E1E));
     canvas.drawPath(path, Paint()
       ..color = const Color(0xFFFFC700)
@@ -437,7 +437,7 @@ class _AreaViewerState extends State<_AreaViewer> {
                 width: 42,
                 height: 42,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 2))]),
+                decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Color(0x331E1E1E), blurRadius: 6, offset: Offset(0, 2))]),
                 child: Text(s, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: p.text, height: 1)),
               ),
             );

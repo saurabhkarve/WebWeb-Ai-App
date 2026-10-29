@@ -119,7 +119,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0x8A000000), Colors.transparent, Colors.transparent, Color(0xDD000000)],
+                    colors: [Color(0x8A1E1E1E), Colors.transparent, Colors.transparent, Color(0xDD1E1E1E)],
                     stops: [0, .25, .7, 1],
                   ),
                 ),
@@ -180,7 +180,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                   child: Container(
                     width: 105,
                     height: 145,
-                    color: Colors.black54,
+                    color: const Color(0x8A1E1E1E),
                     child: Stack(children: [
                       RTCVideoView(showVideo ? (_swapped ? cm.remoteR : cm.localR) : cm.localR, mirror: !_swapped, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
                       if (showVideo)
@@ -189,7 +189,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                           right: 4,
                           child: Container(
                             padding: const EdgeInsets.all(3),
-                            decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
+                            decoration: const BoxDecoration(color: Color(0x731E1E1E), shape: BoxShape.circle),
                             child: const WIcon(WI.refresh, size: 14, color: Colors.white),
                           ),
                         ),

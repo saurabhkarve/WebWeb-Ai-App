@@ -132,7 +132,7 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
           child: Material(
             color: p.card,
             elevation: 8,
-            shadowColor: Colors.black38,
+            shadowColor: const Color(0x611E1E1E),
             borderRadius: BorderRadius.circular(18),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 12, 12),

@@ -1456,7 +1456,7 @@ class _DailyStoriesState extends State<DailyStories> with SingleTickerProviderSt
               top: 0,
               child: Container(
                 padding: EdgeInsets.fromLTRB(12, top + 10, 4, 16),
-                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black.withValues(alpha: .6), Colors.black.withValues(alpha: 0)])),
+                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [const Color(0xFF1E1E1E).withValues(alpha: .6), const Color(0xFF1E1E1E).withValues(alpha: 0)])),
                 child: Column(children: [
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
@@ -1578,7 +1578,7 @@ class _Shell extends StatelessWidget {
     return Container(
       width: double.infinity,
       clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(28), boxShadow: const [BoxShadow(color: Color(0x99000000), blurRadius: 40, offset: Offset(0, 16))]),
+      decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(28), boxShadow: const [BoxShadow(color: Color(0x991E1E1E), blurRadius: 40, offset: Offset(0, 16))]),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),

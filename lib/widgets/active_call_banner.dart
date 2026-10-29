@@ -71,7 +71,7 @@ class _ActiveCallBannerState extends State<ActiveCallBanner> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: const [
               BoxShadow(
-                color: Colors.black26,
+                color: Color(0x421E1E1E),
                 blurRadius: 10,
                 offset: Offset(0, 4),
               ),

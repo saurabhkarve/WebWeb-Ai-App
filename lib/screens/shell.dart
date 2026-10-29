@@ -210,7 +210,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
-        boxShadow: [BoxShadow(color: (p.dark ? Colors.black : const Color(0xFF1E1E1E)).withValues(alpha: p.dark ? .6 : .3), blurRadius: 32, spreadRadius: -8, offset: const Offset(0, 10))],
+        boxShadow: [BoxShadow(color: (p.dark ? const Color(0xFF1E1E1E) : const Color(0xFF1E1E1E)).withValues(alpha: p.dark ? .6 : .3), blurRadius: 32, spreadRadius: -8, offset: const Offset(0, 10))],
       ),
       child: Stack(clipBehavior: Clip.none, children: [
         Positioned.fill(
@@ -262,7 +262,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
               constraints: const BoxConstraints(minWidth: 16),
               padding: const EdgeInsets.symmetric(horizontal: 4),
               alignment: Alignment.center,
-              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 3)]),
+              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x331E1E1E), blurRadius: 3)]),
               child: Text(badge > 9 && k == _notesTab ? '9+' : '$badge', style: const TextStyle(color: kInk, fontSize: 10, fontWeight: FontWeight.w700, height: 1)),
             ),
           ),
@@ -331,7 +331,7 @@ class _AppHeader extends StatelessWidget {
         color: p.chip,
         boxShadow: [
           BoxShadow(
-            color: p.dark ? Colors.black.withValues(alpha: .6) : const Color(0xFF1E1E1E).withValues(alpha: .2),
+            color: p.dark ? const Color(0xFF1E1E1E).withValues(alpha: .6) : const Color(0xFF1E1E1E).withValues(alpha: .2),
             offset: Offset(0, p.dark ? 8 : 6),
             blurRadius: p.dark ? 16 : 14,
             spreadRadius: -8,
@@ -374,7 +374,7 @@ BoxDecoration _panelDecoration(Pal p, {double radius = 14}) => BoxDecoration(
       border: Border.all(color: p.border.withValues(alpha: .6)),
       boxShadow: [
         BoxShadow(color: const Color(0xFF1E1E1E).withValues(alpha: .06), blurRadius: 2, offset: const Offset(0, 1)),
-        BoxShadow(color: (p.dark ? Colors.black : const Color(0xFF1E1E1E)).withValues(alpha: p.dark ? .7 : .35), blurRadius: 40, spreadRadius: -12, offset: const Offset(0, 18)),
+        BoxShadow(color: (p.dark ? const Color(0xFF1E1E1E) : const Color(0xFF1E1E1E)).withValues(alpha: p.dark ? .7 : .35), blurRadius: 40, spreadRadius: -12, offset: const Offset(0, 18)),
       ],
     );
 
@@ -801,7 +801,7 @@ class _ServiceContactsRowState extends State<_ServiceContactsRow> {
             padding: const EdgeInsets.all(3),
             alignment: on ? Alignment.centerRight : Alignment.centerLeft,
             decoration: BoxDecoration(color: on ? kGold : p.border, borderRadius: BorderRadius.circular(12)),
-            child: Container(width: 18, height: 18, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Color(0x33000000), blurRadius: 2)])),
+            child: Container(width: 18, height: 18, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Color(0x331E1E1E), blurRadius: 2)])),
           ),
         ]),
       ),

@@ -291,7 +291,7 @@ class _TalkScreenState extends State<TalkScreen> {
             gradient: on ? kGoldGradient : null,
             color: on ? null : p.chip,
             borderRadius: BorderRadius.circular(20),
-            boxShadow: on ? const [BoxShadow(color: Color(0x14000000), blurRadius: 2, offset: Offset(0, 1))] : null,
+            boxShadow: on ? const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 2, offset: Offset(0, 1))] : null,
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Text(t(label), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: on ? kInk : p.muted)),
@@ -1369,7 +1369,7 @@ class _ChatThreadState extends State<ChatThread> {
               borderRadius: BorderRadius.circular(8),
               child: a['imageUrl'] != null
                   ? NetImg('${a['imageUrl']}', width: 48, height: 48)
-                  : Container(width: 48, height: 48, color: Colors.black.withValues(alpha: .1), child: Center(child: WIcon(icon, size: 24, color: fg))),
+                  : Container(width: 48, height: 48, color: const Color(0xFF1E1E1E).withValues(alpha: .1), child: Center(child: WIcon(icon, size: 24, color: fg))),
             ),
             const SizedBox(width: 12),
             Flexible(

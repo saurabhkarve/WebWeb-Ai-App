@@ -322,7 +322,7 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
           decoration: BoxDecoration(
             color: p.canvas.withValues(alpha: .9),
             borderRadius: BorderRadius.circular(20),
-            boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 2, offset: Offset(0, 1))],
+            boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 2, offset: Offset(0, 1))],
           ),
           child: child,
         );
@@ -382,7 +382,7 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: p.canvas.withValues(alpha: .9),
-                    boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 2, offset: Offset(0, 1))],
+                    boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 2, offset: Offset(0, 1))],
                   ),
                   child: WIcon(WI.bookmark, size: 18, fill: it.bookmarked, color: it.bookmarked ? p.link : p.muted),
                 ),
@@ -398,7 +398,7 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
                     decoration: BoxDecoration(
                       gradient: kGoldGradient,
                       borderRadius: BorderRadius.circular(20),
-                      boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 2, offset: Offset(0, 1))],
+                      boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 2, offset: Offset(0, 1))],
                     ),
                     child: Text(it.price!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, height: 1, color: kInk)),
                   ),

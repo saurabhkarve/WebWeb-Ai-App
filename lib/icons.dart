@@ -190,7 +190,7 @@ class _WIconState extends State<WIcon> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final c = widget.color ?? IconTheme.of(context).color ?? DefaultTextStyle.of(context).style.color ?? Colors.black;
+    final c = widget.color ?? IconTheme.of(context).color ?? DefaultTextStyle.of(context).style.color ?? const Color(0xFF1E1E1E);
     final (body, fixed) = _body[widget.icon]!;
     final sw = fixed ?? widget.strokeWidth;
     if (!_hasSpark) {

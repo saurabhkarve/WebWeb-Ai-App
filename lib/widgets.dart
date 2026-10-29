@@ -179,7 +179,7 @@ class _AiPillState extends State<AiPill> with SingleTickerProviderStateMixin {
             ? const LinearGradient(colors: [Color(0xFF34322B), Color(0xFF1E1E1E)], begin: Alignment.topCenter, end: Alignment.bottomCenter)
             : const LinearGradient(colors: [Color(0xFFFFE27A), Color(0xFFFFC700), Color(0xFFE6AC00)], stops: [0, .55, 1], begin: Alignment.topLeft, end: Alignment.bottomRight),
         border: Border.all(color: p.dark ? kGold.withValues(alpha: .6) : const Color(0xFFC9AE24).withValues(alpha: .7)),
-        boxShadow: [BoxShadow(color: p.dark ? Colors.black.withValues(alpha: .4) : const Color(0xFF9A7B00).withValues(alpha: .35), blurRadius: 3, offset: const Offset(0, 1))],
+        boxShadow: [BoxShadow(color: p.dark ? const Color(0xFF1E1E1E).withValues(alpha: .4) : const Color(0xFF9A7B00).withValues(alpha: .35), blurRadius: 3, offset: const Offset(0, 1))],
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Text('AI', style: TextStyle(fontSize: f, fontWeight: FontWeight.w700, height: 1, letterSpacing: f * .06, color: p.dark ? const Color(0xFFFFD84A) : kInk)),
@@ -643,7 +643,7 @@ class GoldButton extends StatelessWidget {
             color: outlined ? p.chip : null,
             border: outlined ? Border.all(color: p.border.withValues(alpha: .7)) : null,
             borderRadius: BorderRadius.circular(height),
-            boxShadow: outlined ? null : const [BoxShadow(color: Color(0x14000000), blurRadius: 2, offset: Offset(0, 1))],
+            boxShadow: outlined ? null : const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 2, offset: Offset(0, 1))],
           ),
           child: InkWell(
             borderRadius: BorderRadius.circular(height),
@@ -1011,7 +1011,7 @@ class SubPage extends StatelessWidget {
             color: p.chip,
             boxShadow: [
               BoxShadow(
-                color: p.dark ? Colors.black.withValues(alpha: .6) : const Color(0xFF1E1E1E).withValues(alpha: .2),
+                color: p.dark ? const Color(0xFF1E1E1E).withValues(alpha: .6) : const Color(0xFF1E1E1E).withValues(alpha: .2),
                 offset: Offset(0, p.dark ? 8 : 6),
                 blurRadius: p.dark ? 16 : 14,
                 spreadRadius: -8,

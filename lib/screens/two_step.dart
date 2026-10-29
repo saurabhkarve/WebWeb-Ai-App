@@ -358,7 +358,7 @@ class _PlainQr extends CustomPainter {
     final n = img.moduleCount;
     final pad = size.width * .06;
     final cell = (size.width - pad * 2) / n;
-    final ink = Paint()..color = Colors.black;
+    final ink = Paint()..color = const Color(0xFF1E1E1E);
     for (var r = 0; r < n; r++) {
       for (var c = 0; c < n; c++) {
         if (img.isDark(r, c)) canvas.drawRect(Rect.fromLTWH(pad + c * cell, pad + r * cell, cell + .5, cell + .5), ink);

@@ -79,7 +79,7 @@ class ImageGrid extends StatelessWidget {
 void openImageViewer(BuildContext context, List<String> images, int start, {String? shareUrl, String? shareRef}) {
   Navigator.of(context).push(PageRouteBuilder(
     opaque: false,
-    barrierColor: Colors.black,
+    barrierColor: const Color(0xFF1E1E1E),
     pageBuilder: (_, __, ___) => _Viewer(images, start, shareUrl, shareRef),
     transitionsBuilder: (_, a, __, child) => FadeTransition(opacity: a, child: child),
   ));
@@ -122,7 +122,7 @@ class _ViewerState extends State<_Viewer> {
           ),
         );
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF1E1E1E),
       body: Stack(children: [
         PageView.builder(
           controller: _pc,

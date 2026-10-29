@@ -276,7 +276,7 @@ class _AskDeckState extends State<AskDeck> {
                     height: (40 * _scale).clamp(34.0, 48.0),
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 2))]),
+                    decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x331E1E1E), blurRadius: 6, offset: Offset(0, 2))]),
                     child: Text(t(visitHref != null ? 'Visit website' : 'I can help'), style: TextStyle(fontSize: (14 * _scale).clamp(13.0, 16.0), fontWeight: FontWeight.w700, color: kInk)),
                   ),
                 ),
@@ -577,7 +577,7 @@ class _AskDeckState extends State<AskDeck> {
           child: IgnorePointer(
             child: Container(
               padding: const EdgeInsets.fromLTRB(16, 36, 16, 12),
-              decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x00000000), Color(0xCC1E1E1E)])),
+              decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x001E1E1E), Color(0xCC1E1E1E)])),
               child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, height: 1.3, fontWeight: FontWeight.w700, color: Colors.white)),
             ),
           ),

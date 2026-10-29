@@ -208,7 +208,7 @@ class _CropPainter extends CustomPainter {
       ..fillType = PathFillType.evenOdd
       ..addRect(Offset.zero & size);
     addFrame(dim);
-    canvas.drawPath(dim, Paint()..color = Colors.black.withValues(alpha: .6));
+    canvas.drawPath(dim, Paint()..color = const Color(0xFF1E1E1E).withValues(alpha: .6));
     // thirds, to line things up
     canvas.save();
     canvas.clipPath(hole);
