@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
 import '../i18n.dart';
@@ -212,6 +213,26 @@ class _AskAreaSheetState extends State<_AskAreaSheet> {
             Text(t('{d} reach', {'d': formatDistance(radius)}), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
           ]),
           const SizedBox(height: 4),
+          ValueListenableBuilder<({double lat, double lng})?>(
+            valueListenable: kMyPlace,
+            builder: (_, me, __) {
+              if (me == null || lat == null || lng == null) return const SizedBox.shrink();
+              final d = (distanceKm(lat, lng, me.lat, me.lng) * 1000).round();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(children: [
+                  Container(width: 12, height: 12, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF2563EB), border: Border.all(color: Colors.white, width: 2), boxShadow: const [BoxShadow(color: Color(0x552563EB), spreadRadius: 2)])),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text.rich(TextSpan(children: [
+                      TextSpan(text: t('You are {d} from this ask', {'d': formatDistance(d)})),
+                      TextSpan(text: ' · ${t(d <= radius ? 'Inside the reach' : 'Outside the reach')}', style: TextStyle(fontWeight: FontWeight.w700, color: d <= radius ? const Color(0xFF059669) : p.muted)),
+                    ]), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  ),
+                ]),
+              );
+            },
+          ),
           if (spot != null && away != null)
             Text.rich(TextSpan(children: [
               TextSpan(text: t('{place} is {d} from this ask', {'place': spot.name, 'd': formatDistance(away)})),
@@ -238,6 +259,29 @@ class _AskAreaSheetState extends State<_AskAreaSheet> {
   }
 }
 
+/// Where the member is now, shown as a blue dot on the ask maps so the distance can be compared. Read quietly: only
+/// when location is already allowed (a map never asks), and again when the last reading is over five minutes old.
+final ValueNotifier<({double lat, double lng})?> kMyPlace = ValueNotifier(null);
+DateTime? _myPlaceAt;
+bool _myPlaceBusy = false;
+
+Future<void> loadMyPlace() async {
+  if (_myPlaceBusy || (_myPlaceAt != null && DateTime.now().difference(_myPlaceAt!) < const Duration(minutes: 5))) return;
+  _myPlaceBusy = true;
+  try {
+    final perm = await Geolocator.checkPermission();
+    if ((perm != LocationPermission.whileInUse && perm != LocationPermission.always) || !await Geolocator.isLocationServiceEnabled()) return;
+    Position? pos = await Geolocator.getLastKnownPosition();
+    pos ??= await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.low, timeLimit: Duration(seconds: 8)));
+    kMyPlace.value = (lat: pos.latitude, lng: pos.longitude);
+    _myPlaceAt = DateTime.now();
+  } catch (_) {
+    // no reading: the map simply has no blue dot
+  } finally {
+    _myPlaceBusy = false;
+  }
+}
+
 /// A still map (OpenStreetMap tiles) centred on a point, zoomed so the reach circle fits, with the circle drawn on top.
 class AreaMap extends StatelessWidget {
   final double lat, lng, radiusM;
@@ -248,11 +292,19 @@ class AreaMap extends StatelessWidget {
   static const _tile = 256.0;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) {
+  Widget build(BuildContext context) {
+    loadMyPlace();
+    return ValueListenableBuilder<({double lat, double lng})?>(valueListenable: kMyPlace, builder: (context, me, _) => _map(context, me));
+  }
+
+  Widget _map(BuildContext context, ({double lat, double lng})? me) => LayoutBuilder(builder: (context, box) {
         final w = box.maxWidth, h = box.maxHeight;
         final cosLat = math.cos(lat * math.pi / 180);
         // metres per pixel at zoom 0 is 156543 · cos(lat); pick the zoom where the circle fills ~70% of the height
-        final reach = point == null ? radiusM : math.max(radiusM, distanceKm(lat, lng, point!.lat, point!.lng) * 1000 * 1.15);
+        final fromMe = me == null ? null : distanceKm(lat, lng, me.lat, me.lng) * 1000;
+        var reach = point == null ? radiusM : math.max(radiusM, distanceKm(lat, lng, point!.lat, point!.lng) * 1000 * 1.15);
+        // you are kept in view when you are within 50 km of the ask
+        if (fromMe != null && fromMe <= 50000) reach = math.max(reach, fromMe * 1.15);
         final want = reach / (h * .35);
         final z = (math.log(156543.03 * cosLat / want) / math.ln2).floor().clamp(3, 15);
         final scale = math.pow(2, z).toDouble();
@@ -294,6 +346,32 @@ class AreaMap extends StatelessWidget {
                 left: px - 14,
                 top: py - 34,
                 child: IgnorePointer(child: CustomPaint(size: const Size(28, 36), painter: _Pin())),
+              );
+            }),
+          if (me != null && fromMe != null && fromMe <= 50000)
+            Builder(builder: (_) {
+              final mx = (me.lng + 180) / 360 * _tile * scale - left;
+              final s3 = math.sin(me.lat * math.pi / 180);
+              final my = (0.5 - math.log((1 + s3) / (1 - s3)) / (4 * math.pi)) * _tile * scale - top;
+              return Positioned(
+                left: mx - 15,
+                top: my - 15,
+                child: IgnorePointer(
+                  child: Semantics(
+                    label: t('You are here'),
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF2563EB).withValues(alpha: .22)),
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF2563EB), border: Border.all(color: Colors.white, width: 3), boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 4)]),
+                      ),
+                    ),
+                  ),
+                ),
               );
             }),
           Positioned(
