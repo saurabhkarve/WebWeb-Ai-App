@@ -82,6 +82,26 @@ class AskCards extends StatelessWidget {
         ]),
         const SizedBox(height: 6),
         HashtagText(askText(post.askType, post.title), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -.3)),
+        if (post.askType == 'visit' && firstLink([post.title, post.description]) != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+            decoration: BoxDecoration(color: p.canvas.withValues(alpha: .7), borderRadius: BorderRadius.circular(12), border: Border.all(color: p.border)),
+            child: Row(children: [
+              Expanded(child: Text(hostOf(firstLink([post.title, post.description])!), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+              GestureDetector(
+                onTap: () => openExternal(context, firstLink([post.title, post.description])!),
+                child: Container(
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(18)),
+                  child: Text(t('Visit website'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kInk)),
+                ),
+              ),
+            ]),
+          ),
+        ],
         if (chips != null) ...[const SizedBox(height: 12), chips!],
       ])),
       if (askText(post.askType, post.description).trim().isNotEmpty)
