@@ -183,16 +183,26 @@ class _AskDeckState extends State<AskDeck> {
         }),
       ),
       const SizedBox(height: 2),
-      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        for (var k = 0; k < kinds.length; k++)
-          GestureDetector(
-            onTap: () => _page.animateToPage(k, duration: const Duration(milliseconds: 250), curve: Curves.easeOut),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
-              child: AnimatedContainer(duration: const Duration(milliseconds: 200), width: k == _i ? 20 : 6, height: 6, decoration: BoxDecoration(color: k == _i ? kGold : p.border, borderRadius: BorderRadius.circular(3))),
+      // small dots, five at a time as in a photo carousel: the card you are on dark, the ends of the window smaller
+      Builder(builder: (_) {
+        final n = kinds.length;
+        final start = (_i - 2).clamp(0, (n - 5).clamp(0, n));
+        return Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          for (var k = start; k < n && k < start + 5; k++)
+            GestureDetector(
+              onTap: () => _page.animateToPage(k, duration: const Duration(milliseconds: 250), curve: Curves.easeOut),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 2),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: ((k == start && start > 0) || (k == start + 4 && start + 4 < n - 1)) ? 4 : 6,
+                  height: ((k == start && start > 0) || (k == start + 4 && start + 4 < n - 1)) ? 4 : 6,
+                  decoration: BoxDecoration(color: k == _i ? p.text : p.text.withValues(alpha: .25), shape: BoxShape.circle),
+                ),
+              ),
             ),
-          ),
-      ]),
+        ]);
+      }),
     ]);
   }
 
