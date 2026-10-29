@@ -1147,3 +1147,30 @@ class _RenderFitRow extends RenderBox
   @override
   bool hitTestChildren(BoxHitTestResult result, {required Offset position}) => defaultHitTestChildren(result, position: position);
 }
+
+/// A message that is one emoji and nothing else (a flag, a skin tone, a keycap or a family counts as one): shown big, as WhatsApp does.
+bool isSingleEmoji(String text) {
+  final r = text.trim().runes.toList();
+  if (r.isEmpty || r.length > 12) return false;
+  bool pict(int c) => (c >= 0x1F300 && c <= 0x1FAFF) || (c >= 0x1F000 && c <= 0x1F2FF) || (c >= 0x2600 && c <= 0x27BF) || (c >= 0x2300 && c <= 0x23FF) || (c >= 0x2B00 && c <= 0x2BFF) || (c >= 0x2190 && c <= 0x21FF) || const {0xA9, 0xAE, 0x203C, 0x2049, 0x2122, 0x2139, 0x2934, 0x2935, 0x3030, 0x303D, 0x3297, 0x3299}.contains(c);
+  bool ri(int c) => c >= 0x1F1E6 && c <= 0x1F1FF;
+  // a flag: two regional indicators
+  if (r.length == 2 && ri(r[0]) && ri(r[1])) return true;
+  // a keycap: 1️⃣
+  if ((r.length == 2 || r.length == 3) && (r[0] == 0x23 || r[0] == 0x2A || (r[0] >= 0x30 && r[0] <= 0x39)) && r.last == 0x20E3 && (r.length == 2 || r[1] == 0xFE0F)) return true;
+  // one pictograph with its variation selector / skin tone, or several joined by ZWJ
+  var bases = 0;
+  for (var k = 0; k < r.length; k++) {
+    final c = r[k];
+    if (c == 0xFE0F || (c >= 0x1F3FB && c <= 0x1F3FF)) {
+      if (k == 0) return false;
+    } else if (c == 0x200D) {
+      if (k == 0 || k == r.length - 1) return false;
+    } else if (pict(c) && !ri(c)) {
+      if (k == 0 || r[k - 1] != 0x200D) bases++;
+    } else {
+      return false;
+    }
+  }
+  return bases == 1;
+}
