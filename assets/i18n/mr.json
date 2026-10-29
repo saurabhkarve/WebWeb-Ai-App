@@ -2417,5 +2417,20 @@
   "Why am I seeing this?": "मला हे का दिसत आहे?",
   "Hide this ad": "ही जाहिरात लपवा",
   "Ad hidden": "जाहिरात लपवली",
-  "This is a paid ad. The business chose to reach members like you. Ads are always marked Sponsored, and your number is never shared with them.": "ही सशुल्क जाहिरात आहे. या व्यवसायाने तुमच्यासारख्या सदस्यांपर्यंत पोहोचणे निवडले आहे. जाहिराती नेहमी 'प्रायोजित' म्हणून चिन्हांकित असतात आणि तुमचा नंबर त्यांना कधीही दिला जात नाही."
+  "This is a paid ad. The business chose to reach members like you. Ads are always marked Sponsored, and your number is never shared with them.": "ही सशुल्क जाहिरात आहे. या व्यवसायाने तुमच्यासारख्या सदस्यांपर्यंत पोहोचणे निवडले आहे. जाहिराती नेहमी 'प्रायोजित' म्हणून चिन्हांकित असतात आणि तुमचा नंबर त्यांना कधीही दिला जात नाही.",
+  "Visit": "भेट",
+  "I want members to visit my website": "सदस्यांनी माझी वेबसाइट पाहावी असे मला वाटते",
+  "Share a link to your website or page": "तुमच्या वेबसाइट किंवा पेजची लिंक शेअर करा",
+  "{name} invites you to visit their website": "{name} तुम्हाला त्यांची वेबसाइट पाहायला बोलावतात",
+  "Visit website": "वेबसाइट पाहा",
+  "Add the link to your website in the details": "तपशिलात तुमच्या वेबसाइटची लिंक जोडा",
+  "You can share one link a day. Try again later.": "तुम्ही दिवसातून एकच लिंक शेअर करू शकता. थोड्या वेळाने पुन्हा प्रयत्न करा.",
+  "Paste your website link in the title or details. One link a day.": "शीर्षक किंवा तपशिलात तुमच्या वेबसाइटची लिंक पेस्ट करा. दिवसातून एक लिंक.",
+  "My website": "माझी वेबसाइट",
+  "A new page or offer": "नवे पेज किंवा ऑफर",
+  "Visit our new website: [business name]": "आमची नवी वेबसाइट पाहा: [व्यवसायाचे नाव]",
+  "What you will find: [products / services / offers]\nLink: https://[your-website]": "तुम्हाला काय मिळेल: [उत्पादने / सेवा / ऑफर]\nलिंक: https://[तुमची-वेबसाइट]",
+  "See our [new catalogue / offer] at [website]": "[वेबसाइट] वर आमचा [नवा कॅटलॉग / ऑफर] पाहा",
+  "What is new: [what changed]\nLink: https://[your-website]/[page]": "नवे काय: [काय बदलले]\nलिंक: https://[तुमची-वेबसाइट]/[पेज]",
+  "What they will find there, and your website link": "तिथे त्यांना काय मिळेल, आणि तुमच्या वेबसाइटची लिंक"
 }

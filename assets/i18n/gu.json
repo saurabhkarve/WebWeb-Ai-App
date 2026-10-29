@@ -2417,5 +2417,20 @@
   "Why am I seeing this?": "મને આ કેમ દેખાય છે?",
   "Hide this ad": "આ જાહેરાત છુપાવો",
   "Ad hidden": "જાહેરાત છુપાવી",
-  "This is a paid ad. The business chose to reach members like you. Ads are always marked Sponsored, and your number is never shared with them.": "આ ચૂકવણીવાળી જાહેરાત છે. આ વ્યવસાયે તમારા જેવા સભ્યો સુધી પહોંચવાનું પસંદ કર્યું છે. જાહેરાતો હંમેશા 'પ્રાયોજિત' તરીકે ચિહ્નિત હોય છે અને તમારો નંબર તેમને ક્યારેય આપવામાં આવતો નથી."
+  "This is a paid ad. The business chose to reach members like you. Ads are always marked Sponsored, and your number is never shared with them.": "આ ચૂકવણીવાળી જાહેરાત છે. આ વ્યવસાયે તમારા જેવા સભ્યો સુધી પહોંચવાનું પસંદ કર્યું છે. જાહેરાતો હંમેશા 'પ્રાયોજિત' તરીકે ચિહ્નિત હોય છે અને તમારો નંબર તેમને ક્યારેય આપવામાં આવતો નથી.",
+  "Visit": "મુલાકાત",
+  "I want members to visit my website": "હું ઇચ્છું છું કે સભ્યો મારી વેબસાઇટ જુએ",
+  "Share a link to your website or page": "તમારી વેબસાઇટ અથવા પેજની લિંક શેર કરો",
+  "{name} invites you to visit their website": "{name} તમને તેમની વેબસાઇટ જોવા બોલાવે છે",
+  "Visit website": "વેબસાઇટ જુઓ",
+  "Add the link to your website in the details": "વિગતમાં તમારી વેબસાઇટની લિંક ઉમેરો",
+  "You can share one link a day. Try again later.": "તમે દિવસમાં એક જ લિંક શેર કરી શકો છો. થોડી વાર પછી ફરી પ્રયત્ન કરો.",
+  "Paste your website link in the title or details. One link a day.": "શીર્ષક અથવા વિગતમાં તમારી વેબસાઇટની લિંક પેસ્ટ કરો. દિવસમાં એક લિંક.",
+  "My website": "મારી વેબસાઇટ",
+  "A new page or offer": "નવું પેજ અથવા ઑફર",
+  "Visit our new website: [business name]": "અમારી નવી વેબસાઇટ જુઓ: [વ્યવસાયનું નામ]",
+  "What you will find: [products / services / offers]\nLink: https://[your-website]": "તમને શું મળશે: [ઉત્પાદનો / સેવાઓ / ઑફર]\nલિંક: https://[તમારી-વેબસાઇટ]",
+  "See our [new catalogue / offer] at [website]": "[વેબસાઇટ] પર અમારું [નવું કેટલૉગ / ઑફર] જુઓ",
+  "What is new: [what changed]\nLink: https://[your-website]/[page]": "નવું શું છે: [શું બદલાયું]\nલિંક: https://[તમારી-વેબસાઇટ]/[પેજ]",
+  "What they will find there, and your website link": "ત્યાં તેમને શું મળશે, અને તમારી વેબસાઇટની લિંક"
 }

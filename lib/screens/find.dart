@@ -785,6 +785,8 @@ class _AskTile extends StatelessWidget {
         return (key: '{name} wants your vote', vars: v);
       case 'recommend':
         return (key: '{name} wants a recommendation', vars: v);
+      case 'visit':
+        return (key: '{name} invites you to visit their website', vars: v);
       case 'partner':
         return (key: '{name} is looking for a partner', vars: v);
       case 'funding':

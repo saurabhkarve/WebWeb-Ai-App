@@ -16,6 +16,7 @@ const kAskTypes = [
   AskTypeDef('advice', 'I need advice', 'Advice', 'A question or an opinion', 'advice', '💡', 'advice'),
   AskTypeDef('poll', 'I want a vote', 'Poll', 'Let members choose between options', 'poll', '🗳️', 'advice'),
   AskTypeDef('recommend', 'Who do you recommend?', 'Recommend', 'Ask for a trusted name', 'recommend', '⭐', 'advice'),
+  AskTypeDef('visit', 'I want members to visit my website', 'Visit', 'Share a link to your website or page', 'visit', '🔗', 'digital'),
   AskTypeDef('partner', 'I am looking for a partner', 'Partner', 'Co-founder, joint venture, franchise', 'partnership', '🤝', 'partnership', 'partnership'),
   AskTypeDef('funding', 'I am looking for funding', 'Funding', 'Loan, investor, working capital', 'funding', '💰', 'funding', 'funding'),
   AskTypeDef('other', 'Something else', 'Other', 'Say what it is in a few words', 'other', '💬', 'other', 'other'),
@@ -93,6 +94,8 @@ String askTypeOf(Post p) => p.askType ?? typeOfCategory(p.category);
       return (key: '{name} wants your vote', vars: {'name': name});
     case 'recommend':
       return (key: '{name} wants a recommendation', vars: {'name': name});
+    case 'visit':
+      return (key: '{name} invites you to visit their website', vars: {'name': name});
     case 'partner':
       return (key: '{name} is looking for a partner', vars: {'name': name});
     case 'funding':

@@ -2417,5 +2417,20 @@
   "Why am I seeing this?": "म्हाका हें कित्याक दिसता?",
   "Hide this ad": "ही जाहिरात लिपयात",
   "Ad hidden": "जाहिरात लिपयली",
-  "This is a paid ad. The business chose to reach members like you. Ads are always marked Sponsored, and your number is never shared with them.": "ही पयशांची जाहिरात. ह्या धंद्यान तुमचे सारक्या सदस्यां मेरेन पावप थारायलां. जाहिराती सदांच 'प्रायोजित' म्हणून दाखयतात आनी तुमचो नंबर तांकां केन्नाच दितात ना."
+  "This is a paid ad. The business chose to reach members like you. Ads are always marked Sponsored, and your number is never shared with them.": "ही पयशांची जाहिरात. ह्या धंद्यान तुमचे सारक्या सदस्यां मेरेन पावप थारायलां. जाहिराती सदांच 'प्रायोजित' म्हणून दाखयतात आनी तुमचो नंबर तांकां केन्नाच दितात ना.",
+  "Visit": "भेट",
+  "I want members to visit my website": "सभासदांनी म्हजी वेबसायट पळोवची अशें म्हाका दिसता",
+  "Share a link to your website or page": "तुमच्या वेबसायट वा पानाची लिंक शेअर करात",
+  "{name} invites you to visit their website": "{name} तुमकां तांची वेबसायट पळोवपाक आयतें दिता",
+  "Visit website": "वेबसायट पळयात",
+  "Add the link to your website in the details": "तपशिलांत तुमच्या वेबसायटीची लिंक जोडात",
+  "You can share one link a day. Try again later.": "तुमी दिसाक एकूच लिंक शेअर करूं शकता. थोड्या वेळान परत यत्न करात.",
+  "Paste your website link in the title or details. One link a day.": "मथळो वा तपशिलांत तुमच्या वेबसायटीची लिंक पेस्ट करात. दिसाक एक लिंक.",
+  "My website": "म्हजी वेबसायट",
+  "A new page or offer": "नवें पान वा ऑफर",
+  "Visit our new website: [business name]": "आमची नवी वेबसायट पळयात: [धंद्याचें नांव]",
+  "What you will find: [products / services / offers]\nLink: https://[your-website]": "तुमकां कितें मेळटलें: [उत्पादनां / सेवा / ऑफर]\nलिंक: https://[तुमची-वेबसायट]",
+  "See our [new catalogue / offer] at [website]": "[वेबसायट] वयलो आमचो [नवो कॅटलॉग / ऑफर] पळयात",
+  "What is new: [what changed]\nLink: https://[your-website]/[page]": "नवें कितें: [कितें बदललें]\nलिंक: https://[तुमची-वेबसायट]/[पान]",
+  "What they will find there, and your website link": "थंय तांकां कितें मेळटलें, आनी तुमच्या वेबसायटीची लिंक"
 }

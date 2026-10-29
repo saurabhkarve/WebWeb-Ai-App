@@ -5,6 +5,7 @@ import '../ask_types.dart';
 import '../auth_provider.dart';
 import '../card_events.dart';
 import '../card_colors.dart';
+import '../links.dart';
 import '../i18n.dart';
 import '../icons.dart';
 import '../models.dart';
@@ -462,6 +463,12 @@ class _AskDeckState extends State<AskDeck> {
                     ? null
                     : () {
                         if (_log) CardEvents.log(context.read<AuthProvider>().api, post.id, 'cta', _kinds.length - 1, _kinds.length);
+                        // a Visit ask: the button is its link, opened away from WEBWEB
+                        final visit = post.askType == 'visit' ? firstLink([post.title, post.description]) : null;
+                        if (visit != null) {
+                          openExternal(context, visit);
+                          return;
+                        }
                         (widget.mine ? widget.onOpen : widget.onReply)?.call();
                       },
                 child: Container(
@@ -469,7 +476,7 @@ class _AskDeckState extends State<AskDeck> {
                   padding: const EdgeInsets.symmetric(horizontal: 22),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(18)),
-                  child: Text(t(widget.mine ? 'Review responses' : 'I can help'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kInk)),
+                  child: Text(t(post.askType == 'visit' && firstLink([post.title, post.description]) != null ? 'Visit website' : (widget.mine ? 'Review responses' : 'I can help')), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kInk)),
                 ),
               ),
               ),

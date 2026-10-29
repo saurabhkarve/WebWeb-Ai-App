@@ -12,6 +12,8 @@ import '../ask_types.dart';
 import '../card_colors.dart';
 import '../widgets/ask_deck.dart';
 import 'dart:io' show File;
+import '../api.dart';
+import '../links.dart';
 import '../i18n.dart';
 import 'your_asks.dart';
 import '../location.dart';
@@ -212,6 +214,10 @@ final _typeSamples = <String, List<_Sample>>{
   'recommend': [
     ('advice', 'A service', 'Who can you recommend for [service] in [area]?', 'What I need: [service]\nArea: [area]\nBudget: ₹[amount]\nNeeded by: [date]', null),
     ('advice', 'A supplier', 'Can anyone recommend a reliable [supplier / vendor] for [item]?', 'Item: [item]\nQuantity: [quantity]\nDelivery to: [area]\nWhat matters: [price / quality / credit]', null),
+  ],
+  'visit': [
+    ('digital', 'My website', 'Visit our new website: [business name]', 'What you will find: [products / services / offers]\nLink: https://[your-website]', null),
+    ('digital', 'A new page or offer', 'See our [new catalogue / offer] at [website]', 'What is new: [what changed]\nLink: https://[your-website]/[page]', null),
   ],
   'partner': _fromCat('partnership'),
   'funding': _fromCat('funding'),
@@ -803,8 +809,8 @@ class _AskFormState extends State<_AskForm> {
       });
       widget.onPosted();
       Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${r['id']}')));
-    } catch (_) {
-      if (mounted) setState(() => _error = t(_editing ? 'Could not save your changes. Please try again.' : 'Could not publish your post. Please try again.'));
+    } catch (e) {
+      if (mounted) setState(() => _error = e is ApiException && e.status == 429 ? t('You can share one link a day. Try again later.') : t(_editing ? 'Could not save your changes. Please try again.' : 'Could not publish your post. Please try again.'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -949,9 +955,11 @@ class _AskFormState extends State<_AskForm> {
     final titleOk = title.trim().length >= 5;
     final descOk = desc.trim().length >= 20;
     final pollOk = _askType != 'poll' || _pollOpts.where((o) => o.trim().isNotEmpty).length >= 2;
+    // a Visit ask is its link: it needs a web address in the title or details
+    final linkOk = _askType != 'visit' || firstLink([title, desc]) != null;
     final typeOk = _category.isNotEmpty && (_category != 'other' || _other.text.trim().length >= 2) && pollOk;
     final titleBlank = _blank.hasMatch(title), descBlank = _blank.hasMatch(desc);
-    final ready = titleOk && descOk && typeOk && !titleBlank && !descBlank && !_photos.any((ph) => ph.failed);
+    final ready = titleOk && descOk && typeOk && linkOk && !titleBlank && !descBlank && !_photos.any((ph) => ph.failed);
     final missing = !titleOk
         ? 'Add a title'
         : !descOk
@@ -960,7 +968,9 @@ class _AskFormState extends State<_AskForm> {
                 ? 'Replace the [brackets] with your details'
                 : _category.isEmpty
                     ? 'Choose a type'
-                    : !pollOk
+                    : !linkOk
+                        ? 'Add the link to your website in the details'
+                        : !pollOk
                         ? 'Add at least 2 options to vote on'
                         : !typeOk
                         ? 'Say what this ask is about'
@@ -1253,8 +1263,9 @@ class _AskFormState extends State<_AskForm> {
                   maxLength: 300,
                   textCapitalization: TextCapitalization.sentences,
                   style: const TextStyle(fontSize: 15, height: 1.4),
-                  decoration: _input(p, t(tip?.$1 ?? 'Describe what you need: quantity, quality, area, timing')),
+                  decoration: _input(p, t(_askType == 'visit' ? 'What they will find there, and your website link' : (tip?.$1 ?? 'Describe what you need: quantity, quality, area, timing'))),
                 ),
+                if (_askType == 'visit') Padding(padding: const EdgeInsets.only(top: 4), child: Text(t('Paste your website link in the title or details. One link a day.'), style: TextStyle(fontSize: 12, color: p.muted))),
                 MentionSuggest(controller: _desc, focus: _descFocus),
                 // hashtags in the title or description become links to every ask that carries them
                 Padding(

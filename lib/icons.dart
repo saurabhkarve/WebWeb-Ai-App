@@ -245,6 +245,7 @@ WI categoryIcon(String? category) => switch (category) {
       'repair' => WI.repair,
       'poll' => WI.views,
       'recommend' => WI.refer,
+      'visit' => WI.website,
       'daily' => WI.service,
       'events' => WI.users,
       'rental' => WI.truck,
