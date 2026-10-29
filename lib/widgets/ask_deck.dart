@@ -68,7 +68,7 @@ class _AskDeckState extends State<AskDeck> {
   }
 
   /// The cards' height follows the screen (about a third of it); the headline and the buttons follow the cards.
-  double get _deckH => (MediaQuery.sizeOf(context).height * .30).clamp(236.0, 300.0);
+  double get _deckH => (MediaQuery.sizeOf(context).height * .34).clamp(272.0, 340.0);
   double get _scale => _deckH / 240;
 
   List<DeckKind> get _kinds {
