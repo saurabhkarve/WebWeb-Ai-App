@@ -1144,7 +1144,7 @@ class _AskFormState extends State<_AskForm> {
         ],
         // examples: a starting point while the ask is empty, never filled in on their own
         if (empty && !_editing) ...[
-          _caps(p, 'Start from an example'),
+          _caps(p, 'Start with an example, finish with AI'),
           const SizedBox(height: 2),
           Text(t('Tap one, then change the details to yours.'), style: TextStyle(fontSize: 12, color: p.muted)),
           const SizedBox(height: 8),
