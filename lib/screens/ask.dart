@@ -935,6 +935,24 @@ class _AskFormState extends State<_AskForm> {
     );
   }
 
+  /// Fields that open and close with a slide and a fade; closed, they cannot be tapped, focused or read out.
+  Widget _reveal(bool open, List<Widget> children) => ClipRect(
+        child: AnimatedAlign(
+          alignment: Alignment.topCenter,
+          heightFactor: open ? 1 : 0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+          child: AnimatedOpacity(
+            opacity: open ? 1 : 0,
+            duration: const Duration(milliseconds: 300),
+            child: ExcludeFocus(
+              excluding: !open,
+              child: IgnorePointer(ignoring: !open, child: ExcludeSemantics(excluding: !open, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children))),
+            ),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
@@ -942,6 +960,9 @@ class _AskFormState extends State<_AskForm> {
     final title = _title.text, desc = _desc.text;
     final tip = _tips[_category];
     final empty = title.trim().isEmpty && desc.trim().isEmpty;
+    // the form opens in steps: the types first; once one is picked, the examples, the title and the details; once there is a title, the rest
+    final typeReady = _editing || _typeChosen || _askType.isNotEmpty || !empty;
+    final restReady = _editing || title.trim().isNotEmpty || desc.trim().isNotEmpty || _photos.isNotEmpty;
     // examples: the chosen type's, or the first of each type while none is chosen
     final examples = _typeChosen && _typeSamples[_askType] != null
         ? [for (final x in _typeSamples[_askType]!) (_askType, x)]
@@ -1040,6 +1061,10 @@ class _AskFormState extends State<_AskForm> {
                   _category = categoryForType(o.value, _category);
                   if (o.value == 'poll' && _pollOpts.where((x) => x.trim().isNotEmpty).length < 2) _pollOpts = ['', ''];
                   _typeChosen = true;
+                  // the title opens just below: start there once it has
+                  Future.delayed(const Duration(milliseconds: 350), () {
+                    if (mounted) _titleFocus.requestFocus();
+                  });
                 }),
                 child: Container(
                   height: 32,
@@ -1155,7 +1180,7 @@ class _AskFormState extends State<_AskForm> {
           const SizedBox(height: 12),
         ],
         // examples: a starting point while the ask is empty, never filled in on their own
-        if (empty && !_editing) ...[
+        _reveal(typeReady && empty && !_editing, [
           _caps(p, 'Start with an example, finish with AI'),
           const SizedBox(height: 2),
           Text(t('Tap one, then change the details to yours.'), style: TextStyle(fontSize: 12, color: p.muted)),
@@ -1166,7 +1191,7 @@ class _AskFormState extends State<_AskForm> {
             child: hScroll(height: 92, [for (final e in examples) _exampleCard(p, e, exW)]),
           ),
           const SizedBox(height: 16),
-        ],
+        ]),
         // the ask laid out like its row on Connect: photo, name and time, then the title, details and chips as fields
         KeyedSubtree(
           key: _tk('ask-card'),
@@ -1193,6 +1218,7 @@ class _AskFormState extends State<_AskForm> {
                   const SizedBox(height: 8),
                 ],
                 typePills,
+                _reveal(typeReady, [
                 if (_askType == 'poll') ...[
                   const SizedBox(height: 10),
                   Text(t('Options to vote on'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
@@ -1280,6 +1306,8 @@ class _AskFormState extends State<_AskForm> {
                       ),
                   ]),
                 ),
+                ]),
+                _reveal(restReady, [
                 const SizedBox(height: 10),
                 Wrap(spacing: 8, runSpacing: 8, children: [
                   for (final ph in _photos)
@@ -1398,12 +1426,14 @@ class _AskFormState extends State<_AskForm> {
                       ),
                   ]),
                 ),
+                ]),
               ]),
             ),
           ]),
         ),
         _aiCard(p) ?? const SizedBox.shrink(),
         // live preview: the deck of cards members swipe on Connect; tap one to edit that part
+        _reveal(restReady, [
         const SizedBox(height: 14),
         Column(
           key: _tk('ask-preview'),
@@ -1452,6 +1482,7 @@ class _AskFormState extends State<_AskForm> {
             ),
           ],
         ),
+        ]),
         if (_aiError != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_aiError!, style: TextStyle(fontSize: 12, color: p.danger))),
         if ((_aiUndo != null && !_aiBusy) || _undoTpl != null || (!empty && !_editing)) ...[
           const SizedBox(height: 12),
