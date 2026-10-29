@@ -376,6 +376,8 @@ class _AskFormState extends State<_AskForm> {
   // Ask AI
   bool _aiOn = false;
   bool _aiBusy = false;
+  // Publish was tapped with something missing: the bar names it in red
+  bool _attempted = false;
   int _aiSpin = 0; // spins the pill's star on each Ask AI
   String? _aiError;
   Map<String, String>? _aiDraft;
@@ -1529,13 +1531,26 @@ class _AskFormState extends State<_AskForm> {
             ),
             if (ready || title.trim().isNotEmpty || desc.trim().isNotEmpty) ...[
               const SizedBox(width: 8),
-              Text(t(ready ? strength : missing), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ready ? const Color(0xFF059669) : p.muted)),
+              Text(t(ready ? strength : missing), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ready ? const Color(0xFF059669) : (_attempted ? p.danger : p.muted))),
             ],
           ]),
           const SizedBox(height: 6),
           Row(children: [
             if (_aiOn) aiButton,
-            Expanded(child: GoldButton(label: t(_editing ? 'Save' : 'Publish'), wi: WI.askPlus, height: 44, loading: _busy, onPressed: ready ? _publish : null)),
+            Expanded(child: GoldButton(label: t(_editing ? 'Save' : 'Publish'), wi: WI.askPlus, height: 44, loading: _busy, onPressed: ready
+                    ? _publish
+                    : () {
+                        // not ready: say what is missing and go to it, instead of a button that does nothing
+                        setState(() => _attempted = true);
+                        toast(context, t(missing));
+                        if (!titleOk || titleBlank) {
+                          _titleFocus.requestFocus();
+                        } else if (!descOk || descBlank) {
+                          _descFocus.requestFocus();
+                        } else if (_category.isEmpty) {
+                          setState(() => _open = 'type');
+                        }
+                      })),
           ]),
         ]),
       ),
