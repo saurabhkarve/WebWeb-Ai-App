@@ -6,6 +6,7 @@ import '../auth_provider.dart';
 import '../card_events.dart';
 import '../card_colors.dart';
 import '../links.dart';
+import 'hashtag_text.dart';
 import '../i18n.dart';
 import '../icons.dart';
 import '../models.dart';
@@ -15,7 +16,7 @@ import 'area_map.dart' show AreaMap, askDeadline, askTimeLeft, showAreaViewer;
 import 'image_grid.dart' show openImageViewer;
 import 'poll_vote.dart';
 
-enum DeckKind { headline, poll, photos, morePhotos, details, budget, map, glance, act }
+enum DeckKind { headline, poll, photos, morePhotos, details, budget, link, map, glance, act }
 
 /// An ask as a short deck of cards you swipe (web ask-deck.tsx): the headline with its essentials, the photos, the
 /// details, a glance at budget, place and timing, and a last card that asks "Can you help?". One swipe moves one card.
@@ -66,6 +67,10 @@ class _AskDeckState extends State<AskDeck> {
     return c == null ? null : (lat: c[0], lng: c[1]);
   }
 
+  /// The cards' height follows the screen (about a third of it); the headline and the buttons follow the cards.
+  double get _deckH => (MediaQuery.sizeOf(context).height * .30).clamp(190.0, 300.0);
+  double get _scale => _deckH / 240;
+
   List<DeckKind> get _kinds {
     final post = _post;
     final left = askTimeLeft(post);
@@ -80,6 +85,8 @@ class _AskDeckState extends State<AskDeck> {
       ] else if (widget.preview) DeckKind.photos,
       if (widget.preview || (post.description ?? '').trim().isNotEmpty) DeckKind.details,
       if ((post.budget ?? '').isNotEmpty) DeckKind.budget,
+      // the preview of a link in the ask (picture, title, the site, a Visit button) is a card of its own
+      if (post.fact == null && firstLink([post.title, post.description]) != null) DeckKind.link,
       if (_mapPoint != null) DeckKind.map,
       if (widget.preview || (post.locationPref ?? '').isNotEmpty || left != null || post.radiusM != null) DeckKind.glance,
       DeckKind.act,
@@ -133,7 +140,7 @@ class _AskDeckState extends State<AskDeck> {
     final bleed = widget.preview ? 0.0 : _bleed;
     return Column(children: [
       SizedBox(
-        height: 236,
+        height: _deckH,
         child: LayoutBuilder(builder: (context, box) {
         final v = box.maxWidth + 2 * bleed;
         final f = (.88 * box.maxWidth + bleed) / v;
@@ -210,6 +217,7 @@ class _AskDeckState extends State<AskDeck> {
         final cat = askLabel(post);
         final sentence = askSentence(post);
         final thumbs = !widget.preview && post.images.isNotEmpty;
+        final visitHref = post.askType == 'visit' ? firstLink([post.title, post.description]) : null;
         // the photos sit at the card's top right: the first lines keep clear of them
         final thumbPad = thumbs ? post.images.length.clamp(1, 4) * 48.0 + 12 : 0.0;
         final card = Padding(
@@ -227,17 +235,17 @@ class _AskDeckState extends State<AskDeck> {
             Row(children: [
               Text(type.emoji, style: const TextStyle(fontSize: 16)),
               const SizedBox(width: 6),
-              Expanded(child: Padding(padding: EdgeInsets.only(right: thumbPad), child: Text(t(sentence.key, {...sentence.vars, if (sentence.vars['what'] != null) 'what': t(sentence.vars['what']!)}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .75))))),
+              Expanded(child: Padding(padding: EdgeInsets.only(right: thumbPad), child: Text(t(sentence.key, {...sentence.vars, if (sentence.vars['what'] != null) 'what': t(sentence.vars['what']!)}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .6))))),
             ]),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Expanded(
               child: Padding(
                 padding: EdgeInsets.only(right: thumbPad),
-                child: Text(
+                child: HashtagText(
                 (post.title ?? '').isEmpty ? t('Your title shows here') : post.title!,
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 20, height: 1.2, fontWeight: FontWeight.w800, color: (post.title ?? '').isEmpty ? p.muted : p.text),
+                style: TextStyle(fontSize: 26 * _scale, height: 1.15, letterSpacing: -.4, fontWeight: FontWeight.w800, color: (post.title ?? '').isEmpty ? p.muted : p.text),
                 ),
               ),
             ),
@@ -252,20 +260,24 @@ class _AskDeckState extends State<AskDeck> {
                   if (widget.reachLabel != null) _chip(p, WI.locate, widget.reachLabel!),
                 ]),
               ),
-              if (!widget.mine && !widget.preview) ...[
+              if (!widget.preview && (visitHref != null || !widget.mine)) ...[
                 const SizedBox(width: 8),
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () {
                     if (_log) CardEvents.log(context.read<AuthProvider>().api, post.id, 'cta', 0, _kinds.length);
-                    widget.onReply?.call();
+                    if (visitHref != null) {
+                      openExternal(context, visitHref);
+                    } else {
+                      widget.onReply?.call();
+                    }
                   },
                   child: Container(
-                    height: 32,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    height: (40 * _scale).clamp(34.0, 48.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(16)),
-                    child: Text(t('I can help'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kInk)),
+                    decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 2))]),
+                    child: Text(t(visitHref != null ? 'Visit website' : 'I can help'), style: TextStyle(fontSize: (14 * _scale).clamp(13.0, 16.0), fontWeight: FontWeight.w700, color: kInk)),
                   ),
                 ),
               ],
@@ -370,6 +382,8 @@ class _AskDeckState extends State<AskDeck> {
             if (left != null) Padding(padding: const EdgeInsets.only(top: 6), child: Row(children: [WIcon(WI.clock, size: 14, color: p.muted, still: true), const SizedBox(width: 4), Text(left, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted))])),
           ]),
         );
+      case DeckKind.link:
+        return LinkPreviewCard(firstLink([post.title, post.description])!, key: ValueKey('deck-${post.id}'), visit: true, margin: EdgeInsets.zero, flat: true);
       case DeckKind.map:
         final pt = _mapPoint!;
         final place = (post.locationPref ?? '').isEmpty ? t('Where') : t(post.locationPref!);

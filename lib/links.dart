@@ -66,7 +66,7 @@ String stripLinks(String text) {
 }
 
 /// What to draw of an ask's title or details: a Visit ask has its link taken out (see [stripLinks]).
-String askText(String? askType, String? text) => askType == 'visit' ? stripLinks(text ?? '') : (text ?? '');
+String askText(String? askType, String? text) => text ?? '';
 
 /// "skyq.tech" from https://www.skyq.tech/about
 String hostOf(String href) {
@@ -160,8 +160,11 @@ class LinkPreviewCard extends StatefulWidget {
 
   /// A Visit ask: only the domain is named (never the address) and a Visit button shows, even with no preview data.
   final bool visit;
+
+  /// Inside a card of the ask's deck: no border of its own, the picture takes the height left.
+  final bool flat;
   final EdgeInsets margin;
-  const LinkPreviewCard(this.href, {super.key, this.compact = false, this.visit = false, this.margin = const EdgeInsets.only(top: 8)});
+  const LinkPreviewCard(this.href, {super.key, this.compact = false, this.visit = false, this.flat = false, this.margin = const EdgeInsets.only(top: 8)});
   @override
   State<LinkPreviewCard> createState() => _LinkPreviewCardState();
 }
@@ -219,9 +222,9 @@ class _LinkPreviewCardState extends State<LinkPreviewCard> {
     return Padding(
       padding: widget.margin,
       child: Material(
-        color: pal.canvas,
+        color: widget.flat ? Colors.transparent : pal.canvas,
         clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: pal.border)),
+        shape: widget.flat ? const RoundedRectangleBorder() : RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: pal.border)),
         child: InkWell(
           onTap: () => openExternal(context, widget.href),
           child: c
@@ -231,10 +234,15 @@ class _LinkPreviewCardState extends State<LinkPreviewCard> {
                     Expanded(child: words),
                   ]),
                 )
-              : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  if (picture != null) AspectRatio(aspectRatio: 1.91, child: ColoredBox(color: pal.chip, child: picture)),
-                  words,
-                ]),
+              : widget.flat
+                  ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      Expanded(child: picture != null ? ColoredBox(color: pal.chip, child: picture) : const SizedBox.shrink()),
+                      words,
+                    ])
+                  : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      if (picture != null) AspectRatio(aspectRatio: 1.91, child: ColoredBox(color: pal.chip, child: picture)),
+                      words,
+                    ]),
         ),
       ),
     );

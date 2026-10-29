@@ -295,7 +295,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     // the first link in the text gets a preview card (not a fact's: its source shows under it; not inside a repost's quote)
     final link = post.fact != null || post.repostedByName != null ? null : firstLink([post.title, post.description]);
     final extra = <Widget>[
-      if (link != null) LinkPreviewCard(link, key: ValueKey(link), visit: post.askType == 'visit'),
+      if (link != null && !isAsk) LinkPreviewCard(link, key: ValueKey(link)),
       if (post.fact != null && post.fact!.sourceUrl.isNotEmpty)
         GestureDetector(
           behavior: HitTestBehavior.opaque,

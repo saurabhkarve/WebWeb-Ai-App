@@ -726,6 +726,7 @@ class _AskFormState extends State<_AskForm> {
       case DeckKind.headline:
         _titleFocus.requestFocus();
       case DeckKind.details:
+      case DeckKind.link:
         _descFocus.requestFocus();
       case DeckKind.photos:
       case DeckKind.morePhotos:

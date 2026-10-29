@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../icons.dart';
 import '../links.dart';
 import '../screens/find.dart';
 import '../screens/profile.dart';
@@ -84,7 +85,27 @@ class _HashtagTextState extends State<HashtagText> {
               _Kind.tag => _open(value),
             };
       _taps.add(tap);
-      spans.add(TextSpan(text: text.substring(start, end), style: switch (kind) { _Kind.url => web, _Kind.mention => person, _Kind.tag => link }, recognizer: tap));
+      if (kind == _Kind.url) {
+        // a link shows as its site with a link mark, never the long address
+        if (widget.selectable) {
+          spans.add(TextSpan(text: hostOf(value), style: web, recognizer: tap));
+        } else {
+          spans.add(WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: GestureDetector(
+              onTap: () => openExternal(context, value),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                WIcon(WI.link, size: 13, color: p.link, still: true),
+                const SizedBox(width: 3),
+                Text(hostOf(value), style: (widget.style ?? const TextStyle()).merge(web).copyWith(decoration: TextDecoration.underline)),
+              ]),
+            ),
+          ));
+        }
+      } else {
+        spans.add(TextSpan(text: text.substring(start, end), style: kind == _Kind.mention ? person : link, recognizer: tap));
+      }
       last = end;
     }
     if (last < text.length) spans.add(TextSpan(text: text.substring(last)));
