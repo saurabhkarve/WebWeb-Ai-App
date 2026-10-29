@@ -1317,7 +1317,7 @@ class _AskFormState extends State<_AskForm> {
                           textCapitalization: TextCapitalization.sentences,
                           onSubmitted: (_) => _descFocus.requestFocus(),
                           style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, height: 1.3),
-                          decoration: _bare(p, t('Title: e.g. Need 5 CNC operators in Turbhe')),
+                          decoration: _bare(p, t(_titleHints[_askType] ?? 'Title: e.g. Need 5 CNC operators in Turbhe')),
                         ),
                         MentionSuggest(controller: _title, focus: _titleFocus),
                         if (titleIdea != null)
@@ -1355,7 +1355,7 @@ class _AskFormState extends State<_AskForm> {
                           maxLength: 300,
                           textCapitalization: TextCapitalization.sentences,
                           style: const TextStyle(fontSize: 16, height: 1.4),
-                          decoration: _bare(p, t(_askType == 'visit' ? 'What they will find there, and your website link' : (tip?.$1 ?? 'Describe what you need: quantity, quality, area, timing'))),
+                          decoration: _bare(p, t(_askType == 'visit' ? 'What they will find there, and your website link' : (tip?.$1 ?? _descHints[_askType] ?? 'Describe what you need: quantity, quality, area, timing'))),
                         ),
                         // quick starts: tap to put the part on its own line and carry on writing
                         if (promptChips.isNotEmpty)
@@ -1868,6 +1868,29 @@ class _BudgetRangeState extends State<_BudgetRange> {
 }
 
 /// The parts worth saying in the details, by what the ask wants (English keys: translated where shown).
+/// The title's example, by what the ask wants (web TITLE_HINTS).
+const _titleHints = <String, String>{
+  'hire': 'Title: e.g. Need 5 CNC operators in Turbhe',
+  'quote': 'Title: e.g. Need packaging boxes, 500 pieces, in Vashi',
+  'offer': 'Title: e.g. Selling a used lathe machine, Rabale',
+  'advice': 'Title: e.g. Which GST scheme is best for a small shop?',
+  'poll': 'Title: e.g. Which day should the market stay closed?',
+  'recommend': 'Title: e.g. Who is a good electrician in Vashi?',
+  'visit': 'Title: e.g. Our new website is live: see our products',
+  'partner': 'Title: e.g. Looking for a partner to start a packaging unit',
+  'funding': 'Title: e.g. Need a ₹5 lakh working capital loan',
+  'other': 'Title: e.g. Need a stall for the Diwali mela',
+};
+
+/// The details' example when the type has no template of its own (web DESC_HINTS).
+const _descHints = <String, String>{
+  'advice': 'Tell us the situation, so the answers fit it.',
+  'poll': 'Say what you are deciding, and why it matters.',
+  'recommend': 'Say what you need done, and the area.',
+  'partner': 'Say the business, what each side brings, and the area.',
+  'funding': 'Say the amount, what it is for, and by when.',
+};
+
 const _askPrompts = <String, List<String>>{
   'hire': ['Role', 'Experience', 'Pay', 'Shift'],
   'quote': ['Quantity', 'Quality', 'Area', 'By when'],
