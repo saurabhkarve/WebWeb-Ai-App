@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-enum WI { calendar, home, refresh, check, lock, qr, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, consultant, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, link, logout, machinery, mentor, monitor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, views, website }
+enum WI { calendar, home, refresh, check, lock, qr, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, exchange, camera, cart, checkCircle, clip, clock, close, compliance, connect, consultant, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, link, logout, machinery, mentor, monitor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, views, website }
 
 /// SVG body per icon. {C} = colour, {SW/x} = stroke width divided by x (scaled groups).
 const Map<WI, (String, double?)> _body = {
@@ -37,6 +37,7 @@ const Map<WI, (String, double?)> _body = {
   WI.bookmark: (r'<path d="M7.2 3.8h9.6a1.4 1.4 0 0 1 1.4 1.4v14.6l-6.2-4.3-6.2 4.3V5.2a1.4 1.4 0 0 1 1.4-1.4z" />', null),
   WI.box: (r'<path d="M12 3.5l7.8 4.2v8.6L12 20.5l-7.8-4.2V7.7L12 3.5z" /> <path d="M4.5 7.9L12 12l7.5-4.1M12 12v8.3" />', null),
   WI.business: (r'<rect x="3.5" y="7.5" width="17" height="12" rx="2.5" /> <path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5" />', null),
+  WI.exchange: (r'<path d="M4 8h14" /> <path d="M14.5 4.5 18 8l-3.5 3.5" /> <path d="M20 16H6" /> <path d="M9.5 12.5 6 16l3.5 3.5" />', null),
   WI.buyer: (r'<circle cx="9.5" cy="8" r="3.2" /> <path d="M3.5 19.5c.5-3.2 2.7-5 6-5 1.2 0 2.2.2 3.1.7" /> <path d="M14.5 15.5h4.2l2 2-3 3-3.2-3.2v-1.8z" />', null),
   WI.camera: (r'<path d="M4.5 8h2.6l1.2-2h7.4l1.2 2h2.6a1.2 1.2 0 0 1 1.2 1.2v8.6a1.2 1.2 0 0 1-1.2 1.2H4.5a1.2 1.2 0 0 1-1.2-1.2V9.2A1.2 1.2 0 0 1 4.5 8z" /> <circle cx="12" cy="13.2" r="3.1" />', null),
   WI.cart: (r'<path d="M3 4.5h2.3l1.7 9.2a1.6 1.6 0 0 0 1.6 1.3h8a1.6 1.6 0 0 0 1.6-1.2l1.3-5.8H6.1" /> <circle cx="9.5" cy="19" r="1.3" /> <circle cx="16.5" cy="19" r="1.3" />', null),
@@ -227,6 +228,7 @@ WI categoryIcon(String? category) => switch (category) {
       'job' => WI.job,
       'supplier' => WI.supplier,
       'quote' => WI.cart,
+      'offer' => WI.exchange,
       'buyer' => WI.buyer,
       'logistics' => WI.truck,
       'funding' => WI.funding,
