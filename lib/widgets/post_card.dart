@@ -385,7 +385,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 GestureDetector(
                   onTap: _openAuthor,
-                  child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: framed ? 32 : 40, ring: post.authorHasUpdate, type: post.authorType, uid: post.authorUid, badge: framed ? 14 : 15),
+                  child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: framed ? 28 : 32, ring: post.authorHasUpdate, type: post.authorType, uid: post.authorUid, badge: framed ? 12 : 13),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -394,11 +394,11 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                     behavior: HitTestBehavior.opaque,
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(children: [
-                        Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25))),
+                        Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, height: 1.2))),
                         if (post.authorVerification > 0 || post.authorPremium || post.authorPlan != null) ...[const SizedBox(width: 6), VerifiedBadge(level: post.authorVerification, premium: post.authorPremium, plan: post.authorPlan)],
                       ]),
                       Text('${isBusiness ? post.authorName : post.authorCompany} · ${timeAgo(post.createdAt)}${post.editedAt != null ? ' · ${editedLabel(post.editedAt!)}' : ''}',
-                          maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted, height: 1.3)),
+                          maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: p.muted, height: 1.2)),
                     ]),
                   ),
                 ),
@@ -483,9 +483,9 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         GestureDetector(
           onTap: _openAuthor,
-          child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: small ? 36 : 44, ring: post.authorHasUpdate, type: post.authorType, uid: post.authorUid, badge: small ? 15 : 18),
+          child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: small ? 30 : 36, ring: post.authorHasUpdate, type: post.authorType, uid: post.authorUid, badge: small ? 13 : 15),
         ),
-        SizedBox(width: small ? 10 : 12),
+        SizedBox(width: small ? 8 : 10),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -495,15 +495,15 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                   behavior: HitTestBehavior.opaque,
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
-                      Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25))),
+                      Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, height: 1.2))),
                       if (post.authorVerification > 0 || post.authorPremium || post.authorPlan != null) ...[const SizedBox(width: 6), VerifiedBadge(level: post.authorVerification, premium: post.authorPremium, plan: post.authorPlan)],
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text('${timeAgo(post.createdAt)}${post.editedAt != null ? ' · ${editedLabel(post.editedAt!)}' : ''}',
-                            maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: p.muted)),
                       ),
                     ]),
-                    Text(isBusiness ? post.authorName : post.authorCompany, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted, height: 1.3)),
+                    Text(isBusiness ? post.authorName : post.authorCompany, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: p.muted, height: 1.2)),
                   ]),
                 ),
               ),
