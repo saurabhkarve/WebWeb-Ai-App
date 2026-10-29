@@ -1084,7 +1084,7 @@ class LatestReplies extends StatelessWidget {
     // plus its 10 gap), and Show all n last, as on the web
     final any = replies.isNotEmpty || referrers.isNotEmpty;
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.only(top: 6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(padding: const EdgeInsets.only(left: 20), child: Row(children: [
           WIcon(WI.talk, size: 16, color: kGold.withValues(alpha: .8)),
