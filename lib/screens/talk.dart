@@ -370,20 +370,20 @@ class _TalkScreenState extends State<TalkScreen> {
           const SizedBox(height: 12),
           if (_tab == 'calls') ...[
             if (_calls.isEmpty) const _Empty(WI.phone, 'No calls yet', 'Open a chat and tap the call or video icon.'),
-            for (final c in _calls) ...[_callTile(c, p), const SizedBox(height: 4)],
+            for (final c in _calls) ...[_callTile(c, p)],
           ] else if (all == null)
             const Padding(padding: EdgeInsets.symmetric(vertical: 48), child: Center(child: LogoLoader()))
           else ...[
             if (chats.isEmpty && _tab == 'chats' && q.isEmpty && morePeople.isEmpty) const _Empty(WI.talk, 'No messages yet', 'Open a public page or a post and tap Message.'),
             if (chats.isEmpty && (_tab == 'unread' || q.isNotEmpty) && (_tab == 'unread' || morePeople.isEmpty))
               _Empty(WI.search, _tab == 'unread' && q.isEmpty ? "You're all caught up" : 'No matches', _tab == 'unread' && q.isEmpty ? 'No unread conversations.' : 'Try a different name or word.'),
-            for (final c in chats) ...[_chatTile(c, p), const SizedBox(height: 4)],
+            for (final c in chats) ...[_chatTile(c, p)],
             if (_tab == 'chats' && morePeople.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.only(top: 16, bottom: 6),
                 child: Text(t(q.isEmpty ? 'Start a new chat' : 'People'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.muted)),
               ),
-              for (final u in morePeople) ...[_personTile(u, p), const SizedBox(height: 4)],
+              for (final u in morePeople) ...[_personTile(u, p)],
             ],
           ],
         ],
@@ -391,16 +391,16 @@ class _TalkScreenState extends State<TalkScreen> {
     );
   }
 
+  /// A flat row: no card behind it, a hairline under it; an unread one has a soft gold wash.
   Widget _row(Pal p, {required Widget avatar, required Widget top, required Widget bottom, bool highlight = false, VoidCallback? onTap, VoidCallback? onLongPress, Widget? trailing}) {
     return Material(
-      color: highlight ? kGold.withValues(alpha: .1) : p.chip.withValues(alpha: .4),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: highlight ? kGold.withValues(alpha: .6) : Colors.transparent)),
-      clipBehavior: Clip.antiAlias,
+      color: highlight ? kGold.withValues(alpha: .08) : Colors.transparent,
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
           child: Row(children: [
             avatar,
             const SizedBox(width: 12),
@@ -448,7 +448,7 @@ class _TalkScreenState extends State<TalkScreen> {
         background: Container(
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: 20),
-          decoration: BoxDecoration(color: p.danger, borderRadius: BorderRadius.circular(8)),
+          decoration: BoxDecoration(color: p.danger),
           child: const WIcon(WI.trash, color: Colors.white),
         ),
         child: _row(
