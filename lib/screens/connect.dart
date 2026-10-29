@@ -17,6 +17,7 @@ import '../widgets/invite_card.dart';
 import '../widgets/catalog_strip.dart';
 import '../widgets/house_card.dart';
 import '../widgets/post_card.dart';
+import '../widgets/sponsored_card.dart';
 import '../widgets/story_viewer.dart';
 import '../widgets/tour.dart';
 import 'edit_profile.dart';
@@ -47,6 +48,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
   final Set<String> _gone = {};
   /// WEBWEB Facts posts: one after every 10th ask
   List<Post> _facts = [];
+  List<FeedAd> _ads = [];
   List<Post> _fresh = [];
   String? _error;
   bool _hasMore = true;
@@ -93,7 +95,15 @@ class _ConnectScreenState extends State<ConnectScreen> {
     if (_scroll.hasClients) _scroll.animateTo(0, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
   }
 
+  Future<void> _loadAds() async {
+    try {
+      final r = await _api.get('/feed/ads') as List;
+      if (mounted) setState(() => _ads = r.map((e) => FeedAd.fromJson(e as Map)).toList());
+    } catch (_) {}
+  }
+
   Future<void> _load() async {
+    unawaited(_loadAds());
     try {
       final raw = (await _api.get('/posts', {'matched': 1, 'limit': _page}) as List).map((e) => Post.fromJson(e as Map)).toList();
       _blocked = await loadBlocked(_api);
@@ -225,6 +235,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
           if (((i + 1) % 3 == 0 ? (i + 1) ~/ 3 - 1 : (posts.length < 3 && i == posts.length - 1 ? 0 : -1)) case final slot when slot >= 0 && slot < blocks.length) _block(blocks[slot]),
           // a short feed: WEBWEB cards that got no slot go after the last ask, up to 3 cards in all
           if (i == posts.length - 1) ...blocks.skip(slotCount).whereType<HouseCard>().take((3 - houseShown).clamp(0, 3)).map(_block),
+          // a paid ad after every 7th ask (none are served yet, so none show)
+          if ((i + 1) % 7 == 0 && (i + 1) ~/ 7 - 1 < _ads.length) SponsoredCard(key: ValueKey('ad-${_ads[(i + 1) ~/ 7 - 1].id}'), ad: _ads[(i + 1) ~/ 7 - 1]),
           // invite people you know, after the 15th ask
           if (i == 14) const InviteCard(),
           // a fact after ask 10, 20, 30 ... (a short feed of 4+ asks gets one at its end)

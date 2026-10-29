@@ -13,6 +13,7 @@ import '../config.dart';
 import '../i18n.dart';
 import '../models.dart';
 import '../safety.dart';
+import '../places.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/post_card.dart';
@@ -29,7 +30,7 @@ import '../widgets/picture_picker.dart';
 import '../widgets/resume.dart';
 import '../widgets/upi.dart';
 import '../widgets/p1.dart' show OfferChips;
-import '../widgets/area_map.dart' show AreaMap;
+import '../widgets/area_map.dart' show AreaMap, showAreaViewer;
 
 /// One profile for everyone (web profile-view.tsx): your own page ([handle] == null) and any member's.
 /// Cover band with the back arrow, picture, one quiet stats line, name, tags, then the actions and
@@ -485,7 +486,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           tag(text: '🤝 ${u.location.isNotEmpty && u.location != 'Other' ? t('Helped {n} businesses in {area}', {'n': u.statHelped!, 'area': u.location}) : t('Helped {n} businesses', {'n': u.statHelped!})}'),
         if ((u.statReplyMins ?? 0) > 0) tag(text: '⚡ ${t('Usually replies in {t}', {'t': _replyTime(u.statReplyMins!)})}'),
         if (u.statReplyRate != null) tag(text: '✓ ${t('Answers {n}% of asks that fit', {'n': u.statReplyRate!})}'),
-        if (u.location.isNotEmpty) tag(icon: WI.pin, text: u.location == 'Other' ? t('Other') : u.location),
+        // the place opens on a map you can look around (view only), when it has a point
+        if (u.location.isNotEmpty)
+          Builder(builder: (ctx) {
+            final pl = u.location == 'Other' ? null : findPlace(u.location);
+            return tag(
+              icon: WI.pin,
+              text: u.location == 'Other' ? t('Other') : u.location,
+              onTap: pl?.lat == null || pl?.lng == null ? null : () => showAreaViewer(ctx, lat: pl!.lat!, lng: pl.lng!, radiusM: 0, label: u.location),
+            );
+          }),
         if (u.category.isNotEmpty) tag(text: t(labelOf(kProfileCategories, u.category))),
         // a GSTIN is public record: tap to check it on the GST portal
         if ((gst ?? '').isNotEmpty)

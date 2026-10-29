@@ -387,8 +387,9 @@ class _AreaViewerState extends State<_AreaViewer> {
     _mx = c.$1;
     _my = c.$2;
     final cosLat = math.cos(widget.lat * math.pi / 180);
+    // a place with no reach (a profile's city): a street-level view with no circle
     final want = widget.radiusM / (300 * .45);
-    _zf = (math.log(156543.03 * cosLat / want) / math.ln2).floor().clamp(3, 17).toDouble();
+    _zf = widget.radiusM <= 0 ? 13 : (math.log(156543.03 * cosLat / want) / math.ln2).floor().clamp(3, 17).toDouble();
   }
 
   void _zoom(double d) => setState(() => _zf = (_zf + d).clamp(3, 18));
