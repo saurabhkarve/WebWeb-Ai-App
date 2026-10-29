@@ -24,6 +24,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'post_card.dart';
 import 'reaction_picker.dart';
+import 'swipe_deck.dart';
 
 /// A WEBWEB house card between asks on Connect (web house-card.tsx, API feed-cards.ts). Always from a house account
 /// with the WEBWEB badge (and AI when the model wrote it), never dressed as an ask; each one has something to do in it:
@@ -245,7 +246,7 @@ class _HouseCardViewState extends State<HouseCardView> {
         const SizedBox(height: 12),
         // the posts that read come as a swipeable deck of small cards, as an ask does; the others are one tinted card
         // (a row of items needs none: its item cards are the cards)
-        if (_deckTypes.contains(card.type)) _HouseDeck(card, (c) => setState(() => card = c), _tap) else if (card.type == 'items') _body() else Builder(builder: (_) {
+        if (_readTypes.contains(card.type)) _HouseDeck(card, (c) => setState(() => card = c), _tap) else if (_deckTypes.contains(card.type)) _PersonalDeck(card, (c) => setState(() => card = c), _tap) else if (card.type == 'items') _body() else Builder(builder: (_) {
           final tint = kCardColors[_tone[card.account.handle] ?? 'gold']!;
           return Container(
             padding: const EdgeInsets.all(16),
@@ -1423,7 +1424,8 @@ class _CardActionsState extends State<_CardActions> {
 
 // ---------- the deck: news, tips, tenders, schemes, events and jobs as swipeable cards ----------
 
-const _deckTypes = {'news', 'tip', 'tender', 'scheme', 'event', 'job'};
+const _readTypes = {'news', 'tip', 'tender', 'scheme', 'event', 'job'};
+const _deckTypes = {..._readTypes, 'missed_leads', 'improve_ask', 'pulse', 'buy_select', 'profile', 'spotlight', 'ask_ai', 'quiz', 'poll'};
 const _kindEmoji = {'news': '📰', 'tip': '💡', 'tender': '📄', 'scheme': '🏛️', 'event': '📅', 'job': '👷'};
 
 /// the first words of a text, ended at a word
@@ -1445,16 +1447,15 @@ class _HouseDeck extends StatefulWidget {
 }
 
 class _HouseDeckState extends State<_HouseDeck> {
-  final _page = PageController(viewportFraction: .9);
-  int _i = 0;
+  final _ctl = DeckController();
 
   @override
   void dispose() {
-    _page.dispose();
+    _ctl.dispose();
     super.dispose();
   }
 
-  void _go(int i) => _page.animateToPage(i, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+  void _go(int i) => _ctl.go(i);
 
   @override
   Widget build(BuildContext context) {
@@ -1463,7 +1464,7 @@ class _HouseDeckState extends State<_HouseDeck> {
     final tap = widget.tap;
     final d = card.data;
     final tint = kCardColors[_tone[card.account.handle] ?? 'gold']!;
-    final deckH = (MediaQuery.sizeOf(context).height * .34).clamp(272.0, 340.0);
+    final deckH = deckHeight(context);
     final emoji = _kindEmoji[card.type] ?? '✨';
     final kind = t(_sub[card.type] ?? 'For you');
     final left = _daysLeft(d['deadline'] as String?);
@@ -1631,51 +1632,488 @@ class _HouseDeckState extends State<_HouseDeck> {
       ]),
     ];
 
-    final n = cards.length;
-    final start = (_i - 2).clamp(0, (n - 5).clamp(0, n));
-    return Column(children: [
-      Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Row(children: [
-          Expanded(child: Text('$emoji ${kind.toUpperCase()}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link))),
-          if (n > 1)
-            for (var k = start; k < n && k < start + 5; k++)
-              GestureDetector(
-                onTap: () => _go(k),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 2),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: ((k == start && start > 0) || (k == start + 4 && start + 4 < n - 1)) ? 4 : 6,
-                    height: ((k == start && start > 0) || (k == start + 4 && start + 4 < n - 1)) ? 4 : 6,
-                    decoration: BoxDecoration(color: k == _i ? p.text : p.text.withValues(alpha: .25), shape: BoxShape.circle),
-                  ),
-                ),
-              ),
-        ]),
-      ),
-      SizedBox(
-        height: deckH,
-        child: PageView.builder(
-          controller: _page,
-          padEnds: false,
-          itemCount: n,
-          onPageChanged: (i) => setState(() => _i = i),
-          itemBuilder: (_, i) => Padding(
-            padding: const EdgeInsets.only(right: 10),
+    return SwipeDeck(cards: cards, tint: tint, label: '$emoji $kind', controller: _ctl);
+  }
+}
+
+// ---------- the personal cards as decks: leads, your ask, demand, a question, your page, a member, ask AI, quiz, poll ----------
+
+class _PersonalDeck extends StatefulWidget {
+  final HouseCard card;
+  final ValueChanged<HouseCard> set;
+  final VoidCallback tap;
+  const _PersonalDeck(this.card, this.set, this.tap);
+  @override
+  State<_PersonalDeck> createState() => _PersonalDeckState();
+}
+
+class _PersonalDeckState extends State<_PersonalDeck> {
+  final _ctl = DeckController();
+  final _text = TextEditingController();
+  final _picked = <String>[];
+  bool _busy = false;
+  List<SourcingItem>? _items;
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    _text.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveBuy() async {
+    setState(() => _busy = true);
+    widget.tap();
+    try {
+      final d = await context.read<AuthProvider>().api.post('/feed/cards/buy', {'items': _picked}) as Map;
+      if (!mounted) return;
+      setState(() => _items = [for (final i in (d['items'] as List? ?? const [])) SourcingItem.fromJson(i as Map)]);
+      Future.delayed(const Duration(milliseconds: 60), () => _ctl.go(2));
+    } catch (_) {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _sendAsk() async {
+    final text = _text.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _busy = true);
+    widget.tap();
+    final api = context.read<AuthProvider>().api;
+    final a = widget.card.account;
+    try {
+      final chatId = (await api.post('/chats', {'userId': a.uid}) as Map)['id'] as String;
+      await api.post('/chats/$chatId/messages', {'text': text});
+      _text.clear();
+      if (mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: chatId, peer: Peer(uid: a.uid, name: a.name, handle: a.handle))));
+    } catch (_) {
+      if (mounted) toast(context, t('Could not open the chat'), error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _pick(int i) async {
+    setState(() => _busy = true);
+    widget.tap();
+    try {
+      widget.set(await _answer(context.read<AuthProvider>().api, widget.card.key, {'option': i}));
+    } catch (_) {
+      if (mounted) toast(context, t('Something went wrong. Please try again.'), error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final card = widget.card;
+    final tap = widget.tap;
+    final d = card.data;
+    final tint = kCardColors[_tone[card.account.handle] ?? 'gold']!;
+    final deckH = deckHeight(context);
+    final label = TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .6));
+    Widget head(String text) => Text(text, maxLines: 4, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: deckH * .095, fontWeight: FontWeight.w800, height: 1.15, letterSpacing: -.3));
+    Widget big(String text, {int lines = 4}) => Text(text, maxLines: lines, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: deckH * .08, fontWeight: FontWeight.w700, height: 1.3));
+    Widget col(List<Widget> kids) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: kids);
+    Widget next(String text) => _Btn('${t(text)} →', soft: true, onTap: () => _ctl.go(1));
+    final cards = <Widget>[];
+    var emoji = '✨';
+
+    switch (card.type) {
+      case 'missed_leads':
+        emoji = '🔥';
+        final leads = [for (final l in (d['leads'] as List? ?? const []).take(3)) l as Map];
+        final n = (d['total'] as num?)?.toInt() ?? leads.length;
+        cards.add(col([
+          head('🔥 ${t(n == 1 ? '1 lead near you has no replies yet' : '{n} leads near you have no replies yet', {'n': n})}'),
+          const SizedBox(height: 8),
+          Text(t('Be the first: the first few replies get the most attention.'), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted)),
+          const Spacer(),
+          Row(children: [
+            _Btn(t('See all leads'), expand: true, onTap: () {
+              tap();
+              _push(context, const LeadsScreen());
+            }),
+            if (leads.isNotEmpty) ...[const SizedBox(width: 8), Flexible(child: next('Reply'))],
+          ]),
+        ]));
+        for (final l in leads) {
+          cards.add(col([
+            Text('${kCategoryEmoji[l['category']] ?? '✨'} ${t(kCategoryShort[l['category']] ?? 'Ask')}', style: label),
+            const SizedBox(height: 8),
+            big('${l['title'] ?? ''}', lines: 3),
+            if ([l['location'], l['budget']].any((x) => (x ?? '').toString().isNotEmpty))
+              Padding(padding: const EdgeInsets.only(top: 6), child: Text([l['location'], l['budget']].where((x) => (x ?? '').toString().isNotEmpty).join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted))),
+            const Spacer(),
+            _Btn(t('Reply'), onTap: () {
+              tap();
+              _push(context, PostDetailScreen(postId: '${l['id']}', openReply: true));
+            }),
+          ]));
+        }
+        cards.add(col([
+          Text(t('What next'), style: label),
+          const SizedBox(height: 12),
+          _Btn(t('See all leads'), onTap: () {
+            tap();
+            _push(context, const LeadsScreen());
+          }),
+          const SizedBox(height: 8),
+          _Btn(t('Alerts'), soft: true, onTap: () {
+            tap();
+            showAlertSheet(context);
+          }),
+        ]));
+      case 'improve_ask':
+        emoji = '⏳';
+        final post = (d['post'] as Map?) ?? const {};
+        final id = '${post['id']}';
+        final hint = '${d['hint']}';
+        void open() {
+          tap();
+          _push(context, PostDetailScreen(postId: id));
+        }
+
+        cards.add(col([
+          head('⏳ ${t('Your ask has no replies yet')}'),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: open,
             child: Container(
-              padding: const EdgeInsets.all(16),
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [tint.withValues(alpha: .28), tint.withValues(alpha: 0)], stops: const [0, .8]),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: tint.withValues(alpha: .4)),
-              ),
-              child: cards[i],
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              decoration: BoxDecoration(color: p.card.withValues(alpha: .6), borderRadius: BorderRadius.circular(12), border: const Border(left: BorderSide(color: kGold, width: 4))),
+              child: Text('${post['title'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
             ),
           ),
-        ),
-      ),
-    ]);
+          const Spacer(),
+          Row(children: [Flexible(child: next('What can help')), const SizedBox(width: 8), _Btn(t('Open'), soft: true, onTap: open)]),
+        ]));
+        cards.add(col([
+          Text('💡 ${t('A tip')}', style: label),
+          const SizedBox(height: 8),
+          big(t(hint == 'budget' ? 'Asks with a budget get about twice the replies. Add one?' : hint == 'photo' ? 'A photo shows what you need at a glance. Add one?' : 'Share it in your WhatsApp groups: people there can reply here.')),
+          const Spacer(),
+          hint == 'share'
+              ? _Btn(t('Share on WhatsApp'), onTap: () {
+                  tap();
+                  _launch(_wa('${post['title'] ?? ''}', 'https://webweb.ai/post/$id'));
+                })
+              : _Btn(t(hint == 'budget' ? 'Add a budget' : 'Add a photo'), onTap: open),
+        ]));
+      case 'pulse':
+        emoji = '📊';
+        final rows = [for (final r in (d['rows'] as List? ?? const [])) r as Map];
+        final max = rows.fold<num>(1, (m, r) => (r['n'] as num? ?? 0) > m ? r['n'] as num : m);
+        final place = '${d['place'] ?? ''}';
+        const green = Color(0xFF059669);
+        cards.add(col([
+          head('📊 ${t('What {place} is asking for this week', {'place': place})}'),
+          const SizedBox(height: 8),
+          Text(t('{n} asks this week. Tap one to see them.', {'n': d['total'] ?? 0}), style: TextStyle(fontSize: 14, color: p.muted)),
+          const Spacer(),
+          if (rows.isNotEmpty) next('See the list'),
+        ]));
+        for (var i = 0; i < rows.length; i += 3) {
+          cards.add(Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            for (final r in rows.skip(i).take(3))
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  tap();
+                  _push(context, FindScreen(standalone: true, initialScope: 'asks', initialLocation: place, initialQuery: t(kCategoryShort[r['category']] ?? 'Other')));
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Column(children: [
+                    Row(children: [
+                      SizedBox(width: 24, child: Text(kCategoryEmoji[r['category']] ?? '✨', textAlign: TextAlign.center)),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(t(kCategoryShort[r['category']] ?? 'Other'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+                      Text('${r['n']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                      if (r['change'] != null) ...[
+                        const SizedBox(width: 6),
+                        Text((r['change'] as num) >= 0 ? '▲${r['change']}%' : '▼${(r['change'] as num).abs()}%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: (r['change'] as num) >= 0 ? green : p.muted)),
+                      ],
+                    ]),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 32, top: 4),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: Container(
+                          height: 8,
+                          color: p.card.withValues(alpha: .7),
+                          alignment: Alignment.centerLeft,
+                          child: FractionallySizedBox(widthFactor: ((r['n'] as num? ?? 0) / max).clamp(0, 1).toDouble(), child: Container(decoration: const BoxDecoration(gradient: kGoldGradient))),
+                        ),
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
+          ]));
+        }
+        cards.add(col([
+          Text('💡 ${t('What next')}', style: label),
+          const SizedBox(height: 8),
+          Text(t('Do any of these? Add them to your services and the asks come to you.'), maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, height: 1.3)),
+          const Spacer(),
+          _Btn(t('Add to my services'), onTap: () async {
+            tap();
+            final auth = context.read<AuthProvider>();
+            if (auth.profile == null) return;
+            if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: auth.profile!))) == true) auth.loadProfile();
+          }),
+        ]));
+      case 'buy_select':
+        emoji = '🛒';
+        final options = [for (final o in (d['options'] as List? ?? const [])) o as Map];
+        cards.add(col([
+          head('🛒 ${t('Which of these do you buy for your business?')}'),
+          const SizedBox(height: 8),
+          Text(t("Pick all that apply. We'll show you items from businesses near you."), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted)),
+          const Spacer(),
+          _Btn('${t('Pick all that apply')} →', onTap: () => _ctl.go(1)),
+        ]));
+        cards.add(col([
+          Expanded(
+            child: SingleChildScrollView(
+              child: Wrap(spacing: 6, runSpacing: 6, children: [
+                for (final o in options)
+                  GestureDetector(
+                    onTap: () => setState(() => _picked.contains(o['key']) ? _picked.remove(o['key']) : _picked.add('${o['key']}')),
+                    child: Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: _picked.contains(o['key']) ? kGold.withValues(alpha: .25) : p.card.withValues(alpha: .6),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: _picked.contains(o['key']) ? kGold : p.border),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        if (_picked.contains(o['key'])) ...[WIcon(WI.tick, size: 16, color: p.text), const SizedBox(width: 6)],
+                        Text(t('${o['label']}'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      ]),
+                    ),
+                  ),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _Btn(_busy ? '…' : t(_picked.isNotEmpty ? 'Show me suppliers ({n})' : 'Pick at least one', {'n': _picked.length}), onTap: _picked.isEmpty || _busy ? null : _saveBuy),
+        ]));
+        final items = _items;
+        if (items != null) {
+          cards.add(col([
+            Text('🙌 ${t("Thanks! Here's who sells them near you")}', style: label),
+            Expanded(child: SingleChildScrollView(child: items.isNotEmpty ? _ItemRow(items, tap) : _hint(context, t("No one near you lists these yet. We'll show them here as they join.")))),
+          ]));
+        }
+      case 'profile':
+        emoji = '🚀';
+        final pct = (d['percent'] as num?)?.toInt() ?? 0;
+        final item = t('${d['label'] ?? ''}');
+        cards.add(Row(children: [
+          SizedBox(
+            width: 80,
+            height: 80,
+            child: Stack(alignment: Alignment.center, children: [
+              SizedBox(width: 68, height: 68, child: CircularProgressIndicator(value: pct / 100, strokeWidth: 7, backgroundColor: p.card.withValues(alpha: .7), color: const Color(0xFFE0A800), strokeCap: StrokeCap.round)),
+              Text('$pct%', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+            ]),
+          ),
+          const SizedBox(width: 16),
+          Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('🚀 ${t('Your page is {n}% done', {'n': pct})}', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, height: 1.25)),
+            const SizedBox(height: 10),
+            next("What's next"),
+          ])),
+        ]));
+        cards.add(col([
+          Text(t('What next'), style: label),
+          const SizedBox(height: 8),
+          Text(t('Next: {item}. Complete pages get more replies and leads.', {'item': item}), maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, height: 1.3)),
+          const Spacer(),
+          _Btn(t('Add {item}', {'item': item.toLowerCase()}), onTap: () async {
+            tap();
+            final auth = context.read<AuthProvider>();
+            if (auth.profile == null) return;
+            if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: auth.profile!))) == true) auth.loadProfile();
+          }),
+        ]));
+      case 'spotlight':
+        emoji = '🏆';
+        final u = (d['user'] as Map?) ?? const {};
+        final peer = Peer.fromJson(u);
+        final won = (d['won'] as num?)?.toInt() ?? 0;
+        final replies = (d['replies'] as num?)?.toInt() ?? 0;
+        final rose = p.dark ? const Color(0xFFFDA4AF) : const Color(0xFFBE123C);
+        final bio = (u['bio'] ?? '').toString();
+        cards.add(col([
+          Row(children: [
+            Avatar(name: peer.shownName, photoUrl: peer.photoUrl, size: 56, type: peer.userType, uid: peer.uid),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Flexible(child: Text(peer.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
+                  const SizedBox(width: 4),
+                  VerifiedBadge(level: (u['verification'] as num?)?.toInt() ?? 1, size: 15),
+                ]),
+                Text([u['category'], u['location']].where((x) => (x ?? '').toString().isNotEmpty).join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+              ]),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          Text(
+            d['reason'] == 'won' ? '🏆 ${t(won == 1 ? 'Won 1 job this week' : 'Won {n} jobs this week', {'n': won})}' : '⚡ ${t('Replied to {n} asks this week', {'n': replies})}',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: rose, height: 1.25),
+          ),
+          const Spacer(),
+          Row(children: [
+            _Btn(t('View profile'), expand: true, onTap: () {
+              tap();
+              _push(context, ProfileScreen(handle: peer.handle));
+            }),
+            if (bio.isNotEmpty) ...[const SizedBox(width: 8), Flexible(child: next('About'))],
+          ]),
+        ]));
+        if (bio.isNotEmpty) {
+          cards.add(col([
+            Text(t('About'), style: label),
+            const SizedBox(height: 8),
+            Text(bio, maxLines: 5, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, height: 1.4)),
+            const Spacer(),
+            _Btn(t('Say hello'), soft: true, onTap: () {
+              tap();
+              openChat(context, peer);
+            }),
+          ]));
+        }
+      case 'ask_ai':
+        emoji = '💬';
+        cards.add(col([
+          head('💬 ${t('What do you need today?')}'),
+          const SizedBox(height: 8),
+          Text(t("Tell me in your own words, in any language. I'll find who fits and post an ask for you if you like."), maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted)),
+          const Spacer(),
+          _Btn('${t('Ask')} →', onTap: () => _ctl.go(1)),
+        ]));
+        cards.add(col([
+          Row(children: [
+            Expanded(
+              child: TextField(
+                controller: _text,
+                maxLength: 300,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _sendAsk(),
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  counterText: '',
+                  hintText: t('e.g. 2 welders for a week in Turbhe'),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: p.border)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: p.border)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kGold)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            _Btn(_busy ? '…' : t('Ask'), onTap: _busy || _text.text.trim().isEmpty ? null : _sendAsk),
+          ]),
+          const SizedBox(height: 10),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Wrap(spacing: 6, runSpacing: 6, children: [
+                for (final i in _askIdeas)
+                  GestureDetector(
+                    onTap: () => setState(() => _text.text = t(i)),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(color: p.card.withValues(alpha: .6), borderRadius: BorderRadius.circular(20), border: Border.all(color: p.border)),
+                      child: Text(t(i), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+              ]),
+            ),
+          ),
+        ]));
+      default:
+        // quiz and poll: the question, then the options, then how it went
+        final quiz = card.type == 'quiz';
+        emoji = quiz ? '🧠' : '🗳️';
+        final options = [for (final o in (d['options'] as List? ?? const [])) '$o'];
+        final mine = (card.mine?['option'] as num?)?.toInt();
+        final answered = mine != null;
+        final counts = [for (final c in (card.results?['counts'] as List? ?? const [])) (c as num).toInt()];
+        final n = (card.results?['n'] as num?)?.toInt() ?? 0;
+        final right = (d['answer'] as num?)?.toInt();
+        const green = Color(0xFF059669);
+        const red = Color(0xFFEF4444);
+        final correctPct = quiz && n > 0 && right != null && right < counts.length ? (counts[right] / n * 100).round() : null;
+        cards.add(col([
+          head('$emoji ${card.title ?? ''}'),
+          if ((card.body ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(card.body!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted))),
+          const Spacer(),
+          _Btn('${t(answered ? 'See how others did' : quiz ? 'Choose one answer' : 'Choose one option')} →', onTap: () => _ctl.go(1)),
+        ]));
+        cards.add(col([
+          Expanded(
+            child: ListView(padding: EdgeInsets.zero, children: [
+              for (var i = 0; i < options.length; i++)
+                Builder(builder: (_) {
+                  final pct = n > 0 && i < counts.length ? (counts[i] / n * 100).round() : 0;
+                  final isRight = quiz && answered && i == right;
+                  final wrongPick = quiz && answered && i == mine && i != right;
+                  final edge = isRight ? green : (wrongPick ? red : (!quiz && answered && i == mine ? kGold : p.border));
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: GestureDetector(
+                      onTap: answered || _busy ? null : () => _pick(i),
+                      child: Container(
+                        height: 40,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(color: p.card.withValues(alpha: .6), borderRadius: BorderRadius.circular(12), border: Border.all(color: edge)),
+                        child: Stack(children: [
+                          if (answered) FractionallySizedBox(widthFactor: pct / 100, child: Container(color: isRight ? green.withValues(alpha: .2) : (wrongPick ? red.withValues(alpha: .15) : kGold.withValues(alpha: .25)))),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Row(children: [
+                              OptionMark(!answered ? OptionState.open : wrongPick ? OptionState.wrong : isRight ? OptionState.right : i == mine ? OptionState.mine : OptionState.other),
+                              const SizedBox(width: 10),
+                              Expanded(child: Text(options[i], maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: i == mine ? FontWeight.w800 : FontWeight.w600))),
+                              if (answered) Text('$pct%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                            ]),
+                          ),
+                        ]),
+                      ),
+                    ),
+                  );
+                }),
+            ]),
+          ),
+          Text(
+            answered ? (correctPct != null ? t('{n} answered · {p}% got it right', {'n': n, 'p': correctPct}) : t(n == 1 ? '1 answer so far' : '{n} answers so far', {'n': n})) : t(quiz ? "Tap an answer to see if you're right and how others did." : 'Tap to vote and see what others said.'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, color: p.muted),
+          ),
+        ]));
+        if (answered && quiz) {
+          cards.add(col([
+            Text(mine == right ? '🎉 ${t('Right!')}' : '💡 ${t('Good try!')}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            if ((d['explain'] ?? '').toString().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text('${d['explain']}', maxLines: 5, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, height: 1.4))),
+            const Spacer(),
+            if ((card.sourceUrl ?? '').isNotEmpty)
+              GestureDetector(
+                onTap: () => openExternal(context, card.sourceUrl!),
+                child: Text('🔗 ${t('Source')}: ${(card.sourceName ?? '').isNotEmpty ? card.sourceName : hostOf(card.sourceUrl!)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.tagText)),
+              ),
+          ]));
+        }
+    }
+    return SwipeDeck(cards: cards, tint: tint, label: '$emoji ${t(_sub[card.type] ?? 'For you')}', controller: _ctl);
   }
 }

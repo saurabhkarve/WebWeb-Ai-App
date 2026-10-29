@@ -26,6 +26,7 @@ import '../widgets.dart';
 import 'area_map.dart';
 import 'image_grid.dart';
 import 'reaction_picker.dart';
+import 'swipe_deck.dart';
 import 'reply_thread.dart';
 import 'p1.dart';
 import 'response_sheet.dart';
@@ -296,22 +297,6 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     final link = post.fact != null || post.repostedByName != null ? null : firstLink([post.title, post.description]);
     final extra = <Widget>[
       if (link != null && !isAsk) LinkPreviewCard(link, key: ValueKey(link)),
-      if (post.fact != null && post.fact!.sourceUrl.isNotEmpty)
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => openExternal(context, post.fact!.sourceUrl),
-          child: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Row(children: [
-              WIcon(WI.link, size: 13, color: p.muted),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text('${t('Source')}: ${(post.fact!.sourceName ?? '').isNotEmpty ? post.fact!.sourceName : hostOf(post.fact!.sourceUrl)}',
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
-              ),
-            ]),
-          ),
-        ),
     ];
 
     // ⋯: my own ask's menu (save, edit, delete), or save / report / block on someone else's
@@ -1440,40 +1425,78 @@ class ChipLine extends StatelessWidget {
       );
 }
 
-/// A WEBWEB Facts post as a data card (web post-card.tsx FactCard): the big figure, what it counts, the fact and why it
-/// matters, on a soft gold glow.
-class FactCard extends StatelessWidget {
+/// A WEBWEB Facts post as a swipeable deck (web post-card.tsx FactDeck): the big figure, what happened, why it
+/// matters, the source.
+class FactCard extends StatefulWidget {
   final PostFact fact;
   const FactCard(this.fact, {super.key});
+  @override
+  State<FactCard> createState() => _FactCardState();
+}
+
+class _FactCardState extends State<FactCard> {
+  final _ctl = DeckController();
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kGold.withValues(alpha: .4)),
-        gradient: RadialGradient(center: const Alignment(1, -1), radius: 1.2, colors: [kGold.withValues(alpha: .28), kGold.withValues(alpha: 0)], stops: const [0, .6]),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('📊 ${t('Facts & figures near you')}'.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.3, color: p.tagText)),
+    final fact = widget.fact;
+    final deckH = deckHeight(context);
+    final label = TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .6));
+    final host = (fact.sourceName ?? '').isNotEmpty ? fact.sourceName! : hostOf(fact.sourceUrl);
+    Widget btn(String text, VoidCallback onTap, {bool soft = false}) => GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: soft ? null : kGoldGradient,
+              color: soft ? p.chip.withValues(alpha: .6) : null,
+              borderRadius: BorderRadius.circular(12),
+              border: soft ? Border.all(color: p.border) : null,
+            ),
+            child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: soft ? p.text : kInk)),
+          ),
+        );
+    final cards = <Widget>[
+      Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(fact.emoji, style: const TextStyle(fontSize: 36, height: 1)),
         const SizedBox(height: 8),
-        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(fact.emoji, style: const TextStyle(fontSize: 36, height: 1)),
-          const SizedBox(width: 12),
-          Expanded(child: Text(fact.figure, style: TextStyle(fontSize: 40, fontWeight: FontWeight.w800, height: 1, letterSpacing: -1, color: p.text))),
-        ]),
-        const SizedBox(height: 6),
-        Text(fact.label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3)),
-        const SizedBox(height: 12),
-        Text(fact.title, style: const TextStyle(fontSize: 15, height: 1.35)),
-        if ((fact.body ?? '').isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text(fact.body!, style: TextStyle(fontSize: 14, height: 1.35, color: p.text.withValues(alpha: .7))),
-        ],
+        Text(fact.figure, style: TextStyle(fontSize: deckH * .19, fontWeight: FontWeight.w800, height: 1, letterSpacing: -1, color: p.text)),
+        const SizedBox(height: 8),
+        Text(fact.label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3)),
       ]),
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(t('What happened'), style: label),
+        const SizedBox(height: 8),
+        Text(fact.title, maxLines: 6, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: deckH * .08, fontWeight: FontWeight.w700, height: 1.3)),
+      ]),
+      if ((fact.body ?? '').isNotEmpty)
+        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(t('Why it matters'), style: label),
+          const SizedBox(height: 8),
+          Text(fact.body!, maxLines: 6, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, height: 1.4)),
+        ]),
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('🔗 ${t('Source')}', style: label),
+        const SizedBox(height: 8),
+        Text(host, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+        const Spacer(),
+        if (fact.sourceUrl.isNotEmpty) btn(t('Read the source'), () => openExternal(context, fact.sourceUrl)),
+        const SizedBox(height: 8),
+        btn('📤 ${t('Share on WhatsApp')}', () => launchUrl(Uri.parse('https://wa.me/?text=${Uri.encodeComponent('${fact.figure} ${fact.label}\n${fact.title}\n${fact.sourceUrl}')}'), mode: LaunchMode.externalApplication).catchError((_) => false), soft: true),
+      ]),
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: SwipeDeck(cards: cards, tint: kGold, label: '📊 ${t('Facts & figures near you')}', controller: _ctl),
     );
   }
 }
