@@ -68,7 +68,7 @@ class _AskDeckState extends State<AskDeck> {
   }
 
   /// The cards' height follows the screen (about a third of it); the headline and the buttons follow the cards.
-  double get _deckH => (MediaQuery.sizeOf(context).height * .30).clamp(210.0, 300.0);
+  double get _deckH => (MediaQuery.sizeOf(context).height * .30).clamp(236.0, 300.0);
   double get _scale => _deckH / 240;
 
   List<DeckKind> get _kinds {
@@ -406,16 +406,16 @@ class _AskDeckState extends State<AskDeck> {
       case DeckKind.glance:
         final none = (post.locationPref ?? '').isEmpty && left == null && post.radiusM == null;
         Widget tile(WI icon, String label, String value, [String? sub]) => Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(color: p.canvas.withValues(alpha: .7), borderRadius: BorderRadius.circular(12)),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
                   Container(width: 20, height: 20, alignment: Alignment.center, decoration: BoxDecoration(color: kGold.withValues(alpha: .25), shape: BoxShape.circle), child: WIcon(icon, size: 12, color: p.text, still: true)),
                   const SizedBox(width: 6),
                   Flexible(child: Text(label.toUpperCase(), maxLines: 1, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: .3, color: p.muted))),
                 ]),
-                const SizedBox(height: 6),
-                Text(value, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.2)),
+                const SizedBox(height: 4),
+                Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.2)),
                 if (sub != null) Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, color: p.muted)),
               ]),
             );
@@ -428,10 +428,10 @@ class _AskDeckState extends State<AskDeck> {
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             _label(p, t('At a glance')),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             if (none) Text(t('Add where, when and budget so members can decide quickly.'), style: TextStyle(fontSize: 14, color: p.muted)),
             Expanded(
-              child: GridView.count(crossAxisCount: 2, mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 1.9, physics: const NeverScrollableScrollPhysics(), padding: EdgeInsets.zero, children: tiles),
+              child: GridView(gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 8, crossAxisSpacing: 8, mainAxisExtent: 76), physics: const NeverScrollableScrollPhysics(), padding: EdgeInsets.zero, children: tiles),
             ),
           ]),
         );
