@@ -387,7 +387,6 @@ class _AccountMenu extends StatelessWidget {
     final me = auth.profile;
     final themeCtl = context.watch<ThemeController>();
     final i18n = context.watch<I18n>();
-    final dark = p.dark;
     final mq = MediaQuery.of(context);
     if (me == null) return const SizedBox();
     void push(Widget page) {
@@ -582,11 +581,27 @@ class _AccountMenu extends StatelessWidget {
                       ),
                     ),
                   ),
-                  IconButton(
-                    tooltip: t('Dark mode'),
-                    onPressed: () => themeCtl.set(dark ? ThemeMode.light : ThemeMode.dark),
-                    style: IconButton.styleFrom(backgroundColor: p.chip, fixedSize: const Size(36, 36), minimumSize: const Size(36, 36), padding: EdgeInsets.zero),
-                    icon: WIcon(dark ? WI.sun : WI.moon, size: 18, color: p.text, strokeWidth: 1.8),
+                  // theme: follow the device (the default), light or dark
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      for (final o in [(ThemeMode.system, WI.monitor, 'Device theme'), (ThemeMode.light, WI.sun, 'Light'), (ThemeMode.dark, WI.moon, 'Dark')])
+                        Semantics(
+                          button: true,
+                          selected: themeCtl.mode == o.$1,
+                          label: t(o.$3),
+                          child: GestureDetector(
+                            onTap: () => themeCtl.set(o.$1),
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(color: themeCtl.mode == o.$1 ? p.card : Colors.transparent, shape: BoxShape.circle),
+                              child: Center(child: WIcon(o.$2, size: 18, color: themeCtl.mode == o.$1 ? p.text : p.muted, strokeWidth: 1.8)),
+                            ),
+                          ),
+                        ),
+                    ]),
                   ),
                 ]),
               ),

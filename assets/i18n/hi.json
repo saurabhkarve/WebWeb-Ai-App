@@ -2391,5 +2391,6 @@
   "A supplier": "कोई सप्लायर",
   "Item: [item]\nQuantity: [quantity]\nDelivery to: [area]\nWhat matters: [price / quality / credit]": "सामान: [सामान]\nमात्रा: [मात्रा]\nडिलीवरी: [इलाका]\nक्या ज़रूरी है: [दाम / क्वालिटी / उधार]",
   "[Option A]": "[विकल्प A]",
-  "Show {n} more replies": "{n} और जवाब देखें"
+  "Show {n} more replies": "{n} और जवाब देखें",
+  "Device theme": "डिवाइस जैसा"
 }

@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-enum WI { calendar, home, refresh, check, lock, qr, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, consultant, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, link, logout, machinery, mentor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, views, website }
+enum WI { calendar, home, refresh, check, lock, qr, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, camera, cart, checkCircle, clip, clock, close, compliance, connect, consultant, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, link, logout, machinery, mentor, monitor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, views, website }
 
 /// SVG body per icon. {C} = colour, {SW/x} = stroke width divided by x (scaled groups).
 const Map<WI, (String, double?)> _body = {
@@ -68,6 +68,7 @@ const Map<WI, (String, double?)> _body = {
   WI.logout: (r'<path d="M10 4.5H7a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h3" /> <path d="M15.5 8l4 4-4 4" /> <path d="M19.5 12H9.5" />', null),
   WI.machinery: (r'<circle cx="12" cy="12" r="3" /> <path d="M12 3.5v2.3M12 18.2v2.3M3.5 12h2.3M18.2 12h2.3M6 6l1.7 1.7M16.3 16.3 18 18M18 6l-1.7 1.7M7.7 16.3 6 18" />', null),
   WI.mentor: (r'<circle cx="9" cy="8.5" r="3.2" /> <path d="M3.4 19.5c.5-3.1 2.8-4.9 5.6-4.9 1 0 1.9.2 2.7.6" /> <path d="M14.5 19.5 19 15m0 0h-3.4M19 15v3.4" />', null),
+  WI.monitor: (r'<rect x="3" y="4" width="18" height="12" rx="2" /> <path d="M8 20h8M12 16v4" />', null),
   WI.moon: (r'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />', null),
   WI.other: (r'<circle cx="12" cy="12" r="8.6" /> <path d="M8.5 12h.01M12 12h.01M15.5 12h.01" stroke-width="2.6" />', null),
   WI.partner: (r'<circle cx="9" cy="12" r="5.2" /> <circle cx="15" cy="12" r="5.2" />', null),

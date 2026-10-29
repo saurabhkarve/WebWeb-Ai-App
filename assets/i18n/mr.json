@@ -2391,5 +2391,6 @@
   "A supplier": "एखादा सप्लायर",
   "Item: [item]\nQuantity: [quantity]\nDelivery to: [area]\nWhat matters: [price / quality / credit]": "वस्तू: [वस्तू]\nप्रमाण: [प्रमाण]\nडिलिव्हरी: [भाग]\nकाय महत्त्वाचे: [भाव / दर्जा / उधार]",
   "[Option A]": "[पर्याय A]",
-  "Show {n} more replies": "आणखी {n} उत्तरे पहा"
+  "Show {n} more replies": "आणखी {n} उत्तरे पहा",
+  "Device theme": "डिव्हाइसप्रमाणे"
 }
