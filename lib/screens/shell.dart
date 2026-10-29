@@ -518,6 +518,32 @@ class _AccountMenu extends StatelessWidget {
     Widget item(WI icon, String text, VoidCallback onTap) => row(icon, label(t(text)), onTap);
     final divider = Divider(height: 1, color: p.border.withValues(alpha: .6));
 
+    // the drawer's ⋯ (Log out) and close sit on the account card: one section, no title bar above it
+    final Widget actions = Row(mainAxisSize: MainAxisSize.min, children: [
+      PopupMenuButton<String>(
+        tooltip: t('More options'),
+        icon: WIcon(WI.more, size: 22, color: p.text),
+        color: p.canvas,
+        position: PopupMenuPosition.under,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: p.border.withValues(alpha: .6))),
+        onSelected: (_) {
+          Navigator.of(context).pop();
+          auth.logout();
+        },
+        itemBuilder: (_) => [
+          PopupMenuItem(
+            value: 'logout',
+            child: Row(children: [
+              WIcon(WI.logout, size: 20, color: p.danger, strokeWidth: 1.8),
+              const SizedBox(width: 12),
+              Text(t('Log out'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: p.danger)),
+            ]),
+          ),
+        ],
+      ),
+      IconButton(tooltip: t('Close'), onPressed: () => Navigator.of(context).pop(), icon: WIcon(WI.close, size: 22, color: p.text)),
+    ]);
+
     return Material(
       color: p.canvas,
       elevation: 16,
@@ -528,42 +554,15 @@ class _AccountMenu extends StatelessWidget {
         height: mq.size.height,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           SizedBox(height: mq.padding.top),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 8, 4),
-            child: Row(children: [
-              Expanded(child: Text(t('Account').toUpperCase(), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 1.6, color: p.muted))),
-              PopupMenuButton<String>(
-                tooltip: t('More options'),
-                icon: WIcon(WI.more, size: 22, color: p.text),
-                color: p.canvas,
-                position: PopupMenuPosition.under,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: p.border.withValues(alpha: .6))),
-                onSelected: (_) {
-                  Navigator.of(context).pop();
-                  auth.logout();
-                },
-                itemBuilder: (_) => [
-                  PopupMenuItem(
-                    value: 'logout',
-                    child: Row(children: [
-                      WIcon(WI.logout, size: 20, color: p.danger, strokeWidth: 1.8),
-                      const SizedBox(width: 12),
-                      Text(t('Log out'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: p.danger)),
-                    ]),
-                  ),
-                ],
-              ),
-              IconButton(tooltip: t('Close'), onPressed: () => Navigator.of(context).pop(), icon: WIcon(WI.close, size: 22, color: p.text)),
-            ]),
-          ),
           // account card: this page, then the other pages of the sign-in and Add, as one block
           Container(
             decoration: BoxDecoration(color: p.chip.withValues(alpha: .5), border: Border(top: BorderSide(color: p.border.withValues(alpha: .6)), bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            child: Stack(children: [
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           InkWell(
             onTap: () => push(const ProfileScreen()),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding: const EdgeInsets.fromLTRB(20, 12, 96, 12),
               child: Row(children: [
                 Avatar(name: me.name, photoUrl: me.photoUrl, size: 48, ring: me.hasUpdate, type: me.userType, badge: 18, uid: me.uid),
                 const SizedBox(width: 16),
@@ -584,6 +583,8 @@ class _AccountMenu extends StatelessWidget {
             ),
           ),
           const _PagesSwitcher(),
+              ]),
+              Positioned(top: 2, right: 4, child: actions),
             ]),
           ),
           Expanded(
