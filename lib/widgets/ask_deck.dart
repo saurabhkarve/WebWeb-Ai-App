@@ -202,6 +202,8 @@ class _AskDeckState extends State<AskDeck> {
         final cat = askLabel(post);
         final sentence = askSentence(post);
         final thumbs = !widget.preview && post.images.isNotEmpty;
+        // the photos sit at the card's top right: the first lines keep clear of them
+        final thumbPad = thumbs ? post.images.length.clamp(1, 3) * 48.0 + 12 : 0.0;
         final card = Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -217,15 +219,18 @@ class _AskDeckState extends State<AskDeck> {
             Row(children: [
               Text(type.emoji, style: const TextStyle(fontSize: 16)),
               const SizedBox(width: 6),
-              Expanded(child: Text(t(sentence.key, {...sentence.vars, if (sentence.vars['what'] != null) 'what': t(sentence.vars['what']!)}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .75)))),
+              Expanded(child: Padding(padding: EdgeInsets.only(right: thumbPad), child: Text(t(sentence.key, {...sentence.vars, if (sentence.vars['what'] != null) 'what': t(sentence.vars['what']!)}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .75))))),
             ]),
             const SizedBox(height: 6),
             Expanded(
-              child: Text(
+              child: Padding(
+                padding: EdgeInsets.only(right: thumbPad),
+                child: Text(
                 (post.title ?? '').isEmpty ? t('Your title shows here') : post.title!,
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 20, height: 1.2, fontWeight: FontWeight.w800, color: (post.title ?? '').isEmpty ? p.muted : p.text),
+                ),
               ),
             ),
             // the chips and, when the ask is not yours, a small "I can help" on the same line: the card keeps its height
