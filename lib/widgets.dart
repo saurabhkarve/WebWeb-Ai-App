@@ -275,6 +275,47 @@ void toast(BuildContext context, String msg, {bool error = false}) {
 /// The web's displayName: businesses show their company, job seekers their own name.
 String displayName(String userType, String name, String company) => userType == 'entrepreneur' && company.isNotEmpty ? company : name;
 
+/// One muted tone per business group for the starter pictures (/defaults/av/<group>-<n>.jpg), drawn as a monogram of
+/// the name instead of the cartoon files: [light, deeper, text]
+const _monoTones = <String, List<int>>{
+  'construction': [0xFFF1E4D3, 0xFFE2C9A8, 0xFF6B4A1F],
+  'education': [0xFFE3E8F5, 0xFFC6D1EC, 0xFF34477E],
+  'food': [0xFFF6E3DC, 0xFFEBC3B5, 0xFF8A3F27],
+  'healthcare': [0xFFDCEFEC, 0xFFB6DCD6, 0xFF1F6A60],
+  'it': [0xFFE1E6EF, 0xFFC3CDDD, 0xFF2F4466],
+  'job': [0xFFE9E4F3, 0xFFD3C9E8, 0xFF4D3A85],
+  'logistics': [0xFFDFEAF1, 0xFFBDD4E2, 0xFF1F5575],
+  'manufacturing': [0xFFE6E6E2, 0xFFCFCFC8, 0xFF4A4A44],
+  'other': [0xFFEBE7DC, 0xFFD9D2BD, 0xFF5E5638],
+  'professional': [0xFFE4E9E1, 0xFFC6D3C0, 0xFF34553A],
+  'retail': [0xFFF3E1E8, 0xFFE5C1CF, 0xFF7D3350],
+  'trading': [0xFFF1EAD2, 0xFFE2D4A2, 0xFF6E5A14],
+};
+
+/// The tone of a starter picture's group, null for any other picture
+List<int>? starterTone(String? url) {
+  final g = RegExp(r'/defaults/av/([a-z]+)-\d+').firstMatch(url ?? '')?.group(1);
+  return g == null ? null : (_monoTones[g] ?? _monoTones['other']);
+}
+
+/// The monogram of a starter picture, filling its parent (round, clipped)
+class StarterMono extends StatelessWidget {
+  final String url, name;
+  final double size;
+  const StarterMono({super.key, required this.url, required this.name, required this.size});
+  @override
+  Widget build(BuildContext context) {
+    final t = starterTone(url) ?? _monoTones['other']!;
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(t[0]), Color(t[1])])),
+      child: Text(initials(name), style: TextStyle(fontSize: size * .38, fontWeight: FontWeight.w600, letterSpacing: .4, color: Color(t[2]))),
+    );
+  }
+}
+
 /// Circle avatar like the web: cream fill with initials, optional gold "update" ring, and a small
 /// type badge (briefcase = business, person = job seeker) on the 45 degree edge.
 class Avatar extends StatelessWidget {
@@ -303,7 +344,9 @@ class Avatar extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(shape: BoxShape.circle, color: p.chip),
       clipBehavior: Clip.antiAlias,
-      child: (photoUrl ?? '').isNotEmpty
+      child: starterTone(photoUrl) != null
+          ? StarterMono(url: photoUrl!, name: name, size: size)
+          : (photoUrl ?? '').isNotEmpty
           // profile photos come in 640px and 160px: the small one is plenty for most avatars
           ? NetImg(size * MediaQuery.devicePixelRatioOf(context) <= 160 ? smallImage(photoUrl!) : photoUrl!, width: size, height: size, fallback: ini)
           : ini,

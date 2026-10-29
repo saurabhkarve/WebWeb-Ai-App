@@ -1269,7 +1269,7 @@ class DailyCircle extends StatelessWidget {
       child: g.photo != null
           ? ClipOval(
               child: (g.photo!.url ?? '').isNotEmpty
-                  ? Image.network(g.photo!.url!, width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Text(initials(g.photo!.name)))
+                  ? (starterTone(g.photo!.url) != null ? StarterMono(url: g.photo!.url!, name: g.photo!.name, size: 64) : Image.network(g.photo!.url!, width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Text(initials(g.photo!.name))))
                   : Text(initials(g.photo!.name), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.muted)),
             )
           : Text(g.emoji, style: const TextStyle(fontSize: 28, height: 1)),
