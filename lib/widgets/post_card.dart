@@ -423,24 +423,6 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               ...[
                 // why you see this ask (or that it is closed), then the ask as swipeable cards
                 // the ask type pinned above the cards, and why you see this ask (or that it is closed) on the right
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(children: [
-                    WIcon(categoryIcon(askTypeDef(askTypeOf(post))?.icon ?? post.category), size: 14, color: p.link, still: true),
-                    const SizedBox(width: 6),
-                    Expanded(child: Text(askLabel(post).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link))),
-                    if (post.closed || why != null) ...[
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: post.closed
-                            ? ClosedChip(post)
-                            : (!mine && match != null && post.leadReason == null && ((post.locationPref ?? '').isNotEmpty || post.lat != null)
-                                ? GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showAskAreaSheet(context, post), child: GoldTag(why!))
-                                : GoldTag(why!)),
-                      ),
-                    ],
-                  ]),
-                ),
                 // double tap gives it a thumbs up (with the burst), as on the text card
                 GestureDetector(
                   onDoubleTap: _quickReact,
@@ -456,6 +438,21 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                         onQuickReact: _quickReact,
                         onVoted: (v) => setState(() => post = v),
                         typeAbove: true,
+                        lead: Row(children: [
+                          WIcon(categoryIcon(askTypeDef(askTypeOf(post))?.icon ?? post.category), size: 14, color: p.link, still: true),
+                          const SizedBox(width: 6),
+                          Flexible(child: Text(askLabel(post).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link))),
+                          if (post.closed || why != null) ...[
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: post.closed
+                                  ? ClosedChip(post)
+                                  : (!mine && match != null && post.leadReason == null && ((post.locationPref ?? '').isNotEmpty || post.lat != null)
+                                      ? GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showAskAreaSheet(context, post), child: GoldTag(why!))
+                                      : GoldTag(why!)),
+                            ),
+                          ],
+                        ]),
                       ),
                     ),
                     Positioned.fill(

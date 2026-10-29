@@ -42,7 +42,9 @@ class AskDeck extends StatefulWidget {
 
   /// the feed card pins the ask type above the deck, so the first card does not repeat it
   final bool typeAbove;
-  const AskDeck({super.key, required this.post, this.preview = false, this.images = const [], this.reachLabel, this.onCardTap, this.mine = false, this.onOpen, this.onReply, this.onReplies, this.onQuickReact, this.onVoted, this.typeAbove = false});
+  /// the row above the cards: the ask type and why you see it on the left, the dots on its right
+  final Widget? lead;
+  const AskDeck({super.key, required this.post, this.preview = false, this.images = const [], this.reachLabel, this.onCardTap, this.mine = false, this.onOpen, this.onReply, this.onReplies, this.onQuickReact, this.onVoted, this.typeAbove = false, this.lead});
   @override
   State<AskDeck> createState() => _AskDeckState();
 }
@@ -138,7 +140,28 @@ class _AskDeckState extends State<AskDeck> {
     final tint = kCardColors[cardColorOf(post)]!;
     final kinds = _kinds;
     final bleed = widget.preview ? 0.0 : _bleed;
+    // small dots, five at a time as in a photo carousel: the card you are on dark, the ends of the window smaller
+    final dots = Builder(builder: (_) {
+            final n = kinds.length;
+            final start = (_i - 2).clamp(0, (n - 5).clamp(0, n));
+            return Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              for (var k = start; k < n && k < start + 5; k++)
+                GestureDetector(
+                  onTap: () => _page.animateToPage(k, duration: const Duration(milliseconds: 250), curve: Curves.easeOut),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 2),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: ((k == start && start > 0) || (k == start + 4 && start + 4 < n - 1)) ? 4 : 6,
+                      height: ((k == start && start > 0) || (k == start + 4 && start + 4 < n - 1)) ? 4 : 6,
+                      decoration: BoxDecoration(color: k == _i ? p.text : p.text.withValues(alpha: .25), shape: BoxShape.circle),
+                    ),
+                  ),
+                ),
+            ]);
+          });
     return Column(children: [
+      if (widget.lead != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: [Expanded(child: widget.lead!), dots])),
       SizedBox(
         height: _deckH,
         child: LayoutBuilder(builder: (context, box) {
@@ -182,27 +205,7 @@ class _AskDeckState extends State<AskDeck> {
         );
         }),
       ),
-      const SizedBox(height: 2),
-      // small dots, five at a time as in a photo carousel: the card you are on dark, the ends of the window smaller
-      Builder(builder: (_) {
-        final n = kinds.length;
-        final start = (_i - 2).clamp(0, (n - 5).clamp(0, n));
-        return Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          for (var k = start; k < n && k < start + 5; k++)
-            GestureDetector(
-              onTap: () => _page.animateToPage(k, duration: const Duration(milliseconds: 250), curve: Curves.easeOut),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 2),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: ((k == start && start > 0) || (k == start + 4 && start + 4 < n - 1)) ? 4 : 6,
-                  height: ((k == start && start > 0) || (k == start + 4 && start + 4 < n - 1)) ? 4 : 6,
-                  decoration: BoxDecoration(color: k == _i ? p.text : p.text.withValues(alpha: .25), shape: BoxShape.circle),
-                ),
-              ),
-            ),
-        ]);
-      }),
+      if (widget.lead == null) ...[const SizedBox(height: 2), dots],
     ]);
   }
 
