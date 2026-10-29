@@ -481,9 +481,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               if (!framed && mine) OutcomeNudge(post: post, onTap: () => _openDetail(askOutcome: true)),
               // quoted in a repost: the replies and the controls are the repost's (below)
               if (!framed) ...[
-                // on a lead the competition line above already invites the first reply
-                LatestReplies(post: post, hideEmpty: true, onMore: () => _openDetail(expandResponses: true)),
-                const SizedBox(height: 6),
+                // the replies are on the ask page, not on the card
                 PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
               ],
             ]),
@@ -700,8 +698,6 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
           ),
         ),
         if (ask) ...[
-          LatestReplies(post: post, hideEmpty: true, onMore: () => _openDetail(expandResponses: true)),
-          const SizedBox(height: 12),
           PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
         ] else ...[
           const SizedBox(height: 12),
