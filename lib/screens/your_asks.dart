@@ -224,12 +224,14 @@ class _YourAsksPillState extends State<YourAsksPill> with MyAskActivityLoader {
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Text(t('Your asks'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.text)),
-          const SizedBox(width: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            decoration: BoxDecoration(color: fresh > 0 ? null : p.text.withValues(alpha: .1), gradient: fresh > 0 ? const LinearGradient(colors: [Color(0xFFFFE27A), kGold]) : null, borderRadius: BorderRadius.circular(20)),
-            child: Text(fresh > 0 ? t('{n} new', {'n': '$fresh'}) : '${items.length}', style: TextStyle(fontSize: 11, height: 1.45, fontWeight: FontWeight.w800, color: fresh > 0 ? const Color(0xFF1E1E1E) : p.text)),
-          ),
+          if (fresh > 0) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFFFE27A), kGold]), borderRadius: BorderRadius.circular(20)),
+              child: Text(t('{n} new', {'n': '$fresh'}), style: const TextStyle(fontSize: 11, height: 1.45, fontWeight: FontWeight.w800, color: Color(0xFF1E1E1E))),
+            ),
+          ],
           const SizedBox(width: 6),
           WIcon(WI.arrow, size: 12, color: p.muted, still: true),
         ]),
