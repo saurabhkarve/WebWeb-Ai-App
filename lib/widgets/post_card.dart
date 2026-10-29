@@ -617,9 +617,36 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     final ink = Theme.of(context).brightness == Brightness.dark ? const Color(0xFF7FD6AD) : green;
     void open() => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? '')));
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
+      padding: EdgeInsets.symmetric(vertical: ask ? 16 : 20),
       foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (ask)
+          // an ask: one slim line says who reposted it (the ask below has its own author row, so a second big avatar and
+          // name would read as the same person twice)
+          Row(children: [
+            WIcon(WI.repost, size: 16, color: ink),
+            const SizedBox(width: 8),
+            GestureDetector(onTap: open, child: Avatar(name: post.repostedByName ?? '', photoUrl: r['photoURL'] as String?, size: 20)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: GestureDetector(
+                onTap: open,
+                behavior: HitTestBehavior.opaque,
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(text: post.repostedByName ?? '', style: TextStyle(fontWeight: FontWeight.w700, color: p.text)),
+                    TextSpan(text: ' ${t('Reposted')}', style: TextStyle(fontWeight: FontWeight.w600, color: ink)),
+                    if (post.repostedAt != null) TextSpan(text: ' · ${timeAgo(post.repostedAt!)}'),
+                  ]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: p.muted),
+                ),
+              ),
+            ),
+            ...more,
+          ])
+        else
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           GestureDetector(
             onTap: open,
@@ -648,7 +675,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
           ...more,
         ]),
         Padding(
-          padding: EdgeInsets.only(left: ask ? 0 : 50, top: ask ? 8 : 4),
+          padding: EdgeInsets.only(left: ask ? 0 : 50, top: ask ? 4 : 4),
           // as on x.com (and the web) the whole quote is one link to the ask: a tap anywhere in it, the name and chips
           // included, opens the ask, so the quote's own taps are absorbed (an ask's cards still swipe, their taps open the ask)
           child: Material(
