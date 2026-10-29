@@ -845,23 +845,24 @@ class _AskFormState extends State<_AskForm> {
       onTap: () => _applyTemplate(e.$1, x.$1, x.$3, x.$4, x.$5),
       child: Container(
         width: width,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border.withValues(alpha: .7))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // icon, name and the AI pill on one line
           Row(children: [
             Container(
-              width: 30,
-              height: 30,
+              width: 28,
+              height: 28,
               alignment: Alignment.center,
               decoration: BoxDecoration(color: kGold.withValues(alpha: .18), shape: BoxShape.circle),
-              child: WIcon(categoryIcon(x.$1), size: 16, color: p.tagText, still: true),
+              child: WIcon(categoryIcon(x.$1), size: 15, color: p.tagText, still: true),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
+            Expanded(child: Text(t(x.$2), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
+            const SizedBox(width: 6),
             const AiPill(font: 8),
           ]),
-          const SizedBox(height: 8),
-          Text(t(x.$2), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 3),
+          const SizedBox(height: 6),
           Text.rich(TextSpan(children: spans), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, height: 1.35, color: p.muted)),
         ]),
       ),
@@ -1151,7 +1152,7 @@ class _AskFormState extends State<_AskForm> {
           KeyedSubtree(
             key: _tk('ask-templates'),
             // edge to edge, swiped sideways
-            child: hScroll(height: 124, [for (final e in examples) _exampleCard(p, e, exW)]),
+            child: hScroll(height: 92, [for (final e in examples) _exampleCard(p, e, exW)]),
           ),
           const SizedBox(height: 16),
         ],
