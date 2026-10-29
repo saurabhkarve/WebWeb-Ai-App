@@ -226,6 +226,7 @@ class _WIconState extends State<WIcon> with TickerProviderStateMixin {
 WI categoryIcon(String? category) => switch (category) {
       'job' => WI.job,
       'supplier' => WI.supplier,
+      'quote' => WI.cart,
       'buyer' => WI.buyer,
       'logistics' => WI.truck,
       'funding' => WI.funding,

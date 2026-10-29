@@ -11,7 +11,7 @@ class AskTypeDef {
 
 const kAskTypes = [
   AskTypeDef('hire', 'I want to hire someone', 'Hire', 'Staff, workers, freelancers', 'job', '👷', 'job', 'job'),
-  AskTypeDef('quote', 'I need something or a service', 'Buy / Quote', 'Suppliers, repairs, a space, transport: get quotes', 'supplier', '🔎', 'supplier'),
+  AskTypeDef('quote', 'I need something or a service', 'Buy / Quote', 'Suppliers, repairs, a space, transport: get quotes', 'quote', '🔎', 'supplier'),
   AskTypeDef('offer', 'I have something to sell or rent', 'Sell / Offer', 'Goods, machines, a shop or godown', 'buyer', '🏷️', 'buyer'),
   AskTypeDef('advice', 'I need advice', 'Advice', 'A question or an opinion', 'advice', '💡', 'advice'),
   AskTypeDef('poll', 'I want a vote', 'Poll', 'Let members choose between options', 'poll', '🗳️', 'advice'),
