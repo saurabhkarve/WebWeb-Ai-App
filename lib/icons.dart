@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 // GENERATED from web/src/components/icons.tsx: the same icon set as the website.
 // Regenerate when icons change there. Use WIcon(WI.connect, size: 24, color: ...).
 import 'package:flutter/material.dart';
@@ -30,8 +31,8 @@ const Map<WI, (String, double?)> _body = {
   WI.home: (r'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />', null),
   WI.bell: (r'<path d="M6 9a6 6 0 1 1 12 0c0 5 2 6.5 2 6.5H4S6 14 6 9z" /><path d="M10 19a2 2 0 0 0 4 0" />', null),
   WI.advice: (r'<path d="M9 17.5h6M10 20.5h4" /> <path d="M12 3.5a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3.5z" />', null),
-  WI.ask: (r'<g transform="translate(0.5 5.2) scale(0.76)" stroke-width="{SW/0.76}"> <path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12" /> <path d="M11 5.5v-2a1.5 1.5 0 0 1 3 0V12" /> <path d="M14 5.5a1.5 1.5 0 0 1 3 0V12" /> <path d="M17 7.5a1.5 1.5 0 0 1 3 0V16a6 6 0 0 1-6 6h-2.8a6 6 0 0 1-5-2.7l-.2-.3c-.3-.5-1.4-2.4-3.3-5.7a1.5 1.5 0 0 1 .5-2 1.9 1.9 0 0 1 2.3.3L8 14" /> </g> <path d="M19 1.6l1.15 3.1 3.1 1.15-3.1 1.15L19 10.1l-1.15-3.1-3.1-1.15 3.1-1.15z" fill="{C}" stroke-width="1.2" />', null),
-  WI.askPlus: (r'<g transform="translate(0.5 5.2) scale(0.76)" stroke-width="{SW/0.76}"> <path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12" /> <path d="M11 5.5v-2a1.5 1.5 0 0 1 3 0V12" /> <path d="M14 5.5a1.5 1.5 0 0 1 3 0V12" /> <path d="M17 7.5a1.5 1.5 0 0 1 3 0V16a6 6 0 0 1-6 6h-2.8a6 6 0 0 1-5-2.7l-.2-.3c-.3-.5-1.4-2.4-3.3-5.7a1.5 1.5 0 0 1 .5-2 1.9 1.9 0 0 1 2.3.3L8 14" /> </g> <path d="M19 1.6l1.15 3.1 3.1 1.15-3.1 1.15L19 10.1l-1.15-3.1-3.1-1.15 3.1-1.15z" fill="{C}" stroke-width="1.2" />', null),
+  WI.ask: (r'<path d="M11 3l1.9 6.1L19 11l-6.1 1.9L11 19l-1.9-6.1L3 11l6.1-1.9z" fill="{C}" stroke-width="1.2" /> <path d="M19 2.6l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8z" fill="{C}" stroke-width="1" />', null),
+  WI.askPlus: (r'<path d="M11 3l1.9 6.1L19 11l-6.1 1.9L11 19l-1.9-6.1L3 11l6.1-1.9z" fill="{C}" stroke-width="1.2" /> <path d="M19 2.6l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8z" fill="{C}" stroke-width="1" />', null),
   WI.back: (r'<path d="M14.5 5.5L8 12l6.5 6.5" />', null),
   WI.bookmark: (r'<path d="M7.2 3.8h9.6a1.4 1.4 0 0 1 1.4 1.4v14.6l-6.2-4.3-6.2 4.3V5.2a1.4 1.4 0 0 1 1.4-1.4z" />', null),
   WI.box: (r'<path d="M12 3.5l7.8 4.2v8.6L12 20.5l-7.8-4.2V7.7L12 3.5z" /> <path d="M4.5 7.9L12 12l7.5-4.1M12 12v8.3" />', null),
@@ -47,7 +48,7 @@ const Map<WI, (String, double?)> _body = {
   // a person with a tie: Consultant / Advisor
   WI.consultant: (r'<circle cx="12" cy="7.2" r="3.2" /> <path d="M5.5 20c.6-3.8 3.1-6 6.5-6s5.9 2.2 6.5 6" /> <path d="M12 14l-1.1 1.8 1.1 3.7 1.1-3.7z" />', null),
   WI.compliance: (r'<path d="M6.5 3.5h8l4 4v13h-12v-17z" /> <path d="M14.5 3.5v4h4M9.5 14l2 2 3.5-4" />', null),
-  WI.connect: (r'<circle cx="8.6" cy="12" r="5" /> <circle cx="15.4" cy="12" r="5" />', null),
+  WI.connect: (r'<path d="M11 3l1.9 6.1L19 11l-6.1 1.9L11 19l-1.9-6.1L3 11l6.1-1.9z" fill="{C}" stroke-width="1.2" /> <path d="M19 2.6l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8z" fill="{C}" stroke-width="1" />', null),
   WI.contactCard: (r'<rect x="3" y="5" width="18" height="14" rx="2.6" /> <circle cx="9" cy="10.7" r="2.1" /> <path d="M5.6 16.4c.4-1.5 1.7-2.4 3.4-2.4s3 .9 3.4 2.4M14.6 9.8h3.4M14.6 13h3.4" />', null),
   WI.deals: (r'<circle cx="9" cy="12" r="5.2" /> <circle cx="15" cy="12" r="5.2" />', null),
   WI.digital: (r'<rect x="3.5" y="4.5" width="17" height="12" rx="2" /> <path d="M8 20h8M12 16.5V20M10 8.5 8 10.5l2 2M14 8.5l2 2-2 2" />', null),
@@ -113,8 +114,9 @@ String _hex(Color c) => '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(
 /// The AI sparkle inside Ask / Updates (CSS class `ask-spark`): its path and the centre of its box,
 /// which is the transform origin for the pulse and the spin.
 const Map<WI, (String, double, double)> _spark = {
-  WI.askPlus: ('<path d="M19 1.6l1.15 3.1 3.1 1.15-3.1 1.15L19 10.1l-1.15-3.1-3.1-1.15 3.1-1.15z" fill="{C}" stroke-width="1.2" />', 19, 5.85),
-  WI.ask: ('<path d="M19 1.6l1.15 3.1 3.1 1.15-3.1 1.15L19 10.1l-1.15-3.1-3.1-1.15 3.1-1.15z" fill="{C}" stroke-width="1.2" />', 19, 5.85),
+  WI.askPlus: ('<path d="M11 3l1.9 6.1L19 11l-6.1 1.9L11 19l-1.9-6.1L3 11l6.1-1.9z" fill="{C}" stroke-width="1.2" />', 11, 11),
+  WI.ask: ('<path d="M11 3l1.9 6.1L19 11l-6.1 1.9L11 19l-1.9-6.1L3 11l6.1-1.9z" fill="{C}" stroke-width="1.2" />', 11, 11),
+  WI.connect: ('<path d="M11 3l1.9 6.1L19 11l-6.1 1.9L11 19l-1.9-6.1L3 11l6.1-1.9z" fill="{C}" stroke-width="1.2" />', 11, 11),
   WI.updates: ('<path d="M19.6 1.4l.95 2.6 2.6.95-2.6.95-.95 2.6-.95-2.6-2.6-.95 2.6-.95z" fill="{C}" stroke-width="1.1" />', 19.6, 4.95),
 };
 
@@ -162,7 +164,7 @@ class _WIconState extends State<WIcon> with TickerProviderStateMixin {
 
   void _setup() {
     if (_hasSpark) {
-      _pulse ??= AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat();
+      _pulse ??= AnimationController(vsync: this, duration: const Duration(seconds: 12))..repeat();
       _spin ??= AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
     } else {
       _pulse?.dispose();
@@ -184,8 +186,6 @@ class _WIconState extends State<WIcon> with TickerProviderStateMixin {
     _spin?.dispose();
     super.dispose();
   }
-
-  static const _spinCurve = Cubic(0.34, 1.3, 0.64, 1);
 
   @override
   Widget build(BuildContext context) {
@@ -209,25 +209,10 @@ class _WIconState extends State<WIcon> with TickerProviderStateMixin {
         AnimatedBuilder(
           animation: Listenable.merge([_pulse, _spin]),
           builder: (_, child) {
-            final spinning = _spin!.isAnimating;
-            double scale, turns = 0;
-            if (spinning) {
-              // ai-spin: 0 -> 400deg and 1.25x at 60 %, settles at 360deg and 1x
-              final t = _spin!.value;
-              if (t < .6) {
-                final k = _spinCurve.transform(t / .6);
-                turns = 400 / 360 * k;
-                scale = 1 + .25 * k;
-              } else {
-                final k = _spinCurve.transform((t - .6) / .4);
-                turns = (400 - 40 * k) / 360;
-                scale = 1.25 - .25 * k;
-              }
-            } else {
-              // ask-pulse: 1 -> 1.3 -> 1, ease-in-out
-              final t = _pulse!.value;
-              scale = 1 + .3 * Curves.easeInOut.transform(t < .5 ? t * 2 : 2 - t * 2);
-            }
+            // calm: one slow turn every 12 s and a soft breath (1 -> 1.12 -> 1) every 3 s, both continuous
+            final t = _pulse!.value;
+            final turns = t;
+            final scale = 1 + .12 * (1 - math.cos(t * 4 * 2 * math.pi)) / 2;
             return Transform.rotate(angle: turns * 2 * 3.141592653589793, alignment: origin, child: Transform.scale(scale: scale, alignment: origin, child: child));
           },
           child: star,
