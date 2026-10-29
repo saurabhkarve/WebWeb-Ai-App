@@ -295,7 +295,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             decoration: BoxDecoration(
               color: active ? kGold.withValues(alpha: p.dark ? .25 : .2) : Colors.transparent,
               borderRadius: BorderRadius.circular(20),
-              border: active ? Border.all(color: kGold.withValues(alpha: .7)) : null,
+              border: active ? Border.all(color: kGold.withValues(alpha: .7), width: .8) : null,
             ),
             child: content,
           );
