@@ -14,7 +14,7 @@ import 'area_map.dart' show AreaMap, askDeadline, askTimeLeft, showAreaViewer;
 import 'image_grid.dart' show openImageViewer;
 import 'poll_vote.dart';
 
-enum DeckKind { headline, poll, photos, details, budget, map, glance, act }
+enum DeckKind { headline, poll, photos, morePhotos, details, budget, map, glance, act }
 
 /// An ask as a short deck of cards you swipe (web ask-deck.tsx): the headline with its essentials, the photos, the
 /// details, a glance at budget, place and timing, and a last card that asks "Can you help?". One swipe moves one card.
@@ -70,8 +70,11 @@ class _AskDeckState extends State<AskDeck> {
       DeckKind.headline,
       if (post.pollOptions.length > 1) DeckKind.poll,
       // a card for each photo (up to five), each with the ask's title; the composer's preview has one to invite adding photos
-      if ((widget.preview ? widget.images.length : post.images.length) > 0) ...[for (var q = 0; q < (widget.preview ? widget.images.length : post.images.length) && q < 5; q++) DeckKind.photos]
-      else if (widget.preview) DeckKind.photos,
+      if ((widget.preview ? widget.images.length : post.images.length) > 0) ...[
+        for (var q = 0; q < (widget.preview ? widget.images.length : post.images.length) && q < 3; q++) DeckKind.photos,
+        // more than three: the others share one card, "See all n photos" opens them in the lightbox
+        if ((widget.preview ? widget.images.length : post.images.length) > 3) DeckKind.morePhotos,
+      ] else if (widget.preview) DeckKind.photos,
       if (widget.preview || (post.description ?? '').trim().isNotEmpty) DeckKind.details,
       if ((post.budget ?? '').isNotEmpty) DeckKind.budget,
       if (_mapPoint != null) DeckKind.map,
@@ -205,7 +208,7 @@ class _AskDeckState extends State<AskDeck> {
         final sentence = askSentence(post);
         final thumbs = !widget.preview && post.images.isNotEmpty;
         // the photos sit at the card's top right: the first lines keep clear of them
-        final thumbPad = thumbs ? post.images.length.clamp(1, 3) * 48.0 + 12 : 0.0;
+        final thumbPad = thumbs ? post.images.length.clamp(1, 4) * 48.0 + 12 : 0.0;
         final card = Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -286,10 +289,24 @@ class _AskDeckState extends State<AskDeck> {
                       height: 44,
                       decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white.withValues(alpha: .25)), color: p.chip),
                       clipBehavior: Clip.antiAlias,
+                      child: Image.network(urls[k], fit: BoxFit.cover, errorBuilder: (_, __, ___) => ColoredBox(color: p.chip)),
+                    ),
+                  ),
+                ),
+              // the 4th tile: the next picture dimmed under "+N", it opens them all
+              if (urls.length > 3)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: GestureDetector(
+                    onTap: () => openImageViewer(context, urls, 3, shareUrl: post.webUrl, shareRef: post.id),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white.withValues(alpha: .25)), color: p.chip),
+                      clipBehavior: Clip.antiAlias,
                       child: Stack(fit: StackFit.expand, children: [
-                        Image.network(urls[k], fit: BoxFit.cover, errorBuilder: (_, __, ___) => ColoredBox(color: p.chip)),
-                        if (k == 2 && urls.length > 3)
-                          Container(color: kInk.withValues(alpha: .55), alignment: Alignment.center, child: Text('+${urls.length - 3}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
+                        Image.network(urls[3], fit: BoxFit.cover, errorBuilder: (_, __, ___) => ColoredBox(color: p.chip)),
+                        Container(color: kInk.withValues(alpha: .6), alignment: Alignment.center, child: Text('+${urls.length - 3}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white))),
                       ]),
                     ),
                   ),
@@ -327,6 +344,8 @@ class _AskDeckState extends State<AskDeck> {
         );
       case DeckKind.photos:
         return _photos(p, photoAt);
+      case DeckKind.morePhotos:
+        return _morePhotos(p);
       case DeckKind.details:
         final d = (post.description ?? '').trim();
         return Padding(
@@ -449,6 +468,44 @@ class _AskDeckState extends State<AskDeck> {
   }
 
   /// 1 photo full; 2 side by side; 3 one tall and two stacked; 4 in a grid. Empty: a dashed invitation.
+  /// The card after the third photo: the others as tiles under one "See all n photos", which opens them all big.
+  Widget _morePhotos(Pal p) {
+    final all = widget.preview ? widget.images : [for (final u in _post.images) NetworkImage(u) as ImageProvider];
+    final rest = all.skip(3).take(4).toList();
+    Widget tile(ImageProvider i) => Image(image: i, fit: BoxFit.cover, width: double.infinity, height: double.infinity, errorBuilder: (_, __, ___) => ColoredBox(color: p.chip));
+    const gap = 2.0;
+    Widget grid;
+    if (rest.length == 1) {
+      grid = tile(rest[0]);
+    } else if (rest.length == 2) {
+      grid = Row(children: [Expanded(child: tile(rest[0])), const SizedBox(width: gap), Expanded(child: tile(rest[1]))]);
+    } else if (rest.length == 3) {
+      grid = Row(children: [
+        Expanded(child: tile(rest[0])),
+        const SizedBox(width: gap),
+        Expanded(child: Column(children: [Expanded(child: tile(rest[1])), const SizedBox(height: gap), Expanded(child: tile(rest[2]))])),
+      ]);
+    } else {
+      grid = Column(children: [
+        Expanded(child: Row(children: [Expanded(child: tile(rest[0])), const SizedBox(width: gap), Expanded(child: tile(rest[1]))])),
+        const SizedBox(height: gap),
+        Expanded(child: Row(children: [Expanded(child: tile(rest[2])), const SizedBox(width: gap), Expanded(child: tile(rest[3]))])),
+      ]);
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.preview ? null : () => openImageViewer(context, _post.images, 3, shareUrl: _post.webUrl, shareRef: _post.id),
+      child: Stack(fit: StackFit.expand, children: [
+        grid,
+        Container(color: const Color(0x731E1E1E), alignment: Alignment.center, child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+          child: Text(t('See all {n} photos', {'n': all.length}), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
+        )),
+      ]),
+    );
+  }
+
   Widget _photos(Pal p, int at) {
     final all = widget.preview ? widget.images : [for (final u in _post.images) NetworkImage(u) as ImageProvider];
     if (all.isEmpty) {

@@ -639,6 +639,7 @@ class _AskFormState extends State<_AskForm> {
       case DeckKind.details:
         _descFocus.requestFocus();
       case DeckKind.photos:
+      case DeckKind.morePhotos:
         _addPhotos();
       case DeckKind.budget:
         setState(() => _open = 'budget');
