@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:webweb_app/theme.dart';
+import 'package:webweb_app/widgets.dart' show LogoInline;
 import 'package:webweb_app/widgets/splash_screen.dart';
 
 void main() {
@@ -13,7 +14,7 @@ void main() {
       await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light), home: const SplashScreen()));
       await tester.pump(const Duration(milliseconds: 100));
       expect(tester.takeException(), isNull);
-      final title = tester.getRect(find.textContaining('WEBWEB'));
+      final title = tester.getRect(find.byType(LogoInline));
       final from = tester.getRect(find.text('SKYQ'));
       expect(title.bottom, lessThan(from.top));
       expect(from.bottom, lessThanOrEqualTo(h));
