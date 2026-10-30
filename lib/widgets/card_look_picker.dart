@@ -102,21 +102,29 @@ class CardLookPicker extends StatelessWidget {
         Row(children: [
           Text(t('Card colour'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
           const SizedBox(width: 10),
-          for (final e in kCardColors.entries)
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => onColor(e.key),
-              child: Padding(
-                padding: const EdgeInsets.all(3),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(color: e.value, shape: BoxShape.circle, border: Border.all(color: color == e.key ? p.text : Colors.transparent, width: 2)),
-                  child: color == e.key ? const Icon(Icons.check, size: 13, color: Colors.white) : null,
-                ),
-              ),
+          // the circles scroll sideways on a narrow phone rather than run off the edge
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [
+                for (final e in kCardColors.entries)
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => onColor(e.key),
+                    child: Padding(
+                      padding: const EdgeInsets.all(3),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(color: e.value, shape: BoxShape.circle, border: Border.all(color: color == e.key ? p.text : Colors.transparent, width: 2)),
+                        child: color == e.key ? const Icon(Icons.check, size: 13, color: Colors.white) : null,
+                      ),
+                    ),
+                  ),
+              ]),
             ),
+          ),
         ]),
       ]),
     );
