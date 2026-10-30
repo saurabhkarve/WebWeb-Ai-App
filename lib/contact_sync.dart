@@ -62,6 +62,9 @@ class ContactSync {
     return opens >= 3;
   }
 
+  /// Has the member been offered it (or chosen) on this phone?
+  static Future<bool> wasAsked() async => (await SharedPreferences.getInstance()).getBool(_kAsked) == true;
+
   static Future<void> markInvited() async => (await SharedPreferences.getInstance()).setBool(_kAsked, true);
 
   /// Look and send, if it is on and contacts are allowed. Never asks for anything; returns how many were sent.

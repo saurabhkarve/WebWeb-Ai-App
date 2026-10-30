@@ -16,7 +16,7 @@ class SplashScreen extends StatelessWidget {
     final mq = MediaQuery.of(context);
     final short = math.min(mq.size.width, mq.size.height);
     // the header's proportions (type 28, mark 36), scaled up
-    final word = (short * .16).clamp(48.0, 96.0);
+    final word = (short * .09).clamp(30.0, 56.0);
     final small = (short * .034).clamp(11.0, 16.0);
     return Scaffold(
       backgroundColor: p.canvas,

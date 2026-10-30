@@ -24,6 +24,7 @@ import '../widgets/reviews_card.dart';
 import 'find.dart';
 import 'post_detail.dart';
 import 'profile.dart';
+import 'service_contacts_sheet.dart' show showServiceContactsSheet;
 import 'ask.dart' show SearchAskForm;
 
 /// The AI Phonebook (web /phonebook): which of my contacts already have a WEBWEB page, with what they do, where
@@ -209,7 +210,15 @@ class _Entry {
   final String name;
   final String? phone;
   final Map? member;
-  const _Entry(this.name, this.phone, this.member);
+  /// the phone's own contact, with everything saved on it (numbers, emails, company, address, photo)
+  final Contact? contact;
+  const _Entry(this.name, this.phone, this.member, [this.contact]);
+
+  /// the company and job title saved on the contact
+  String get org => (contact?.organizations ?? const <Organization>[])
+      .map((o) => [o.name, o.jobTitle].whereType<String>().where((s) => s.trim().isNotEmpty).join(' · '))
+      .where((s) => s.isNotEmpty)
+      .join(', ');
 
   String get letter {
     final c = name.isEmpty ? '#' : name[0].toUpperCase();
@@ -278,6 +287,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     });
     _loadMatches();
     _readPhoneBook(ask: false);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _firstAsk());
     _loadAsks();
     final me = context.read<AuthProvider>().profile;
     if (me != null) {
@@ -302,8 +312,21 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     if (mounted) setState(() => _matches = c);
   }
 
-  /// Reads the phone book on the phone. [ask]: show the permission pop-up (from the "Allow contacts" card);
-  /// otherwise only reads when contacts are already allowed.
+  static const _kAskedContacts = 'pb_contacts_asked';
+
+  /// The first time the app opens on a phone: ask for contacts once, saying why, so the directory is the phone book
+  /// straight away. After that only the "Allow contacts" card asks.
+  Future<void> _firstAsk() async {
+    if (!ContactSync.supported || await Permissions.granted(Need.contacts)) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_kAskedContacts) == true || !mounted) return;
+    await prefs.setBool(_kAskedContacts, true);
+    await _readPhoneBook(ask: true);
+  }
+
+  /// Reads the phone book on the phone, with each contact's numbers, emails, company, address and photo.
+  /// [ask]: show the permission pop-up (first open, or the "Allow contacts" card); otherwise only reads when contacts
+  /// are already allowed.
   Future<void> _readPhoneBook({required bool ask}) async {
     if (!ContactSync.supported) return;
     final ok = ask
@@ -313,11 +336,26 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     setState(() => (_canRead = ok, _reading = ok));
     if (!ok) return;
     try {
-      final all = await FlutterContacts.getAll(properties: {ContactProperty.phone});
+      final all = await FlutterContacts.getAll(properties: {ContactProperty.phone, ContactProperty.email, ContactProperty.organization, ContactProperty.address, ContactProperty.photoThumbnail});
       if (mounted) setState(() => (_device = all.where((c) => (c.displayName ?? '').trim().isNotEmpty && c.phones.isNotEmpty).toList(), _reading = false));
     } catch (_) {
       if (mounted) setState(() => _reading = false);
     }
+    if (ask && mounted) _serviceContacts();
+  }
+
+  /// Contacts were just allowed: service contacts (only the contacts saved with a service word, shared with the
+  /// member's say-so) look at once if they are on, or are offered once, here, instead of at the third open.
+  Future<void> _serviceContacts() async {
+    final api = context.read<AuthProvider>().api;
+    try {
+      if (await ContactSync.isOn(api)) {
+        ContactSync.run(api, force: true);
+      } else if (!await ContactSync.wasAsked() && mounted) {
+        await ContactSync.markInvited();
+        if (mounted) showServiceContactsSheet(context, invite: true);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadAsks() async {
@@ -448,7 +486,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
       }
       member ??= bySaved[name];
       if (member != null) used.add('${member['uid']}');
-      out.add(_Entry(name, phone, member));
+      out.add(_Entry(name, phone, member, c));
     }
     for (final m in matches) {
       if (used.add('${m['uid']}')) out.add(_Entry((m['saved'] as String?) ?? _memberName(m), m['phone'] as String?, m));
@@ -686,7 +724,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
       ];
     }
     final all = _entries;
-    final mine = all.where((e) => '${e.name} ${e.phone ?? ''} ${e.member == null ? '' : '${e.member!['name']} ${e.member!['company']} ${e.member!['category']} ${e.member!['location']} ${(e.member!['services'] as List? ?? const []).join(' ')}'}'.toLowerCase().contains(q)).toList();
+    final mine = all.where((e) => '${e.name} ${e.phone ?? ''} ${e.org} ${(e.contact?.emails ?? const <Email>[]).map((m) => m.address).join(' ')} ${e.member == null ? '' : '${e.member!['name']} ${e.member!['company']} ${e.member!['category']} ${e.member!['location']} ${(e.member!['services'] as List? ?? const []).join(' ')}'}'.toLowerCase().contains(q)).toList();
     final aiMatches = _aiFor == _q.text.trim() ? ((_ai?['matches'] as List?) ?? const []).cast<Map>() : const <Map>[];
     bool shown(Map u) => mine.any((e) => e.member?['uid'] == u['uid']) || aiMatches.any((m) => m['uid'] == u['uid']);
     final others = (_results ?? const <Map>[]).where((u) => !shown(u)).take(20).toList();
@@ -812,7 +850,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     final d = (m?['distanceM'] as num?)?.toDouble();
     final away = d == null ? '' : (d < 1000 ? t('under 1 km') : t('{n} km', {'n': (d / 1000).toStringAsFixed(d < 10000 ? 1 : 0)}));
     final sub = m == null
-        ? (e.phone ?? '')
+        ? [e.org, e.phone ?? ''].where((s) => s.isNotEmpty).join(' · ')
         : [if (who != e.name) who, '${m['category'] ?? ''}', '${m['location'] ?? ''}', away].where((s) => s.isNotEmpty).join(' · ');
     final reviews = (m?['reviews'] as num?)?.toInt() ?? 0;
     final rating = (m?['rating'] as num?)?.toDouble() ?? 0;
@@ -824,7 +862,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         padding: EdgeInsets.symmetric(vertical: why == null || why.isEmpty ? 0 : 8),
         child: Row(children: [
           Stack(clipBehavior: Clip.none, children: [
-            Avatar(name: e.name, photoUrl: (m?['photoURL'] ?? m?['photoUrl']) as String?, size: 44),
+            _photo(e, m, 44),
             // a WEBWEB page: the gold W on the picture
             if (m != null)
               Positioned(
@@ -868,54 +906,84 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     );
   }
 
-  /// A contact without a page: call, WhatsApp, or invite them to make one.
+  /// The page's photo, else the one saved on the phone, else the initials
+  Widget _photo(_Entry e, Map? m, double size) {
+    final url = (m?['photoURL'] ?? m?['photoUrl']) as String?;
+    final thumb = e.contact?.photo?.thumbnail;
+    if ((url ?? '').isEmpty && thumb != null && thumb.isNotEmpty) {
+      return ClipOval(child: Image.memory(thumb, width: size, height: size, fit: BoxFit.cover, gaplessPlayback: true));
+    }
+    return Avatar(name: e.name, photoUrl: url, size: size);
+  }
+
+  /// A contact without a page: everything saved on it (each number with call and WhatsApp, emails, company,
+  /// address), and an invitation to make a page.
   Future<void> _contactSheet(_Entry e) async {
     final p = Pal.of(context);
-    final ten = e.phone == null ? null : ContactSync.mobile10(e.phone!);
+    final c = e.contact;
+    final phones = c == null ? [if (e.phone != null) e.phone!] : c.phones.map((ph) => ph.number).toSet().toList();
+    final emails = (c?.emails ?? const <Email>[]).map((m) => m.address.trim()).where((m) => m.isNotEmpty).toSet().toList();
+    final places = (c?.addresses ?? const <Address>[])
+        .map((a) => (a.formatted ?? [a.street, a.subLocality, a.city, a.state, a.postalCode].whereType<String>().where((x) => x.trim().isNotEmpty).join(', ')).trim())
+        .where((a) => a.isNotEmpty)
+        .toSet()
+        .toList();
+    final ten = phones.map(ContactSync.mobile10).whereType<String>().firstOrNull;
     final invite = '${t('I have a free business page on WEBWEB, the AI Phonebook. Make yours so customers can find and review you:')} https://webweb.ai';
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: p.canvas,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            ListTile(
-              leading: Avatar(name: e.name, size: 44),
-              title: Text(e.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text(e.phone ?? '', style: TextStyle(color: p.muted)),
+      isScrollControlled: true,
+      builder: (ctx) {
+        void go(String url) {
+          Navigator.pop(ctx);
+          _open(url);
+        }
+
+        Widget icon(IconData i, Color color, String tip, VoidCallback onTap) => IconButton(tooltip: tip, onPressed: onTap, icon: Icon(i, color: color));
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * .8),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                ListTile(
+                  leading: _photo(e, null, 48),
+                  title: Text(e.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                  subtitle: e.org.isEmpty ? null : Text(e.org, style: TextStyle(color: p.muted)),
+                ),
+                const Divider(height: 8),
+                for (final ph in phones)
+                  ListTile(
+                    leading: Icon(Icons.phone_rounded, color: p.muted),
+                    title: Text(ph),
+                    onTap: () => go('tel:${ph.replaceAll(RegExp(r'[^\d+]'), '')}'),
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      icon(Icons.call_rounded, const Color(0xFF1E9E5A), t('Call'), () => go('tel:${ph.replaceAll(RegExp(r'[^\d+]'), '')}')),
+                      if (ContactSync.mobile10(ph) != null) icon(Icons.chat_rounded, const Color(0xFF25D366), 'WhatsApp', () => go('https://wa.me/91${ContactSync.mobile10(ph)}')),
+                    ]),
+                  ),
+                for (final m in emails)
+                  ListTile(leading: Icon(Icons.mail_outline_rounded, color: p.muted), title: Text(m), onTap: () => go('mailto:$m')),
+                for (final a in places)
+                  ListTile(
+                    leading: Icon(Icons.place_outlined, color: p.muted),
+                    title: Text(a),
+                    onTap: () => go('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(a)}'),
+                  ),
+                if (ten != null) ...[
+                  const Divider(height: 8),
+                  ListTile(
+                    leading: const Icon(Icons.person_add_alt_1_rounded, color: kStar),
+                    title: Text(t('Invite to the phonebook')),
+                    onTap: () => go('https://wa.me/91$ten?text=${Uri.encodeComponent(invite)}'),
+                  ),
+                ],
+              ]),
             ),
-            const Divider(height: 8),
-            if (e.phone != null)
-              ListTile(
-                leading: const Icon(Icons.call_rounded, color: Color(0xFF1E9E5A)),
-                title: Text(t('Call')),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _open('tel:${e.phone!.replaceAll(RegExp(r'[^\d+]'), '')}');
-                },
-              ),
-            if (ten != null) ...[
-              ListTile(
-                leading: const Icon(Icons.chat_rounded, color: Color(0xFF25D366)),
-                title: const Text('WhatsApp'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _open('https://wa.me/91$ten');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.person_add_alt_1_rounded, color: kStar),
-                title: Text(t('Invite to the phonebook')),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _open('https://wa.me/91$ten?text=${Uri.encodeComponent(invite)}');
-                },
-              ),
-            ],
-          ]),
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
