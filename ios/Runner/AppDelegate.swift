@@ -28,6 +28,7 @@ import flutter_callkit_incoming
     // forwards it to them, so taps and foreground pushes reach Dart) and ask for the APNs token here,
     // which Firebase needs before it hands out the FCM token used for message notifications.
     UNUserNotificationCenter.current().delegate = self
+    registerNotificationCategories()
     application.registerForRemoteNotifications()
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
@@ -47,6 +48,97 @@ import flutter_callkit_incoming
       }
       result(nil)
     }
+  }
+
+  // MARK: Notification buttons
+
+  /// MESSAGE: Reply (a text box, answered without opening the app). ASK (a new lead): Reply ("I can do this", with a
+  /// note) and Refer (opens the app on the contact picker). The API names the category in the push (app-push.ts).
+  private func registerNotificationCategories() {
+    let reply = UNTextInputNotificationAction(identifier: "REPLY", title: "Reply", options: [], textInputButtonTitle: "Send", textInputPlaceholder: "Reply")
+    let offer = UNTextInputNotificationAction(identifier: "REPLY", title: "Reply", options: [], textInputButtonTitle: "Send", textInputPlaceholder: "I can do this: price, when")
+    let refer = UNNotificationAction(identifier: "REFER", title: "Refer", options: [.foreground])
+    UNUserNotificationCenter.current().setNotificationCategories([
+      UNNotificationCategory(identifier: "MESSAGE", actions: [reply], intentIdentifiers: [], options: []),
+      UNNotificationCategory(identifier: "ASK", actions: [offer, refer], intentIdentifiers: [], options: []),
+    ])
+  }
+
+  /// Reply and Refer typed or tapped on a notification, also with the app closed. Everything else (a plain tap)
+  /// goes on to the plugins as before. Reply is sent from here with the saved sign-in; Refer leaves a note for the
+  /// app (notifications.dart, _takePendingAction) and brings it to the front.
+  override func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    let action = response.actionIdentifier
+    guard action == "REPLY" || action == "REFER" else {
+      return super.userNotificationCenter(center, didReceive: response, withCompletionHandler: completionHandler)
+    }
+    var info = response.notification.request.content.userInfo as? [String: Any] ?? [:]
+    // a notification the app showed itself (local) keeps its data as JSON in "payload"
+    if let raw = info["payload"] as? String, let data = raw.data(using: .utf8),
+       let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+      info = parsed
+    }
+    if action == "REFER" {
+      var note: [String: Any] = ["postId": info["postId"] ?? "", "body": response.notification.request.content.body]
+      note["kind"] = info["kind"] ?? "ask_match"
+      if let json = try? JSONSerialization.data(withJSONObject: note), let text = String(data: json, encoding: .utf8) {
+        UserDefaults.standard.set(text, forKey: "flutter.pending_action")
+      }
+      return completionHandler()
+    }
+    guard let text = (response as? UNTextInputNotificationResponse)?.userText.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+      return completionHandler()
+    }
+    info["clientId"] = UUID().uuidString
+    sendReply(info, text: text, done: completionHandler)
+  }
+
+  /// POST a chat message (chatId) or an "I can do this" reply (postId), with a background task so iOS lets it finish.
+  private func sendReply(_ info: [String: Any], text: String, attempt: Int = 0, task: UIBackgroundTaskIdentifier? = nil, done: @escaping () -> Void) {
+    var bg = task ?? UIBackgroundTaskIdentifier.invalid
+    if task == nil {
+      bg = UIApplication.shared.beginBackgroundTask(withName: "notification-reply") {
+        UIApplication.shared.endBackgroundTask(bg)
+        bg = .invalid
+      }
+    }
+    func finish() {
+      DispatchQueue.main.async {
+        if bg != .invalid { UIApplication.shared.endBackgroundTask(bg) }
+        bg = .invalid
+        done()
+      }
+    }
+    let saved = UserDefaults.standard
+    var endpoint: String?
+    var body: [String: Any] = [:]
+    if let chatId = info["chatId"] as? String, !chatId.isEmpty {
+      endpoint = "/chats/\(chatId)/messages"
+      body = ["text": text, "clientId": info["clientId"] as? String ?? UUID().uuidString]
+    } else if let postId = info["postId"] as? String, !postId.isEmpty {
+      endpoint = "/posts/\(postId)/share"
+      body = ["kind": "info", "text": text, "canDo": true]
+    }
+    guard let api = saved.string(forKey: "flutter.apiUrl"), let token = saved.string(forKey: "flutter.token"),
+          let path = endpoint, let url = URL(string: "\(api)\(path)") else { return finish() }
+    var req = URLRequest(url: url, timeoutInterval: 15)
+    req.httpMethod = "POST"
+    req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+    // the same clientId on a retry, so a reply that went through but lost its answer is not sent twice
+    URLSession.shared.dataTask(with: req) { _, resp, err in
+      let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+      if (err != nil || code >= 500) && attempt < 2 {
+        DispatchQueue.global().asyncAfter(deadline: .now() + 1.5) { self.sendReply(info, text: text, attempt: attempt + 1, task: bg, done: done) }
+      } else {
+        finish()
+      }
+    }.resume()
   }
 
   // MARK: PushKit

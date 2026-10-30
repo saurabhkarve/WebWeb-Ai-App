@@ -17,6 +17,7 @@ import 'native_calls.dart';
 import 'realtime.dart';
 import 'widgets.dart';
 import 'i18n.dart';
+import 'screens/contact_picker.dart';
 import 'screens/leads.dart';
 import 'screens/p2.dart';
 import 'screens/post_detail.dart';
@@ -70,7 +71,7 @@ class NotificationService with WidgetsBindingObserver {
     }
     _ready = true;
     WidgetsBinding.instance.addObserver(this);
-    await _initLocal(onTap: (r) => _openFromPayload(r.payload));
+    await _initLocal(onTap: _onResponse);
 
     final fm = FirebaseMessaging.instance;
     // iOS: in the foreground we show our own local notification (see onMessage), so no system banner too.
@@ -95,6 +96,7 @@ class NotificationService with WidgetsBindingObserver {
       if (ev is CallEventActionDidUpdateDevicePushTokenVoip) _registerVoip();
     });
 
+    _takePendingAction();
     // Cold start from a tapped notification.
     final initial = await fm.getInitialMessage();
     final launch = await _local.getNotificationAppLaunchDetails();
@@ -113,6 +115,7 @@ class NotificationService with WidgetsBindingObserver {
     // a registration that failed (no APNs token yet, offline) is retried whenever the app comes back, and the token
     // is sent again at most hourly so a server that lost it (a cleanup, a restore) gets it back on the next open
     if (!_foreground) return;
+    _takePendingAction();
     Device.report(auth.api); // permissions may have changed in Settings meanwhile
     if (_registeredFor != null && _registeredAt != null && DateTime.now().difference(_registeredAt!) > const Duration(hours: 1)) {
       _registeredFor = null;
@@ -264,7 +267,7 @@ class NotificationService with WidgetsBindingObserver {
     switch (d['type']) {
       case 'msg':
         if (_foreground && activeChat == d['chatId']) return;
-        await showMessage(chatId: '${d['chatId']}', name: title ?? '${d['name']}', body: body ?? '');
+        await showMessage(chatId: '${d['chatId']}', name: title ?? '${d['title'] ?? d['name']}', body: body ?? '${d['body'] ?? ''}');
         break;
       case 'call':
         if (rt.connected) return; // the socket already brought the offer to CallManager
@@ -275,8 +278,73 @@ class NotificationService with WidgetsBindingObserver {
         break;
       default:
         if (d['kind'] == null && d['path'] == null) return;
-        await showActivity(d, title: title ?? 'WEBWEB AI', body: body ?? '');
+        await showActivity(d, title: title ?? '${d['title'] ?? 'WEBWEB AI'}', body: body ?? '${d['body'] ?? ''}');
     }
+  }
+
+  // ---------- notification buttons ----------
+  /// A tap on a notification or on one of its buttons (the app is running; a Reply typed while it was closed went
+  /// through [notificationBackgroundResponse]).
+  void _onResponse(NotificationResponse r) {
+    if (r.actionId == 'reply') {
+      _handleReply(r);
+    } else if (r.actionId == 'refer') {
+      _refer(r.payload);
+    } else {
+      _openFromPayload(r.payload);
+    }
+  }
+
+  void _handleReply(NotificationResponse r) {
+    final text = (r.input ?? '').trim();
+    if (text.isNotEmpty) handleNotificationReply(r.payload, text);
+  }
+
+  /// iPhone: the notification's Reply / Refer buttons are handled natively (AppDelegate), which leaves a note here
+  /// for what needs the app (Refer opens the contact picker).
+  Future<void> _takePendingAction() async {
+    if (!_ios) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      final raw = prefs.getString('pending_action');
+      if (raw == null) return;
+      await prefs.remove('pending_action');
+      _refer(raw);
+    } catch (_) {}
+  }
+
+  /// "Refer" on a lead notification: the ask opens and the member picks the contacts to refer.
+  Future<void> _refer(String? payload) async {
+    String? postId;
+    var asker = '';
+    try {
+      final d = jsonDecode(payload ?? '{}') as Map;
+      postId = '${d['postId'] ?? ''}';
+      asker = '${d['body'] ?? ''}'.split(' · ').first;
+    } catch (_) {}
+    if (postId == null || postId.isEmpty) return _openFromPayload(payload);
+    for (var i = 0; i < 40 && (auth.profile == null || nav.currentState == null); i++) {
+      await Future.delayed(const Duration(milliseconds: 250));
+    }
+    final nv = nav.currentState;
+    final ctx = nav.currentContext;
+    if (nv == null || ctx == null || auth.profile == null) return;
+    nv.push(MaterialPageRoute(builder: (_) => PostDetailScreen(postId: postId!)));
+    try {
+      final mine = ((await auth.api.get('/app/posts/$postId/referrals/mine')) as List).length;
+      if (mine >= 5) return;
+      final picked = await nv.push<List<PickedContact>>(MaterialPageRoute(builder: (_) => ContactPicker(askerName: asker, maxSelect: 5 - mine)));
+      var ok = 0;
+      for (final c in picked ?? const <PickedContact>[]) {
+        try {
+          await auth.api.post('/posts/$postId/refer', {'name': c.name, 'phone': c.phone});
+          ok++;
+        } catch (_) {}
+      }
+      final c2 = nav.currentContext;
+      if (ok > 0 && c2 != null && c2.mounted) toast(c2, t('Referral sent'));
+    } catch (_) {}
   }
 
   // ---------- taps ----------
@@ -388,6 +456,23 @@ const _callsChannel = AndroidNotificationChannel(
   importance: Importance.max,
 );
 
+/// Reply from the notification itself (Android: an inline text box; iPhone: the MESSAGE / ASK category in AppDelegate).
+const _replyAction = AndroidNotificationAction(
+  'reply',
+  'Reply',
+  inputs: [AndroidNotificationActionInput(label: 'Reply')],
+  allowGeneratedReplies: true,
+  semanticAction: SemanticAction.reply,
+  cancelNotification: false,
+);
+const _askReplyAction = AndroidNotificationAction(
+  'reply',
+  'Reply',
+  inputs: [AndroidNotificationActionInput(label: 'I can do this: price, when')],
+  semanticAction: SemanticAction.reply,
+);
+const _referAction = AndroidNotificationAction('refer', 'Refer', showsUserInterface: true);
+
 const _messageDetails = NotificationDetails(
   android: AndroidNotificationDetails(
     'messages',
@@ -396,6 +481,7 @@ const _messageDetails = NotificationDetails(
     importance: Importance.high,
     priority: Priority.high,
     category: AndroidNotificationCategory.message,
+    groupKey: 'messages',
   ),
   iOS: DarwinNotificationDetails(threadIdentifier: 'messages'),
 );
@@ -407,6 +493,7 @@ const _asksDetails = NotificationDetails(
     channelDescription: 'Responses and referrals on your asks and catalog',
     importance: Importance.high,
     priority: Priority.high,
+    groupKey: 'asks',
   ),
   iOS: DarwinNotificationDetails(threadIdentifier: 'asks'),
 );
@@ -420,6 +507,7 @@ Future<void> _initLocal({DidReceiveNotificationResponseCallback? onTap}) async {
       iOS: DarwinInitializationSettings(requestAlertPermission: false, requestBadgePermission: false, requestSoundPermission: false),
     ),
     onDidReceiveNotificationResponse: onTap,
+    onDidReceiveBackgroundNotificationResponse: notificationBackgroundResponse,
   );
   final android = _local.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
   await android?.createNotificationChannel(_messagesChannel);
@@ -432,16 +520,155 @@ Future<void> _initLocal({DidReceiveNotificationResponseCallback? onTap}) async {
 
 int _callNotifId(String callId) => callId.hashCode & 0x7fffffff;
 
-Future<void> showMessage({required String chatId, required String name, required String body}) async {
+int _chatNotifId(String chatId) => chatId.hashCode & 0x7fffffff;
+const _summaryId = 0x7ffffff0;
+
+/// What a chat's notification shows: the last few lines, theirs and the ones sent from the notification.
+Future<List<Map<String, dynamic>>> _chatLines(String chatId, {String? add, bool mine = false}) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.reload();
+  final key = 'nh_$chatId';
+  final lines = <Map<String, dynamic>>[];
+  for (final e in prefs.getStringList(key) ?? const <String>[]) {
+    try {
+      lines.add(Map<String, dynamic>.from(jsonDecode(e) as Map));
+    } catch (_) {}
+  }
+  if (add != null) {
+    lines.add({'t': add, 'me': mine, 'ts': DateTime.now().millisecondsSinceEpoch});
+    if (lines.length > 6) lines.removeRange(0, lines.length - 6);
+    await prefs.setStringList(key, [for (final l in lines) jsonEncode(l)]);
+  }
+  return lines;
+}
+
+/// The chat is open or answered: its notification and the lines it kept go away.
+Future<void> clearChatNotification(String chatId) async {
+  try {
+    await _initLocal();
+    await _local.cancel(id: _chatNotifId(chatId));
+    (await SharedPreferences.getInstance()).remove('nh_$chatId');
+  } catch (_) {}
+}
+
+/// One notification per chat (the same person or group): new messages are added to it as lines (Android:
+/// MessagingStyle with a Reply box, several chats fold into one group; iPhone: threadIdentifier = the chat).
+Future<void> showMessage({required String chatId, required String name, required String body, bool quiet = false, String? sent, bool failed = false}) async {
   await _initLocal();
+  final lines = await _chatLines(chatId, add: sent ?? body, mine: sent != null);
+  final them = Person(name: name, key: chatId);
+  const me = Person(name: 'You', key: 'me');
   await _local.show(
-    id: chatId.hashCode & 0x7fffffff,
+    id: _chatNotifId(chatId),
     title: name,
-    body: body,
-    notificationDetails: _messageDetails,
+    body: lines.last['t'] as String,
+    notificationDetails: NotificationDetails(
+      android: AndroidNotificationDetails(
+        quiet ? 'quiet' : 'messages',
+        quiet ? 'Quiet hours' : 'Messages',
+        channelDescription: 'New chat messages and missed calls',
+        importance: quiet ? Importance.low : Importance.high,
+        priority: quiet ? Priority.low : Priority.high,
+        category: AndroidNotificationCategory.message,
+        groupKey: 'messages',
+        tag: chatId,
+        onlyAlertOnce: sent != null,
+        actions: const [_replyAction],
+        styleInformation: MessagingStyleInformation(
+          me,
+          conversationTitle: name,
+          groupConversation: false,
+          messages: [for (final l in lines) Message(l['t'] as String, DateTime.fromMillisecondsSinceEpoch(l['ts'] as int), l['me'] == true ? me : them)],
+        ),
+      ),
+      iOS: DarwinNotificationDetails(threadIdentifier: chatId, categoryIdentifier: 'MESSAGE'),
+    ),
     payload: jsonEncode({'type': 'msg', 'chatId': chatId, 'name': name}),
   );
+  await _summary('messages', 'Messages', 'New messages');
 }
+
+/// Android folds notifications of one group under a summary; without one they would not be grouped below four.
+Future<void> _summary(String group, String channelName, String text) async {
+  if (defaultTargetPlatform != TargetPlatform.android) return;
+  await _local.show(
+    id: _summaryId + (group == 'messages' ? 0 : group == 'asks' ? 1 : 2),
+    title: 'WEBWEB AI',
+    body: text,
+    notificationDetails: NotificationDetails(
+      android: AndroidNotificationDetails(
+        group == 'messages' ? 'messages' : 'asks',
+        channelName,
+        groupKey: group,
+        setAsGroupSummary: true,
+        groupAlertBehavior: GroupAlertBehavior.children,
+        importance: Importance.high,
+        priority: Priority.high,
+        styleInformation: const InboxStyleInformation([]),
+      ),
+    ),
+  );
+}
+
+/// A Reply typed into a notification (also when the app is closed): sent as a chat message, or as "I can do this"
+/// on a lead. The notification then shows it, or says it was not sent.
+Future<void> handleNotificationReply(String? payload, String text) async {
+  Map<String, dynamic> d;
+  try {
+    d = Map<String, dynamic>.from(jsonDecode(payload ?? '{}') as Map);
+  } catch (_) {
+    return;
+  }
+  final ok = await sendNotificationReply(d, text);
+  await _initLocal();
+  final chatId = '${d['chatId'] ?? ''}';
+  if (chatId.isNotEmpty) {
+    await showMessage(chatId: chatId, name: '${d['name'] ?? 'Chat'}', body: '', sent: ok ? text : 'Not sent: $text. Tap to try again.');
+  } else {
+    await _local.cancel(id: _activityId(d, ''));
+    if (!ok) await _showFailed(d);
+  }
+}
+
+Future<void> _showFailed(Map<String, dynamic> d) => _local.show(
+      id: _activityId(d, ''),
+      title: 'Reply not sent',
+      body: 'Tap to open the ask and try again',
+      notificationDetails: const NotificationDetails(android: AndroidNotificationDetails('asks', 'Asks', groupKey: 'asks'), iOS: DarwinNotificationDetails(threadIdentifier: 'asks')),
+      payload: jsonEncode(d),
+    );
+
+/// Sends a notification's Reply with the saved sign-in (this also runs in the background isolate).
+Future<bool> sendNotificationReply(Map<String, dynamic> d, String text) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.reload();
+  final token = prefs.getString('token');
+  if (token == null) return false;
+  final api = Api(() => token);
+  try {
+    final chatId = '${d['chatId'] ?? ''}';
+    final postId = '${d['postId'] ?? ''}';
+    if (chatId.isNotEmpty) {
+      await api.post('/chats/$chatId/messages', {'text': text, 'clientId': NativeCalls.newCallId()});
+    } else if (postId.isNotEmpty) {
+      await api.post('/posts/$postId/share', {'kind': 'info', 'text': text, 'canDo': true});
+    } else {
+      return false;
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Reply typed into a notification while the app is closed (Android runs this in a background isolate).
+@pragma('vm:entry-point')
+Future<void> notificationBackgroundResponse(NotificationResponse r) async {
+  if (r.actionId != 'reply') return;
+  final text = (r.input ?? '').trim();
+  if (text.isNotEmpty) await handleNotificationReply(r.payload, text);
+}
+
 const _activityDetails = NotificationDetails(
   android: AndroidNotificationDetails(
     'activity',
@@ -449,29 +676,63 @@ const _activityDetails = NotificationDetails(
     channelDescription: 'Reactions, reposts, ratings and new asks that fit your business',
     importance: Importance.defaultImportance,
     priority: Priority.defaultPriority,
+    groupKey: 'activity',
   ),
   iOS: DarwinNotificationDetails(threadIdentifier: 'activity'),
 );
 
+int _activityId(Map<String, dynamic> d, String title) {
+  final kind = '${d['kind'] ?? d['type'] ?? ''}';
+  final key = '${d['postId'] ?? d['productId'] ?? d['storyId'] ?? _sender(d) ?? d['nid'] ?? title}$kind';
+  return key.hashCode & 0x7fffffff;
+}
+
 /// Any notification from the API's engine (asks, responses, activity, catch-ups). Notifications on the
-/// same subject replace each other (same id).
+/// same subject replace each other (same id). A new lead (ask_match) has Reply ("I can do this") and Refer.
 Future<void> showActivity(Map<String, dynamic> d, {required String title, required String body}) async {
   await _initLocal();
   final kind = '${d['kind'] ?? d['type'] ?? ''}';
   if (kind == 'message' || kind == 'msg') {
-    await showMessage(chatId: '${d['chatId']}', name: title, body: body);
+    await showMessage(chatId: '${d['chatId']}', name: title, body: body, quiet: d['channel'] == 'quiet');
     return;
   }
   const asks = {'ask_response', 'ask_referral', 'ask_reaction', 'ask_repost', 'ask_shared', 'ask_thread', 'share_asked', 'share_answered', 'contact_request', 'item_referral', 'ask_match', 'ask_won', 'ask_outcome'};
-  final details = kind == 'missed_call' ? _messageDetails : (asks.contains(kind) ? _asksDetails : _activityDetails);
-  final key = '${d['postId'] ?? d['productId'] ?? d['storyId'] ?? _sender(d) ?? d['nid'] ?? title}$kind';
+  final lead = kind == 'ask_match' && '${d['postId'] ?? ''}'.isNotEmpty;
+  final quiet = d['channel'] == 'quiet';
+  final isAsk = asks.contains(kind);
+  final NotificationDetails details;
+  if (kind == 'missed_call') {
+    details = _messageDetails;
+  } else if (lead) {
+    details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        quiet ? 'quiet' : 'asks',
+        quiet ? 'Quiet hours' : 'Asks',
+        channelDescription: 'Responses and referrals on your asks and catalog',
+        importance: quiet ? Importance.low : Importance.high,
+        priority: quiet ? Priority.low : Priority.high,
+        groupKey: 'asks',
+        actions: const [_askReplyAction, _referAction],
+      ),
+      iOS: DarwinNotificationDetails(threadIdentifier: 'ask-${d['postId']}', categoryIdentifier: 'ASK'),
+    );
+  } else if (isAsk) {
+    details = _asksDetails;
+  } else {
+    details = _activityDetails;
+  }
   await _local.show(
-    id: key.hashCode & 0x7fffffff,
+    id: _activityId(d, title),
     title: title,
     body: body,
     notificationDetails: details,
     payload: jsonEncode(d),
   );
+  if (isAsk) {
+    await _summary('asks', 'Asks', 'Activity on your asks');
+  } else if (details == _activityDetails) {
+    await _summary('activity', 'Activity', 'New activity');
+  }
 }
 
 Future<void> showIncomingCall({required String callId, required String from, required String name, required bool video}) async {
@@ -536,6 +797,15 @@ Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
   // signed out on this phone: a push still on its way is not for it (no ringing for a call)
   if (message.data['type'] == 'call' && (await SharedPreferences.getInstance()).getString('token') == null) return;
   await initFirebase();
+  // Android messages and leads arrive data-only (the API: app-push.ts), so the app shows them, with their buttons
+  final d = message.data;
+  if (message.notification == null && d['title'] != null && (d['kind'] == 'message' || d['kind'] == 'ask_match')) {
+    if ((await SharedPreferences.getInstance()).getString('token') == null) return;
+    try {
+      await showActivity(d, title: '${d['title']}', body: '${d['body'] ?? ''}');
+    } catch (_) {}
+    return;
+  }
   await handleCallData(message.data);
   // the main app may not be running to hear the phone's Decline: wait here for this call's answer
   if (message.data['type'] == 'call' && NativeCalls.supported) await _declineWhenDeclined('${message.data['callId']}');

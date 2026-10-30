@@ -577,6 +577,7 @@ class _ChatThreadState extends State<ChatThread> {
   void initState() {
     super.initState();
     NotificationService.activeChat = widget.chatId;
+    clearChatNotification(widget.chatId); // its notification and the lines it kept
     _apiKept;
     _meKept;
     _load();
