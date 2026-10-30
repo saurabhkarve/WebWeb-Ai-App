@@ -4,7 +4,7 @@ import '../i18n.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-/// The opening screen, laid out like the big apps': the WEBWEB lockup as in the header, a little above the middle, and "from SKYQ" at the bottom edge. Sizes follow the screen (the short side), and the two groups are
+/// The opening screen, laid out like the big apps': the WEBWEB lockup as in the header, a little above the middle, and "from SkyQ" at the bottom edge. Sizes follow the screen (the short side), and the two groups are
 /// placed by alignment, not by fixed offsets, so it fits a small phone, a tall one, a tablet or a landscape window
 /// without overflowing.
 class SplashScreen extends StatelessWidget {
@@ -38,7 +38,7 @@ class SplashScreen extends StatelessWidget {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 Text(t('from'), style: TextStyle(fontSize: small, color: p.muted, height: 1.2)),
                 SizedBox(height: small * .25),
-                Text('SKYQ', style: TextStyle(fontSize: small * 1.35, fontWeight: FontWeight.w700, letterSpacing: small * .12, color: p.text)),
+                Text('SkyQ', style: TextStyle(fontSize: small * 1.35, fontWeight: FontWeight.w700, letterSpacing: small * .12, color: p.text)),
               ]),
             ),
           ),

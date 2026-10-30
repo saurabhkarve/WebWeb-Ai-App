@@ -15,7 +15,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       expect(tester.takeException(), isNull);
       final title = tester.getRect(find.byType(LogoInline));
-      final from = tester.getRect(find.text('SKYQ'));
+      final from = tester.getRect(find.text('SkyQ'));
       expect(title.bottom, lessThan(from.top));
       expect(from.bottom, lessThanOrEqualTo(h));
     });

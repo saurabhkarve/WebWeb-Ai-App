@@ -14,7 +14,6 @@ import '../links.dart';
 import '../models.dart';
 import '../safety.dart';
 import '../screens/ask.dart';
-import '../screens/contact_picker.dart';
 import '../screens/find.dart';
 import '../screens/p2.dart' show showAlertSheet;
 import '../screens/post_detail.dart';
@@ -28,6 +27,7 @@ import 'reaction_picker.dart';
 import 'swipe_deck.dart';
 import 'reply_thread.dart';
 import 'p1.dart';
+import 'refer_sheet.dart';
 import 'response_sheet.dart';
 import 'tour.dart';
 import '../share_log.dart';
@@ -773,71 +773,16 @@ class PostActionsState extends State<PostActions> {
     }
   }
 
-  /// Refer contacts from the phone book (one call per contact, max 5 per ask).
-  Future<void> _refer() async {
-    if (widget.post.closed) return toast(context, t('This ask is closed'));
-    final api = _api;
-    var mine = 0;
-    try {
-      mine = ((await api.get('/app/posts/${post.id}/referrals/mine')) as List).length;
-    } catch (_) {}
-    if (!mounted) return;
-    final left = 5 - mine;
-    if (left <= 0) return toast(context, t('You can refer up to 5 contacts on one ask'));
-    final picked = await Navigator.push<List<PickedContact>>(context, MaterialPageRoute(builder: (_) => ContactPicker(askerName: post.shownName, maxSelect: left)));
-    if (picked == null || picked.isEmpty || !mounted) return;
-    var ok = 0;
-    String? err;
-    for (final c in picked) {
-      try {
-        await api.post('/posts/${post.id}/refer', {'name': c.name, 'phone': c.phone});
-        ok++;
-      } catch (e) {
-        err = '$e';
-      }
-    }
-    if (!mounted) return;
-    if (ok > 0) {
-      post.referralsCount += ok;
-      _changed();
-    }
-    toast(context, ok > 0 ? t('Referral sent') : (err ?? t('Could not refer')), error: ok == 0);
-  }
-
-  /// The one Reply-or-refer button: help yourself, or put someone you know in touch (an update: pass it on).
-  Future<void> _replyOrRefer(bool isAsk) async {
-    final p = Pal.of(context);
-    Widget option(BuildContext ctx, WI icon, String title, String sub, String value, {bool gold = false}) => ListTile(
-          leading: Container(
-            width: 40,
-            height: 40,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(gradient: gold ? kGoldGradient : null, color: gold ? null : p.chip, shape: BoxShape.circle),
-            child: WIcon(icon, size: 20, color: gold ? kInk : p.text),
-          ),
-          title: Text(t(title), style: const TextStyle(fontWeight: FontWeight.w700)),
-          subtitle: Text(t(sub), style: TextStyle(fontSize: 12.5, color: p.muted)),
-          onTap: () => Navigator.pop(ctx, value),
-        );
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: p.canvas,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            option(ctx, WI.talk, isAsk ? 'I can help' : 'Reply', isAsk ? 'Send your price and when you can do it' : 'Write to them about this', 'reply', gold: true),
-            option(ctx, WI.refer, isAsk ? 'Refer someone' : 'Pass it on', isAsk ? 'Put a contact who can do it in touch' : 'Send it to someone on WhatsApp', 'refer'),
-          ]),
-        ),
-      ),
-    );
-    if (!mounted || choice == null) return;
-    if (choice == 'reply') {
-      widget.onReply();
-    } else {
-      isAsk ? await _refer() : await _whatsApp();
-    }
+  /// Refer: on an ask, the note box with "Attach a contact" (refer_sheet.dart), open and ready to type; on an update,
+  /// pass it on over WhatsApp.
+  Future<void> _referTap(bool isAsk) async {
+    if (!isAsk) return _whatsApp();
+    if (post.closed) return toast(context, t('This ask is closed'));
+    final r = await showReferSheet(context, post);
+    if (r == null || !mounted) return;
+    if (r.referred > 0) post.referralsCount += r.referred;
+    _changed();
+    toast(context, t(r.referred > 0 ? 'Referral sent' : 'Response sent'));
   }
 
   @override
@@ -971,7 +916,7 @@ class PostActionsState extends State<PostActions> {
         return Semantics(button: true, label: t(label), excludeSemantics: true, child: onTap == null ? c : InkWell(onTap: onTap, borderRadius: radius, hoverColor: splash, highlightColor: splash, child: c));
       }
 
-      // React, Reply or refer (gold, in the middle) and Share; the views are in the header above the cards. Equal widths:
+      // React, Refer (gold, in the middle) and Share; the views are in the header above the cards. Equal widths:
       // each is as wide as the widest needs, count or not, so nothing shifts when a count appears
       final kids = <Widget>[
         // React first
@@ -991,22 +936,22 @@ class PostActionsState extends State<PostActions> {
         if (mine && isAsk)
           pill(label: 'Review responses', icon: WIcon(WI.talk, size: 18, color: p.tagText), count: post.sharesCount, badge: p.tagBg, color: p.tagText, edge: kGold.withValues(alpha: .45), fill: kGold.withValues(alpha: .1), onTap: widget.onReview ?? widget.onReply)
         else
-          // Reply and Refer are one gold button: it asks which, "I can help" or "Refer someone" (on an update: reply, or
-          // pass it on over WhatsApp); its count is the replies and referrals together
+          // Refer, gold: the note box with Attach a contact opens at once (on an update: pass it on over WhatsApp); its
+          // count is the replies and referrals together ("I can help" is the ask card's own button)
           tour(
             'reply',
             KeyedSubtree(
               key: widget.tourTarget ? Tours.key('refer') : null,
               child: pill(
-                label: 'Reply or refer',
-                icon: WIcon(WI.talk, size: 18, color: p.tagText),
+                label: 'Refer',
+                icon: WIcon(WI.refer, size: 18, color: p.tagText),
                 count: (isAsk ? post.sharesCount : 0) + post.referralsCount,
                 color: p.tagText,
                 badge: p.tagBg,
                 splash: kGold.withValues(alpha: .15),
                 edge: kGold.withValues(alpha: .45),
                 fill: kGold.withValues(alpha: .1),
-                onTap: () => _replyOrRefer(isAsk),
+                onTap: () => _referTap(isAsk),
               ),
             ),
           ),
@@ -1037,7 +982,7 @@ class PostActionsState extends State<PostActions> {
           wrap: false,
         ),
       ),
-      if (isAsk && !mine) tour('refer', btn(icon: WIcon(WI.refer, size: 20, color: p.muted), count: post.referralsCount, label: 'Refer', color: p.muted, onTap: _refer)),
+      if (isAsk && !mine) tour('refer', btn(icon: WIcon(WI.refer, size: 20, color: p.muted), count: post.referralsCount, label: 'Refer', color: p.muted, onTap: () => _referTap(true))),
       tour('reply', btn(icon: WIcon(WI.talk, size: 20, color: p.muted), count: isAsk ? post.sharesCount : null, label: 'Reply', color: p.muted, onTap: widget.onReply)),
       // Share holds Repost too: green with the repost icon once you have reposted it
       btn(

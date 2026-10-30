@@ -2643,5 +2643,8 @@
   "Type what you need in the search": "सोदांत तुमकां किदें जाय तें बरयात",
   "Or post it as an ask": "वा तें आस्क म्हूण पोस्ट करात",
   "Type a name, or what you need. Ask AI finds who can help, nearest first.": "नांव बरयात, वा तुमकां किदें जाय तें. Ask AI कोण मदत करूंक शकता तें सोदता, लागींचे पयलीं.",
-  "Businesses, jobs and asks around you": "तुमच्या भोंवतणच्या वेवसाय, नोकऱ्यो आनी गरजो"
+  "Businesses, jobs and asks around you": "तुमच्या भोंवतणच्या वेवसाय, नोकऱ्यो आनी गरजो",
+  "Attach a contact": "संपर्क जोडात",
+  "Who can help, and why they fit. Attach their contact below.": "कोण मदत करूंक शकता, आनी ते कित्याक योग्य. तांचो संपर्क सकयल जोडात.",
+  "{name} gets the contact and your note.": "{name} हांकां संपर्क आनी तुमची नोंद मेळटली."
 }
