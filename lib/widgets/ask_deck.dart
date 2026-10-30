@@ -256,15 +256,20 @@ class _AskDeckState extends State<AskDeck> {
               if (emoji) ...[Text(type.emoji, style: const TextStyle(fontSize: 16)), const SizedBox(width: 6)],
               Flexible(child: Padding(padding: EdgeInsets.only(right: rightPad), child: Text(t(sentence.key, {...sentence.vars, if (sentence.vars['what'] != null) 'what': t(sentence.vars['what']!)}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fgSub)))),
             ]);
+        // as many lines as the space holds (at most 4), the last ending in "…": a long title never runs into the chips
         Widget titleW(double size, {double rightPad = 0, bool center = false}) => Padding(
               padding: EdgeInsets.only(right: rightPad),
-              child: HashtagText(
-                (post.title ?? '').isEmpty ? t('Your title shows here') : post.title!,
-                maxLines: 4,
-                overflow: TextOverflow.ellipsis,
-                textAlign: center ? TextAlign.center : TextAlign.start,
-                style: TextStyle(fontSize: size * _scale, height: 1.15, letterSpacing: -.4, fontWeight: FontWeight.w700, color: (post.title ?? '').isEmpty ? (poster ? onSolid.withValues(alpha: .7) : p.muted) : fgTitle),
-              ),
+              child: LayoutBuilder(builder: (context, c) {
+                final line = size * _scale * 1.15 * MediaQuery.textScalerOf(context).scale(1);
+                final lines = c.maxHeight.isFinite ? (c.maxHeight / line).floor().clamp(1, 4) : 4;
+                return HashtagText(
+                  (post.title ?? '').isEmpty ? t('Your title shows here') : post.title!,
+                  maxLines: lines,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: center ? TextAlign.center : TextAlign.start,
+                  style: TextStyle(fontSize: size * _scale, height: 1.15, letterSpacing: -.4, fontWeight: FontWeight.w700, color: (post.title ?? '').isEmpty ? (poster ? onSolid.withValues(alpha: .7) : p.muted) : fgTitle),
+                );
+              }),
             );
         final chips = Wrap(spacing: 6, runSpacing: 6, children: [
           if ((post.locationPref ?? '').isNotEmpty) _chip(p, WI.pin, t(post.locationPref!)),
