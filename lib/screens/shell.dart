@@ -51,25 +51,28 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   Timer? _poll, _svcTimer;
   final _notes = NotificationsModel();
 
-  // The Smart Phonebook: Home (the feed), Recents (favourites, calls and contacts opened lately), Directory (the
-  // contacts, where the app opens: the raised gold button in the middle), Talk (chats and calls), Nearby (the local
-  // directory). The round gold button is Ask; Ask itself is a page of its own (index 5) without the bar.
-  // Notifications are the bell in the header. All five use the WebWeb icon set (the same Talk icon as before).
+  // The Smart Phonebook: Home (the feed), Nearby (the local directory), Directory (the contacts, where the app opens:
+  // the raised gold button in the middle), Talk (chats and calls), Notifications (responses and referrals on my asks).
+  // The round gold button is Ask; Ask itself is a page of its own (index 5) without the bar. Recents (favourites,
+  // calls and pages opened lately) is in the account menu. All five use the WebWeb icon set.
   // From 600 px wide (tablets, desktop) the bar becomes a rail down the left with Ask at its top, and pages keep a
   // readable width; from 1200 px the rail shows its labels beside the icons.
-  static const _items = [(WI.home, 'Home'), (WI.clock, 'Recents'), (WI.directory, 'Directory'), (WI.talk, 'Talk'), (WI.pin, 'Nearby')];
-  static const _tourKeys = ['nav-feed', 'nav-recents', 'nav-contacts', 'nav-talk', 'nav-find'];
+  static const _items = [(WI.home, 'Home'), (WI.pin, 'Nearby'), (WI.directory, 'Directory'), (WI.talk, 'Talk'), (WI.bell, 'Notifications')];
+  static const _tourKeys = ['nav-feed', 'nav-find', 'nav-contacts', 'nav-talk', 'nav-notes'];
   /// how far the Contacts button rises above the bar
   static const _rise = 20.0;
-  static const _feed = 0, _recents = 1, _dir = 2, _talk = 3, _ask = 5;
+  static const _feed = 0, _dir = 2, _talk = 3, _notesTab = 4, _ask = 5;
   static const _barH = 64.0;
   int _beforeAsk = _feed;
+  /// the Directory's search page is open: it has its own Publish bar, so the bar and Ask step aside
+  bool _dirSearch = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     unreadChats.addListener(_unreadChanged);
+    _notes.addListener(_unreadChanged);
     _loadUnread();
     _notes.refresh(context.read<AuthProvider>());
     _poll = Timer.periodic(const Duration(seconds: 30), (_) => _notes.refresh(context.read<AuthProvider>()));
@@ -121,6 +124,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     unreadChats.removeListener(_unreadChanged);
+    _notes.removeListener(_unreadChanged);
     _sub?.cancel();
     _pushSub?.cancel();
     _poll?.cancel();
@@ -146,6 +150,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       if (_i != _ask) _beforeAsk = _i;
     }
     if (k == _i && k == _feed) _topTick++; // tapping Home again scrolls the feed to the top
+    if (k == _notesTab) _notes.refresh(context.read<AuthProvider>());
     setState(() => _i = k);
   }
 
@@ -159,7 +164,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     final w = MediaQuery.sizeOf(context).width;
     final rail = w >= 600;
     final railW = rail ? (w >= 1200 ? 220.0 : 88.0) : 0.0;
-    final bottomBar = bar && !rail;
+    // the bar steps aside while the keyboard is up, so what is typed has the room (the Directory's search)
+    final bottomBar = bar && !rail && MediaQuery.viewInsetsOf(context).bottom == 0 && !(_i == _dir && _dirSearch);
     // without the bar on Ask, back returns to the tab it was opened from
     return PopScope(
       canPop: _i != _ask,
@@ -184,11 +190,11 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                   removeLeft: rail,
                   child: IndexedStack(index: _i, children: [
                     _fit(ConnectScreen(refreshTick: _feedTick, topTick: _topTick, onGoAsk: () => _go(_ask), active: _i == _feed), 680),
-                    // Recents and Talk load afresh each time they open
-                    if (_i == _recents) _fit(const RecentsScreen(), 760) else const SizedBox.shrink(),
-                    _fit(PhonebookHome(onAsk: () => _go(_ask), onSeeAsks: () => _go(_feed)), 1240),
-                    if (_i == _talk) _fit(const TalkScreen(), 900) else const SizedBox.shrink(),
                     _fit(const FindScreen(), 900),
+                    _fit(PhonebookHome(active: _i == _dir, onAsk: () => _go(_ask), onSeeAsks: () => _go(_feed), onPosted: () => setState(() => _feedTick++), onSearching: (on) => setState(() => _dirSearch = on)), 1240),
+                    // Talk loads afresh each time it opens
+                    if (_i == _talk) _fit(const TalkScreen(), 900) else const SizedBox.shrink(),
+                    _fit(_NotesPanel(notes: _notes, page: true), 760),
                     _fit(
                         AskScreen(active: _i == _ask, onBack: () => _go(_beforeAsk), onPosted: () => setState(() {
                               _feedTick++;
@@ -204,10 +210,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
               top: 0,
               left: 0,
               right: 0,
-              child: _AppHeader(
-                notes: _notes,
-                onHome: () => _go(_dir),
-              ),
+              child: _AppHeader(onHome: () => _go(_dir)),
             ),
             // "Waiting for network…" / "Connecting…" under the header, WhatsApp-style
             Positioned(top: top + header + 8, left: 0, right: 0, child: const ConnectionPill()),
@@ -253,7 +256,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                 Expanded(
                   child: KeyedSubtree(
                     key: k == _dir ? null : Tours.key(_tourKeys[k]),
-                    child: k == _dir ? _dirLabel(p) : _barItem(p, k, badge: k == _talk ? unreadChats.value : 0),
+                    child: k == _dir ? _dirLabel(p) : _barItem(p, k, badge: _badgeOf(k)),
                   ),
                 ),
             ]),
@@ -337,6 +340,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     );
   }
 
+  /// unread chats on Talk, unseen responses on Notifications
+  int _badgeOf(int k) => k == _talk ? unreadChats.value : (k == _notesTab ? _notes.unseen : 0);
+
   Widget _badge(int n) => Container(
         height: 16,
         constraints: const BoxConstraints(minWidth: 16),
@@ -353,7 +359,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     Widget item(int k) {
       final active = _i == k;
       final home = k == _dir;
-      final badge = k == _talk ? unreadChats.value : 0;
+      final badge = _badgeOf(k);
       final icon = Stack(clipBehavior: Clip.none, children: [
         WIcon(_items[k].$1, size: 24, color: home ? kInk : (active ? tone : p.muted), strokeWidth: active || home ? 2.2 : 1.9),
         if (badge > 0) Positioned(right: -10, top: -6, child: _badge(badge)),
@@ -459,9 +465,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
 // ======================= header =======================
 
 class _AppHeader extends StatelessWidget {
-  final NotificationsModel notes;
   final VoidCallback onHome;
-  const _AppHeader({required this.notes, required this.onHome});
+  const _AppHeader({required this.onHome});
 
   @override
   Widget build(BuildContext context) {
@@ -486,47 +491,12 @@ class _AppHeader extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(children: [
-            // with the SMART PHONEBOOK slogan, as on the web; shrinks rather than crowd the bell on the narrowest phones
+            // with the SMART PHONEBOOK slogan, as on the web; shrinks rather than crowd the avatar on the narrowest phones
+            // (notifications are a tab of the bar now)
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(left: 4, right: 8),
                 child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: LogoInline(size: 28, markSize: 36, tagline: true, onTap: onHome)),
-              ),
-            ),
-            // notifications (no longer a tab): the bell with the unseen count, opening the full list
-            AnimatedBuilder(
-              animation: notes,
-              builder: (ctx, _) => Semantics(
-                button: true,
-                label: t('Notifications'),
-                child: GestureDetector(
-                  key: Tours.key('nav-notes'),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    notes.refresh(ctx.read<AuthProvider>());
-                    Navigator.push(ctx, MaterialPageRoute(builder: (_) => SubPage(title: t('Notifications'), body: _NotesPanel(notes: notes, page: true))));
-                  },
-                  child: SizedBox(
-                    width: 44,
-                    height: 44,
-                    child: Stack(alignment: Alignment.center, clipBehavior: Clip.none, children: [
-                      WIcon(WI.bell, size: 23, color: p.text, strokeWidth: 1.9),
-                      if (notes.unseen > 0)
-                        Positioned(
-                          right: 4,
-                          top: 4,
-                          child: Container(
-                            height: 16,
-                            constraints: const BoxConstraints(minWidth: 16),
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(8)),
-                            child: Text(notes.unseen > 9 ? '9+' : '${notes.unseen}', style: const TextStyle(color: kInk, fontSize: 10, fontWeight: FontWeight.w700, height: 1)),
-                          ),
-                        ),
-                    ]),
-                  ),
-                ),
               ),
             ),
             const SizedBox(width: 6),
@@ -769,37 +739,14 @@ class _AccountMenu extends StatelessWidget {
           Expanded(
             child: ListView(padding: const EdgeInsets.all(6), children: [
               item(WI.edit, 'Edit profile', () => push(EditProfileScreen(profile: me))),
-              item(WI.contactCard, 'Check contacts', () => push(SubPage(title: t('Phonebook'), body: const PhonebookScreen()))),
-              item(WI.sparkle, 'Leads for you', () => push(SubPage(title: t('Leads for you'), body: const LeadsScreen()))),
-              item(WI.sun, 'Today in your area', () => push(SubPage(title: t('Today in your area'), body: const TodayScreen()))),
-              item(WI.bell, 'Alerts', () => push(SubPage(title: t('Alerts'), body: const AlertsScreen()))),
-              item(WI.deals, 'Your week', () => push(SubPage(title: t('Your week'), body: const WeekScreen()))),
+              item(WI.clock, 'Recents', () => push(SubPage(title: t('Recents'), body: const RecentsScreen()))),
+              // leads, today, alerts and the week: one page of their own
+              item(WI.sparkle, 'For your business', () => push(SubPage(title: t('For your business'), body: const _BusinessHub()))),
               item(WI.bookmark, 'Saved asks', () => push(const SavedPostsScreen())),
-              // help lives on the website so articles stay current without an app update
+              // help articles, writing to us, the assistant and the tour: one sheet
               item(WI.help, 'Help & Support', () {
                 Navigator.of(context).pop();
-                final from = defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
-                launchUrl(Uri.parse('$siteUrl/help?lang=${i18n.lang}&from=$from'), mode: LaunchMode.externalApplication);
-              }),
-              item(WI.sparkle, 'Take the app tour', () {
-                Navigator.of(context).pop();
-                tourRequest.value++;
-              }),
-              // @webwebai: the assistant answers in a chat
-              item(WI.sparkle, 'Ask WebWeb AI', () async {
-                final nav = Navigator.of(context);
-                final api = auth.api;
-                nav.pop();
-                try {
-                  final u = Profile.fromJson(await api.get('/users/handle/webwebai') as Map);
-                  final ctx = nav.context;
-                  if (ctx.mounted) openChat(ctx, Peer.fromProfile(u));
-                } catch (_) {}
-              }),
-              // the Help page's form, in the app and signed in
-              item(WI.talk, 'Write to us', () {
-                Navigator.of(context).pop();
-                showSupportSheet(context);
+                _openHelp(context);
               }),
               const SizedBox(height: 4),
               divider,
@@ -902,6 +849,72 @@ class _AccountMenu extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The account menu's "For your business": leads, today in your area, alerts and your week, one tap each.
+class _BusinessHub extends StatelessWidget {
+  const _BusinessHub();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    Widget tile(WI icon, String title, Widget body) => ListTile(
+          leading: Container(width: 36, height: 36, alignment: Alignment.center, decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(10)), child: WIcon(icon, size: 19, color: p.muted, strokeWidth: 1.8)),
+          title: Text(t(title), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          trailing: WIcon(WI.chevronRight, size: 18, color: p.muted),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SubPage(title: t(title), body: body))),
+        );
+    return ListView(padding: const EdgeInsets.symmetric(vertical: 8), children: [
+      tile(WI.sparkle, 'Leads for you', const LeadsScreen()),
+      tile(WI.sun, 'Today in your area', const TodayScreen()),
+      tile(WI.bell, 'Alerts', const AlertsScreen()),
+      tile(WI.deals, 'Your week', const WeekScreen()),
+    ]);
+  }
+}
+
+/// Help & Support from the account menu: the help articles (on the website, so they stay current without an app
+/// update), the Help page's form in the app, the @webwebai assistant, and the app tour.
+void _openHelp(BuildContext context) {
+  final p = Pal.of(context);
+  final auth = context.read<AuthProvider>();
+  final lang = context.read<I18n>().lang;
+  final nav = Navigator.of(context);
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: p.canvas,
+    builder: (ctx) {
+      Widget row(WI icon, String label, VoidCallback onTap) => ListTile(
+            leading: WIcon(icon, size: 21, color: p.muted, strokeWidth: 1.8),
+            title: Text(t(label), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+            onTap: () {
+              Navigator.pop(ctx);
+              onTap();
+            },
+          );
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            row(WI.help, 'Help articles', () {
+              final from = defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+              launchUrl(Uri.parse('$siteUrl/help?lang=$lang&from=$from'), mode: LaunchMode.externalApplication);
+            }),
+            row(WI.talk, 'Write to us', () => showSupportSheet(nav.context)),
+            // @webwebai: the assistant answers in a chat
+            row(WI.sparkle, 'Ask WebWeb AI', () async {
+              try {
+                final u = Profile.fromJson(await auth.api.get('/users/handle/webwebai') as Map);
+                final ctx = nav.context;
+                if (ctx.mounted) openChat(ctx, Peer.fromProfile(u));
+              } catch (_) {}
+            }),
+            row(WI.info, 'Take the app tour', () => tourRequest.value++),
+          ]),
+        ),
+      );
+    },
+  );
 }
 
 /// "WebWeb AI · Version 0.1.9 (42)" at the foot of the account menu.

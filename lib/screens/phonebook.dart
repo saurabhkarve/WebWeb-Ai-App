@@ -24,7 +24,7 @@ import '../widgets/reviews_card.dart';
 import 'find.dart';
 import 'post_detail.dart';
 import 'profile.dart';
-import 'your_asks.dart' show askPrefill;
+import 'ask.dart' show SearchAskForm;
 
 /// The AI Phonebook (web /phonebook): which of my contacts already have a WEBWEB page, with what they do, where
 /// and their reviews. Only when the member taps "Check my contacts": the numbers are sent once to
@@ -225,10 +225,18 @@ class _Entry {
 /// - Matching it to pages is the separate "Check my contacts" (POST /phonebook/match), which the member starts.
 /// - On the web, and before contacts are allowed, the directory is the pages from the last check.
 /// - From 900 px wide the asks move to a column of their own beside the directory.
+/// - Tapping the search turns everything under it into a new ask whose title is the search: what was found shows
+///   first, as it is typed, and if no one fits the rest of the form posts it for members to refer someone.
 class PhonebookHome extends StatefulWidget {
   /// open the ask composer, and the feed of asks (the Updates tab)
   final VoidCallback? onAsk, onSeeAsks;
-  const PhonebookHome({super.key, this.onAsk, this.onSeeAsks});
+  /// an ask was posted from the search
+  final VoidCallback? onPosted;
+  /// the search page opened or closed
+  final ValueChanged<bool>? onSearching;
+  /// the Directory tab is on screen (back closes the search only then)
+  final bool active;
+  const PhonebookHome({super.key, this.onAsk, this.onSeeAsks, this.onPosted, this.onSearching, this.active = true});
   @override
   State<PhonebookHome> createState() => _PhonebookHomeState();
 }
@@ -236,6 +244,11 @@ class PhonebookHome extends StatefulWidget {
 class _PhonebookHomeState extends State<PhonebookHome> {
   static const _headH = 30.0, _rowH = 64.0;
   final _q = TextEditingController();
+  final _qFocus = FocusNode();
+  /// the search field moves between the directory and the search page: one field, so it keeps the keyboard
+  final _searchKey = GlobalKey();
+  /// the search page is open (from the first tap on the search until Cancel, back or the ask is posted)
+  bool _searching = false;
   final _scroll = ScrollController();
   final _topKey = GlobalKey();
   List<Map>? _matches;
@@ -257,6 +270,12 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   @override
   void initState() {
     super.initState();
+    _qFocus.addListener(() {
+      if (_qFocus.hasFocus && !_searching) {
+        setState(() => _searching = true);
+        widget.onSearching?.call(true);
+      }
+    });
     _loadMatches();
     _readPhoneBook(ask: false);
     _loadAsks();
@@ -273,6 +292,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     _debounce?.cancel();
     _aiTimer?.cancel();
     _q.dispose();
+    _qFocus.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -379,15 +399,13 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     _askAi(q);
   }
 
-  /// Not found: the search goes to the Ask form as a new ask, for members to refer someone
-  void _postAsAsk() {
-    final q = _q.text.trim();
-    final title = _aiFor == q ? '${_ai?['title'] ?? q}' : q;
-    askPrefill.value = title.isEmpty ? q : title;
+  /// Cancel, back, or the ask was posted: the directory again
+  void _closeSearch() {
     _q.clear();
     _search('');
-    FocusScope.of(context).unfocus();
-    widget.onAsk?.call();
+    _qFocus.unfocus();
+    setState(() => _searching = false);
+    widget.onSearching?.call(false);
   }
 
   Future<void> _openCheck() async {
@@ -447,7 +465,13 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     final p = Pal.of(context);
     return LayoutBuilder(builder: (context, c) {
       final wide = c.maxWidth >= 900;
-      final directory = _directory(p, showAsks: !wide);
+      final directory = PopScope(
+        canPop: !(_searching && widget.active),
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop && _searching) _closeSearch();
+        },
+        child: _searching ? _searchPage(p) : _directory(p, showAsks: !wide),
+      );
       if (!wide) return directory;
       // large screens: the directory, and the asks in a column beside it
       return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -468,10 +492,8 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   }
 
   Widget _directory(Pal p, {required bool showAsks}) {
-    final q = _q.text.trim().toLowerCase();
     final me = context.watch<AuthProvider>().profile;
     final all = _entries;
-    final searching = q.length >= 2;
 
     final top = Column(key: _topKey, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
@@ -480,30 +502,8 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         if (all.isNotEmpty) Text('${all.length}', style: TextStyle(fontSize: 15, color: p.muted)),
       ]),
       const SizedBox(height: 10),
-      // Ask AI: a name finds the contact; anything else is a need, and the AI finds who can help
-      TextField(
-        controller: _q,
-        onChanged: _search,
-        onSubmitted: (v) => _askAi(v.trim()),
-        textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          prefixIcon: Padding(padding: const EdgeInsets.only(left: 14, right: 8), child: _aiMark(20)),
-          prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-          hintText: t('Ask AI: a name, or what you need'),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide(color: kGold.withValues(alpha: .75), width: 1.5)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: const BorderSide(color: kGold, width: 2)),
-          suffixIcon: _q.text.isEmpty
-              ? null
-              : IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () {
-                    _q.clear();
-                    _search('');
-                  }),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(28)),
-        ),
-      ),
-      if (!searching) ...[
+      _searchField(),
+      ...[
         // my card, as at the top of a phone's contacts
         if (me != null) ...[const SizedBox(height: 14), _myCard(p, me.handle, displayName(me.userType, me.name, me.company), me.photoUrl)],
         if (showAsks) ...[
@@ -516,29 +516,6 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         ..._prompts(p),
       ],
     ]);
-
-    if (searching) {
-      final mine = all.where((e) => '${e.name} ${e.phone ?? ''} ${e.member == null ? '' : '${e.member!['name']} ${e.member!['company']} ${e.member!['category']} ${e.member!['location']} ${(e.member!['services'] as List? ?? const []).join(' ')}'}'.toLowerCase().contains(q)).toList();
-      final aiMatches = _aiFor == _q.text.trim() ? ((_ai?['matches'] as List?) ?? const []).cast<Map>() : const <Map>[];
-      bool shown(Map u) => mine.any((e) => e.member?['uid'] == u['uid']) || aiMatches.any((m) => m['uid'] == u['uid']);
-      final others = (_results ?? const <Map>[]).where((u) => !shown(u)).take(20).toList();
-      // what the member saved a page as, when it is in their contacts
-      final saved = {for (final e in all) if (e.member != null) '${e.member!['uid']}': e.name};
-      return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 120), children: [
-        top,
-        if (mine.isNotEmpty) ...[_label(p, t('In your contacts')), for (final e in mine.take(30)) _row(p, e)],
-        ..._aiSection(p, aiMatches, saved),
-        if (others.isNotEmpty) ...[_label(p, t('On WEBWEB')), for (final u in others) _row(p, _Entry(_memberName(u), null, u))],
-        const SizedBox(height: 18),
-        _postAsAskCard(p),
-        Center(
-          child: TextButton(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FindScreen(standalone: true, initialQuery: _q.text.trim()))),
-            child: Text(t('Search nearby')),
-          ),
-        ),
-      ]);
-    }
 
     // A to Z: a letter over each group, every line the same height so the index can jump straight to a letter
     final items = <Object>[];
@@ -631,6 +608,104 @@ class _PhonebookHomeState extends State<PhonebookHome> {
           ),
         ),
     ]);
+  }
+
+  /// Ask AI: a name finds the contact; anything else is a need, and the AI finds who can help
+  Widget _searchField() => TextField(
+        key: _searchKey,
+        controller: _q,
+        focusNode: _qFocus,
+        onChanged: _search,
+        onSubmitted: (v) => _askAi(v.trim()),
+        textInputAction: TextInputAction.search,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: InputDecoration(
+          prefixIcon: Padding(padding: const EdgeInsets.only(left: 14, right: 8), child: _aiMark(20)),
+          prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+          hintText: t('Ask AI: a name, or what you need'),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide(color: kGold.withValues(alpha: .75), width: 1.5)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: const BorderSide(color: kGold, width: 2)),
+          suffixIcon: _q.text.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    _q.clear();
+                    _search('');
+                  }),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(28)),
+        ),
+      );
+
+  /// The search page: the search (the ask's title) with Cancel, then, down to the keyboard, what was found as it is
+  /// typed and the new ask to post when no one fits.
+  Widget _searchPage(Pal p) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+          child: Row(children: [
+            Expanded(child: _searchField()),
+            TextButton(onPressed: _closeSearch, child: Text(t('Cancel'))),
+          ]),
+        ),
+        Expanded(
+          child: SearchAskForm(
+            title: _q,
+            focus: _qFocus,
+            lead: _found(p),
+            onPosted: () {
+              _closeSearch();
+              widget.onPosted?.call();
+            },
+          ),
+        ),
+      ]);
+
+  /// What the search found, above the ask: in my contacts, what Ask AI found (with why), others on WEBWEB; then the
+  /// heading of the ask to post when none of them fits.
+  List<Widget> _found(Pal p) {
+    final q = _q.text.trim().toLowerCase();
+    final heading = [
+      Padding(
+        padding: const EdgeInsets.only(top: 18, bottom: 4),
+        child: Row(children: [
+          const Icon(Icons.campaign_rounded, color: kStar, size: 20),
+          const SizedBox(width: 6),
+          Expanded(child: Text(t(q.length < 2 ? 'Or post it as an ask' : 'Not the right one? Post it as an ask'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+        ]),
+      ),
+      Text(t('Members near you who know someone will refer the right contact to you.'), style: TextStyle(fontSize: 13, height: 1.35, color: p.muted)),
+      const SizedBox(height: 12),
+    ];
+    if (q.length < 2) {
+      return [
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(t('Type a name, or what you need. Ask AI finds who can help, nearest first.'), style: TextStyle(fontSize: 13.5, height: 1.4, color: p.muted)),
+        ),
+        ...heading,
+      ];
+    }
+    final all = _entries;
+    final mine = all.where((e) => '${e.name} ${e.phone ?? ''} ${e.member == null ? '' : '${e.member!['name']} ${e.member!['company']} ${e.member!['category']} ${e.member!['location']} ${(e.member!['services'] as List? ?? const []).join(' ')}'}'.toLowerCase().contains(q)).toList();
+    final aiMatches = _aiFor == _q.text.trim() ? ((_ai?['matches'] as List?) ?? const []).cast<Map>() : const <Map>[];
+    bool shown(Map u) => mine.any((e) => e.member?['uid'] == u['uid']) || aiMatches.any((m) => m['uid'] == u['uid']);
+    final others = (_results ?? const <Map>[]).where((u) => !shown(u)).take(20).toList();
+    // what the member saved a page as, when it is in their contacts
+    final saved = {for (final e in all) if (e.member != null) '${e.member!['uid']}': e.name};
+    return [
+      if (mine.isNotEmpty) ...[_label(p, t('In your contacts')), for (final e in mine.take(30)) _row(p, e)],
+      ..._aiSection(p, aiMatches, saved),
+      if (others.isNotEmpty) ...[_label(p, t('On WEBWEB')), for (final u in others) _row(p, _Entry(_memberName(u), null, u))],
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FindScreen(standalone: true, initialQuery: _q.text.trim()))),
+          icon: const Icon(Icons.place_rounded, size: 16),
+          label: Text(t('Search nearby')),
+        ),
+      ),
+      ...heading,
+    ];
   }
 
   /// What is missing before the directory is whole: contacts not allowed yet, or never matched to pages.
@@ -730,28 +805,6 @@ class _PhonebookHomeState extends State<PhonebookHome> {
       for (final m in matches) _row(p, _Entry(saved['${m['uid']}'] ?? _memberName(m), null, m), why: '${m['why'] ?? ''}'),
     ];
   }
-
-  /// Still not the one: post the search as an ask, and members refer someone they know.
-  Widget _postAsAskCard(Pal p) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: kGold.withValues(alpha: p.dark ? .1 : .08), borderRadius: BorderRadius.circular(18), border: Border.all(color: kGold.withValues(alpha: .6))),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Icon(Icons.campaign_rounded, color: kStar, size: 22),
-            const SizedBox(width: 8),
-            Expanded(child: Text(t('Not the right one? Post it as an ask'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
-          ]),
-          const SizedBox(height: 4),
-          Text(t('Members near you who know someone will refer the right contact to you.'), style: TextStyle(fontSize: 13, height: 1.35, color: p.muted)),
-          const SizedBox(height: 10),
-          FilledButton.icon(
-            onPressed: _postAsAsk,
-            icon: const Icon(Icons.send_rounded, size: 18),
-            label: Text(t('Post as an ask'), style: const TextStyle(fontWeight: FontWeight.w700)),
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(44), backgroundColor: kStar, foregroundColor: kInk, shape: const StadiumBorder()),
-          ),
-        ]),
-      );
 
   Widget _row(Pal p, _Entry e, {String? why}) {
     final m = e.member;

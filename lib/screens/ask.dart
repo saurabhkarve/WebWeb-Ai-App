@@ -335,12 +335,29 @@ class _AskScreenState extends State<AskScreen> with MyAskActivityLoader {
   }
 }
 
+/// The Directory's search as a new ask (phonebook.dart): what the member types in the search bar is the ask's title,
+/// [lead] (what was found for it) comes first, and the rest of the form is there to post it when no one fits.
+class SearchAskForm extends StatelessWidget {
+  final TextEditingController title;
+  final FocusNode focus;
+  final List<Widget> lead;
+  final VoidCallback onPosted;
+  const SearchAskForm({super.key, required this.title, required this.focus, required this.lead, required this.onPosted});
+
+  @override
+  Widget build(BuildContext context) => _AskForm(onPosted: onPosted, titleController: title, titleFocus: focus, lead: lead);
+}
+
 class _AskForm extends StatefulWidget {
   final VoidCallback onPosted;
   final bool active;
   final Post? edit;
   final VoidCallback? onBack;
-  const _AskForm({required this.onPosted, this.active = true, this.edit, this.onBack});
+  /// the search bar above, as the title (SearchAskForm); the form then has no title field of its own
+  final TextEditingController? titleController;
+  final FocusNode? titleFocus;
+  final List<Widget> lead;
+  const _AskForm({required this.onPosted, this.active = true, this.edit, this.onBack, this.titleController, this.titleFocus, this.lead = const []});
   @override
   State<_AskForm> createState() => _AskFormState();
 }
@@ -366,10 +383,10 @@ class _AskFormState extends State<_AskForm> {
   bool _typeChosen = false;
   /// the chip whose choices are open under the ask
   String? _open;
-  final _title = TextEditingController();
+  late final _title = widget.titleController ?? TextEditingController();
   final _desc = TextEditingController();
   final _other = TextEditingController();
-  final _titleFocus = FocusNode();
+  late final _titleFocus = widget.titleFocus ?? FocusNode();
   final _descFocus = FocusNode();
   String _location = '';
   String _urgency = '7_days';
@@ -409,8 +426,10 @@ class _AskFormState extends State<_AskForm> {
   /// editing: the stored pin is only sent again when the member moves it (the one we get back is rounded)
   bool _geoMoved = false;
   bool get _editing => widget.edit != null;
-  /// tour targets are global keys: only the Ask tab carries them, never the editor opened over it
-  GlobalKey? _tk(String target) => _editing ? null : Tours.key(target);
+  /// under the Directory's search: no drafts, examples, tour or title field
+  bool get _search => widget.titleController != null;
+  /// tour targets are global keys: only the Ask tab carries them, never the editor opened over it or the search
+  GlobalKey? _tk(String target) => _editing || _search ? null : Tours.key(target);
 
   @override
   void initState() {
@@ -427,7 +446,7 @@ class _AskFormState extends State<_AskForm> {
     }).catchError((_) {});
     _title.addListener(_changed);
     _desc.addListener(_changed);
-    if (!_editing) {
+    if (!_editing && !_search) {
       askPrefill.addListener(_prefill);
       _prefill();
     }
@@ -452,7 +471,7 @@ class _AskFormState extends State<_AskForm> {
 
   /// first visit to Ask: a short walk through the form
   void _maybeTour() {
-    if (!widget.active || _editing) return;
+    if (!widget.active || _editing || _search) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && widget.active) Tours.maybeShow(context, 'ask2', kAskTour);
     });
@@ -510,7 +529,7 @@ class _AskFormState extends State<_AskForm> {
     } catch (_) {}
     if (!mounted) return;
     // the form always opens empty; an unfinished ask is offered with Continue
-    if (draft != null && ('${draft['title'] ?? ''}'.isNotEmpty || '${draft['description'] ?? ''}'.isNotEmpty)) _savedDraft = draft;
+    if (!_search && draft != null && ('${draft['title'] ?? ''}'.isNotEmpty || '${draft['description'] ?? ''}'.isNotEmpty)) _savedDraft = draft;
     if ((profile?.location ?? '').isNotEmpty) {
       final c = findPlace(profile!.location);
       setState(() {
@@ -570,7 +589,7 @@ class _AskFormState extends State<_AskForm> {
   }
 
   Future<void> _saveDraft() async {
-    if (_editing) return;
+    if (_editing || _search) return;
     if (_title.text.isEmpty && _desc.text.isEmpty) {
       // everything typed was deleted: nothing to continue next time
       if (_hadText) {
@@ -849,10 +868,10 @@ class _AskFormState extends State<_AskForm> {
     askPrefill.removeListener(_prefill);
     _draftTimer?.cancel();
     _aiCatTimer?.cancel();
-    for (final c in [_title, _desc, _other]) {
+    for (final c in [if (!_search) _title, _desc, _other]) {
       c.dispose();
     }
-    _titleFocus.dispose();
+    if (!_search) _titleFocus.dispose();
     _descFocus.dispose();
     super.dispose();
   }
@@ -1039,7 +1058,7 @@ class _AskFormState extends State<_AskForm> {
     final titleBlank = _blank.hasMatch(title), descBlank = _blank.hasMatch(desc);
     final ready = titleOk && descOk && typeOk && linkOk && !titleBlank && !descBlank && !_photos.any((ph) => ph.failed);
     final missing = !titleOk
-        ? 'Add a title'
+        ? (_search ? 'Type what you need in the search' : 'Add a title')
         : !descOk
             ? 'Add a little more detail'
             : titleBlank || descBlank
@@ -1119,7 +1138,7 @@ class _AskFormState extends State<_AskForm> {
                   _typeChosen = true;
                   // the title opens just below: start there once it has
                   Future.delayed(const Duration(milliseconds: 350), () {
-                    if (mounted) _titleFocus.requestFocus();
+                    if (mounted) (_search ? _descFocus : _titleFocus).requestFocus();
                   });
                 }),
                 child: Container(
@@ -1213,6 +1232,7 @@ class _AskFormState extends State<_AskForm> {
     final form = ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       children: [
+        ...widget.lead,
         // an unfinished ask from last time, until the member starts a new one
         if (_savedDraft != null && empty && !_editing) ...[
           DashedBox(
@@ -1236,7 +1256,7 @@ class _AskFormState extends State<_AskForm> {
           const SizedBox(height: 12),
         ],
         // examples: a starting point while the ask is empty, never filled in on their own
-        _reveal(typeReady && empty && !_editing, [
+        _reveal(typeReady && empty && !_editing && !_search, [
           _caps(p, 'Start with an example, finish with AI'),
           const SizedBox(height: 2),
           Text(t('Tap one, then change the details to yours.'), style: TextStyle(fontSize: 12, color: p.muted)),
@@ -1254,7 +1274,7 @@ class _AskFormState extends State<_AskForm> {
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                if (me != null) ...[
+                if (me != null && !_search) ...[
                   // back (the island steps aside on Ask) and the photo share the name line, so the fields get the full width
                   Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                     if (widget.onBack != null)
@@ -1325,6 +1345,7 @@ class _AskFormState extends State<_AskForm> {
                     );
                   },
                   child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    if (!_search) ...[
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -1366,6 +1387,7 @@ class _AskFormState extends State<_AskForm> {
                       ]),
                     ),
                     Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 16), color: p.border),
+                    ],
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

@@ -2637,5 +2637,10 @@
   "Recent": "हाल के",
   "No recent calls or contacts yet": "अभी कोई हाल की कॉल या संपर्क नहीं",
   "People you call or whose page you open show here.": "जिन्हें आप कॉल करते हैं या जिनका पेज खोलते हैं, वे यहाँ दिखते हैं।",
-  "Viewed their page": "उनका पेज देखा"
+  "Viewed their page": "उनका पेज देखा",
+  "For your business": "आपके व्यवसाय के लिए",
+  "Help articles": "सहायता लेख",
+  "Type what you need in the search": "खोज में लिखें कि आपको क्या चाहिए",
+  "Or post it as an ask": "या इसे आस्क के रूप में पोस्ट करें",
+  "Type a name, or what you need. Ask AI finds who can help, nearest first.": "कोई नाम लिखें, या आपको क्या चाहिए। Ask AI ढूँढता है कि कौन मदद कर सकता है, सबसे पास वाले पहले।"
 }
