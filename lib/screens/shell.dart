@@ -43,7 +43,7 @@ class Shell extends StatefulWidget {
 }
 
 class _ShellState extends State<Shell> with WidgetsBindingObserver {
-  int _i = 2; // Contacts
+  int _i = 2; // Directory
   int _feedTick = 0; // reload the feed
   int _topTick = 0; // scroll the feed to the top
   int _askSpin = 0;
@@ -51,16 +51,17 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   Timer? _poll, _svcTimer;
   final _notes = NotificationsModel();
 
-  // The Smart Phonebook: Favourites, Chats (chats and calls), Contacts (home, the raised gold button in the middle),
-  // Nearby (the local directory), Updates (the feed). The round gold button is Ask; Ask itself is a page of its own
-  // (index 5) without the bar. Notifications are the bell in the header.
+  // The Smart Phonebook: Home (the feed), Recents (favourites, calls and contacts opened lately), Directory (the
+  // contacts, where the app opens: the raised gold button in the middle), Talk (chats and calls), Nearby (the local
+  // directory). The round gold button is Ask; Ask itself is a page of its own (index 5) without the bar.
+  // Notifications are the bell in the header. All five use the WebWeb icon set (the same Talk icon as before).
   // From 600 px wide (tablets, desktop) the bar becomes a rail down the left with Ask at its top, and pages keep a
   // readable width; from 1200 px the rail shows its labels beside the icons.
-  static const _items = [(Icons.star_rounded, Icons.star_outline_rounded, 'Favourites'), (Icons.chat_bubble_rounded, Icons.chat_bubble_outline_rounded, 'Chats'), (Icons.contacts_rounded, Icons.contacts_outlined, 'Contacts'), (Icons.place_rounded, Icons.place_outlined, 'Nearby'), (Icons.dynamic_feed_rounded, Icons.dynamic_feed_outlined, 'Updates')];
-  static const _tourKeys = ['nav-favourites', 'nav-talk', 'nav-contacts', 'nav-find', 'nav-feed'];
+  static const _items = [(WI.home, 'Home'), (WI.clock, 'Recents'), (WI.contactCard, 'Directory'), (WI.talk, 'Talk'), (WI.pin, 'Nearby')];
+  static const _tourKeys = ['nav-feed', 'nav-recents', 'nav-contacts', 'nav-talk', 'nav-find'];
   /// how far the Contacts button rises above the bar
   static const _rise = 20.0;
-  static const _talk = 1, _home = 2, _feed = 4, _ask = 5;
+  static const _feed = 0, _recents = 1, _dir = 2, _talk = 3, _ask = 5;
   static const _barH = 64.0;
   int _beforeAsk = _feed;
 
@@ -144,7 +145,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       _askSpin++;
       if (_i != _ask) _beforeAsk = _i;
     }
-    if (k == _i && k == _feed) _topTick++; // tapping Updates again scrolls the feed to the top
+    if (k == _i && k == _feed) _topTick++; // tapping Home again scrolls the feed to the top
     setState(() => _i = k);
   }
 
@@ -182,11 +183,12 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                   removeBottom: bottomBar,
                   removeLeft: rail,
                   child: IndexedStack(index: _i, children: [
-                    _fit(const FavouritesScreen(), 760),
-                    if (_i == _talk) _fit(const TalkScreen(), 900) else const SizedBox.shrink(), // reload conversations each time it opens
-                    _fit(PhonebookHome(onAsk: () => _go(_ask), onSeeAsks: () => _go(_feed)), 1240),
-                    _fit(const FindScreen(), 900),
                     _fit(ConnectScreen(refreshTick: _feedTick, topTick: _topTick, onGoAsk: () => _go(_ask), active: _i == _feed), 680),
+                    // Recents and Talk load afresh each time they open
+                    if (_i == _recents) _fit(const RecentsScreen(), 760) else const SizedBox.shrink(),
+                    _fit(PhonebookHome(onAsk: () => _go(_ask), onSeeAsks: () => _go(_feed)), 1240),
+                    if (_i == _talk) _fit(const TalkScreen(), 900) else const SizedBox.shrink(),
+                    _fit(const FindScreen(), 900),
                     _fit(
                         AskScreen(active: _i == _ask, onBack: () => _go(_beforeAsk), onPosted: () => setState(() {
                               _feedTick++;
@@ -204,7 +206,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
               right: 0,
               child: _AppHeader(
                 notes: _notes,
-                onHome: () => _go(_home),
+                onHome: () => _go(_dir),
               ),
             ),
             // "Waiting for network…" / "Connecting…" under the header, WhatsApp-style
@@ -248,25 +250,25 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
               for (var k = 0; k < _items.length; k++)
                 Expanded(
                   child: KeyedSubtree(
-                    key: k == _home ? null : Tours.key(_tourKeys[k]),
-                    child: k == _home ? _homeLabel(p) : _barItem(p, k, badge: k == _talk ? unreadChats.value : 0),
+                    key: k == _dir ? null : Tours.key(_tourKeys[k]),
+                    child: k == _dir ? _dirLabel(p) : _barItem(p, k, badge: k == _talk ? unreadChats.value : 0),
                   ),
                 ),
             ]),
           ),
         ),
-        Positioned(top: 0, left: 0, right: 0, child: Center(child: KeyedSubtree(key: Tours.key(_tourKeys[_home]), child: _homeButton(p, 60)))),
+        Positioned(top: 0, left: 0, right: 0, child: Center(child: KeyedSubtree(key: Tours.key(_tourKeys[_dir]), child: _dirButton(p, 60)))),
       ]);
 
-  /// Contacts, the heart of the app: always the gold round button, raised in the middle of the bar.
-  Widget _homeButton(Pal p, double size) {
-    final active = _i == _home;
+  /// Directory, the heart of the app: always the gold round button, raised in the middle of the bar.
+  Widget _dirButton(Pal p, double size) {
+    final active = _i == _dir;
     return Semantics(
       button: true,
       selected: active,
-      label: t(_items[_home].$3),
+      label: t(_items[_dir].$2),
       child: GestureDetector(
-        onTap: () => _go(_home),
+        onTap: () => _go(_dir),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           width: size,
@@ -277,24 +279,24 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             border: Border.all(color: p.canvas, width: 4),
             boxShadow: [BoxShadow(color: const Color(0xFFD6AA00).withValues(alpha: active ? .55 : .35), blurRadius: active ? 18 : 12, spreadRadius: -4, offset: const Offset(0, 6))],
           ),
-          child: Icon(active ? _items[_home].$1 : _items[_home].$2, color: kInk, size: size * .46),
+          child: Center(child: WIcon(_items[_dir].$1, color: kInk, size: size * .46, strokeWidth: active ? 2.2 : 2)),
         ),
       ),
     );
   }
 
   /// the label under the raised button, in the bar
-  Widget _homeLabel(Pal p) {
-    final active = _i == _home;
+  Widget _dirLabel(Pal p) {
+    final active = _i == _dir;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => _go(_home),
+      onTap: () => _go(_dir),
       child: ExcludeSemantics(
         child: Align(
           alignment: Alignment.bottomCenter,
           child: Padding(
             padding: const EdgeInsets.only(bottom: 9),
-            child: FittedBox(fit: BoxFit.scaleDown, child: Text(t(_items[_home].$3), maxLines: 1, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: active ? p.text : p.muted))),
+            child: FittedBox(fit: BoxFit.scaleDown, child: Text(t(_items[_dir].$2), maxLines: 1, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: active ? p.text : p.muted))),
           ),
         ),
       ),
@@ -308,7 +310,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     return Semantics(
       button: true,
       selected: active,
-      label: t(_items[k].$3),
+      label: t(_items[k].$2),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => _go(k),
@@ -321,12 +323,12 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
               height: 30,
               decoration: BoxDecoration(color: active ? kGold.withValues(alpha: p.dark ? .25 : .22) : Colors.transparent, borderRadius: BorderRadius.circular(15)),
               child: Stack(alignment: Alignment.center, clipBehavior: Clip.none, children: [
-                Icon(active ? _items[k].$1 : _items[k].$2, size: 23, color: fg),
+                WIcon(_items[k].$1, size: 23, color: fg, strokeWidth: active ? 2.2 : 1.9),
                 if (badge > 0) Positioned(right: 8, top: 0, child: _badge(badge)),
               ]),
             ),
             const SizedBox(height: 4),
-            FittedBox(fit: BoxFit.scaleDown, child: Text(t(_items[k].$3), maxLines: 1, style: TextStyle(fontSize: 11.5, fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: active ? p.text : p.muted))),
+            FittedBox(fit: BoxFit.scaleDown, child: Text(t(_items[k].$2), maxLines: 1, style: TextStyle(fontSize: 11.5, fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: active ? p.text : p.muted))),
           ]),
         ),
       ),
@@ -348,20 +350,20 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     final tone = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
     Widget item(int k) {
       final active = _i == k;
-      final home = k == _home;
+      final home = k == _dir;
       final badge = k == _talk ? unreadChats.value : 0;
       final icon = Stack(clipBehavior: Clip.none, children: [
-        Icon(active ? _items[k].$1 : _items[k].$2, size: 24, color: home ? kInk : (active ? tone : p.muted)),
+        WIcon(_items[k].$1, size: 24, color: home ? kInk : (active ? tone : p.muted), strokeWidth: active || home ? 2.2 : 1.9),
         if (badge > 0) Positioned(right: -10, top: -6, child: _badge(badge)),
       ]);
       final fill = home ? null : (active ? kGold.withValues(alpha: p.dark ? .25 : .22) : Colors.transparent);
-      final label = Text(t(_items[k].$3), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: labels ? 14.5 : 11.5, fontWeight: active || home ? FontWeight.w700 : FontWeight.w500, color: active ? p.text : p.muted));
+      final label = Text(t(_items[k].$2), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: labels ? 14.5 : 11.5, fontWeight: active || home ? FontWeight.w700 : FontWeight.w500, color: active ? p.text : p.muted));
       return KeyedSubtree(
         key: Tours.key(_tourKeys[k]),
         child: Semantics(
           button: true,
           selected: active,
-          label: t(_items[k].$3),
+          label: t(_items[k].$2),
           child: InkWell(
             onTap: () => _go(k),
             borderRadius: BorderRadius.circular(28),
@@ -376,7 +378,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                         borderRadius: BorderRadius.circular(26),
                         border: home && active ? Border.all(color: kInk.withValues(alpha: .5), width: 1.5) : null,
                       ),
-                      child: Row(children: [icon, const SizedBox(width: 14), Expanded(child: home ? Text(t(_items[k].$3), maxLines: 1, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: kInk)) : label)]),
+                      child: Row(children: [icon, const SizedBox(width: 14), Expanded(child: home ? Text(t(_items[k].$2), maxLines: 1, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: kInk)) : label)]),
                     )
                   : Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6),

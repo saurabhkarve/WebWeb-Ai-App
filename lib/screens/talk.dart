@@ -317,7 +317,7 @@ class _TalkScreenState extends State<TalkScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.fromLTRB(16, 16, 16, islandSpace(context)),
         children: [
-          Text(t('Chats'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1)),
+          Text(t('Talk'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1)),
           const SizedBox(height: 4),
           Text(
             all == null

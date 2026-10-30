@@ -2632,5 +2632,10 @@
   "Nearest to you": "तुमच्या सगळ्यांत लागसार",
   "Nearest to {place}": "{place} च्या सगळ्यांत लागसार",
   "To show people near you first.": "तुमच्या लागसारच्या लोकांक पयलीं दाखोवंक.",
-  "under 1 km": "1 किमी परस उणें"
+  "under 1 km": "1 किमी परस उणें",
+  "Directory": "डिरेक्टरी",
+  "Recent": "हालींचे",
+  "No recent calls or contacts yet": "अजून हालींचे कॉल वा संपर्क नात",
+  "People you call or whose page you open show here.": "तुमी जांकां कॉल करतात वा जांचें पान उगडटात, ते हांगा दिसतात.",
+  "Viewed their page": "तांचें पान पळयलें"
 }

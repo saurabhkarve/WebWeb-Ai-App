@@ -2632,5 +2632,10 @@
   "Nearest to you": "आपके सबसे पास",
   "Nearest to {place}": "{place} के सबसे पास",
   "To show people near you first.": "आपके पास के लोगों को पहले दिखाने के लिए।",
-  "under 1 km": "1 किमी से कम"
+  "under 1 km": "1 किमी से कम",
+  "Directory": "डायरेक्टरी",
+  "Recent": "हाल के",
+  "No recent calls or contacts yet": "अभी कोई हाल की कॉल या संपर्क नहीं",
+  "People you call or whose page you open show here.": "जिन्हें आप कॉल करते हैं या जिनका पेज खोलते हैं, वे यहाँ दिखते हैं।",
+  "Viewed their page": "उनका पेज देखा"
 }

@@ -22,7 +22,7 @@ import '../widgets/qr_card.dart';
 import '../widgets/catalog_strip.dart' show CatalogItemCard;
 import '../widgets/story_viewer.dart';
 import 'catalog.dart';
-import 'favourites.dart' show Favourites;
+import 'favourites.dart' show Favourites, RecentPeople;
 import 'edit_profile.dart';
 import 'find.dart';
 import 'post_detail.dart';
@@ -86,6 +86,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _u = u;
         _error = null;
       });
+      // for Recents: pages of others opened lately
+      if (u.uid != context.read<AuthProvider>().profile?.uid) RecentPeople.note(u);
       _loadTabs(u);
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
