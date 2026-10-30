@@ -22,6 +22,7 @@ import '../widgets/qr_card.dart';
 import '../widgets/catalog_strip.dart' show CatalogItemCard;
 import '../widgets/story_viewer.dart';
 import 'catalog.dart';
+import 'dialer.dart' show Favourites;
 import 'edit_profile.dart';
 import 'find.dart';
 import 'post_detail.dart';
@@ -155,6 +156,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _message() async => openChat(context, Peer.fromProfile(_u!));
+  final _reviewsKey = GlobalKey();
 
   Future<void> _edit() async {
     final u = _u;
@@ -280,7 +282,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ]),
             ),
             // reviews: the page is the member's website, so they are public (AI Phonebook)
-            if (!isJob) ReviewsCard(key: ValueKey('reviews-${u.uid}'), uid: u.uid, own: own, name: displayName(u.userType, u.name, u.company)),
+            if (!isJob) ReviewsCard(key: _reviewsKey, uid: u.uid, own: own, name: displayName(u.userType, u.name, u.company)),
             const SizedBox(height: 16),
             _tabBar(p, tabs, tab, isJob, own),
             // swipe left / right anywhere below the tabs to move between them
@@ -563,13 +565,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ]);
 
   /// Someone else's page: talk, call, share.
-  Widget _visitorActions(Pal p, Profile u) => Row(children: [
-        Expanded(child: _ActionBtn(label: t('Talk'), wi: WI.talk, gold: true, onTap: _message)),
-        const SizedBox(width: 8),
-        Expanded(child: _ActionBtn(label: t('Call'), wi: WI.phone, onTap: () => placeCall(context, Peer.fromProfile(u), false))),
-        const SizedBox(width: 8),
-        SizedBox(width: 44, child: _ActionBtn(wi: WI.share, label: '', semantic: t('Share profile'), onTap: () => showShareProfileSheet(context, u, isSelf: false))),
-      ]);
+  /// A phone contact's row of round buttons: free in-app call, message and video (numbers stay private), star into
+  /// Favourites, share the page, and jump to the reviews.
+  Widget _visitorActions(Pal p, Profile u) => ValueListenableBuilder<List<Map>>(
+        valueListenable: Favourites.list,
+        builder: (_, __, ___) {
+          final fav = Favourites.has(u.uid);
+          return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            _round(p, Icons.call_rounded, t('Call'), () => placeCall(context, Peer.fromProfile(u), false), color: const Color(0xFF1E9E5A)),
+            _round(p, Icons.chat_bubble_rounded, t('Message'), _message, gold: true),
+            _round(p, Icons.videocam_rounded, t('Video'), () => placeCall(context, Peer.fromProfile(u), true)),
+            _round(p, fav ? Icons.star_rounded : Icons.star_outline_rounded, t('Favourite'), () => Favourites.toggle(u), color: fav ? kStar : null),
+            _round(p, Icons.ios_share_rounded, t('Share'), () => showShareProfileSheet(context, u, isSelf: false)),
+            if (!u.isJobSeeker)
+              _round(p, Icons.reviews_outlined, t('Review'), () {
+                final c = _reviewsKey.currentContext;
+                if (c != null) Scrollable.ensureVisible(c, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic, alignment: .1);
+              }),
+          ]);
+        },
+      );
+
+  Widget _round(Pal p, IconData icon, String label, VoidCallback onTap, {Color? color, bool gold = false}) => Semantics(
+        button: true,
+        label: label,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: ExcludeSemantics(
+            child: SizedBox(
+              width: 56,
+              child: Column(children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(gradient: gold ? kGoldGradient : null, color: gold ? null : (color ?? p.text).withValues(alpha: .1), shape: BoxShape.circle),
+                  child: Icon(icon, size: 22, color: gold ? kInk : (color ?? p.text)),
+                ),
+                const SizedBox(height: 5),
+                FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: p.text))),
+              ]),
+            ),
+          ),
+        ),
+      );
 
   // ---------- tabs ----------
 

@@ -60,7 +60,7 @@ class LogoInline extends StatefulWidget {
   final VoidCallback? onTap;
   /// AI pill under the wordmark (app header, sign-in); false puts it beside the wordmark (web Logo withText)
   final bool stacked;
-  /// "BUSINESS NETWORK" under the wordmark, spread across its width in a quiet grey (the web site header);
+  /// "SMART PHONEBOOK" under the wordmark, spread across its width in a quiet grey (the web site header);
   /// puts the AI pill beside the wordmark
   final bool tagline;
   const LogoInline({super.key, this.size = 36, this.markSize, this.onTap, this.stacked = true, this.tagline = false});
@@ -113,10 +113,10 @@ class _LogoInlineState extends State<LogoInline> {
     );
   }
 
-  /// [word] with "BUSINESS NETWORK" under it, every letter spread across the exact width of the wordmark + pill.
+  /// [word] with "SMART PHONEBOOK" under it, every letter spread across the exact width of the wordmark + pill.
   Widget _withTagline(Pal p, double font, Widget word) {
     if (!widget.tagline) return word;
-    const tag = 'BUSINESS NETWORK';
+    const tag = 'SMART PHONEBOOK';
     return IntrinsicWidth(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
         word,

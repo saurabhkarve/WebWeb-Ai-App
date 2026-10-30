@@ -33,7 +33,9 @@ class ConnectScreen extends StatefulWidget {
   final int refreshTick;
   final int topTick;
   final VoidCallback onGoAsk;
-  const ConnectScreen({super.key, required this.refreshTick, this.topTick = 0, required this.onGoAsk});
+  /// the tab is on screen (the feed is built behind the Phonebook tab too; its tour waits until it is shown)
+  final bool active;
+  const ConnectScreen({super.key, required this.refreshTick, this.topTick = 0, required this.onGoAsk, this.active = true});
   @override
   State<ConnectScreen> createState() => _ConnectScreenState();
 }
@@ -82,6 +84,16 @@ class _ConnectScreenState extends State<ConnectScreen> {
     super.didUpdateWidget(old);
     if (old.refreshTick != widget.refreshTick) _refresh();
     if (old.topTick != widget.topTick) _toTop();
+    if (widget.active && !old.active && _posts != null) _maybeTour();
+  }
+
+  /// first visit: walk through the feed once it has something to point at and is on screen
+  void _maybeTour() {
+    if (_tourTried || !widget.active) return;
+    _tourTried = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Tours.maybeShow(context, kConnectTourId, kConnectTour);
+    });
   }
 
   @override
@@ -116,13 +128,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
         _error = null;
         _fresh = [];
       });
-      // first visit: walk through the feed once it has something to point at
-      if (!_tourTried) {
-        _tourTried = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) Tours.maybeShow(context, kConnectTourId, kConnectTour);
-        });
-      }
+      _maybeTour();
     } catch (e) {
       if (mounted) setState(() => _error = t('Could not load posts. Please try again.'));
     }
