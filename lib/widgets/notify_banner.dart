@@ -8,11 +8,11 @@ import '../i18n.dart';
 import '../models.dart';
 import '../notifications.dart';
 import '../realtime.dart';
-import '../screens/contact_picker.dart';
 import '../screens/post_detail.dart';
 import '../screens/talk.dart' show ChatThread;
 import '../theme.dart';
 import '../widgets.dart';
+import 'refer_sheet.dart';
 import 'response_sheet.dart';
 
 /// The in-app notification while the app is open (web notify-banner.tsx): tap it to open what it is about. A chat
@@ -154,39 +154,28 @@ class _NotifyBannerHostState extends State<NotifyBannerHost> {
     });
   }
 
+  /// Refer: the ask's Refer sheet (a note, Attach a contact), as on the card
   Future<void> _refer() async {
     final b = _b!;
     final api = context.read<AuthProvider>().api;
     setState(() => _sheet = true);
     _timer?.cancel();
-    var mine = 0;
+    ReferResult? r;
     try {
-      mine = ((await api.get('/app/posts/${b.postId}/referrals/mine')) as List).length;
-    } catch (_) {}
-    if (!mounted) return;
-    final left = 5 - mine;
-    if (left <= 0) {
-      setState(() => _sheet = false);
-      return toast(context, t('You can refer up to 5 contacts on one ask'));
-    }
-    final picked = await Navigator.push<List<PickedContact>>(context, MaterialPageRoute(builder: (_) => ContactPicker(askerName: b.body.split(' · ').first, maxSelect: left)));
-    var ok = 0;
-    String? err;
-    for (final c in picked ?? const <PickedContact>[]) {
-      try {
-        await api.post('/posts/${b.postId}/refer', {'name': c.name, 'phone': c.phone});
-        ok++;
-      } catch (e) {
-        err = '$e';
-      }
+      final post = Post.fromJson(await api.get('/posts/${b.postId}') as Map);
+      if (!mounted) return;
+      r = post.closed ? null : await showReferSheet(context, post);
+      if (post.closed && mounted) toast(context, t('This ask is closed'));
+    } catch (e) {
+      if (mounted) toast(context, '$e', error: true);
     }
     if (!mounted) return;
     setState(() {
       _sheet = false;
-      if (ok > 0) _b = null;
+      if (r != null) _b = null;
       _arm();
     });
-    if (picked != null && picked.isNotEmpty) toast(context, ok > 0 ? t('Referral sent') : (err ?? t('Could not refer')), error: ok == 0);
+    if (r != null) toast(context, t(r.referred > 0 ? 'Referral sent' : 'Response sent'));
   }
 
   @override

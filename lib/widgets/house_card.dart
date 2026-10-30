@@ -24,6 +24,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'post_card.dart';
 import 'reaction_picker.dart';
+import 'refer_sheet.dart';
 import 'swipe_deck.dart';
 
 /// A WEBWEB house card between asks on Connect (web house-card.tsx, API feed-cards.ts). Always from a house account
@@ -1403,9 +1404,12 @@ class _CardActionsState extends State<_CardActions> {
         color: p.tagText,
         edge: kGold.withValues(alpha: .45),
         fill: kGold.withValues(alpha: .1),
-        onTap: () {
+        // the note and contacts to the house account in a chat, as Reply (refer_sheet.dart)
+        onTap: () async {
           widget.tap();
-          _launch(_wa(_text, _link));
+          final a = widget.card.account;
+          final r = await showReferToChat(context, uid: a.uid, name: a.name, about: _text.isNotEmpty ? _text : (widget.card.title ?? ''));
+          if (r != null && context.mounted) toast(context, t(r.referred > 0 ? 'Referral sent' : 'Response sent'));
         },
       ),
       Semantics(label: t('1 view'), excludeSemantics: true, child: pill(label: 'Views', icon: WIcon(WI.views, size: 18, color: p.muted))),

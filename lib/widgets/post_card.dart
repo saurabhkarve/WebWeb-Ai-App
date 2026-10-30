@@ -773,14 +773,14 @@ class PostActionsState extends State<PostActions> {
     }
   }
 
-  /// Refer: on an ask, the note box with "Attach a contact" (refer_sheet.dart), open and ready to type; on an update,
-  /// pass it on over WhatsApp.
+  /// Refer: the note box with "Attach a contact" (refer_sheet.dart), open and ready to type, on asks and updates
+  /// alike (on an update they go to the poster in a chat). Your own update opens its page instead.
   Future<void> _referTap(bool isAsk) async {
-    if (!isAsk) return _whatsApp();
-    if (post.closed) return toast(context, t('This ask is closed'));
+    if (!isAsk && _isOwner) return widget.onReply();
+    if (isAsk && post.closed) return toast(context, t('This ask is closed'));
     final r = await showReferSheet(context, post);
     if (r == null || !mounted) return;
-    if (r.referred > 0) post.referralsCount += r.referred;
+    if (isAsk && r.referred > 0) post.referralsCount += r.referred;
     _changed();
     toast(context, t(r.referred > 0 ? 'Referral sent' : 'Response sent'));
   }
@@ -789,16 +789,6 @@ class PostActionsState extends State<PostActions> {
   Widget build(BuildContext context) => _actions(Pal.of(context), post.isRequirement, _isOwner);
 
   String get _subject => post.title ?? post.fact?.title ?? (post.isRequirement ? 'WebWeb AI ask' : 'WebWeb AI update');
-
-  /// Refer on an update: pass it on to someone over WhatsApp.
-  Future<void> _whatsApp() async {
-    // for an ask, a group message that says what is wanted, where, and that replying is free
-    final text = post.isRequirement
-        ? '🔎 $_subject${(post.locationPref ?? '').isNotEmpty ? '\n📍 ${post.locationPref}' : ''}${(post.budget ?? '').isNotEmpty ? ' · ${post.budget}' : ''}\n${t('Can you help? Reply free on WEBWEB:')}\n${post.webUrl}'
-        : '$_subject\n${post.webUrl}';
-    final ok = await launchUrl(Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}'), mode: LaunchMode.externalApplication).catchError((_) => false);
-    if (ok) logShare(_api, 'post', post.id, channel: 'whatsapp');
-  }
 
   /// Share: repost to your page, WhatsApp, the phone's share sheet, copy link.
   Future<void> _share() async {
@@ -936,8 +926,8 @@ class PostActionsState extends State<PostActions> {
         if (mine && isAsk)
           pill(label: 'Review responses', icon: WIcon(WI.talk, size: 18, color: p.tagText), count: post.sharesCount, badge: p.tagBg, color: p.tagText, edge: kGold.withValues(alpha: .45), fill: kGold.withValues(alpha: .1), onTap: widget.onReview ?? widget.onReply)
         else
-          // Refer, gold: the note box with Attach a contact opens at once (on an update: pass it on over WhatsApp); its
-          // count is the replies and referrals together ("I can help" is the ask card's own button)
+          // Refer, gold: the note box with Attach a contact opens at once, on asks and updates; its count is the
+          // replies and referrals together ("I can help" is the ask card's own button)
           tour(
             'reply',
             KeyedSubtree(
