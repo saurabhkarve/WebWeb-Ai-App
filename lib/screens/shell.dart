@@ -148,10 +148,12 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         if (!didPop && _i == _ask) _go(0);
       },
       child: Scaffold(
-      body: Column(children: [
+      // stretch + expand: the page area is always the full width. With a loose width, a Stack whose only unpositioned child
+      // is the empty banner host (SizedBox.shrink) sized itself 0 wide, and every page in it was laid out 0 wide: a blank screen
+      body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const ActiveCallBanner(),
         Expanded(
-          child: Stack(children: [
+          child: Stack(fit: StackFit.expand, children: [
             // pages, below the header
             Positioned.fill(
               child: Padding(
