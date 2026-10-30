@@ -10,7 +10,7 @@ import '../screens/profile.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-/// A paid ad in the feed (GET /feed/ads). Ads are not rolled out: the API serves none, so the feed shows none.
+/// An ad pushed from Admin > Ads (GET /feed/ads?placement=home|updates).
 class FeedAd {
   final String id, headline, ctaUrl;
   final String? body, imageUrl, ctaLabel, advertiserHandle, advertiserPhoto;
@@ -29,7 +29,7 @@ class FeedAd {
         advertiserVerified = (j['advertiser'] as Map?)?['verified'] == true;
 }
 
-/// Always labelled "Sponsored", with a menu to see why it is shown or hide it; counts an impression once it has been on screen.
+/// Always labelled "Ad", with a menu to see why it is shown or hide it; counts an impression once it has been on screen.
 class SponsoredCard extends StatefulWidget {
   final FeedAd ad;
   const SponsoredCard({super.key, required this.ad});
@@ -118,7 +118,7 @@ class _SponsoredCardState extends State<SponsoredCard> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), border: Border.all(color: p.text.withValues(alpha: .25))),
-                child: Text(t('Sponsored').toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: .5, color: p.text.withValues(alpha: .7))),
+                child: Text(t('Ad').toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: .5, color: p.text.withValues(alpha: .7))),
               ),
             ]),
           ),
@@ -129,7 +129,7 @@ class _SponsoredCardState extends State<SponsoredCard> {
             margin: const EdgeInsets.only(top: 8),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(12)),
-            child: Text(t('This is a paid ad. The business chose to reach members like you. Ads are always marked Sponsored, and your number is never shared with them.'), style: TextStyle(fontSize: 12, height: 1.4, color: p.muted)),
+            child: Text(t('This is a paid ad. The business chose to reach members like you. Ads are always marked Ad, and your number is never shared with them.'), style: TextStyle(fontSize: 12, height: 1.4, color: p.muted)),
           ),
         const SizedBox(height: 12),
         GestureDetector(
@@ -169,6 +169,78 @@ class _SponsoredCardState extends State<SponsoredCard> {
           ),
         ),
       ]),
+    );
+  }
+}
+
+/// An ad in the Updates strip: a circle like a business's, tagged "Ad"; tapping it shows the ad (the same card as in the feed).
+class AdCircle extends StatefulWidget {
+  final FeedAd ad;
+  const AdCircle({super.key, required this.ad});
+  @override
+  State<AdCircle> createState() => _AdCircleState();
+}
+
+class _AdCircleState extends State<AdCircle> {
+  Timer? _seen;
+
+  @override
+  void initState() {
+    super.initState();
+    // on screen for a second counts as seen
+    _seen = Timer(const Duration(seconds: 1), () {
+      if (mounted) context.read<AuthProvider>().api.post('/feed/ads/${widget.ad.id}/event', {'event': 'impression'}).catchError((_) {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _seen?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final ad = widget.ad;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: p.canvas,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (_) => SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.symmetric(horizontal: 16), child: SponsoredCard(ad: ad))),
+      ),
+      child: Container(
+        width: 84,
+        margin: const EdgeInsets.only(right: 12),
+        child: Column(children: [
+          Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
+            Container(
+              width: 74,
+              height: 74,
+              padding: const EdgeInsets.all(2.5),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: p.border),
+              child: Container(
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(shape: BoxShape.circle, color: p.canvas),
+                child: ClipOval(child: Avatar(name: ad.advertiserName, photoUrl: ad.advertiserPhoto, size: 64)),
+              ),
+            ),
+            Positioned(
+              bottom: -3,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(6), border: Border.all(color: p.text.withValues(alpha: .25))),
+                child: Text(t('Ad').toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: .5, color: p.text.withValues(alpha: .7))),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 7),
+          Text(ad.advertiserName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+        ]),
+      ),
     );
   }
 }

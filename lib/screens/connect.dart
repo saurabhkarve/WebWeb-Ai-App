@@ -97,7 +97,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
 
   Future<void> _loadAds() async {
     try {
-      final r = await _api.get('/feed/ads') as List;
+      final r = await _api.get('/feed/ads', {'placement': 'home'}) as List;
       if (mounted) setState(() => _ads = r.map((e) => FeedAd.fromJson(e as Map)).toList());
     } catch (_) {}
   }
@@ -235,7 +235,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
           if (((i + 1) % 3 == 0 ? (i + 1) ~/ 3 - 1 : (posts.length < 3 && i == posts.length - 1 ? 0 : -1)) case final slot when slot >= 0 && slot < blocks.length) _block(blocks[slot]),
           // a short feed: WEBWEB cards that got no slot go after the last ask, up to 3 cards in all
           if (i == posts.length - 1) ...blocks.skip(slotCount).whereType<HouseCard>().take((3 - houseShown).clamp(0, 3)).map(_block),
-          // a paid ad after every 7th ask (none are served yet, so none show)
+          // an ad (pushed from Admin > Ads) after every 7th ask
           if ((i + 1) % 7 == 0 && (i + 1) ~/ 7 - 1 < _ads.length) SponsoredCard(key: ValueKey('ad-${_ads[(i + 1) ~/ 7 - 1].id}'), ad: _ads[(i + 1) ~/ 7 - 1]),
           // invite people you know, after the 15th ask
           if (i == 14) const InviteCard(),
@@ -392,6 +392,7 @@ class _UpdatesBarState extends State<_UpdatesBar> {
   // the daily circles: Leads for you by kind of ask, Today in your area by kind of item, New here
   LeadSummary? _leads;
   List<Post>? _leadList;
+  List<FeedAd> _ads = [];
   TodayFeed? _today;
   List<Profile>? _biz;
   Set<String> _dailySeen = {};
@@ -439,6 +440,9 @@ class _UpdatesBarState extends State<_UpdatesBar> {
       }).catchError((_) {}),
       api.get('/today').then((d) {
         if (mounted) setState(() => _today = TodayFeed.fromJson(d as Map));
+      }).catchError((_) {}),
+      api.get('/feed/ads', {'placement': 'updates'}).then((d) {
+        if (mounted) setState(() => _ads = [for (final e in d as List) FeedAd.fromJson(e as Map)]);
       }).catchError((_) {}),
       api.get('/today/new-businesses').then((d) {
         if (mounted) setState(() => _biz = [for (final e in d as List) Profile.fromJson(e as Map)]);
@@ -602,6 +606,7 @@ class _UpdatesBarState extends State<_UpdatesBar> {
           ),
           if (getLeads) _getLeadsTile(p),
           for (final g in order.where((g) => g.fresh > 0)) circle(g),
+          for (final a in _ads.take(1)) AdCircle(key: ValueKey('adc-${a.id}'), ad: a),
           for (final i in others)
             _UpdateTile(
               name: _groups[i].shownName,
@@ -613,6 +618,7 @@ class _UpdatesBarState extends State<_UpdatesBar> {
               onTap: () => _open(i),
             ),
           for (final g in order.where((g) => g.fresh == 0)) circle(g),
+          for (final a in _ads.skip(1).take(2)) AdCircle(key: ValueKey('adc-${a.id}'), ad: a),
           if (_hasMore)
             const SizedBox(width: 48, child: Align(alignment: Alignment(0, -.45), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))),
           // the daily circles already fill an empty row

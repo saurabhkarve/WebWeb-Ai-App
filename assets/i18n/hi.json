@@ -2471,5 +2471,7 @@
   "Say what you need done, and the area.": "बताएँ कि क्या काम कराना है और कौन सा इलाक़ा है।",
   "Say the business, what each side brings, and the area.": "बताएँ कौन सा व्यवसाय, हर पक्ष क्या लाएगा और इलाक़ा कौन सा है।",
   "Say the amount, what it is for, and by when.": "राशि, किसलिए चाहिए और कब तक, यह बताएँ।",
-  "You are {d} from this ask": "आप इस Ask से {d} दूर हैं"
+  "You are {d} from this ask": "आप इस Ask से {d} दूर हैं",
+  "Ad": "विज्ञापन",
+  "This is a paid ad. The business chose to reach members like you. Ads are always marked Ad, and your number is never shared with them.": "यह एक भुगतान वाला विज्ञापन है। व्यवसाय ने आप जैसे सदस्यों तक पहुँचना चुना है। विज्ञापन हमेशा 'विज्ञापन' के रूप में चिह्नित होते हैं और आपका नंबर उन्हें कभी नहीं दिया जाता।"
 }
