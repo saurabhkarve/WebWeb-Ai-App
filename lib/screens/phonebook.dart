@@ -497,7 +497,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
     final top = Column(key: _topKey, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-        Text(t('Directory'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
+        Text(t('Directory'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
         const SizedBox(width: 8),
         if (all.isNotEmpty) Text('${all.length}', style: TextStyle(fontSize: 15, color: p.muted)),
       ]),

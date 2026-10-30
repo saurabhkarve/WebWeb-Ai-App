@@ -224,6 +224,13 @@ class _FindScreenState extends State<FindScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(16, 16, 16, bottom),
       children: [
+        // the tab's title, as Talk's and the Directory's (the page opened from a search has its own bar)
+        if (!widget.standalone) ...[
+          Text(t('Nearby'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1)),
+          const SizedBox(height: 4),
+          Text(t('Businesses, jobs and asks around you'), style: TextStyle(fontSize: 14, color: p.muted)),
+          const SizedBox(height: 12),
+        ],
         // search box
         Container(
           height: 40,

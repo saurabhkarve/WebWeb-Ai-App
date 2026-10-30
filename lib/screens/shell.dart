@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -34,7 +35,7 @@ import 'support_sheet.dart';
 import 'talk.dart';
 
 /// Signed-in chrome, same as the web on phones (app-frame.tsx): the slim header (logo, bell, your
-/// avatar with the account menu) and the floating island with Connect, Find, Talk and Ask.
+/// avatar with the account menu) and the bar with the five places.
 /// The header always stays in view (the web hides it on scroll only on small screens).
 class Shell extends StatefulWidget {
   const Shell({super.key});
@@ -46,16 +47,15 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int _i = 2; // Directory
   int _feedTick = 0; // reload the feed
   int _topTick = 0; // scroll the feed to the top
-  int _askSpin = 0;
   StreamSubscription? _sub, _pushSub;
   Timer? _poll, _svcTimer;
   final _notes = NotificationsModel();
 
   // The Smart Phonebook: Home (the feed), Nearby (the local directory), Directory (the contacts, where the app opens:
   // the raised gold button in the middle), Talk (chats and calls), Notifications (responses and referrals on my asks).
-  // The round gold button is Ask; Ask itself is a page of its own (index 5) without the bar. Recents (favourites,
+  // Asks start from the Directory's search or a "Post an ask" card; Ask is a page of its own (index 5) without the bar. Recents (favourites,
   // calls and pages opened lately) is in the account menu. All five use the WebWeb icon set.
-  // From 600 px wide (tablets, desktop) the bar becomes a rail down the left with Ask at its top, and pages keep a
+  // From 600 px wide (tablets, desktop) the bar becomes a rail down the left, and pages keep a
   // readable width; from 1200 px the rail shows its labels beside the icons.
   static const _items = [(WI.home, 'Home'), (WI.pin, 'Nearby'), (WI.directory, 'Directory'), (WI.talk, 'Talk'), (WI.bell, 'Notifications')];
   static const _tourKeys = ['nav-feed', 'nav-find', 'nav-contacts', 'nav-talk', 'nav-notes'];
@@ -145,10 +145,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   }
 
   void _go(int k) {
-    if (k == _ask) {
-      _askSpin++;
-      if (_i != _ask) _beforeAsk = _i;
-    }
+    if (k == _ask && _i != _ask) _beforeAsk = _i;
+    if (k != _i) HapticFeedback.selectionClick();
     if (k == _i && k == _feed) _topTick++; // tapping Home again scrolls the feed to the top
     if (k == _notesTab) _notes.refresh(context.read<AuthProvider>());
     setState(() => _i = k);
@@ -194,7 +192,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                     _fit(PhonebookHome(active: _i == _dir, onAsk: () => _go(_ask), onSeeAsks: () => _go(_feed), onPosted: () => setState(() => _feedTick++), onSearching: (on) => setState(() => _dirSearch = on)), 1240),
                     // Talk loads afresh each time it opens
                     if (_i == _talk) _fit(const TalkScreen(), 900) else const SizedBox.shrink(),
-                    _fit(_NotesPanel(notes: _notes, page: true), 760),
+                    _fit(_NotesPanel(notes: _notes, page: true, onAsk: () => _go(_ask)), 760),
                     _fit(
                         AskScreen(active: _i == _ask, onBack: () => _go(_beforeAsk), onPosted: () => setState(() {
                               _feedTick++;
@@ -216,8 +214,6 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             Positioned(top: top + header + 8, left: 0, right: 0, child: const ConnectionPill()),
             // a message or a new ask while the app is open: a banner with Reply (and Refer) right on it
             const NotifyBannerHost(),
-            // the round Ask button (contribute), above the bar on phones; on the rail on wider screens
-            if (bottomBar) Positioned(right: 16, bottom: _barH + bottom + 16, child: _fab(p)),
             // the bar along the bottom, Contacts raised in the middle; Ask has its own Publish bar instead
             if (bottomBar) Positioned(left: 0, right: 0, bottom: 0, height: _barH + bottom + _rise, child: _bar(p, bottom)),
             // tablets and desktop: the rail down the left, under the header
@@ -352,7 +348,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         child: Text(n > 99 ? '99+' : '$n', style: const TextStyle(color: kInk, fontSize: 10, fontWeight: FontWeight.w700, height: 1)),
       );
 
-  /// Tablets and desktop: Ask at the top, then the five places; Contacts keeps its gold. [labels]: the wide rail,
+  /// Tablets and desktop: the five places; Directory keeps its gold. [labels]: the wide rail,
   /// with each label beside its icon.
   Widget _rail(Pal p, bool labels) {
     final tone = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
@@ -420,43 +416,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       padding: EdgeInsets.fromLTRB(labels ? 16 : 8, 16, labels ? 16 : 8, 16),
       child: SingleChildScrollView(
         child: Column(crossAxisAlignment: labels ? CrossAxisAlignment.stretch : CrossAxisAlignment.center, children: [
-          _fab(p, compact: !labels),
-          const SizedBox(height: 20),
           for (var k = 0; k < _items.length; k++) Padding(padding: const EdgeInsets.only(bottom: 6), child: item(k)),
         ]),
-      ),
-    );
-  }
-
-  /// Ask: post what you need. [compact]: the narrow rail's square button, the word under the icon.
-  Widget _fab(Pal p, {bool compact = false}) {
-    final active = _i == _ask;
-    return Semantics(
-      button: true,
-      selected: active,
-      label: t('Ask'),
-      child: GestureDetector(
-        key: Tours.key('nav-ask'),
-        onTap: () => _go(_ask),
-        child: Container(
-          height: compact ? 64 : 58,
-          width: compact ? 64 : null,
-          padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 20),
-          constraints: const BoxConstraints(minWidth: 58),
-          decoration: BoxDecoration(
-            gradient: kGoldGradient,
-            borderRadius: BorderRadius.circular(20),
-            border: active ? Border.all(color: kInk.withValues(alpha: .5), width: 1.5) : null,
-            boxShadow: [BoxShadow(color: const Color(0xFFD6AA00).withValues(alpha: .45), blurRadius: 18, spreadRadius: -4, offset: const Offset(0, 8))],
-          ),
-          child: ExcludeSemantics(
-            child: Flex(direction: compact ? Axis.vertical : Axis.horizontal, mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
-              WIcon(WI.connect, size: 22, color: kInk, strokeWidth: 2.2, spinKey: _askSpin),
-              SizedBox(width: compact ? 0 : 8, height: compact ? 3 : 0),
-              Text(t('Ask'), style: TextStyle(color: kInk, fontSize: compact ? 12 : 15, fontWeight: FontWeight.w700)),
-            ]),
-          ),
-        ),
       ),
     );
   }
@@ -1058,7 +1019,9 @@ class _NotesPanel extends StatefulWidget {
   final NotificationsModel notes;
   /// true: the Notifications tab (fills the page, no pop on tap); false: a floating panel
   final bool page;
-  const _NotesPanel({required this.notes, this.page = false});
+  /// the empty tab's "Post an ask"
+  final VoidCallback? onAsk;
+  const _NotesPanel({required this.notes, this.page = false, this.onAsk});
   @override
   State<_NotesPanel> createState() => _NotesPanelState();
 }
@@ -1092,6 +1055,7 @@ class _NotesPanelState extends State<_NotesPanel> {
             decoration: widget.page ? BoxDecoration(color: p.canvas) : _panelDecoration(p, radius: 16),
             clipBehavior: Clip.antiAlias,
             child: Column(mainAxisSize: widget.page ? MainAxisSize.max : MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (widget.page) ..._pageHead(p, n, auth) else ...[
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border))),
@@ -1124,6 +1088,7 @@ class _NotesPanelState extends State<_NotesPanel> {
                   ],
                 ]),
               ),
+              ],
               if (_alertsOn == false)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1154,7 +1119,7 @@ class _NotesPanelState extends State<_NotesPanel> {
                 child: !n.loaded
                     ? const Padding(padding: EdgeInsets.all(24), child: Center(child: LogoLoader(size: 28)))
                     : n.items.isEmpty
-                        ? _empty(p, t('No responses yet. When members share a contact on your Ask, it shows up here.'))
+                        ? (widget.page ? _emptyPage(p) : _empty(p, t('No responses yet. When members share a contact on your Ask, it shows up here.')))
                         : shown.isEmpty
                             ? _empty(p, t(_filter == 'unread' ? "You're all caught up." : 'Nothing read yet.'))
                             : ListView.builder(
@@ -1211,6 +1176,73 @@ class _NotesPanelState extends State<_NotesPanel> {
   /// the list: filling the rest of the page on the tab, a capped height in the floating panel
   Widget _bound(BuildContext context, {required Widget child}) =>
       widget.page ? Expanded(child: child) : ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .62), child: child);
+
+  /// The tab's top, as Talk's: the title and how many are new, Mark all as read, then the filters as gold chips.
+  List<Widget> _pageHead(Pal p, NotificationsModel n, AuthProvider auth) {
+    Widget chip(String f, String label) {
+      final on = _filter == f;
+      return GestureDetector(
+        onTap: () => setState(() => _filter = f),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(gradient: on ? kGoldGradient : null, color: on ? null : p.chip, borderRadius: BorderRadius.circular(20)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text(t(label), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: on ? kInk : p.muted)),
+            if (f == 'unread' && n.unseen > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                decoration: BoxDecoration(color: kInk, borderRadius: BorderRadius.circular(10)),
+                child: Text(n.unseen > 99 ? '99+' : '${n.unseen}', style: const TextStyle(fontSize: 11, height: 16 / 11, fontWeight: FontWeight.w700, color: kGold)),
+              ),
+            ],
+          ]),
+        ),
+      );
+    }
+
+    return [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(t('Notifications'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1)),
+              const SizedBox(height: 4),
+              Text(n.unseen > 0 ? '${n.unseen} ${t('unread')}' : t("You're all caught up"), style: TextStyle(fontSize: 14, color: p.muted)),
+            ]),
+          ),
+          if (n.unseen > 0) TextButton(onPressed: () => n.markSeen(auth), child: Text(t('Mark all as read'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
+        ]),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(children: [chip('all', 'All'), const SizedBox(width: 8), chip('unread', 'Unread'), const SizedBox(width: 8), chip('read', 'Read')]),
+      ),
+    ];
+  }
+
+  /// The empty tab: what will show here, and the way to get some
+  Widget _emptyPage(Pal p) => ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 100), children: [
+        DashedBox(
+          radius: 16,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+          child: Column(children: [
+            Container(width: 64, height: 64, alignment: Alignment.center, decoration: BoxDecoration(color: p.tagBg, shape: BoxShape.circle), child: WIcon(WI.bell, size: 28, color: p.tagText)),
+            const SizedBox(height: 14),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: Text(t('No responses yet. When members share a contact on your Ask, it shows up here.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 14.5, height: 1.4, color: p.muted)),
+            ),
+            if (widget.onAsk != null) ...[
+              const SizedBox(height: 18),
+              GoldButton(label: t('Post an ask'), wi: WI.askPlus, height: 44, onPressed: widget.onAsk),
+            ],
+          ]),
+        ),
+      ]);
 
   Widget _empty(Pal p, String text) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),

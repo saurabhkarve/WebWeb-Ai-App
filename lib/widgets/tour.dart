@@ -28,7 +28,6 @@ const kConnectTour = [
   TourStep('Leads for you', 'Asks that fit your business, picked for you every day. Reply early.', 'today'),
   TourStep('Every ask says who wants what', 'Like "SkyQ is looking for a space". Swipe its cards for photos, details and the budget.', 'first-ask'),
   TourStep('Say "I can help"', 'Add your price and when. The asker compares and picks.', 'reply'),
-  TourStep('Need something yourself?', 'Tap Ask. Choose Hire, Buy, Sell, Advice, a Poll and more: it takes a minute.', 'nav-ask'),
   TourStep('Alerts, your week, and this tour', 'Set alerts for the asks you want first. Your week shows your leads, jobs won and rank.', 'account'),
 ];
 
