@@ -725,7 +725,7 @@ class _TrendingGrid extends StatelessWidget {
     if (asks.isEmpty) return Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Text(t('Nothing here yet'), textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.muted)));
     return LayoutBuilder(builder: (context, c) {
       const gap = 10.0;
-      final w = (c.maxWidth - gap) / 2;
+      final w = ((c.maxWidth - gap) / 2).clamp(0.0, double.infinity); // 0 wide (a hidden tab): never negative, which fails the whole frame
       return Wrap(spacing: gap, runSpacing: gap, children: [
         for (var i = 0; i < asks.length; i++) SizedBox(width: i == 0 ? c.maxWidth : w, child: _AskTile(asks[i], big: i == 0)),
       ]);

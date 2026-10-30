@@ -118,7 +118,7 @@ class AskCards extends StatelessWidget {
           label(t('At a glance')),
           const SizedBox(height: 10),
           LayoutBuilder(builder: (context, box) {
-            final w = (box.maxWidth - 8) / 2;
+            final w = ((box.maxWidth - 8) / 2).clamp(0.0, double.infinity);
             return Wrap(spacing: 8, runSpacing: 8, children: [for (final x in tiles) SizedBox(width: w, child: x)]);
           }),
         ])),

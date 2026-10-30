@@ -127,7 +127,7 @@ class _CropScreenState extends State<_CropScreen> {
         child: Column(children: [
           Expanded(
             child: LayoutBuilder(builder: (context, c) {
-              final fw = math.min(c.maxWidth - 48, (c.maxHeight - 48) * spec.aspect);
+              final fw = math.max(0.0, math.min(c.maxWidth - 48, (c.maxHeight - 48) * spec.aspect));
               final frame = Size(fw, fw / spec.aspect);
               if (frame != _frame) {
                 _frame = frame;

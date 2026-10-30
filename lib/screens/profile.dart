@@ -836,7 +836,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // two per row on phones, three on wide screens (web: grid-cols-2 lg:grid-cols-3)
           final cols = c.maxWidth >= 560 ? 3 : 2;
           final gap = cols == 2 ? 8.0 : 12.0;
-          final w = (c.maxWidth - gap * (cols - 1)) / cols;
+          final w = ((c.maxWidth - gap * (cols - 1)) / cols).clamp(0.0, double.infinity);
           final owner = Peer(uid: u.uid, name: u.name, company: u.company, handle: u.handle, userType: u.userType, photoUrl: u.photoUrl, verification: u.verification);
           return Wrap(spacing: gap, runSpacing: gap, children: [
             for (final x in items)

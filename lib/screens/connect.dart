@@ -627,7 +627,7 @@ class _UpdatesBarState extends State<_UpdatesBar> {
               child: Padding(
                 padding: const EdgeInsets.only(left: 4),
                 child: SizedBox(
-                  width: MediaQuery.of(context).size.width - 32 - 96,
+                  width: (MediaQuery.of(context).size.width - 32 - 96).clamp(0.0, double.infinity),
                   child: Text(t('Updates from other members will show up here.'), style: TextStyle(fontSize: 12, color: p.muted)),
                 ),
               ),
