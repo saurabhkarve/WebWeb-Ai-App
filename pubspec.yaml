@@ -57,8 +57,6 @@ flutter:
           weight: 500
         - asset: assets/fonts/Akash-700.ttf
           weight: 700
-        - asset: assets/fonts/Akash-900.ttf
-          weight: 900
 
 # Smart Phonebook icon: the logo gradient as the square, a white circle, the W in the same gradient
 # ("\" strokes and dot bright, "/" strokes light). Android adaptive: gradient background + circle and W inside the safe zone.

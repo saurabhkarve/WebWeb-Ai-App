@@ -40,7 +40,7 @@ class _SwipeDeckState extends State<SwipeDeck> {
       Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Row(children: [
-          Expanded(child: Text(widget.label.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link))),
+          Expanded(child: Text(widget.label.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.link))),
           if (n > 1)
             for (var k = start; k < n && k < start + 5; k++)
               GestureDetector(

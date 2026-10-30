@@ -86,7 +86,7 @@ class _PhonebookScreenState extends State<PhonebookScreen> {
       if (on.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Text(t('None of these contacts have a page yet. Invite them below.'), textAlign: TextAlign.center, style: TextStyle(color: p.muted))),
       if (notOn.isNotEmpty) ...[
         const SizedBox(height: 16),
-        Text(t('Invite to the phonebook'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+        Text(t('Invite to the phonebook'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
         for (final e in notOn)
           ListTile(
             contentPadding: EdgeInsets.zero,
@@ -111,7 +111,7 @@ class _PhonebookScreenState extends State<PhonebookScreen> {
         FilledButton(
           onPressed: _busy ? null : _check,
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50), backgroundColor: kStar, foregroundColor: kInk, shape: const StadiumBorder()),
-          child: _busy ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: kInk)) : Text(t('Check my contacts'), style: const TextStyle(fontWeight: FontWeight.w800)),
+          child: _busy ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: kInk)) : Text(t('Check my contacts'), style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
         if (_error != null) Padding(padding: const EdgeInsets.only(top: 10), child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: p.danger))),
         const SizedBox(height: 20),
@@ -130,7 +130,7 @@ class _PhonebookScreenState extends State<PhonebookScreen> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(n, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+          Text(n, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
           Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
         ]),
       );
@@ -262,7 +262,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     final me = context.watch<AuthProvider>().profile;
 
     return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 120), children: [
-      Text(t('Contacts'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+      Text(t('Contacts'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
       const SizedBox(height: 10),
       TextField(
         controller: _q,
@@ -308,7 +308,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(t('See who in your contacts has a page'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                    Text(t('See who in your contacts has a page'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 2),
                     Text(t('What they do, where they are and their reviews. Numbers are checked and not kept.'), style: TextStyle(fontSize: 13, color: p.muted, height: 1.35)),
                   ]),
@@ -324,7 +324,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
           if (_contacts!.isEmpty) Text(t('None of your contacts have a page yet. Invite them from the contact check.'), style: TextStyle(color: p.muted)),
           // A to Z, a letter over each group
           for (final e in _byLetter(_contacts!).entries) ...[
-            Padding(padding: const EdgeInsets.only(top: 10, bottom: 2), child: Text(e.key, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kStar))),
+            Padding(padding: const EdgeInsets.only(top: 10, bottom: 2), child: Text(e.key, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kStar))),
             for (final m in e.value) _row(p, m, saved: m['saved'] as String?),
           ],
         ],
@@ -334,7 +334,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
   Widget _label(Pal p, String s) => Padding(
         padding: const EdgeInsets.only(top: 16, bottom: 2),
-        child: Text(s.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .5, color: p.muted)),
+        child: Text(s.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.25, color: p.muted)),
       );
 
   Widget _row(Pal p, Map m, {String? saved}) {
@@ -397,7 +397,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               Text(t('My page'), style: TextStyle(fontSize: 12, color: p.muted)),
               if (count > 0)
                 Row(children: [Stars(value: avg, size: 11), const SizedBox(width: 4), Text('${avg.toStringAsFixed(1)} · $count', style: TextStyle(fontSize: 11, color: p.muted))]),

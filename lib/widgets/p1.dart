@@ -144,7 +144,7 @@ class WinnerBanner extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(18)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('🎉 ${t('You won this job')}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: kInk)),
+          Text('🎉 ${t('You won this job')}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: kInk)),
           const SizedBox(height: 2),
           Text(t('{name} chose you for this ask.', {'name': ownerName}), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kInk)),
           const SizedBox(height: 4),

@@ -44,7 +44,7 @@ class AskCards extends StatelessWidget {
           ),
           child: child,
         );
-    Widget label(String s) => Text(s.toUpperCase(), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.muted));
+    Widget label(String s) => Text(s.toUpperCase(), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.muted));
     Widget tile(WI icon, String name, String value, [String? sub]) => Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(color: p.canvas.withValues(alpha: .7), borderRadius: BorderRadius.circular(12)),
@@ -52,7 +52,7 @@ class AskCards extends StatelessWidget {
             Row(children: [
               Container(width: 20, height: 20, alignment: Alignment.center, decoration: BoxDecoration(color: kGold.withValues(alpha: .25), shape: BoxShape.circle), child: WIcon(icon, size: 12, color: p.text, still: true)),
               const SizedBox(width: 6),
-              Flexible(child: Text(name.toUpperCase(), maxLines: 1, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: .3, color: p.muted))),
+              Flexible(child: Text(name.toUpperCase(), maxLines: 1, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.15, color: p.muted))),
             ]),
             const SizedBox(height: 6),
             Text(value, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.2)),
@@ -71,7 +71,7 @@ class AskCards extends StatelessWidget {
         Row(children: [
           WIcon(categoryIcon(type.icon), size: 14, color: p.link, still: true),
           const SizedBox(width: 6),
-          Expanded(child: Text(askLabel(post).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link))),
+          Expanded(child: Text(askLabel(post).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.link))),
           if (chip != null) ...[const SizedBox(width: 8), Flexible(child: chip!)],
         ]),
         const SizedBox(height: 8),
@@ -81,7 +81,7 @@ class AskCards extends StatelessWidget {
           Expanded(child: Text(t(s.key, {...s.vars, if (s.vars['what'] != null) 'what': t(s.vars['what']!)}), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .75)))),
         ]),
         const SizedBox(height: 6),
-        HashtagText(askText(post.askType, post.title), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -.3)),
+        HashtagText(askText(post.askType, post.title), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, height: 1.2, letterSpacing: -.3)),
         if (post.askType == 'visit' && firstLink([post.title, post.description]) != null) ...[
           const SizedBox(height: 12),
           Container(

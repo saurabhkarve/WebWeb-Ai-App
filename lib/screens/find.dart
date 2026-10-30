@@ -826,7 +826,7 @@ class _AskTile extends StatelessWidget {
           Row(children: [
             WIcon(categoryIcon(type.icon), size: 13, color: p.link, still: true),
             const SizedBox(width: 4),
-            Flexible(child: Text(((a['categoryLabel'] as String?) ?? t(type.short)).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link))),
+            Flexible(child: Text(((a['categoryLabel'] as String?) ?? t(type.short)).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.link))),
           ]),
           const SizedBox(height: 6),
           Row(children: [
@@ -835,7 +835,7 @@ class _AskTile extends StatelessWidget {
             Expanded(child: Text(t(s.key, s.vars), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .7)))),
           ]),
           const SizedBox(height: 4),
-          Text('${a['title']}', maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: big ? 18 : 14, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -.2)),
+          Text('${a['title']}', maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: big ? 18 : 14, fontWeight: FontWeight.w700, height: 1.2, letterSpacing: -.2)),
           const SizedBox(height: 10),
           Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Expanded(

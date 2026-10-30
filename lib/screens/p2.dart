@@ -156,7 +156,7 @@ class _TodayScreenState extends State<TodayScreen> {
         padding: EdgeInsets.fromLTRB(16, 12, 16, islandSpace(context)),
         children: [
           Row(children: [
-            Expanded(child: Text('☀ ${t('Today in {place}', {'place': feed.cluster!})}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
+            Expanded(child: Text('☀ ${t('Today in {place}', {'place': feed.cluster!})}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
             IconButton(
               tooltip: t('Previous day'),
               visualDensity: VisualDensity.compact,
@@ -254,7 +254,7 @@ class _ItemRowState extends State<_ItemRow> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Text('${_icon[it.type]} ', style: const TextStyle(fontSize: 13)),
-          Text(t(_typeLabel[it.type] ?? '').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.muted)),
+          Text(t(_typeLabel[it.type] ?? '').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.muted)),
           if (it.type == 'notice' && pl['when'] != null) Text(' · ${pl['when']}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: amber)),
           if (it.type == 'event' && pl['startsAt'] != null) Text(' · ${pl['startsAt']}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: p.link)),
           if (left != null)
@@ -378,10 +378,10 @@ class _PollCardState extends State<PollCard> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // a story card names it in its own strip
         if (!bare) ...[
-          Text('❓ ${t(q.kind == 'rate' ? 'Rate check' : "Today's question").toUpperCase()}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.tagText)),
+          Text('❓ ${t(q.kind == 'rate' ? 'Rate check' : "Today's question").toUpperCase()}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.tagText)),
           const SizedBox(height: 4),
         ],
-        Text(_question(q), style: bare ? const TextStyle(fontSize: 22, height: 1.2, fontWeight: FontWeight.w800) : const TextStyle(fontSize: 18, height: 1.3, fontWeight: FontWeight.w700)),
+        Text(_question(q), style: bare ? const TextStyle(fontSize: 22, height: 1.2, fontWeight: FontWeight.w700) : const TextStyle(fontSize: 18, height: 1.3, fontWeight: FontWeight.w700)),
         Padding(
           padding: const EdgeInsets.only(top: 6, bottom: 12),
           child: Wrap(spacing: 12, runSpacing: 2, children: [
@@ -434,7 +434,7 @@ class _PollCardState extends State<PollCard> {
                         height: 28,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(color: _picked == i ? kGold : p.chip, shape: BoxShape.circle),
-                        child: Text(_busy && _picked == i ? '…' : _letters[i % 4], style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: _picked == i ? kInk : p.muted)),
+                        child: Text(_busy && _picked == i ? '…' : _letters[i % 4], style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _picked == i ? kInk : p.muted)),
                       ),
                       const SizedBox(width: 12),
                       Expanded(child: Text(q.options[i], style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
@@ -504,10 +504,10 @@ class _PollCardState extends State<PollCard> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: p.chip.withValues(alpha: .5), borderRadius: BorderRadius.circular(14)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(t('What members say').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.muted)),
+        Text(t('What members say').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.muted)),
         const SizedBox(height: 4),
         Wrap(crossAxisAlignment: WrapCrossAlignment.end, spacing: 10, children: [
-          Text(_money(med), style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800)),
+          Text(_money(med), style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700)),
           Padding(padding: const EdgeInsets.only(bottom: 5), child: Text('${t('median')}${(q.unit ?? '').isEmpty ? '' : ' /${q.unit}'}', style: TextStyle(fontSize: 14, color: p.muted))),
         ]),
         const SizedBox(height: 16),
@@ -552,7 +552,7 @@ class _PollCardState extends State<PollCard> {
                 margin: const EdgeInsets.only(left: 6),
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(99)),
-                child: Text(text, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: fg)),
+                child: Text(text, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
               );
           return Container(
             margin: const EdgeInsets.only(bottom: 8),
@@ -576,7 +576,7 @@ class _PollCardState extends State<PollCard> {
                     height: 24,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(color: mine ? kGold : p.canvas.withValues(alpha: .8), shape: BoxShape.circle),
-                    child: Text(mine ? '✓' : _letters[i % 4], style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: mine ? kInk : p.muted)),
+                    child: Text(mine ? '✓' : _letters[i % 4], style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: mine ? kInk : p.muted)),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -588,7 +588,7 @@ class _PollCardState extends State<PollCard> {
                   ),
                   const SizedBox(width: 8),
                   Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Text('$pct%', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, height: 1.1)),
+                    Text('$pct%', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.1)),
                     Text(t(count == 1 ? '1 vote' : '{n} votes', {'n': count}), style: TextStyle(fontSize: 10.5, color: p.muted)),
                   ]),
                 ]),
@@ -713,7 +713,7 @@ class _AlertSheetState extends State<_AlertSheet> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final suggestions = alertSuggestions(context.read<AuthProvider>().profile);
-    Widget label(String s) => Padding(padding: const EdgeInsets.only(top: 16, bottom: 6), child: Text(t(s).toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.muted)));
+    Widget label(String s) => Padding(padding: const EdgeInsets.only(top: 16, bottom: 6), child: Text(t(s).toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.muted)));
     Widget chip(String text, bool on, VoidCallback onTap) => Padding(
           padding: const EdgeInsets.only(right: 6, bottom: 6),
           child: GestureDetector(
@@ -1298,7 +1298,7 @@ class DailyCircle extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(11), border: Border.all(color: p.canvas, width: 2)),
-                    child: Text(g.photo != null ? g.emoji : '$n', style: TextStyle(fontSize: g.photo != null ? 10 : 10, height: 1, fontWeight: FontWeight.w800, color: const Color(0xFFFFD84A))),
+                    child: Text(g.photo != null ? g.emoji : '$n', style: TextStyle(fontSize: g.photo != null ? 10 : 10, height: 1, fontWeight: FontWeight.w700, color: const Color(0xFFFFD84A))),
                   ),
                 ),
             ]),
@@ -1551,7 +1551,7 @@ class _Cta extends StatelessWidget {
             child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               Text(emoji, style: const TextStyle(fontSize: 17, height: 1)),
               const SizedBox(width: 8),
-              Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: soft ? p.text : kInk))),
+              Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: soft ? p.text : kInk))),
             ]),
           ),
         ),
@@ -1584,7 +1584,7 @@ class _Shell extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           decoration: BoxDecoration(gradient: LinearGradient(colors: stripColors)),
           child: Row(children: [
-            Expanded(child: Text(strip.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: .6, color: stripFg))),
+            Expanded(child: Text(strip.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.3, color: stripFg))),
             if (right != null) Text(right!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: stripFg.withValues(alpha: .85))),
           ]),
         ),
@@ -1627,7 +1627,7 @@ class _LeadStoryCard extends StatelessWidget {
       stripFg: const Color(0xFFFFD84A),
       right: '${x.leadNew ? '${t('NEW')} · ' : ''}${timeAgo(x.createdAt)}',
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(x.title ?? '', style: const TextStyle(fontSize: 24, height: 1.15, fontWeight: FontWeight.w800)),
+        Text(x.title ?? '', style: const TextStyle(fontSize: 24, height: 1.15, fontWeight: FontWeight.w700)),
         if ((x.description ?? '').isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(x.description!, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, height: 1.45, color: p.text.withValues(alpha: .75))),
@@ -1725,7 +1725,7 @@ class _TodayStoryCardState extends State<_TodayStoryCard> {
             if ((it.place ?? '').isNotEmpty) _Fact('📍', it.place!),
           ]),
         if (it.type != 'rates') const SizedBox(height: 12),
-        Text(x.title, style: const TextStyle(fontSize: 22, height: 1.2, fontWeight: FontWeight.w800)),
+        Text(x.title, style: const TextStyle(fontSize: 22, height: 1.2, fontWeight: FontWeight.w700)),
         if (it.type == 'rates') ...[
           const SizedBox(height: 12),
           Container(
@@ -1738,7 +1738,7 @@ class _TodayStoryCardState extends State<_TodayStoryCard> {
                   child: Row(children: [
                     Expanded(child: Text(it.rates[k].name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
                     Text.rich(TextSpan(children: [
-                      TextSpan(text: it.rates[k].value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                      TextSpan(text: it.rates[k].value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                       if ((it.rates[k].unit ?? '').isNotEmpty) TextSpan(text: '/${it.rates[k].unit!.replaceFirst(RegExp(r'^/'), '')}', style: TextStyle(fontSize: 13, color: p.muted)),
                     ])),
                     const SizedBox(width: 10),
@@ -1750,7 +1750,7 @@ class _TodayStoryCardState extends State<_TodayStoryCard> {
                         padding: const EdgeInsets.symmetric(vertical: 2),
                         alignment: Alignment.center,
                         decoration: BoxDecoration(color: c == 0 ? p.chip : col.withValues(alpha: .15), borderRadius: BorderRadius.circular(99)),
-                        child: Text(c > 0 ? '▲ ${c.abs()}' : c < 0 ? '▼ ${c.abs()}' : '–', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: col)),
+                        child: Text(c > 0 ? '▲ ${c.abs()}' : c < 0 ? '▼ ${c.abs()}' : '–', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: col)),
                       );
                     }),
                   ]),
@@ -1847,7 +1847,7 @@ class _NewBizCardState extends State<_NewBizCard> {
         Avatar(name: name, photoUrl: u.photoUrl, type: u.userType, size: 80, badge: 20),
         const SizedBox(height: 12),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Flexible(child: Text(name, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, height: 1.2, fontWeight: FontWeight.w800))),
+          Flexible(child: Text(name, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, height: 1.2, fontWeight: FontWeight.w700))),
           const SizedBox(width: 6),
           VerifiedBadge(level: u.verification, size: 18),
         ]),

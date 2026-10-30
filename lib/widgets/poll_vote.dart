@@ -25,7 +25,7 @@ class OptionMark extends StatelessWidget {
       height: 22,
       alignment: Alignment.center,
       decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-      child: state == OptionState.wrong ? Text('✕', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: fg)) : WIcon(WI.tick, size: 14, color: fg),
+      child: state == OptionState.wrong ? Text('✕', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg)) : WIcon(WI.tick, size: 14, color: fg),
     );
   }
 }
@@ -64,7 +64,7 @@ class _PollVoteState extends State<PollVote> {
     return Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(t(show ? 'What members chose' : 'Choose one option').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.muted)),
+        Text(t(show ? 'What members chose' : 'Choose one option').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.muted)),
         const SizedBox(height: 6),
         for (var k = 0; k < post.pollOptions.length; k++)
           Builder(builder: (_) {
@@ -94,7 +94,7 @@ class _PollVoteState extends State<PollVote> {
                       OptionMark(mineK ? OptionState.mine : (show ? OptionState.other : OptionState.open)),
                       const SizedBox(width: 10),
                       Expanded(child: Text(post.pollOptions[k], style: TextStyle(fontSize: 14, fontWeight: mineK ? FontWeight.w700 : FontWeight.w600))),
-                      if (show) Text('$pct%', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                      if (show) Text('$pct%', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                     ]),
                   ),
                 ]),

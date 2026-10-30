@@ -142,7 +142,7 @@ class _CitySheetState extends State<_CitySheet> {
 
     Widget header(String s) => Padding(
           padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
-          child: Text(s.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.muted, letterSpacing: .8)),
+          child: Text(s.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.muted, letterSpacing: 0.4)),
         );
     Widget row(Place pl, {double? km, String? badge}) => InkWell(
           borderRadius: BorderRadius.circular(10),

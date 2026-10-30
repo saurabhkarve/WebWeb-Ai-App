@@ -402,7 +402,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _pictureRow(Pal p, Profile u, bool own) {
     final name = displayName(u.userType, u.name, u.company);
     TextSpan stat(String? v, String label) => TextSpan(children: [
-          TextSpan(text: v ?? '–', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00))),
+          TextSpan(text: v ?? '–', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00))),
           TextSpan(text: ' ${t(label)}'),
         ]);
     return Transform.translate(
@@ -1676,7 +1676,7 @@ class _ConnectList extends StatelessWidget {
                         Text('  ·  ', style: TextStyle(fontSize: 11, color: p.muted)),
                         WIcon(categoryIcon(d.category), size: 12, color: p.link, still: true),
                         const SizedBox(width: 3),
-                        Flexible(child: Text(t(d.categoryText).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.link))),
+                        Flexible(child: Text(t(d.categoryText).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.link))),
                       ],
                       const Spacer(),
                       Text(timeAgo(d.createdAt), style: TextStyle(fontSize: 11, color: p.muted)),

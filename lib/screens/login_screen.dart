@@ -501,7 +501,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           inputFormatters: _useRecovery
               ? [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9-]')), LengthLimitingTextInputFormatter(9)]
               : [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: 6, fontFeatures: [FontFeature.tabularFigures()]),
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: 3, fontFeatures: [FontFeature.tabularFigures()]),
           decoration: InputDecoration(
             hintText: _useRecovery ? 'xxxx-xxxx' : '123456',
             hintStyle: TextStyle(color: p.muted.withValues(alpha: .5)),

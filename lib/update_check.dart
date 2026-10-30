@@ -109,7 +109,7 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                     const Center(child: LogoMark(size: 64)),
                     const SizedBox(height: 24),
-                    Text(t('Update required'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+                    Text(t('Update required'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 10),
                     Text(
                       _message?.isNotEmpty == true ? _message! : t('This version of WEBWEB AI is no longer supported. Update the app to keep using it.'),
@@ -137,7 +137,7 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 12, 12),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Text(t('Update available'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                Text(t('Update available'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 4),
                 Text(
                   _message?.isNotEmpty == true ? _message! : t('A new version of WEBWEB AI is ready, with fixes and improvements.'),

@@ -197,7 +197,7 @@ class _UpiSheetState extends State<_UpiSheet> {
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(t('Pay by UPI').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.muted, letterSpacing: .8)),
+                Text(t('Pay by UPI').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.muted, letterSpacing: 0.4)),
                 Text(widget.name.isEmpty ? widget.vpa : widget.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 2),
                 widget.verifiedName != null
@@ -258,7 +258,7 @@ class _UpiSheetState extends State<_UpiSheet> {
             ),
           ] else if (amount != null) ...[
             const SizedBox(height: 16),
-            Text(rupees(amount), textAlign: TextAlign.center, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+            Text(rupees(amount), textAlign: TextAlign.center, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
             if ((widget.note ?? '').isNotEmpty) Text(widget.note!, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.muted)),
           ],
           const SizedBox(height: 16),
@@ -610,7 +610,7 @@ class UpiCard extends StatelessWidget {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(t(amount != null ? 'Payment request' : 'UPI ID').toUpperCase(),
                       style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg.withValues(alpha: .7))),
-                  if (amount != null) Text(rupees(amount), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: fg)),
+                  if (amount != null) Text(rupees(amount), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: fg)),
                   Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg)),
                   Row(children: [
                     Flexible(child: Text(vpa, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: fg.withValues(alpha: .8)))),

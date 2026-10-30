@@ -173,7 +173,7 @@ class _TwoStepScreenState extends State<TwoStepScreen> {
         inputFormatters: allowRecovery
             ? [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9-]')), LengthLimitingTextInputFormatter(9)]
             : [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
-        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 6, fontFeatures: [FontFeature.tabularFigures()]),
+        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 3, fontFeatures: [FontFeature.tabularFigures()]),
         decoration: InputDecoration(
           hintText: allowRecovery ? t('6-digit code or recovery code') : '123456',
           hintStyle: TextStyle(fontSize: allowRecovery ? 14 : 22, letterSpacing: allowRecovery ? 0 : 6, color: p.muted.withValues(alpha: .6)),
@@ -219,7 +219,7 @@ class _TwoStepScreenState extends State<TwoStepScreen> {
       ),
       const SizedBox(height: 12),
       Wrap(alignment: WrapAlignment.center, crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, runSpacing: 4, children: [
-        SelectableText(secret, style: const TextStyle(fontFamily: 'monospace', fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 1)),
+        SelectableText(secret, style: const TextStyle(fontFamily: 'monospace', fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
         TextButton(onPressed: () => _copy(secret.replaceAll(' ', ''), t('Copied')), child: Text(t('Copy key'))),
       ]),
       const SizedBox(height: 16),

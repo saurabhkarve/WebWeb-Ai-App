@@ -323,7 +323,7 @@ class _WeekScreenState extends State<WeekScreen> {
             borderRadius: BorderRadius.circular(18),
           ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${x.$1}', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: x.$3 ? kInk : p.text)),
+            Text('${x.$1}', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: x.$3 ? kInk : p.text)),
             Text(t(x.$2), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: x.$3 ? kInk.withValues(alpha: .75) : p.muted)),
           ]),
         );

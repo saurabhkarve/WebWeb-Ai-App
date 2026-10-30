@@ -301,7 +301,7 @@ class _AskScreenState extends State<AskScreen> with MyAskActivityLoader {
     Widget count(String s, {bool gold = false}) => Container(
           padding: const EdgeInsets.symmetric(horizontal: 7),
           decoration: BoxDecoration(color: gold ? kGold : p.text.withValues(alpha: .1), borderRadius: BorderRadius.circular(20)),
-          child: Text(s, style: TextStyle(fontSize: 11, height: 1.5, fontWeight: FontWeight.w800, color: gold ? const Color(0xFF1E1E1E) : p.text)),
+          child: Text(s, style: TextStyle(fontSize: 11, height: 1.5, fontWeight: FontWeight.w700, color: gold ? const Color(0xFF1E1E1E) : p.text)),
         );
     return Column(children: [
       Padding(
@@ -1260,7 +1260,7 @@ class _AskFormState extends State<_AskForm> {
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Row(children: [
-                        Container(width: 28, height: 28, alignment: Alignment.center, decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle), child: Text('ABCD'[i], style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: p.muted))),
+                        Container(width: 28, height: 28, alignment: Alignment.center, decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle), child: Text('ABCD'[i], style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted))),
                         const SizedBox(width: 8),
                         Expanded(
                           child: TextFormField(
@@ -1307,7 +1307,7 @@ class _AskFormState extends State<_AskForm> {
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                         Row(children: [
-                          Text(t('Title').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.muted)),
+                          Text(t('Title').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.muted)),
                           const Spacer(),
                           if (titleOk && !titleBlank) ...[const Icon(Icons.check_rounded, size: 14, color: Color(0xFF2F9E6E)), const SizedBox(width: 3)],
                           Text('${title.length}/100', style: TextStyle(fontSize: 11, color: title.length > 90 ? const Color(0xFFB45309) : p.muted, fontFeatures: const [FontFeature.tabularFigures()])),
@@ -1322,7 +1322,7 @@ class _AskFormState extends State<_AskForm> {
                           textInputAction: TextInputAction.next,
                           textCapitalization: TextCapitalization.sentences,
                           onSubmitted: (_) => _descFocus.requestFocus(),
-                          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, height: 1.3),
+                          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, height: 1.3),
                           decoration: _bare(p, t(_titleHints[_askType] ?? 'Title: e.g. Need 5 CNC operators in Turbhe')),
                         ),
                         MentionSuggest(controller: _title, focus: _titleFocus),
@@ -1348,7 +1348,7 @@ class _AskFormState extends State<_AskForm> {
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                         Row(children: [
-                          Text(t('Description').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.muted)),
+                          Text(t('Description').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.muted)),
                           const Spacer(),
                           Text('${desc.length}/300', style: TextStyle(fontSize: 11, color: desc.length > 270 ? const Color(0xFFB45309) : p.muted, fontFeatures: const [FontFeature.tabularFigures()])),
                         ]),
@@ -1531,7 +1531,7 @@ class _AskFormState extends State<_AskForm> {
           key: _tk('ask-preview'),
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('👀 ${t('How members will see your ask')}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+            Text('👀 ${t('How members will see your ask')}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
             Text(t('Swipe the cards. Tap one to edit it.'), style: TextStyle(fontSize: 11, color: p.muted)),
             const SizedBox(height: 8),
             // the ask as the feed shows it: author line, the type above the cards, then the cards
@@ -1557,7 +1557,7 @@ class _AskFormState extends State<_AskForm> {
               child: Row(children: [
                 WIcon(categoryIcon(askTypeDef(askTypeOf(_draftPost()))?.icon ?? _draftPost().category), size: 14, color: p.link, still: true),
                 const SizedBox(width: 6),
-                Expanded(child: Text(askLabel(_draftPost()).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link))),
+                Expanded(child: Text(askLabel(_draftPost()).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.link))),
                 GoldTag(t(_editing ? 'Editing your ask' : 'Your ask')),
               ]),
             ),

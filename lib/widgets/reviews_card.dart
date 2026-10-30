@@ -106,7 +106,7 @@ class _ReviewsCardState extends State<ReviewsCard> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Column(children: [
-            Text(count > 0 ? avg.toStringAsFixed(1) : '–', style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, height: 1)),
+            Text(count > 0 ? avg.toStringAsFixed(1) : '–', style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w700, height: 1)),
             const SizedBox(height: 4),
             Stars(value: avg, size: 13),
             const SizedBox(height: 2),
@@ -232,7 +232,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 20),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(widget.exists ? t('Change your review') : t('Review {name}', {'name': widget.name}), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+        Text(widget.exists ? t('Change your review') : t('Review {name}', {'name': widget.name}), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         const SizedBox(height: 12),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           for (var k = 1; k <= 5; k++)
@@ -248,7 +248,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
         FilledButton(
           onPressed: _busy ? null : _save,
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48), backgroundColor: kStar, foregroundColor: kInk, shape: const StadiumBorder()),
-          child: Text(t('Post review'), style: const TextStyle(fontWeight: FontWeight.w800)),
+          child: Text(t('Post review'), style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
         if (widget.exists) TextButton(onPressed: _delete, child: Text(t('Delete'), style: TextStyle(color: p.danger))),
       ]),

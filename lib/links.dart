@@ -199,7 +199,7 @@ class _LinkPreviewCardState extends State<LinkPreviewCard> {
     final text = Padding(
       padding: c ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8) : const EdgeInsets.fromLTRB(14, 10, 14, 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-        Text(site.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: .4, color: pal.muted)),
+        Text(site.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.2, color: pal.muted)),
         if ((p?.title ?? '').isNotEmpty) Text(p!.title!, maxLines: c ? 1 : 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: c ? 13 : 15, fontWeight: FontWeight.w700, height: 1.3)),
         if ((p?.description ?? '').isNotEmpty)
           Padding(

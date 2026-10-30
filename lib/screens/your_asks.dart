@@ -134,7 +134,7 @@ class _AskRow extends StatelessWidget {
                 ],
               ]),
               const SizedBox(height: 2),
-              Text(a.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, height: 1.25, fontWeight: a.fresh > 0 ? FontWeight.w800 : FontWeight.w700, color: p.text)),
+              Text(a.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, height: 1.25, fontWeight: a.fresh > 0 ? FontWeight.w700 : FontWeight.w700, color: p.text)),
               const SizedBox(height: 8),
               Wrap(spacing: 6, runSpacing: 6, children: [
                 _Chip(WI.talk, a.replies, a.newReplies),
@@ -174,7 +174,7 @@ class _Chip extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6),
             decoration: BoxDecoration(color: kGold, borderRadius: BorderRadius.circular(20)),
-            child: Text('+$fresh', style: const TextStyle(fontSize: 10, height: 1.5, fontWeight: FontWeight.w800, color: Color(0xFF1E1E1E))),
+            child: Text('+$fresh', style: const TextStyle(fontSize: 10, height: 1.5, fontWeight: FontWeight.w700, color: Color(0xFF1E1E1E))),
           ),
         ],
       ]),
@@ -229,7 +229,7 @@ class _YourAsksPillState extends State<YourAsksPill> with MyAskActivityLoader {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6),
               decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFFFE27A), kGold]), borderRadius: BorderRadius.circular(20)),
-              child: Text(t('{n} new', {'n': '$fresh'}), style: const TextStyle(fontSize: 11, height: 1.45, fontWeight: FontWeight.w800, color: Color(0xFF1E1E1E))),
+              child: Text(t('{n} new', {'n': '$fresh'}), style: const TextStyle(fontSize: 11, height: 1.45, fontWeight: FontWeight.w700, color: Color(0xFF1E1E1E))),
             ),
           ],
           const SizedBox(width: 6),

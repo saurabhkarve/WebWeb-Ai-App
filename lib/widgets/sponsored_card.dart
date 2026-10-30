@@ -118,7 +118,7 @@ class _SponsoredCardState extends State<SponsoredCard> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), border: Border.all(color: p.text.withValues(alpha: .25))),
-                child: Text(t('Ad').toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: .5, color: p.text.withValues(alpha: .7))),
+                child: Text(t('Ad').toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.25, color: p.text.withValues(alpha: .7))),
               ),
             ]),
           ),
@@ -149,7 +149,7 @@ class _SponsoredCardState extends State<SponsoredCard> {
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(ad.headline, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, height: 1.25)),
+                  Text(ad.headline, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.25)),
                   if ((ad.body ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(ad.body!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted))),
                   const SizedBox(height: 12),
                   Row(children: [
@@ -160,7 +160,7 @@ class _SponsoredCardState extends State<SponsoredCard> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(18)),
-                      child: Text((ad.ctaLabel ?? '').isNotEmpty ? ad.ctaLabel! : t('Learn more'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: kInk)),
+                      child: Text((ad.ctaLabel ?? '').isNotEmpty ? ad.ctaLabel! : t('Learn more'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
                     ),
                   ]),
                 ]),
@@ -233,7 +233,7 @@ class _AdCircleState extends State<AdCircle> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(6), border: Border.all(color: p.text.withValues(alpha: .25))),
-                child: Text(t('Ad').toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: .5, color: p.text.withValues(alpha: .7))),
+                child: Text(t('Ad').toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.25, color: p.text.withValues(alpha: .7))),
               ),
             ),
           ]),

@@ -195,7 +195,7 @@ class _TourOverlayState extends State<_TourOverlay> {
         padding: const EdgeInsets.fromLTRB(16, 14, 12, 12),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(t('{n} of {total}', {'n': '${_i + 1}', 'total': '${widget.steps.length}'}).toUpperCase(),
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: .8, color: p.muted)),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.4, color: p.muted)),
           const SizedBox(height: 4),
           if (step.visual == 'give-take') ...[const _GiveTake(), const SizedBox(height: 10)],
           if (step.visual == 'ask-types') ...[const _AskTypesDemo(), const SizedBox(height: 10)],
@@ -465,7 +465,7 @@ class _AskTypesDemoState extends State<_AskTypesDemo> {
             ),
         ]),
         const SizedBox(height: 10),
-        Align(alignment: Alignment.centerLeft, child: Text('${d.$1} ${t(d.$2)}'.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: .4, color: Color(0xFF7A5A00)))),
+        Align(alignment: Alignment.centerLeft, child: Text('${d.$1} ${t(d.$2)}'.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: Color(0xFF7A5A00)))),
         const SizedBox(height: 4),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 350),
@@ -486,7 +486,7 @@ class _AskTypesDemoState extends State<_AskTypesDemo> {
                 Expanded(child: Text(t(d.$3), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.text.withValues(alpha: .75)))),
               ]),
               const SizedBox(height: 4),
-              Text(t(d.$4), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, height: 1.25)),
+              Text(t(d.$4), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.25)),
               const SizedBox(height: 8),
               if (d.$2 == 'Poll')
                 Row(children: [
@@ -506,7 +506,7 @@ class _AskTypesDemoState extends State<_AskTypesDemo> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                   decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20)),
-                  child: Text(t(d.$2 == 'Advice' || d.$2 == 'Recommend' ? 'I can suggest' : 'I can help'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kInk)),
+                  child: Text(t(d.$2 == 'Advice' || d.$2 == 'Recommend' ? 'I can suggest' : 'I can help'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kInk)),
                 ),
             ]),
           ),

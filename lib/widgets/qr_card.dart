@@ -31,13 +31,13 @@ class QrCard extends StatelessWidget {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(height: math.max(3, w * .015), decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFFFFD84A), Color(0xFFE0AD00)]))),
           SizedBox(height: w * .07),
-          Text('WEBWEB AI', style: TextStyle(fontSize: w * .036, fontWeight: FontWeight.w700, color: _grey, letterSpacing: .5)),
+          Text('WEBWEB AI', style: TextStyle(fontSize: w * .036, fontWeight: FontWeight.w700, color: _grey, letterSpacing: 0.25)),
           SizedBox(height: w * .02),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: w * .08),
             child: FittedBox(
               fit: BoxFit.scaleDown,
-              child: Text(name, maxLines: 1, style: TextStyle(fontSize: w * .075, fontWeight: FontWeight.w800, color: kInk)),
+              child: Text(name, maxLines: 1, style: TextStyle(fontSize: w * .075, fontWeight: FontWeight.w700, color: kInk)),
             ),
           ),
           SizedBox(height: w * .05),
@@ -65,7 +65,7 @@ class QrCard extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: w * .08),
             child: FittedBox(
               fit: BoxFit.scaleDown,
-              child: Text(label, maxLines: 1, style: TextStyle(fontSize: w * .062, fontWeight: FontWeight.w800, color: kInk)),
+              child: Text(label, maxLines: 1, style: TextStyle(fontSize: w * .062, fontWeight: FontWeight.w700, color: kInk)),
             ),
           ),
           SizedBox(height: w * .015),

@@ -270,7 +270,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                 margin: const EdgeInsets.only(right: 6),
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(color: kGold, borderRadius: BorderRadius.circular(4)),
-                child: Text(t('NEW'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: .4, color: kInk)),
+                child: Text(t('NEW'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: kInk)),
               ),
             ),
             TextSpan(text: post.title ?? ''),
@@ -426,7 +426,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                         lead: Row(children: [
                           WIcon(categoryIcon(askTypeDef(askTypeOf(post))?.icon ?? post.category), size: 14, color: p.link, still: true),
                           const SizedBox(width: 6),
-                          Flexible(child: Text(askLabel(post).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link))),
+                          Flexible(child: Text(askLabel(post).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.link))),
                           if (post.closed || why != null) ...[
                             const SizedBox(width: 8),
                             Flexible(
@@ -1471,7 +1471,7 @@ class _FactCardState extends State<FactCard> {
       Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(fact.emoji, style: const TextStyle(fontSize: 36, height: 1)),
         const SizedBox(height: 8),
-        Text(fact.figure, style: TextStyle(fontSize: deckH * .19, fontWeight: FontWeight.w800, height: 1, letterSpacing: -1, color: p.text)),
+        Text(fact.figure, style: TextStyle(fontSize: deckH * .19, fontWeight: FontWeight.w700, height: 1, letterSpacing: -1, color: p.text)),
         const SizedBox(height: 8),
         Text(fact.label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3)),
       ]),

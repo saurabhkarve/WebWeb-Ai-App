@@ -18,7 +18,7 @@ Future<void> reportContent(BuildContext context, {required String kind, required
     context: context,
     builder: (ctx) => SafeArea(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Padding(padding: const EdgeInsets.fromLTRB(20, 18, 20, 6), child: Align(alignment: Alignment.centerLeft, child: Text('Report $what', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)))),
+        Padding(padding: const EdgeInsets.fromLTRB(20, 18, 20, 6), child: Align(alignment: Alignment.centerLeft, child: Text('Report $what', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)))),
         for (final r in _reasons) ListTile(title: Text(r), onTap: () => Navigator.pop(ctx, r)),
       ]),
     ),

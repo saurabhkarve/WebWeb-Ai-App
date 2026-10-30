@@ -104,7 +104,7 @@ class _CaptchaDialogState extends State<_CaptchaDialog> {
           enableSuggestions: false,
           keyboardType: TextInputType.visiblePassword,
           inputFormatters: [LengthLimitingTextInputFormatter(12)],
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: 4),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: 2),
           decoration: InputDecoration(hintText: t('Characters in the picture'), hintStyle: const TextStyle(fontSize: 14, letterSpacing: 0)),
           onChanged: (_) => setState(() {}),
           onSubmitted: (_) => _submit(),

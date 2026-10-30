@@ -223,14 +223,14 @@ class _HouseCardViewState extends State<HouseCardView> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(color: p.dark ? const Color(0xFF2E2E2E) : kInk, borderRadius: BorderRadius.circular(6)),
-                  child: const Text('WEBWEB', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: .5, color: Color(0xFFFFD84A))),
+                  child: const Text('WEBWEB', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.25, color: Color(0xFFFFD84A))),
                 ),
                 if (card.ai) ...[
                   const SizedBox(width: 4),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                     decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), border: Border.all(color: kGold.withValues(alpha: .6))),
-                    child: Text('AI', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: p.tagText)),
+                    child: Text('AI', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: p.tagText)),
                   ),
                 ],
               ]),
@@ -365,7 +365,7 @@ class _Btn extends StatelessWidget {
   }
 }
 
-Widget _title(String text, {double size = 19}) => Text(text, style: TextStyle(fontSize: size, fontWeight: FontWeight.w800, height: 1.3));
+Widget _title(String text, {double size = 19}) => Text(text, style: TextStyle(fontSize: size, fontWeight: FontWeight.w700, height: 1.3));
 Widget _hint(BuildContext context, String text) => Padding(padding: const EdgeInsets.only(top: 4), child: Text(text, style: TextStyle(fontSize: 14, color: Pal.of(context).muted)));
 
 void _push(BuildContext context, Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
@@ -515,7 +515,7 @@ class _Pulse extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(child: Text(t(kCategoryShort[r['category']] ?? 'Other'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
                 if ((r['open'] as num? ?? 0) > 0) Text(t('{n} open', {'n': r['open']}), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: green)),
-                SizedBox(width: 32, child: Text('${r['n']}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800))),
+                SizedBox(width: 32, child: Text('${r['n']}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
                 if (r['change'] != null) ...[
                   const SizedBox(width: 6),
                   Container(
@@ -527,7 +527,7 @@ class _Pulse extends StatelessWidget {
                     ),
                     child: Text(
                       (r['change'] as num) >= 0 ? '▲${r['change']}%' : '▼${(r['change'] as num).abs()}%',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: (r['change'] as num) >= 0 ? green : p.muted),
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: (r['change'] as num) >= 0 ? green : p.muted),
                     ),
                   ),
                 ],
@@ -731,7 +731,7 @@ class _ItemTileState extends State<_ItemTile> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(color: p.canvas.withValues(alpha: .9), borderRadius: BorderRadius.circular(10)),
-                    child: Text(it.price!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                    child: Text(it.price!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
                   ),
                 ),
             ]),
@@ -781,7 +781,7 @@ class _ItemTileState extends State<_ItemTile> {
                           height: 36,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(12)),
-                          child: Text(t('Enquire'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kInk)),
+                          child: Text(t('Enquire'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kInk)),
                         ),
                       ),
                     ),
@@ -829,7 +829,7 @@ class _ProfileStep extends StatelessWidget {
             height: 60,
             child: CircularProgressIndicator(value: pct / 100, strokeWidth: 7, backgroundColor: p.chip, color: const Color(0xFFE0A800), strokeCap: StrokeCap.round),
           ),
-          Text('$pct%', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+          Text('$pct%', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
         ]),
       ),
       const SizedBox(width: 16),
@@ -875,7 +875,7 @@ class _Spotlight extends StatelessWidget {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Flexible(child: Text(peer.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
+                Flexible(child: Text(peer.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
                 const SizedBox(width: 4),
                 VerifiedBadge(level: (u['verification'] as num?)?.toInt() ?? 1, size: 15),
               ]),
@@ -1063,9 +1063,9 @@ class _QuizState extends State<_Quiz> {
                   child: Row(children: [
                     OptionMark(!answered ? OptionState.open : wrongPick ? OptionState.wrong : isRight ? OptionState.right : i == mine ? OptionState.mine : OptionState.other),
                     const SizedBox(width: 10),
-                    Expanded(child: Text(options[i], maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: i == mine ? FontWeight.w800 : FontWeight.w600))),
+                    Expanded(child: Text(options[i], maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: i == mine ? FontWeight.w700 : FontWeight.w600))),
                     if (answered && i == mine) Container(margin: const EdgeInsets.only(right: 8), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1), decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(99)), child: Text(t('Your pick').toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700))),
-                    if (answered) Text('$pct%', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                    if (answered) Text('$pct%', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                   ]),
                 ),
               ]),
@@ -1080,7 +1080,7 @@ class _QuizState extends State<_Quiz> {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(color: mine == right ? green.withValues(alpha: .1) : kGold.withValues(alpha: .1), borderRadius: BorderRadius.circular(16)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(mine == right ? '🎉 ${t('Right!')}' : '💡 ${t('Good try!')}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+            Text(mine == right ? '🎉 ${t('Right!')}' : '💡 ${t('Good try!')}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
             if ((card.data['explain'] ?? '').toString().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text('${card.data['explain']}', style: const TextStyle(fontSize: 14))),
             if ((card.sourceUrl ?? '').isNotEmpty)
               GestureDetector(
@@ -1138,7 +1138,7 @@ class _TipState extends State<_Tip> {
               ],
             ]),
             const SizedBox(height: 10),
-            Text(t('Step {n} of {m}', {'n': _i + 1, 'm': steps.length}).toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: .5, color: p.muted)),
+            Text(t('Step {n} of {m}', {'n': _i + 1, 'm': steps.length}).toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.25, color: p.muted)),
             const SizedBox(height: 4),
             Text(steps[_i], style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, height: 1.35)),
             const SizedBox(height: 12),
@@ -1498,7 +1498,7 @@ class _HouseDeckState extends State<_HouseDeck> {
     }
 
     final label = TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .6));
-    Widget head(String text) => Text(text, maxLines: 4, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: deckH * .095, fontWeight: FontWeight.w800, height: 1.15, letterSpacing: -.3));
+    Widget head(String text) => Text(text, maxLines: 4, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: deckH * .095, fontWeight: FontWeight.w700, height: 1.15, letterSpacing: -.3));
     Widget chip(String e, String text) => Container(
           margin: const EdgeInsets.only(top: 8),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1714,7 +1714,7 @@ class _PersonalDeckState extends State<_PersonalDeck> {
     final tint = kCardColors[_tone[card.account.handle] ?? 'gold']!;
     final deckH = deckHeight(context);
     final label = TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .6));
-    Widget head(String text) => Text(text, maxLines: 4, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: deckH * .095, fontWeight: FontWeight.w800, height: 1.15, letterSpacing: -.3));
+    Widget head(String text) => Text(text, maxLines: 4, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: deckH * .095, fontWeight: FontWeight.w700, height: 1.15, letterSpacing: -.3));
     Widget big(String text, {int lines = 4}) => Text(text, maxLines: lines, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: deckH * .08, fontWeight: FontWeight.w700, height: 1.3));
     Widget col(List<Widget> kids) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: kids);
     Widget next(String text) => _Btn('${t(text)} →', soft: true, onTap: () => _ctl.go(1));
@@ -1831,10 +1831,10 @@ class _PersonalDeckState extends State<_PersonalDeck> {
                       SizedBox(width: 24, child: Text(kCategoryEmoji[r['category']] ?? '✨', textAlign: TextAlign.center)),
                       const SizedBox(width: 8),
                       Expanded(child: Text(t(kCategoryShort[r['category']] ?? 'Other'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
-                      Text('${r['n']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                      Text('${r['n']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                       if (r['change'] != null) ...[
                         const SizedBox(width: 6),
-                        Text((r['change'] as num) >= 0 ? '▲${r['change']}%' : '▼${(r['change'] as num).abs()}%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: (r['change'] as num) >= 0 ? green : p.muted)),
+                        Text((r['change'] as num) >= 0 ? '▲${r['change']}%' : '▼${(r['change'] as num).abs()}%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: (r['change'] as num) >= 0 ? green : p.muted)),
                       ],
                     ]),
                     Padding(
@@ -1920,12 +1920,12 @@ class _PersonalDeckState extends State<_PersonalDeck> {
             height: 80,
             child: Stack(alignment: Alignment.center, children: [
               SizedBox(width: 68, height: 68, child: CircularProgressIndicator(value: pct / 100, strokeWidth: 7, backgroundColor: p.card.withValues(alpha: .7), color: const Color(0xFFE0A800), strokeCap: StrokeCap.round)),
-              Text('$pct%', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+              Text('$pct%', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             ]),
           ),
           const SizedBox(width: 16),
           Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('🚀 ${t('Your page is {n}% done', {'n': pct})}', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, height: 1.25)),
+            Text('🚀 ${t('Your page is {n}% done', {'n': pct})}', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.25)),
             const SizedBox(height: 10),
             next("What's next"),
           ])),
@@ -1957,7 +1957,7 @@ class _PersonalDeckState extends State<_PersonalDeck> {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  Flexible(child: Text(peer.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
+                  Flexible(child: Text(peer.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
                   const SizedBox(width: 4),
                   VerifiedBadge(level: (u['verification'] as num?)?.toInt() ?? 1, size: 15),
                 ]),
@@ -2083,8 +2083,8 @@ class _PersonalDeckState extends State<_PersonalDeck> {
                             child: Row(children: [
                               OptionMark(!answered ? OptionState.open : wrongPick ? OptionState.wrong : isRight ? OptionState.right : i == mine ? OptionState.mine : OptionState.other),
                               const SizedBox(width: 10),
-                              Expanded(child: Text(options[i], maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: i == mine ? FontWeight.w800 : FontWeight.w600))),
-                              if (answered) Text('$pct%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                              Expanded(child: Text(options[i], maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: i == mine ? FontWeight.w700 : FontWeight.w600))),
+                              if (answered) Text('$pct%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                             ]),
                           ),
                         ]),
@@ -2103,7 +2103,7 @@ class _PersonalDeckState extends State<_PersonalDeck> {
         ]));
         if (answered && quiz) {
           cards.add(col([
-            Text(mine == right ? '🎉 ${t('Right!')}' : '💡 ${t('Good try!')}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            Text(mine == right ? '🎉 ${t('Right!')}' : '💡 ${t('Good try!')}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             if ((d['explain'] ?? '').toString().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text('${d['explain']}', maxLines: 5, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, height: 1.4))),
             const Spacer(),
             if ((card.sourceUrl ?? '').isNotEmpty)

@@ -71,9 +71,12 @@ const kEmojiFonts = ['Apple Color Emoji', 'Noto Color Emoji'];
 ThemeData buildTheme(Brightness b) {
   final p = b == Brightness.dark ? Pal._dark : Pal._light;
   final base = ThemeData(brightness: b, useMaterial3: true, fontFamily: kFont, fontFamilyFallback: kEmojiFonts);
-  // Akash has no kerning: the site tightens tracking by -0.022em and uses weight 500 for body text.
-  TextStyle? tune(TextStyle? s, {FontWeight? w}) =>
-      s?.copyWith(fontFamily: kFont, fontFamilyFallback: kEmojiFonts, color: p.text, fontWeight: w ?? s.fontWeight, letterSpacing: -0.022 * (s.fontSize ?? 14));
+  // Akash has no kerning. The app's copy of the font has the tracking built in (-0.03em on every Latin glyph,
+  // scripts/tighten_akash.py), so text needs no letterSpacing and Hindi, Marathi, Gujarati and Konkani, drawn from
+  // the fallback fonts, keep their natural spacing; headings (20 px and up) go a little tighter, as on the web.
+  // Weight 500 for body text and never 900 (the app ships 300, 500 and 700 only, like the site).
+  TextStyle? tune(TextStyle? s, {FontWeight? w}) => s?.copyWith(
+      fontFamily: kFont, fontFamilyFallback: kEmojiFonts, color: p.text, fontWeight: w ?? s.fontWeight, letterSpacing: (s.fontSize ?? 14) >= 20 ? -0.012 * s.fontSize! : 0);
   final t = base.textTheme;
   final text = TextTheme(
     displayLarge: tune(t.displayLarge, w: FontWeight.w700),
@@ -108,7 +111,7 @@ ThemeData buildTheme(Brightness b) {
       scrolledUnderElevation: 0,
       foregroundColor: p.text,
       centerTitle: false,
-      titleTextStyle: TextStyle(fontFamily: kFont, fontSize: 18, fontWeight: FontWeight.w700, color: p.text, letterSpacing: -0.7),
+      titleTextStyle: TextStyle(fontFamily: kFont, fontSize: 18, fontWeight: FontWeight.w700, color: p.text, letterSpacing: -0.2),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,

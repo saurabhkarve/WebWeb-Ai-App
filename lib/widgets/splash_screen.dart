@@ -37,7 +37,7 @@ class SplashScreen extends StatelessWidget {
                   TextSpan(text: 'WEBWEB ', style: TextStyle(color: p.text)),
                   const TextSpan(text: 'AI', style: TextStyle(color: kGold)),
                 ]),
-                style: TextStyle(fontSize: title, fontWeight: FontWeight.w900, letterSpacing: title * .06),
+                style: TextStyle(fontSize: title, fontWeight: FontWeight.w700, letterSpacing: title * .06),
               ),
             ]),
           ),
@@ -48,7 +48,7 @@ class SplashScreen extends StatelessWidget {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 Text(t('from'), style: TextStyle(fontSize: small, color: p.muted, height: 1.2)),
                 SizedBox(height: small * .25),
-                Text('SKYQ', style: TextStyle(fontSize: small * 1.35, fontWeight: FontWeight.w800, letterSpacing: small * .35, color: p.text)),
+                Text('SKYQ', style: TextStyle(fontSize: small * 1.35, fontWeight: FontWeight.w700, letterSpacing: small * .35, color: p.text)),
               ]),
             ),
           ),

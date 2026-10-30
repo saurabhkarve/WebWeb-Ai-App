@@ -290,7 +290,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
           child: ExcludeSemantics(
             child: Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
               keypad ? const Icon(Icons.dialpad_rounded, color: kInk, size: 26) : WIcon(WI.connect, size: 22, color: kInk, strokeWidth: 2.2, spinKey: _askSpin),
-              if (!keypad) ...[const SizedBox(width: 8), Text(t('Ask'), style: const TextStyle(color: kInk, fontSize: 15, fontWeight: FontWeight.w800))],
+              if (!keypad) ...[const SizedBox(width: 8), Text(t('Ask'), style: const TextStyle(color: kInk, fontSize: 15, fontWeight: FontWeight.w700))],
             ]),
           ),
         ),
@@ -570,7 +570,6 @@ class _AccountMenu extends StatelessWidget {
     return Material(
       color: p.canvas,
       elevation: 16,
-      borderRadius: const BorderRadius.horizontal(left: Radius.circular(24)),
       clipBehavior: Clip.antiAlias,
       child: SizedBox(
         width: (mq.size.width * .88).clamp(0, 380).toDouble(),

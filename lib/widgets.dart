@@ -40,12 +40,12 @@ class LogoStack extends StatelessWidget {
       Text.rich(TextSpan(children: [
         TextSpan(text: 'WEB', style: TextStyle(color: p.text)),
         const TextSpan(text: 'WEB', style: TextStyle(color: kGold)),
-      ]), style: TextStyle(fontSize: size * .24, fontWeight: FontWeight.w900, letterSpacing: .3)),
+      ]), style: TextStyle(fontSize: size * .24, fontWeight: FontWeight.w700, letterSpacing: 0.15)),
       const SizedBox(height: 3),
       Container(
         padding: EdgeInsets.symmetric(horizontal: size * .14, vertical: 1),
         decoration: BoxDecoration(color: kGold.withValues(alpha: .85), borderRadius: BorderRadius.circular(8)),
-        child: Text('AI +', style: TextStyle(fontSize: size * .17, fontWeight: FontWeight.w900, color: const Color(0xFF1E1E1E))),
+        child: Text('AI +', style: TextStyle(fontSize: size * .17, fontWeight: FontWeight.w700, color: const Color(0xFF1E1E1E))),
       ),
     ]);
   }
@@ -99,11 +99,11 @@ class _LogoInlineState extends State<LogoInline> {
         const SizedBox(width: 8),
         _withTagline(p, tagFont, Flex(direction: stacked ? Axis.vertical : Axis.horizontal, mainAxisSize: MainAxisSize.min, crossAxisAlignment: stacked ? CrossAxisAlignment.start : CrossAxisAlignment.center, children: [
           Row(mainAxisSize: MainAxisSize.min, children: [
-            Text('WEB', style: TextStyle(fontSize: word, fontWeight: FontWeight.w900, height: 1, letterSpacing: word * .02, color: p.text)),
+            Text('WEB', style: TextStyle(fontSize: word, fontWeight: FontWeight.w700, height: 1, letterSpacing: word * .02, color: p.text)),
             ShaderMask(
               blendMode: BlendMode.srcIn,
               shaderCallback: (r) => goldWord.createShader(r),
-              child: Text('WEB', style: TextStyle(fontSize: word, fontWeight: FontWeight.w900, height: 1, letterSpacing: word * .02, color: Colors.white)),
+              child: Text('WEB', style: TextStyle(fontSize: word, fontWeight: FontWeight.w700, height: 1, letterSpacing: word * .02, color: Colors.white)),
             ),
           ]),
           SizedBox(height: stacked ? 3 : 0, width: stacked ? 0 : 4),
@@ -311,7 +311,7 @@ class StarterMono extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(t[0]), Color(t[1])])),
-      child: Text(initials(name), style: TextStyle(fontSize: size * .38, fontWeight: FontWeight.w600, letterSpacing: .4, color: Color(t[2]))),
+      child: Text(initials(name), style: TextStyle(fontSize: size * .38, fontWeight: FontWeight.w600, letterSpacing: 0.2, color: Color(t[2]))),
     );
   }
 }

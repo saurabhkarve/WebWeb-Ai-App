@@ -56,7 +56,7 @@ class _InviteCardState extends State<InviteCard> {
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(t('Know someone who should be here?'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, height: 1.25)),
+            Text(t('Know someone who should be here?'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.25)),
             const SizedBox(height: 2),
             Text(t('Invite a supplier, a buyer or a friend. Asks get better answers when more of your people are on WEBWEB.'), style: TextStyle(fontSize: 13, height: 1.3, color: p.muted)),
             const SizedBox(height: 10),

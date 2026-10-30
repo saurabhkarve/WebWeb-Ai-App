@@ -65,7 +65,7 @@ class _FavouritesScreenState extends State<FavouritesScreen> {
     return ValueListenableBuilder<List<Map>>(
       valueListenable: Favourites.list,
       builder: (_, favs, __) => ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 140), children: [
-        Text(t('Favourites'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+        Text(t('Favourites'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
         const SizedBox(height: 14),
         if (favs.isEmpty)
           Padding(
@@ -175,7 +175,7 @@ class _KeypadState extends State<_Keypad> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
+                            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
                             Text(['${who['category'] ?? ''}', '${who['location'] ?? ''}'].where((s) => s.isNotEmpty).join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
                           ]),
                         ),
@@ -194,7 +194,7 @@ class _KeypadState extends State<_Keypad> {
           SizedBox(
             height: 44,
             child: FittedBox(
-              child: Text(_n.isEmpty ? ' ' : _n, style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w500, letterSpacing: 1.5)),
+              child: Text(_n.isEmpty ? ' ' : _n, style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w500, letterSpacing: 0.75)),
             ),
           ),
           const SizedBox(height: 10),
@@ -211,7 +211,7 @@ class _KeypadState extends State<_Keypad> {
                   onLongPress: d == '0' ? () => _press('+') : null,
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                     Text(d, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w500, height: 1)),
-                    Text(l, style: TextStyle(fontSize: 10, letterSpacing: 1.2, color: p.muted)),
+                    Text(l, style: TextStyle(fontSize: 10, letterSpacing: 0.6, color: p.muted)),
                   ]),
                 ),
             ],
