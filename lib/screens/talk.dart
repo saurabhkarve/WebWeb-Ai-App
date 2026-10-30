@@ -355,10 +355,12 @@ class _TalkScreenState extends State<TalkScreen> {
             ),
             const SizedBox(height: 12),
           ],
+          // the chips scroll from edge to edge of the page (its 16 px margins), whatever width the page has
           SizedBox(
             height: 36,
-            child: OverflowBox(
-              maxWidth: MediaQuery.of(context).size.width,
+            child: LayoutBuilder(
+              builder: (context, c) => OverflowBox(
+              maxWidth: c.maxWidth + 32,
               child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16), children: [
                 tabChip('chats', 'All chats'),
                 const SizedBox(width: 8),
@@ -366,6 +368,7 @@ class _TalkScreenState extends State<TalkScreen> {
                 const SizedBox(width: 8),
                 tabChip('calls', 'Calls'),
               ]),
+            ),
             ),
           ),
           const SizedBox(height: 12),

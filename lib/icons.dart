@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-enum WI { calendar, home, refresh, check, lock, qr, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, exchange, camera, cart, checkCircle, clip, clock, close, compliance, connect, consultant, contactCard, deals, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, link, logout, machinery, mentor, monitor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, views, website }
+enum WI { calendar, home, refresh, check, lock, qr, callMissed, callOut, callIn, flipCamera, speakerLow, speaker, locate, more, chevronUp, chevronRight, chevronDown, videoOff, video, arrow, micOff, mic, bell, advice, ask, askPlus, back, bookmark, box, business, buyer, exchange, camera, cart, checkCircle, clip, clock, close, compliance, connect, consultant, contactCard, deals, directory, digital, edit, export, eye, file, funding, globe, grid, heart, help, imageAdd, info, job, jobWork, link, logout, machinery, mentor, monitor, moon, other, partner, phone, pin, plus, refer, repair, reply, repost, rupee, school, search, send, service, share, smile, space, sparkle, sun, supplier, tag, talk, tender, thumbsDown, thumbsUp, tick, tickDouble, trash, truck, update, updates, user, users, views, website }
 
 /// SVG body per icon. {C} = colour, {SW/x} = stroke width divided by x (scaled groups).
 const Map<WI, (String, double?)> _body = {
@@ -50,6 +50,8 @@ const Map<WI, (String, double?)> _body = {
   WI.consultant: (r'<circle cx="12" cy="7.2" r="3.2" /> <path d="M5.5 20c.6-3.8 3.1-6 6.5-6s5.9 2.2 6.5 6" /> <path d="M12 14l-1.1 1.8 1.1 3.7 1.1-3.7z" />', null),
   WI.compliance: (r'<path d="M6.5 3.5h8l4 4v13h-12v-17z" /> <path d="M14.5 3.5v4h4M9.5 14l2 2 3.5-4" />', null),
   WI.connect: (r'<path d="M11 3l1.9 6.1L19 11l-6.1 1.9L11 19l-1.9-6.1L3 11l6.1-1.9z" fill="{C}" stroke-width="1.2" /> <path d="M19 2.6l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8z" fill="{C}" stroke-width="1" />', null),
+  // the Directory (web PhonebookIcon): an address book with its A to Z tabs and a person on the cover
+  WI.directory: (r'<rect x="5.5" y="3.5" width="14" height="17" rx="2.2" /> <path d="M3.5 8h3M3.5 12h3M3.5 16h3" /> <circle cx="12.5" cy="10" r="2.3" /> <path d="M8.8 16.5a3.9 3.9 0 0 1 7.4 0" />', null),
   WI.contactCard: (r'<rect x="3" y="5" width="18" height="14" rx="2.6" /> <circle cx="9" cy="10.7" r="2.1" /> <path d="M5.6 16.4c.4-1.5 1.7-2.4 3.4-2.4s3 .9 3.4 2.4M14.6 9.8h3.4M14.6 13h3.4" />', null),
   WI.deals: (r'<circle cx="9" cy="12" r="5.2" /> <circle cx="15" cy="12" r="5.2" />', null),
   WI.digital: (r'<rect x="3.5" y="4.5" width="17" height="12" rx="2" /> <path d="M8 20h8M12 16.5V20M10 8.5 8 10.5l2 2M14 8.5l2 2-2 2" />', null),

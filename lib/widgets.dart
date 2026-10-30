@@ -97,7 +97,7 @@ class _LogoInlineState extends State<LogoInline> {
           child: AnimatedLogo(size: widget.markSize ?? size, playKey: _play),
         ),
         const SizedBox(width: 8),
-        _withTagline(p, tagFont, Flex(direction: stacked ? Axis.vertical : Axis.horizontal, mainAxisSize: MainAxisSize.min, crossAxisAlignment: stacked ? CrossAxisAlignment.start : CrossAxisAlignment.center, children: [
+        _withTagline(p, tagFont, widget.markSize ?? size, Flex(direction: stacked ? Axis.vertical : Axis.horizontal, mainAxisSize: MainAxisSize.min, crossAxisAlignment: stacked ? CrossAxisAlignment.start : CrossAxisAlignment.center, children: [
           Row(mainAxisSize: MainAxisSize.min, children: [
             Text('WEB', style: TextStyle(fontSize: word, fontWeight: FontWeight.w700, height: 1, letterSpacing: word * .02, color: p.text)),
             ShaderMask(
@@ -113,14 +113,19 @@ class _LogoInlineState extends State<LogoInline> {
     );
   }
 
-  /// [word] with "SMART PHONEBOOK" under it, every letter spread across the exact width of the wordmark + pill.
-  Widget _withTagline(Pal p, double font, Widget word) {
+  /// [word] with "SMART PHONEBOOK" under it, every letter spread across the exact width of the wordmark + pill, the
+  /// two lines spanning the height of the round mark ([mark]): the wordmark level with its top, the tagline with its
+  /// bottom (the tagline's box reaches a little below its capitals, so the block is that much taller).
+  Widget _withTagline(Pal p, double font, double mark, Widget word) {
     if (!widget.tagline) return word;
     const tag = 'SMART PHONEBOOK';
     return IntrinsicWidth(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+      child: SizedBox(
+        // a much larger mark (the sign-in page) keeps the lines together instead
+        height: mark <= widget.size * 1.4 ? mark + font * .15 : null,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         word,
-        const SizedBox(height: 6),
+        if (mark > widget.size * 1.4) const SizedBox(height: 6),
         Semantics(
           label: tag,
           child: ExcludeSemantics(
@@ -131,7 +136,8 @@ class _LogoInlineState extends State<LogoInline> {
             ]),
           ),
         ),
-      ]),
+        ]),
+      ),
     );
   }
 }

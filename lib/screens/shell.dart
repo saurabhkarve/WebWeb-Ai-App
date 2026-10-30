@@ -57,7 +57,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   // Notifications are the bell in the header. All five use the WebWeb icon set (the same Talk icon as before).
   // From 600 px wide (tablets, desktop) the bar becomes a rail down the left with Ask at its top, and pages keep a
   // readable width; from 1200 px the rail shows its labels beside the icons.
-  static const _items = [(WI.home, 'Home'), (WI.clock, 'Recents'), (WI.contactCard, 'Directory'), (WI.talk, 'Talk'), (WI.pin, 'Nearby')];
+  static const _items = [(WI.home, 'Home'), (WI.clock, 'Recents'), (WI.directory, 'Directory'), (WI.talk, 'Talk'), (WI.pin, 'Nearby')];
   static const _tourKeys = ['nav-feed', 'nav-recents', 'nav-contacts', 'nav-talk', 'nav-find'];
   /// how far the Contacts button rises above the bar
   static const _rise = 20.0;
@@ -226,13 +226,15 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     );
   }
 
-  /// A page at a readable width on a wide screen, centred, told the width it has (cards size themselves from it).
+  /// A page at a readable width on a wide screen, centred, and always told the width it really has (beside the rail
+  /// it is narrower than the screen): cards and edge-to-edge rows size themselves from it.
   Widget _fit(Widget page, double max) => LayoutBuilder(builder: (context, c) {
-        if (c.maxWidth <= max) return page;
         final mq = MediaQuery.of(context);
+        final w = c.maxWidth < max ? c.maxWidth : max;
+        if (w == mq.size.width) return page;
         return Align(
           alignment: Alignment.topCenter,
-          child: SizedBox(width: max, height: c.maxHeight, child: MediaQuery(data: mq.copyWith(size: Size(max, mq.size.height)), child: page)),
+          child: SizedBox(width: w, height: c.maxHeight, child: MediaQuery(data: mq.copyWith(size: Size(w, mq.size.height)), child: page)),
         );
       });
 
