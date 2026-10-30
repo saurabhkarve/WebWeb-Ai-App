@@ -464,6 +464,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               if (!framed && mine) OutcomeNudge(post: post, onTap: () => _openDetail(askOutcome: true)),
               // quoted in a repost: the replies and the controls are the repost's (below)
               if (!framed) ...[
+                // air between the cards and the buttons under them
+                const SizedBox(height: 10),
                 // the replies are on the ask page, not on the card
                 PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
               ],

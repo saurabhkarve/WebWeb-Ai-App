@@ -50,10 +50,11 @@ class AskDeck extends StatefulWidget {
 }
 
 class _AskDeckState extends State<AskDeck> {
-  var _page = PageController(viewportFraction: .88);
-  double _fr = .88;
-  /// in the feed the swipe runs edge to edge (the page's side margin); the preview in the ask form stays inside its box
-  static const _bleed = 16.0;
+  var _page = PageController();
+  double _fr = 1;
+  /// in the feed each card is a whole page that slides from screen edge to screen edge (it sits in the page's side
+  /// margin at rest); the preview in the ask form stays inside its box, with a small gap between the cards
+  static const _bleed = 16.0, _previewGap = 6.0;
   int _i = 0;
   Timer? _look;
 
@@ -165,8 +166,9 @@ class _AskDeckState extends State<AskDeck> {
       SizedBox(
         height: _deckH,
         child: LayoutBuilder(builder: (context, box) {
+        // one card per page: no peek of the next one, the dots say there are more
         final v = box.maxWidth + 2 * bleed;
-        final f = (.88 * box.maxWidth + bleed) / v;
+        const f = 1.0;
         if ((f - _fr).abs() > .002) {
           final old = _page;
           _page = PageController(viewportFraction: f, initialPage: _i);
@@ -186,7 +188,7 @@ class _AskDeckState extends State<AskDeck> {
             _looked(i);
           },
           itemBuilder: (_, i) => Padding(
-            padding: EdgeInsets.only(left: bleed, right: 10),
+            padding: EdgeInsets.symmetric(horizontal: bleed > 0 ? bleed : _previewGap / 2),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => _tap(kinds[i], i),
@@ -266,8 +268,7 @@ class _AskDeckState extends State<AskDeck> {
             );
         final chips = Wrap(spacing: 6, runSpacing: 6, children: [
           if ((post.locationPref ?? '').isNotEmpty) _chip(p, WI.pin, t(post.locationPref!)),
-          if (left != null) _chip(p, WI.clock, left),
-          if (left != null && askDeadline(post) != null) _chip(p, WI.calendar, askDeadline(post)!),
+          if (left != null) _chip(p, WI.clock, askDeadline(post) != null ? '$left · ${askDeadline(post)}' : left),
           if ((post.budget ?? '').isNotEmpty) _chip(p, WI.rupee, post.budget!),
           if (widget.reachLabel != null) _chip(p, WI.locate, widget.reachLabel!),
         ]);
@@ -284,7 +285,7 @@ class _AskDeckState extends State<AskDeck> {
               }
             },
             child: Container(
-              height: (40 * _scale).clamp(34.0, 48.0),
+              height: (40 * _scale).clamp(38.0, 46.0),
               padding: const EdgeInsets.symmetric(horizontal: 20),
               alignment: Alignment.center,
               decoration: BoxDecoration(gradient: poster ? null : kGoldGradient, color: poster ? p.canvas : null, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x331E1E1E), blurRadius: 6, offset: Offset(0, 2))]),
@@ -292,12 +293,12 @@ class _AskDeckState extends State<AskDeck> {
             ),
           );
         }
-        // the chips and, when the ask is not yours, a small "I can help" on the same line: the card keeps its height
+        // the chips across the card's full width, then (when the ask is not yours) "I can help" as a full-width button
         Widget foot({bool tray = false}) {
           final c = cta();
-          return Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Expanded(child: tray ? Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: p.canvas.withValues(alpha: .9), borderRadius: BorderRadius.circular(16)), child: chips) : chips),
-            if (c != null) ...[const SizedBox(width: 8), c],
+          return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            tray ? Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: p.canvas.withValues(alpha: .9), borderRadius: BorderRadius.circular(16)), child: chips) : chips,
+            if (c != null) ...[const SizedBox(height: 10), c],
           ]);
         }
 
@@ -315,7 +316,7 @@ class _AskDeckState extends State<AskDeck> {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: titleW(26)), foot()]),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: titleW(26)), const SizedBox(height: 8), foot()]),
               ),
             ),
           ]);
@@ -357,6 +358,7 @@ class _AskDeckState extends State<AskDeck> {
               sentenceRow(rightPad: thumbPad),
               const SizedBox(height: 8),
               Expanded(child: titleW(26, rightPad: thumbPad)),
+              const SizedBox(height: 8),
               foot(),
             ]),
           );
