@@ -40,7 +40,7 @@ extension on Need {
   /// Shown under the reason: what the app does NOT do, so people can decide with confidence.
   String get promise => switch (this) {
         Need.location => 'Used only while you use the app, never in the background. Your exact location is never shown to other members.',
-        Need.contacts => 'Only the contacts you pick are shared (and service contacts, if you turn that on). Your phone book is never uploaded.',
+        Need.contacts => 'Only the contacts you pick are shared (and service contacts, if you turn that on). A phonebook check sends numbers only to find pages and never stores them.',
         Need.camera => 'Used only when you take a photo or turn on video in a call.',
         Need.microphone => 'Used only during calls. Calls are never recorded.',
         Need.notifications => 'Only for messages, calls and replies to your asks.',

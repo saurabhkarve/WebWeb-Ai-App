@@ -26,6 +26,7 @@ import 'edit_profile.dart';
 import 'find.dart';
 import 'leads.dart';
 import 'p2.dart';
+import 'phonebook.dart';
 import 'post_detail.dart';
 import 'profile.dart';
 import 'service_contacts_sheet.dart';
@@ -592,6 +593,7 @@ class _AccountMenu extends StatelessWidget {
           Expanded(
             child: ListView(padding: const EdgeInsets.all(6), children: [
               item(WI.edit, 'Edit profile', () => push(EditProfileScreen(profile: me))),
+              item(WI.contactCard, 'Phonebook', () => push(SubPage(title: t('Phonebook'), body: const PhonebookScreen()))),
               item(WI.sparkle, 'Leads for you', () => push(SubPage(title: t('Leads for you'), body: const LeadsScreen()))),
               item(WI.sun, 'Today in your area', () => push(SubPage(title: t('Today in your area'), body: const TodayScreen()))),
               item(WI.bell, 'Alerts', () => push(SubPage(title: t('Alerts'), body: const AlertsScreen()))),

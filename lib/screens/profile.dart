@@ -16,6 +16,7 @@ import '../safety.dart';
 import '../places.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../widgets/reviews_card.dart';
 import '../widgets/post_card.dart';
 import '../widgets/qr_card.dart';
 import '../widgets/catalog_strip.dart' show CatalogItemCard;
@@ -278,6 +279,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 own ? _ownActions(p) : _visitorActions(p, u),
               ]),
             ),
+            // reviews: the page is the member's website, so they are public (AI Phonebook)
+            if (!isJob) ReviewsCard(key: ValueKey('reviews-${u.uid}'), uid: u.uid, own: own, name: displayName(u.userType, u.name, u.company)),
             const SizedBox(height: 16),
             _tabBar(p, tabs, tab, isJob, own),
             // swipe left / right anywhere below the tabs to move between them
