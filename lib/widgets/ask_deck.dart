@@ -50,11 +50,11 @@ class AskDeck extends StatefulWidget {
 }
 
 class _AskDeckState extends State<AskDeck> {
-  var _page = PageController();
-  double _fr = 1;
-  /// in the feed each card is a whole page that slides from screen edge to screen edge (it sits in the page's side
-  /// margin at rest); the preview in the ask form stays inside its box, with a small gap between the cards
-  static const _bleed = 16.0, _previewGap = 6.0;
+  var _page = PageController(viewportFraction: .88);
+  double _fr = .88;
+  /// in the feed the swipe runs edge to edge (into the page's side margin, or a repost's frame) and the next card
+  /// peeks in at the right, so it is clear there is more to swipe; the preview in the ask form stays inside its box
+  static const _bleed = 16.0;
   int _i = 0;
   Timer? _look;
 
@@ -166,9 +166,8 @@ class _AskDeckState extends State<AskDeck> {
       SizedBox(
         height: _deckH,
         child: LayoutBuilder(builder: (context, box) {
-        // one card per page: no peek of the next one, the dots say there are more
         final v = box.maxWidth + 2 * bleed;
-        const f = 1.0;
+        final f = (.88 * box.maxWidth + bleed) / v;
         if ((f - _fr).abs() > .002) {
           final old = _page;
           _page = PageController(viewportFraction: f, initialPage: _i);
@@ -188,7 +187,7 @@ class _AskDeckState extends State<AskDeck> {
             _looked(i);
           },
           itemBuilder: (_, i) => Padding(
-            padding: EdgeInsets.symmetric(horizontal: bleed > 0 ? bleed : _previewGap / 2),
+            padding: EdgeInsets.only(left: bleed, right: 10),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => _tap(kinds[i], i),
