@@ -42,13 +42,18 @@ class AuthProvider extends ChangeNotifier {
   bool _loggingOut = false;
 
   Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    // for the iPhone's own code (AppDelegate.onDecline), which tells the API a call was declined when the app is closed
-    prefs.setString('apiUrl', apiUrl);
-    final saved = prefs.getString('token');
-    if (saved != null) {
-      token = saved;
-      await loadProfile(silent: true);
+    // whatever happens below, the opening screen must end: a stuck read or a slow network never leaves it up for good
+    try {
+      final prefs = await SharedPreferences.getInstance().timeout(const Duration(seconds: 6));
+      // for the iPhone's own code (AppDelegate.onDecline), which tells the API a call was declined when the app is closed
+      prefs.setString('apiUrl', apiUrl);
+      final saved = prefs.getString('token');
+      if (saved != null) {
+        token = saved;
+        await loadProfile(silent: true).timeout(const Duration(seconds: 10), onTimeout: () {});
+      }
+    } catch (_) {
+      // no saved session readable: the login screen
     }
     ready = true;
     notifyListeners();
