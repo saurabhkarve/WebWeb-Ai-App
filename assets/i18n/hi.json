@@ -2614,5 +2614,11 @@
   "Send your price and when you can do it": "अपना दाम और कब कर सकते हैं, भेजें",
   "Write to them about this": "इस बारे में उन्हें लिखें",
   "Put a contact who can do it in touch": "जो यह कर सके, उस संपर्क को जोड़ें",
-  "Send it to someone on WhatsApp": "WhatsApp पर किसी को भेजें"
+  "Send it to someone on WhatsApp": "WhatsApp पर किसी को भेजें",
+  "Your phone book is shown in the app and read on your phone. Only the contacts you pick are shared (and service contacts, if you turn that on). A phonebook check sends numbers only to find pages and never stores them.": "ऐप में आपकी फ़ोनबुक दिखती है और आपके फ़ोन पर ही पढ़ी जाती है। सिर्फ़ वही संपर्क शेयर होते हैं जो आप चुनते हैं (और सर्विस संपर्क, अगर आप उसे चालू करें)। फ़ोनबुक जाँच नंबर सिर्फ़ पेज ढूँढने के लिए भेजती है और उन्हें कभी नहीं रखती।",
+  "To show your phone book here, with who has a WEBWEB page. It is read on your phone and not uploaded.": "यहाँ आपकी फ़ोनबुक दिखाने के लिए, साथ में किसका WEBWEB पेज है। यह आपके फ़ोन पर ही पढ़ी जाती है, अपलोड नहीं होती।",
+  "See your phone book here, with who has a WEBWEB page. It is read on your phone and not uploaded.": "अपनी फ़ोनबुक यहाँ देखें, साथ में किसका WEBWEB पेज है। यह आपके फ़ोन पर ही पढ़ी जाती है, अपलोड नहीं होती।",
+  "See all": "सब देखें",
+  "Businesses near you reply": "आसपास के व्यवसाय जवाब देते हैं",
+  "Your phone book shows here in the WEBWEB app on your phone.": "आपकी फ़ोनबुक आपके फ़ोन पर WEBWEB ऐप में यहाँ दिखती है।"
 }

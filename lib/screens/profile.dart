@@ -22,7 +22,7 @@ import '../widgets/qr_card.dart';
 import '../widgets/catalog_strip.dart' show CatalogItemCard;
 import '../widgets/story_viewer.dart';
 import 'catalog.dart';
-import 'dialer.dart' show Favourites;
+import 'favourites.dart' show Favourites;
 import 'edit_profile.dart';
 import 'find.dart';
 import 'post_detail.dart';

@@ -21,7 +21,7 @@ import '../widgets/notify_banner.dart';
 import '../widgets/tour.dart';
 import 'ask.dart';
 import 'connect.dart';
-import 'dialer.dart';
+import 'favourites.dart';
 import 'edit_profile.dart';
 import 'find.dart';
 import 'leads.dart';
@@ -51,10 +51,15 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   Timer? _poll, _svcTimer;
   final _notes = NotificationsModel();
 
-  // The Smart Phonebook, laid out like a phone's dialer: Favourites, Recents (chats and calls), Contacts (home),
-  // Nearby (the local directory), Updates (the feed). The round button is the Keypad on the first three and Ask on
-  // the last two; Ask itself is a page of its own (index 5) without the bar. Notifications are the bell in the header.
-  static const _items = [(Icons.star_rounded, Icons.star_outline_rounded, 'Favourites'), (Icons.history_rounded, Icons.history_rounded, 'Recents'), (Icons.contacts_rounded, Icons.contacts_outlined, 'Contacts'), (Icons.place_rounded, Icons.place_outlined, 'Nearby'), (Icons.dynamic_feed_rounded, Icons.dynamic_feed_outlined, 'Updates')];
+  // The Smart Phonebook: Favourites, Chats (chats and calls), Contacts (home, the raised gold button in the middle),
+  // Nearby (the local directory), Updates (the feed). The round gold button is Ask; Ask itself is a page of its own
+  // (index 5) without the bar. Notifications are the bell in the header.
+  // From 600 px wide (tablets, desktop) the bar becomes a rail down the left with Ask at its top, and pages keep a
+  // readable width; from 1200 px the rail shows its labels beside the icons.
+  static const _items = [(Icons.star_rounded, Icons.star_outline_rounded, 'Favourites'), (Icons.chat_bubble_rounded, Icons.chat_bubble_outline_rounded, 'Chats'), (Icons.contacts_rounded, Icons.contacts_outlined, 'Contacts'), (Icons.place_rounded, Icons.place_outlined, 'Nearby'), (Icons.dynamic_feed_rounded, Icons.dynamic_feed_outlined, 'Updates')];
+  static const _tourKeys = ['nav-favourites', 'nav-talk', 'nav-contacts', 'nav-find', 'nav-feed'];
+  /// how far the Contacts button rises above the bar
+  static const _rise = 20.0;
   static const _talk = 1, _home = 2, _feed = 4, _ask = 5;
   static const _barH = 64.0;
   int _beforeAsk = _feed;
@@ -150,6 +155,10 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     const header = 56.0;
     final bottom = MediaQuery.of(context).padding.bottom;
     final bar = _i != _ask;
+    final w = MediaQuery.sizeOf(context).width;
+    final rail = w >= 600;
+    final railW = rail ? (w >= 1200 ? 220.0 : 88.0) : 0.0;
+    final bottomBar = bar && !rail;
     // without the bar on Ask, back returns to the tab it was opened from
     return PopScope(
       canPop: _i != _ask,
@@ -166,21 +175,24 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             // pages, below the header
             Positioned.fill(
               child: Padding(
-                padding: EdgeInsets.only(top: top + header, bottom: bar ? _barH + bottom : 0),
+                padding: EdgeInsets.only(top: top + header, bottom: bottomBar ? _barH + bottom : 0, left: railW),
                 child: MediaQuery.removePadding(
                   context: context,
                   removeTop: true,
-                  removeBottom: bar,
+                  removeBottom: bottomBar,
+                  removeLeft: rail,
                   child: IndexedStack(index: _i, children: [
-                    const FavouritesScreen(),
-                    if (_i == _talk) const TalkScreen() else const SizedBox.shrink(), // reload conversations each time it opens
-                    const PhonebookHome(),
-                    const FindScreen(),
-                    ConnectScreen(refreshTick: _feedTick, topTick: _topTick, onGoAsk: () => _go(_ask), active: _i == _feed),
-                    AskScreen(active: _i == _ask, onBack: () => _go(_beforeAsk), onPosted: () => setState(() {
-                          _feedTick++;
-                          _i = _feed;
-                        })),
+                    _fit(const FavouritesScreen(), 760),
+                    if (_i == _talk) _fit(const TalkScreen(), 900) else const SizedBox.shrink(), // reload conversations each time it opens
+                    _fit(PhonebookHome(onAsk: () => _go(_ask), onSeeAsks: () => _go(_feed)), 1240),
+                    _fit(const FindScreen(), 900),
+                    _fit(ConnectScreen(refreshTick: _feedTick, topTick: _topTick, onGoAsk: () => _go(_ask), active: _i == _feed), 680),
+                    _fit(
+                        AskScreen(active: _i == _ask, onBack: () => _go(_beforeAsk), onPosted: () => setState(() {
+                              _feedTick++;
+                              _i = _feed;
+                            })),
+                        760),
                   ]),
                 ),
               ),
@@ -199,10 +211,12 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             Positioned(top: top + header + 8, left: 0, right: 0, child: const ConnectionPill()),
             // a message or a new ask while the app is open: a banner with Reply (and Refer) right on it
             const NotifyBannerHost(),
-            // the round button: Keypad on Favourites, Recents and Contacts; Ask (contribute) on Nearby and Updates
-            if (bar) Positioned(right: 16, bottom: _barH + bottom + 16, child: _fab(p)),
-            // the bar, flat along the bottom as in a phone's dialer; Ask has its own Publish bar instead
-            if (bar) Positioned(left: 0, right: 0, bottom: 0, child: _bar(p, bottom)),
+            // the round Ask button (contribute), above the bar on phones; on the rail on wider screens
+            if (bottomBar) Positioned(right: 16, bottom: _barH + bottom + 16, child: _fab(p)),
+            // the bar along the bottom, Contacts raised in the middle; Ask has its own Publish bar instead
+            if (bottomBar) Positioned(left: 0, right: 0, bottom: 0, height: _barH + bottom + _rise, child: _bar(p, bottom)),
+            // tablets and desktop: the rail down the left, under the header
+            if (rail) Positioned(left: 0, top: top + header, bottom: 0, width: railW, child: _rail(p, railW >= 200)),
           ]),
         ),
       ]),
@@ -210,20 +224,82 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _bar(Pal p, double bottom) => Container(
-        height: _barH + bottom,
-        padding: EdgeInsets.only(bottom: bottom),
-        decoration: BoxDecoration(color: p.canvas, border: Border(top: BorderSide(color: p.border.withValues(alpha: .7)))),
-        child: Row(children: [
-          for (var k = 0; k < _items.length; k++)
-            Expanded(
-              child: KeyedSubtree(
-                key: Tours.key(const ['nav-favourites', 'nav-talk', 'nav-contacts', 'nav-find', 'nav-feed'][k]),
-                child: _barItem(p, k, badge: k == _talk ? unreadChats.value : 0),
-              ),
-            ),
-        ]),
-      );
+  /// A page at a readable width on a wide screen, centred, told the width it has (cards size themselves from it).
+  Widget _fit(Widget page, double max) => LayoutBuilder(builder: (context, c) {
+        if (c.maxWidth <= max) return page;
+        final mq = MediaQuery.of(context);
+        return Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(width: max, height: c.maxHeight, child: MediaQuery(data: mq.copyWith(size: Size(max, mq.size.height)), child: page)),
+        );
+      });
+
+  Widget _bar(Pal p, double bottom) => Stack(clipBehavior: Clip.none, children: [
+        // the empty strip above the bar lets taps through to the page; only the raised button sits in it
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: _barH + bottom,
+          child: Container(
+            padding: EdgeInsets.only(bottom: bottom),
+            decoration: BoxDecoration(color: p.canvas, border: Border(top: BorderSide(color: p.border.withValues(alpha: .7)))),
+            child: Row(children: [
+              for (var k = 0; k < _items.length; k++)
+                Expanded(
+                  child: KeyedSubtree(
+                    key: k == _home ? null : Tours.key(_tourKeys[k]),
+                    child: k == _home ? _homeLabel(p) : _barItem(p, k, badge: k == _talk ? unreadChats.value : 0),
+                  ),
+                ),
+            ]),
+          ),
+        ),
+        Positioned(top: 0, left: 0, right: 0, child: Center(child: KeyedSubtree(key: Tours.key(_tourKeys[_home]), child: _homeButton(p, 60)))),
+      ]);
+
+  /// Contacts, the heart of the app: always the gold round button, raised in the middle of the bar.
+  Widget _homeButton(Pal p, double size) {
+    final active = _i == _home;
+    return Semantics(
+      button: true,
+      selected: active,
+      label: t(_items[_home].$3),
+      child: GestureDetector(
+        onTap: () => _go(_home),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            gradient: kGoldGradient,
+            shape: BoxShape.circle,
+            border: Border.all(color: p.canvas, width: 4),
+            boxShadow: [BoxShadow(color: const Color(0xFFD6AA00).withValues(alpha: active ? .55 : .35), blurRadius: active ? 18 : 12, spreadRadius: -4, offset: const Offset(0, 6))],
+          ),
+          child: Icon(active ? _items[_home].$1 : _items[_home].$2, color: kInk, size: size * .46),
+        ),
+      ),
+    );
+  }
+
+  /// the label under the raised button, in the bar
+  Widget _homeLabel(Pal p) {
+    final active = _i == _home;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _go(_home),
+      child: ExcludeSemantics(
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 9),
+            child: FittedBox(fit: BoxFit.scaleDown, child: Text(t(_items[_home].$3), maxLines: 1, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: active ? p.text : p.muted))),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _barItem(Pal p, int k, {int badge = 0}) {
     final active = _i == k;
@@ -246,19 +322,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
               decoration: BoxDecoration(color: active ? kGold.withValues(alpha: p.dark ? .25 : .22) : Colors.transparent, borderRadius: BorderRadius.circular(15)),
               child: Stack(alignment: Alignment.center, clipBehavior: Clip.none, children: [
                 Icon(active ? _items[k].$1 : _items[k].$2, size: 23, color: fg),
-                if (badge > 0)
-                  Positioned(
-                    right: 8,
-                    top: 0,
-                    child: Container(
-                      height: 16,
-                      constraints: const BoxConstraints(minWidth: 16),
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(8)),
-                      child: Text(badge > 99 ? '99+' : '$badge', style: const TextStyle(color: kInk, fontSize: 10, fontWeight: FontWeight.w700, height: 1)),
-                    ),
-                  ),
+                if (badge > 0) Positioned(right: 8, top: 0, child: _badge(badge)),
               ]),
             ),
             const SizedBox(height: 4),
@@ -269,28 +333,117 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _fab(Pal p) {
-    final keypad = _i <= _home;
+  Widget _badge(int n) => Container(
+        height: 16,
+        constraints: const BoxConstraints(minWidth: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(8)),
+        child: Text(n > 99 ? '99+' : '$n', style: const TextStyle(color: kInk, fontSize: 10, fontWeight: FontWeight.w700, height: 1)),
+      );
+
+  /// Tablets and desktop: Ask at the top, then the five places; Contacts keeps its gold. [labels]: the wide rail,
+  /// with each label beside its icon.
+  Widget _rail(Pal p, bool labels) {
+    final tone = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
+    Widget item(int k) {
+      final active = _i == k;
+      final home = k == _home;
+      final badge = k == _talk ? unreadChats.value : 0;
+      final icon = Stack(clipBehavior: Clip.none, children: [
+        Icon(active ? _items[k].$1 : _items[k].$2, size: 24, color: home ? kInk : (active ? tone : p.muted)),
+        if (badge > 0) Positioned(right: -10, top: -6, child: _badge(badge)),
+      ]);
+      final fill = home ? null : (active ? kGold.withValues(alpha: p.dark ? .25 : .22) : Colors.transparent);
+      final label = Text(t(_items[k].$3), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: labels ? 14.5 : 11.5, fontWeight: active || home ? FontWeight.w700 : FontWeight.w500, color: active ? p.text : p.muted));
+      return KeyedSubtree(
+        key: Tours.key(_tourKeys[k]),
+        child: Semantics(
+          button: true,
+          selected: active,
+          label: t(_items[k].$3),
+          child: InkWell(
+            onTap: () => _go(k),
+            borderRadius: BorderRadius.circular(28),
+            child: ExcludeSemantics(
+              child: labels
+                  ? Container(
+                      height: 52,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: fill,
+                        gradient: home ? kGoldGradient : null,
+                        borderRadius: BorderRadius.circular(26),
+                        border: home && active ? Border.all(color: kInk.withValues(alpha: .5), width: 1.5) : null,
+                      ),
+                      child: Row(children: [icon, const SizedBox(width: 14), Expanded(child: home ? Text(t(_items[k].$3), maxLines: 1, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: kInk)) : label)]),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Column(children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: home ? 52 : 56,
+                          height: home ? 52 : 32,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: fill,
+                            gradient: home ? kGoldGradient : null,
+                            shape: home ? BoxShape.circle : BoxShape.rectangle,
+                            borderRadius: home ? null : BorderRadius.circular(16),
+                            boxShadow: home ? [BoxShadow(color: const Color(0xFFD6AA00).withValues(alpha: active ? .5 : .3), blurRadius: 14, spreadRadius: -4, offset: const Offset(0, 5))] : null,
+                          ),
+                          child: icon,
+                        ),
+                        const SizedBox(height: 4),
+                        label,
+                      ]),
+                    ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(color: p.canvas, border: Border(right: BorderSide(color: p.border.withValues(alpha: .7)))),
+      padding: EdgeInsets.fromLTRB(labels ? 16 : 8, 16, labels ? 16 : 8, 16),
+      child: SingleChildScrollView(
+        child: Column(crossAxisAlignment: labels ? CrossAxisAlignment.stretch : CrossAxisAlignment.center, children: [
+          _fab(p, compact: !labels),
+          const SizedBox(height: 20),
+          for (var k = 0; k < _items.length; k++) Padding(padding: const EdgeInsets.only(bottom: 6), child: item(k)),
+        ]),
+      ),
+    );
+  }
+
+  /// Ask: post what you need. [compact]: the narrow rail's square button, the word under the icon.
+  Widget _fab(Pal p, {bool compact = false}) {
+    final active = _i == _ask;
     return Semantics(
       button: true,
-      label: keypad ? t('Keypad') : t('Ask'),
+      selected: active,
+      label: t('Ask'),
       child: GestureDetector(
-        key: keypad ? null : Tours.key('nav-ask'),
-        onTap: () => keypad ? showKeypad(context) : _go(_ask),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          height: 58,
-          padding: EdgeInsets.symmetric(horizontal: keypad ? 0 : 20),
+        key: Tours.key('nav-ask'),
+        onTap: () => _go(_ask),
+        child: Container(
+          height: compact ? 64 : 58,
+          width: compact ? 64 : null,
+          padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 20),
           constraints: const BoxConstraints(minWidth: 58),
           decoration: BoxDecoration(
             gradient: kGoldGradient,
             borderRadius: BorderRadius.circular(20),
+            border: active ? Border.all(color: kInk.withValues(alpha: .5), width: 1.5) : null,
             boxShadow: [BoxShadow(color: const Color(0xFFD6AA00).withValues(alpha: .45), blurRadius: 18, spreadRadius: -4, offset: const Offset(0, 8))],
           ),
           child: ExcludeSemantics(
-            child: Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
-              keypad ? const Icon(Icons.dialpad_rounded, color: kInk, size: 26) : WIcon(WI.connect, size: 22, color: kInk, strokeWidth: 2.2, spinKey: _askSpin),
-              if (!keypad) ...[const SizedBox(width: 8), Text(t('Ask'), style: const TextStyle(color: kInk, fontSize: 15, fontWeight: FontWeight.w700))],
+            child: Flex(direction: compact ? Axis.vertical : Axis.horizontal, mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
+              WIcon(WI.connect, size: 22, color: kInk, strokeWidth: 2.2, spinKey: _askSpin),
+              SizedBox(width: compact ? 0 : 8, height: compact ? 3 : 0),
+              Text(t('Ask'), style: TextStyle(color: kInk, fontSize: compact ? 12 : 15, fontWeight: FontWeight.w700)),
             ]),
           ),
         ),
