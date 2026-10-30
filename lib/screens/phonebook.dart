@@ -397,9 +397,23 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
   static String _memberName(Map m) => displayName('${m['userType'] ?? ''}', '${m['name'] ?? ''}', '${m['company'] ?? ''}');
 
+  /// [_build], kept until the phone book or the pages change (a phone book can have thousands of contacts, and the
+  /// letter index rebuilds the page on every move of the finger)
+  List<_Entry> get _entries {
+    final key = (_device, _matches);
+    if (_entriesKey != key) {
+      _entriesKey = key;
+      _entriesList = _build();
+    }
+    return _entriesList;
+  }
+
+  (List<Contact>?, List<Map>?)? _entriesKey;
+  List<_Entry> _entriesList = const [];
+
   /// The phone's contacts with their pages put next to them, plus pages from the check not (or no longer) on the
   /// phone, A to Z by the name shown.
-  List<_Entry> get _entries {
+  List<_Entry> _build() {
     final matches = _matches ?? const <Map>[];
     final byPhone = {for (final m in matches) if (m['phone'] != null) '${m['phone']}': m};
     // checks from before the number was kept: by the name it was saved as
@@ -536,12 +550,12 @@ class _PhonebookHomeState extends State<PhonebookHome> {
       }
       items.add(e);
     }
-    double offsetOf(int index) {
-      var y = 0.0;
-      for (var k = 0; k < index; k++) {
-        y += items[k] is String ? _headH : _rowH;
-      }
-      return y;
+    // where each letter starts, worked out once
+    final offsets = <String, double>{};
+    var y = 0.0;
+    for (final it in items) {
+      if (it is String) offsets[it] = y;
+      y += it is String ? _headH : _rowH;
     }
 
     final list = RefreshIndicator(
@@ -572,7 +586,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
       if (l == _scrubbing) return;
       setState(() => _scrubbing = l);
       final topH = (_topKey.currentContext?.findRenderObject() as RenderBox?)?.size.height ?? 0;
-      _scroll.jumpTo((12 + topH + offsetOf(at[l]!)).clamp(0.0, _scroll.position.maxScrollExtent));
+      _scroll.jumpTo((12 + topH + offsets[l]!).clamp(0.0, _scroll.position.maxScrollExtent));
     }
 
     return Stack(children: [

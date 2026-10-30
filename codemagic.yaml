@@ -20,7 +20,9 @@ definitions:
     flutter: stable
     java: 17
     vars: &vars
-      API_URL: https://biznetapi.webweb.ai
+      # Smart Phonebook branch: staging (biznet.webweb.ai/api, the phonebook server, same database and accounts as
+      # production). Back to https://biznetapi.webweb.ai once the phonebook server is on main.
+      API_URL: https://biznet.webweb.ai/api
       # the only Firebase project this app may be built with (see the header)
       FIREBASE_PROJECT: webweb-ai-app
       FIREBASE_PROJECT_NUMBER: "441974581550"
