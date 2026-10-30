@@ -122,10 +122,10 @@ class _LogoInlineState extends State<LogoInline> {
     return IntrinsicWidth(
       child: SizedBox(
         // a much larger mark (the sign-in page) keeps the lines together instead
-        height: mark <= widget.size * 1.4 ? mark + font * .15 : null,
+        height: mark <= widget.size * 1.5 ? mark + font * .15 : null,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         word,
-        if (mark > widget.size * 1.4) const SizedBox(height: 6),
+        if (mark > widget.size * 1.5) const SizedBox(height: 6),
         Semantics(
           label: tag,
           child: ExcludeSemantics(
