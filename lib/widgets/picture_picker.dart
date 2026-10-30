@@ -115,7 +115,7 @@ class _PicturePickerState extends State<_PicturePicker> {
             borderRadius: BorderRadius.circular(_cover ? 10 : 999),
             border: Border.all(color: current ? kGold : Colors.transparent, width: 2),
           ),
-          child: AspectRatio(aspectRatio: _cover ? 3 : 1, child: Opacity(opacity: _busy == url ? .5 : 1, child: img)),
+          child: AspectRatio(aspectRatio: _cover ? 4 : 1, child: Opacity(opacity: _busy == url ? .5 : 1, child: img)),
         ),
       ),
       if (current)
@@ -163,7 +163,7 @@ class _PicturePickerState extends State<_PicturePicker> {
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
-          childAspectRatio: _cover ? 2.8 : .95,
+          childAspectRatio: _cover ? 3.7 : .95,
           children: tiles,
         );
     Widget heading(String s) => Padding(padding: const EdgeInsets.only(top: 20, bottom: 8), child: Text(s, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)));

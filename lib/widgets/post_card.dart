@@ -397,7 +397,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                         Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, height: 1.2))),
                         if (post.authorVerification > 0 || post.authorPremium || post.authorPlan != null) ...[const SizedBox(width: 6), VerifiedBadge(level: post.authorVerification, premium: post.authorPremium, plan: post.authorPlan)],
                       ]),
-                      Text('${isBusiness ? post.authorName : post.authorCompany} · ${timeAgo(post.createdAt)}${post.editedAt != null ? ' · ${editedLabel(post.editedAt!)}' : ''}',
+                      // views sit here, above the cards, as on x.com: people who saw it (a count, not a button)
+                      Text('${isBusiness ? post.authorName : post.authorCompany} · ${timeAgo(post.createdAt)}${post.editedAt != null ? ' · ${editedLabel(post.editedAt!)}' : ''}${post.viewsCount > 0 ? ' · ${t(post.viewsCount == 1 ? '1 view' : '{n} views', {'n': compactCount(post.viewsCount)})}' : ''}',
                           maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: p.muted, height: 1.2)),
                     ]),
                   ),
@@ -809,6 +810,42 @@ class PostActionsState extends State<PostActions> {
     toast(context, ok > 0 ? t('Referral sent') : (err ?? t('Could not refer')), error: ok == 0);
   }
 
+  /// The one Reply-or-refer button: help yourself, or put someone you know in touch (an update: pass it on).
+  Future<void> _replyOrRefer(bool isAsk) async {
+    final p = Pal.of(context);
+    Widget option(BuildContext ctx, WI icon, String title, String sub, String value, {bool gold = false}) => ListTile(
+          leading: Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(gradient: gold ? kGoldGradient : null, color: gold ? null : p.chip, shape: BoxShape.circle),
+            child: WIcon(icon, size: 20, color: gold ? kInk : p.text),
+          ),
+          title: Text(t(title), style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text(t(sub), style: TextStyle(fontSize: 12.5, color: p.muted)),
+          onTap: () => Navigator.pop(ctx, value),
+        );
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: p.canvas,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            option(ctx, WI.talk, isAsk ? 'I can help' : 'Reply', isAsk ? 'Send your price and when you can do it' : 'Write to them about this', 'reply', gold: true),
+            option(ctx, WI.refer, isAsk ? 'Refer someone' : 'Pass it on', isAsk ? 'Put a contact who can do it in touch' : 'Send it to someone on WhatsApp', 'refer'),
+          ]),
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'reply') {
+      widget.onReply();
+    } else {
+      isAsk ? await _refer() : await _whatsApp();
+    }
+  }
+
   @override
   Widget build(BuildContext context) => _actions(Pal.of(context), post.isRequirement, _isOwner);
 
@@ -940,9 +977,8 @@ class PostActionsState extends State<PostActions> {
         return Semantics(button: true, label: t(label), excludeSemantics: true, child: onTap == null ? c : InkWell(onTap: onTap, borderRadius: radius, hoverColor: splash, highlightColor: splash, child: c));
       }
 
-      // React, Reply, Refer, Views, Share at every size (as on the web), so Refer sits in the middle: in gold, since asks
-      // are answered by referring someone (the asker reviews responses instead). Equal widths, as on the web: each is as
-      // wide as the widest needs, count or not, so nothing shifts when a count appears; 6 apart
+      // React, Reply or refer (gold, in the middle) and Share; the views are in the header above the cards. Equal widths:
+      // each is as wide as the widest needs, count or not, so nothing shifts when a count appears
       final kids = <Widget>[
         // React first
         ReactionPicker(
@@ -960,31 +996,26 @@ class PostActionsState extends State<PostActions> {
         ),
         if (mine && isAsk)
           pill(label: 'Review responses', icon: WIcon(WI.talk, size: 18, color: p.tagText), count: post.sharesCount, badge: p.tagBg, color: p.tagText, edge: kGold.withValues(alpha: .45), fill: kGold.withValues(alpha: .1), onTap: widget.onReview ?? widget.onReply)
-        else ...[
-          tour('reply', pill(label: 'Reply', icon: WIcon(WI.talk, size: 18, color: p.muted), count: isAsk ? post.sharesCount : 0, color: p.muted, onTap: widget.onReply)),
-          // plain like the rest, in deep gold so it still leads (as on the web). An update has no one to put a contact in
-          // touch with, so there Refer passes it on to someone over WhatsApp
+        else
+          // Reply and Refer are one gold button: it asks which, "I can help" or "Refer someone" (on an update: reply, or
+          // pass it on over WhatsApp); its count is the replies and referrals together
           tour(
-              'refer',
-              pill(
-                label: 'Refer',
-                icon: WIcon(WI.refer, size: 18, color: p.tagText),
-                count: post.referralsCount,
+            'reply',
+            KeyedSubtree(
+              key: widget.tourTarget ? Tours.key('refer') : null,
+              child: pill(
+                label: 'Reply or refer',
+                icon: WIcon(WI.talk, size: 18, color: p.tagText),
+                count: (isAsk ? post.sharesCount : 0) + post.referralsCount,
                 color: p.tagText,
                 badge: p.tagBg,
                 splash: kGold.withValues(alpha: .15),
                 edge: kGold.withValues(alpha: .45),
                 fill: kGold.withValues(alpha: .1),
-                onTap: isAsk ? _refer : _whatsApp,
+                onTap: () => _replyOrRefer(isAsk),
               ),
             ),
-        ],
-        // views, as on x.com: people who saw it (a count, not a button). Shown at 0 too, so every tile keeps its place
-        Semantics(
-          label: t(post.viewsCount == 1 ? '1 view' : '{n} views', {'n': post.viewsCount}),
-          excludeSemantics: true,
-          child: pill(label: 'Views', icon: WIcon(WI.views, size: 18, color: p.muted), count: post.viewsCount),
-        ),
+          ),
         pill(
           label: post.reposted ? 'Reposted' : 'Share',
           icon: WIcon(post.reposted ? WI.repost : WI.share, size: 18, color: post.reposted ? green : p.muted),

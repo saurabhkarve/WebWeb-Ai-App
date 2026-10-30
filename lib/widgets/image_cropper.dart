@@ -21,7 +21,7 @@ class CropSpec {
 }
 
 const kAvatarCrop = CropSpec('avatar', 1, true, 640, 640, 'Crop profile photo', 'Use this photo', 'Shown round on your page, asks and chats.');
-const kCoverCrop = CropSpec('cover', 3, false, 1500, 500, 'Crop cover', 'Use this cover', 'Shown across the top of your page.');
+const kCoverCrop = CropSpec('cover', 4, false, 1584, 396, 'Crop cover', 'Use this cover', 'Shown across the top of your page.');
 
 const _maxZoom = 5.0;
 

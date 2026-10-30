@@ -351,8 +351,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ]),
           ),
         );
-    // the cover is 3:1 (as it was cropped) below the status bar; behind the status bar, a blurred copy of it
-    final band = MediaQuery.sizeOf(context).width / 3;
+    // the cover is the standard 4:1 profile banner (1584 x 396, as it is cropped) below the status bar; behind the status
+    // bar, a blurred copy of it. Covers cropped 3:1 before fill it, trimmed a little at the top and bottom
+    final band = MediaQuery.sizeOf(context).width / 4;
     return SizedBox(
       height: top + band,
       child: Stack(fit: StackFit.expand, children: [
@@ -442,23 +443,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text.rich(
-                TextSpan(children: [
-                  stat(u.statPosts?.toString(), 'Asks'),
-                  const TextSpan(text: ' · '),
-                  stat(u.statShared?.toString(), 'Connects'),
-                  const TextSpan(text: ' · '),
-                  stat('${u.contributions}', 'Contributions'),
-                  // deals: asks whose owner chose them (only once there is one)
-                  if (u.statWon > 0) ...[
+              padding: const EdgeInsets.only(bottom: 4, right: 12),
+              // one line under the shorter 4:1 cover: shrinks a little rather than wrap into the band
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text.rich(
+                  TextSpan(children: [
+                    stat(u.statPosts?.toString(), 'Asks'),
                     const TextSpan(text: ' · '),
-                    WidgetSpan(alignment: PlaceholderAlignment.middle, child: Padding(padding: const EdgeInsets.only(right: 3), child: WIcon(WI.deals, size: 13, color: p.dark ? kGold : const Color(0xFF7A5A00), still: true))),
-                    stat('${u.statWon}', u.statWon == 1 ? 'Deal' : 'Deals'),
-                  ],
-                ]),
-                textAlign: TextAlign.right,
-                style: TextStyle(fontSize: 12, height: 1.25, color: p.muted),
+                    stat(u.statShared?.toString(), 'Connects'),
+                    const TextSpan(text: ' · '),
+                    stat('${u.contributions}', 'Contributions'),
+                    // deals: asks whose owner chose them (only once there is one)
+                    if (u.statWon > 0) ...[
+                      const TextSpan(text: ' · '),
+                      WidgetSpan(alignment: PlaceholderAlignment.middle, child: Padding(padding: const EdgeInsets.only(right: 3), child: WIcon(WI.deals, size: 13, color: p.dark ? kGold : const Color(0xFF7A5A00), still: true))),
+                      stat('${u.statWon}', u.statWon == 1 ? 'Deal' : 'Deals'),
+                    ],
+                  ]),
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  style: TextStyle(fontSize: 12, height: 1.25, color: p.muted),
+                ),
               ),
             ),
           ),
