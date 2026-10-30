@@ -870,15 +870,20 @@ class _BusinessCard extends StatelessWidget {
         width: 160,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
-        child: Column(children: [
-          SizedBox(height: 56, width: double.infinity, child: (u.bannerUrl ?? '').isNotEmpty ? NetImg(smallImage(u.bannerUrl!)) : CoverPattern(seed: u.handle)),
-          Transform.translate(
-            offset: const Offset(0, -24),
-            child: Padding(
+        // the avatar overlaps the banner in a Stack, so no empty space is left below the card (a shifted avatar kept
+        // its old room and ran the card past its row)
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Stack(clipBehavior: Clip.none, alignment: Alignment.topCenter, children: [
+            SizedBox(height: 56, width: double.infinity, child: (u.bannerUrl ?? '').isNotEmpty ? NetImg(smallImage(u.bannerUrl!)) : CoverPattern(seed: u.handle)),
+            Positioned(
+              top: 32,
+              child: Container(padding: const EdgeInsets.all(2), decoration: BoxDecoration(color: p.card, shape: BoxShape.circle), child: Avatar(name: name, photoUrl: u.photoUrl, size: 48)),
+            ),
+          ]),
+          const SizedBox(height: 32),
+          Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Column(children: [
-                Container(padding: const EdgeInsets.all(2), decoration: BoxDecoration(color: p.card, shape: BoxShape.circle), child: Avatar(name: name, photoUrl: u.photoUrl, size: 48)),
-                const SizedBox(height: 4),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
                 Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25))),
                   const SizedBox(width: 4),
@@ -893,7 +898,6 @@ class _BusinessCard extends StatelessWidget {
                   child: Text(t('View page'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                 ),
               ]),
-            ),
           ),
         ]),
       ),
