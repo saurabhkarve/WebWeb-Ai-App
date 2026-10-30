@@ -257,14 +257,21 @@ class _AskScreenState extends State<AskScreen> with MyAskActivityLoader {
     if (widget.edit == null) {
       initAskActivity();
       yourAsksRequest.addListener(_onRequest);
+      askPrefill.addListener(_onPrefill);
     }
   }
 
   @override
   void dispose() {
     yourAsksRequest.removeListener(_onRequest);
+    askPrefill.removeListener(_onPrefill);
     disposeAskActivity();
     super.dispose();
+  }
+
+  /// a search from Contacts to post as an ask: the form, not "Your asks"
+  void _onPrefill() {
+    if (askPrefill.value != null && _yours) setState(() => _yours = false);
   }
 
   void _onRequest() {
@@ -420,7 +427,21 @@ class _AskFormState extends State<_AskForm> {
     }).catchError((_) {});
     _title.addListener(_changed);
     _desc.addListener(_changed);
+    if (!_editing) {
+      askPrefill.addListener(_prefill);
+      _prefill();
+    }
     _maybeTour();
+  }
+
+  /// "Post as an ask" from Contacts' Ask AI: the search becomes the title of a fresh ask (the type and category
+  /// follow the words, as when typed)
+  void _prefill() {
+    final v = askPrefill.value;
+    if (v == null) return;
+    askPrefill.value = null;
+    _desc.clear();
+    _title.text = v;
   }
 
   @override
@@ -825,6 +846,7 @@ class _AskFormState extends State<_AskForm> {
 
   @override
   void dispose() {
+    askPrefill.removeListener(_prefill);
     _draftTimer?.cancel();
     _aiCatTimer?.cancel();
     for (final c in [_title, _desc, _other]) {

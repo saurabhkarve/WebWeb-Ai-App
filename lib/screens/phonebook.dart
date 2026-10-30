@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -13,6 +14,7 @@ import '../card_colors.dart';
 import '../contact_sync.dart';
 import '../i18n.dart';
 import '../links.dart';
+import '../location.dart' show PermissionNotGiven, currentLocation;
 import '../models.dart';
 import '../permissions.dart';
 import '../theme.dart';
@@ -22,6 +24,7 @@ import '../widgets/reviews_card.dart';
 import 'find.dart';
 import 'post_detail.dart';
 import 'profile.dart';
+import 'your_asks.dart' show askPrefill;
 
 /// The AI Phonebook (web /phonebook): which of my contacts already have a WEBWEB page, with what they do, where
 /// and their reviews. Only when the member taps "Check my contacts": the numbers are sent once to
@@ -242,8 +245,14 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   List<Map>? _results;
   List<Post>? _asks;
   Map? _mine;
-  Timer? _debounce;
+  Timer? _debounce, _aiTimer;
   String? _scrubbing;
+  /// Ask AI: the answer (engine, title, matches with why) and the search it is for
+  Map? _ai;
+  String? _aiFor;
+  bool _aiBusy = false;
+  /// where the phone is, for nearer results first (only once location is allowed; asked for no more than that)
+  ({double lat, double lng, DateTime at})? _here;
 
   @override
   void initState() {
@@ -262,6 +271,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _aiTimer?.cancel();
     _q.dispose();
     _scroll.dispose();
     super.dispose();
@@ -305,6 +315,9 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
   void _search(String v) {
     _debounce?.cancel();
+    _aiTimer?.cancel();
+    // Ask AI reads the need once the member pauses (or at once on the keyboard's search key)
+    if (v.trim().length >= 4) _aiTimer = Timer(const Duration(milliseconds: 1200), () => _askAi(v.trim()));
     setState(() {});
     if (v.trim().length < 2) return setState(() => _results = null);
     _debounce = Timer(const Duration(milliseconds: 250), () async {
@@ -315,6 +328,66 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         if (mounted) setState(() => _results = const []);
       }
     });
+  }
+
+  /// Ask AI (POST /phonebook/ai-find): the pages that can help with what was typed, each with why.
+  Future<void> _askAi(String q) async {
+    _aiTimer?.cancel();
+    if (q.length < 4 || (q == _aiFor && (_ai != null || _aiBusy))) return;
+    setState(() => (_aiFor = q, _ai = null, _aiBusy = true));
+    try {
+      final here = await _position();
+      if (!mounted) return;
+      final r = await context.read<AuthProvider>().api.post('/phonebook/ai-find', {'q': q, if (here != null) 'lat': here.lat, if (here != null) 'lng': here.lng}) as Map;
+      if (mounted && _aiFor == q) setState(() => _ai = r);
+    } catch (_) {
+      if (mounted && _aiFor == q) setState(() => _ai = const {'matches': []});
+    } finally {
+      if (mounted && _aiFor == q) setState(() => _aiBusy = false);
+    }
+  }
+
+  /// The phone's position for the search (sent with it, not stored): only when location is already allowed,
+  /// read again after 5 minutes. Without it the server uses the last location the app saved, or the page's area.
+  Future<({double lat, double lng})?> _position() async {
+    final h = _here;
+    if (h != null && DateTime.now().difference(h.at) < const Duration(minutes: 5)) return (lat: h.lat, lng: h.lng);
+    if (!ContactSync.supported || !await Permissions.granted(Need.location)) return null;
+    try {
+      final p = await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 6)))
+          .catchError((_) async => (await Geolocator.getLastKnownPosition())!);
+      _here = (lat: p.latitude, lng: p.longitude, at: DateTime.now());
+      return (lat: p.latitude, lng: p.longitude);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// "Use my location": asks (saying why), saves it as the last location, and searches again nearest to you.
+  Future<void> _useLocation() async {
+    try {
+      final h = await currentLocation(context, reason: t('To show people near you first.'), source: 'ask-ai');
+      _here = (lat: h.lat, lng: h.lng, at: DateTime.now());
+    } on PermissionNotGiven {
+      return;
+    } catch (e) {
+      if (mounted && '$e'.isNotEmpty) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      return;
+    }
+    final q = _q.text.trim();
+    _aiFor = null;
+    _askAi(q);
+  }
+
+  /// Not found: the search goes to the Ask form as a new ask, for members to refer someone
+  void _postAsAsk() {
+    final q = _q.text.trim();
+    final title = _aiFor == q ? '${_ai?['title'] ?? q}' : q;
+    askPrefill.value = title.isEmpty ? q : title;
+    _q.clear();
+    _search('');
+    FocusScope.of(context).unfocus();
+    widget.onAsk?.call();
   }
 
   Future<void> _openCheck() async {
@@ -393,13 +466,18 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         if (all.isNotEmpty) Text('${all.length}', style: TextStyle(fontSize: 15, color: p.muted)),
       ]),
       const SizedBox(height: 10),
+      // Ask AI: a name finds the contact; anything else is a need, and the AI finds who can help
       TextField(
         controller: _q,
         onChanged: _search,
+        onSubmitted: (v) => _askAi(v.trim()),
         textInputAction: TextInputAction.search,
         decoration: InputDecoration(
-          prefixIcon: const Icon(Icons.search),
-          hintText: t('Search a name, trade or area'),
+          prefixIcon: Padding(padding: const EdgeInsets.only(left: 14, right: 8), child: _aiMark(20)),
+          prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+          hintText: t('Ask AI: a name, or what you need'),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide(color: kGold.withValues(alpha: .75), width: 1.5)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: const BorderSide(color: kGold, width: 2)),
           suffixIcon: _q.text.isEmpty
               ? null
               : IconButton(
@@ -427,22 +505,24 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
     if (searching) {
       final mine = all.where((e) => '${e.name} ${e.phone ?? ''} ${e.member == null ? '' : '${e.member!['name']} ${e.member!['company']} ${e.member!['category']} ${e.member!['location']} ${(e.member!['services'] as List? ?? const []).join(' ')}'}'.toLowerCase().contains(q)).toList();
-      final others = (_results ?? const <Map>[]).where((u) => !mine.any((e) => e.member?['uid'] == u['uid'])).take(20).toList();
+      final aiMatches = _aiFor == _q.text.trim() ? ((_ai?['matches'] as List?) ?? const []).cast<Map>() : const <Map>[];
+      bool shown(Map u) => mine.any((e) => e.member?['uid'] == u['uid']) || aiMatches.any((m) => m['uid'] == u['uid']);
+      final others = (_results ?? const <Map>[]).where((u) => !shown(u)).take(20).toList();
+      // what the member saved a page as, when it is in their contacts
+      final saved = {for (final e in all) if (e.member != null) '${e.member!['uid']}': e.name};
       return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 120), children: [
         top,
         if (mine.isNotEmpty) ...[_label(p, t('In your contacts')), for (final e in mine.take(30)) _row(p, e)],
-        _label(p, t('On WEBWEB')),
-        for (final u in others) _row(p, _Entry(_memberName(u), null, u)),
-        if (_results != null && _results!.isEmpty && mine.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: Center(
-              child: TextButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FindScreen(standalone: true, initialQuery: _q.text.trim()))),
-                child: Text('${t('No one found.')} ${t('Search nearby')}'),
-              ),
-            ),
+        ..._aiSection(p, aiMatches, saved),
+        if (others.isNotEmpty) ...[_label(p, t('On WEBWEB')), for (final u in others) _row(p, _Entry(_memberName(u), null, u))],
+        const SizedBox(height: 18),
+        _postAsAskCard(p),
+        Center(
+          child: TextButton(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FindScreen(standalone: true, initialQuery: _q.text.trim()))),
+            child: Text(t('Search nearby')),
           ),
+        ),
       ]);
     }
 
@@ -582,19 +662,99 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         child: Text(s.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.25, color: p.muted)),
       );
 
-  Widget _row(Pal p, _Entry e) {
+  /// the gold sparkle that marks Ask AI
+  Widget _aiMark(double size) => ShaderMask(
+        shaderCallback: (r) => kGoldGradient.createShader(r),
+        child: Icon(Icons.auto_awesome_rounded, size: size, color: Colors.white),
+      );
+
+  /// What Ask AI found for the search: looking, the pages with why each fits, or that none fits yet.
+  List<Widget> _aiSection(Pal p, List<Map> matches, Map<String, String> saved) {
+    final q = _q.text.trim();
+    if (q.length < 4) return const [];
+    // nearest first: from the place named, from where you are, or a tap to allow location
+    final near = _aiFor == q ? '${_ai?['near'] ?? ''}' : null;
+    final head = Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 4),
+      child: Row(children: [
+        _aiMark(15),
+        const SizedBox(width: 6),
+        Expanded(child: Text(t('Ask AI found').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.25, color: p.muted))),
+        if (near != null && !_aiBusy)
+          near.isEmpty && ContactSync.supported
+              ? TextButton.icon(
+                  onPressed: _useLocation,
+                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  icon: const Icon(Icons.my_location_rounded, size: 16),
+                  label: Text(t('Use my location'), style: const TextStyle(fontSize: 12.5)),
+                )
+              : near.isEmpty
+                  ? const SizedBox()
+                  : Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.place_rounded, size: 14, color: p.muted),
+                      const SizedBox(width: 2),
+                      Text(near == 'you' ? t('Nearest to you') : t('Nearest to {place}', {'place': near}), style: TextStyle(fontSize: 12, color: p.muted)),
+                    ]),
+      ]),
+    );
+    if (_aiBusy || _aiFor != q) {
+      return [
+        head,
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(children: [
+            const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kGold)),
+            const SizedBox(width: 12),
+            Expanded(child: Text(_aiFor == q ? t('Looking for who can help…') : t('Press search to ask AI who can help'), style: TextStyle(color: p.muted))),
+          ]),
+        ),
+      ];
+    }
+    if (matches.isEmpty) return [head, Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(t('No page fits this yet.'), style: TextStyle(color: p.muted)))];
+    return [
+      head,
+      for (final m in matches) _row(p, _Entry(saved['${m['uid']}'] ?? _memberName(m), null, m), why: '${m['why'] ?? ''}'),
+    ];
+  }
+
+  /// Still not the one: post the search as an ask, and members refer someone they know.
+  Widget _postAsAskCard(Pal p) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: kGold.withValues(alpha: p.dark ? .1 : .08), borderRadius: BorderRadius.circular(18), border: Border.all(color: kGold.withValues(alpha: .6))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.campaign_rounded, color: kStar, size: 22),
+            const SizedBox(width: 8),
+            Expanded(child: Text(t('Not the right one? Post it as an ask'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+          ]),
+          const SizedBox(height: 4),
+          Text(t('Members near you who know someone will refer the right contact to you.'), style: TextStyle(fontSize: 13, height: 1.35, color: p.muted)),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: _postAsAsk,
+            icon: const Icon(Icons.send_rounded, size: 18),
+            label: Text(t('Post as an ask'), style: const TextStyle(fontWeight: FontWeight.w700)),
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(44), backgroundColor: kStar, foregroundColor: kInk, shape: const StadiumBorder()),
+          ),
+        ]),
+      );
+
+  Widget _row(Pal p, _Entry e, {String? why}) {
     final m = e.member;
     final who = m == null ? '' : _memberName(m);
+    final d = (m?['distanceM'] as num?)?.toDouble();
+    final away = d == null ? '' : (d < 1000 ? t('under 1 km') : t('{n} km', {'n': (d / 1000).toStringAsFixed(d < 10000 ? 1 : 0)}));
     final sub = m == null
         ? (e.phone ?? '')
-        : [if (who != e.name) who, '${m['category'] ?? ''}', '${m['location'] ?? ''}'].where((s) => s.isNotEmpty).join(' · ');
+        : [if (who != e.name) who, '${m['category'] ?? ''}', '${m['location'] ?? ''}', away].where((s) => s.isNotEmpty).join(' · ');
     final reviews = (m?['reviews'] as num?)?.toInt() ?? 0;
     final rating = (m?['rating'] as num?)?.toDouble() ?? 0;
     final level = (m?['verificationLevel'] as num?)?.toInt() ?? 0;
     return InkWell(
       onTap: () => m != null ? Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: '${m['handle']}'))) : _contactSheet(e),
-      child: SizedBox(
-        height: _rowH,
+      child: Container(
+        constraints: BoxConstraints(minHeight: _rowH, maxHeight: why == null || why.isEmpty ? _rowH : double.infinity),
+        padding: EdgeInsets.symmetric(vertical: why == null || why.isEmpty ? 0 : 8),
         child: Row(children: [
           Stack(clipBehavior: Clip.none, children: [
             Avatar(name: e.name, photoUrl: (m?['photoURL'] ?? m?['photoUrl']) as String?, size: 44),
@@ -620,6 +780,15 @@ class _PhonebookHomeState extends State<PhonebookHome> {
                 if (level > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: level, size: 14)],
               ]),
               if (sub.isNotEmpty) Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+              if (why != null && why.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Row(children: [
+                    _aiMark(12),
+                    const SizedBox(width: 4),
+                    Expanded(child: Text(why, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.tagText))),
+                  ]),
+                ),
             ]),
           ),
           if (reviews > 0)

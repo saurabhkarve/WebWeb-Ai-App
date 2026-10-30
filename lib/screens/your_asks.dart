@@ -14,6 +14,10 @@ import 'post_detail.dart';
 /// Home asks the Ask tab to open on "Your asks" (the pill beside the Asks heading); the Ask tab resets it.
 final ValueNotifier<bool> yourAsksRequest = ValueNotifier(false);
 
+/// Contacts' Ask AI hands its search over to the Ask form as the title of a new ask ("Post as an ask"); the form
+/// takes it and resets this.
+final ValueNotifier<String?> askPrefill = ValueNotifier(null);
+
 /// One of my asks with what came in on it (GET /posts/mine/activity).
 class MyAskActivity {
   final String id, title;
