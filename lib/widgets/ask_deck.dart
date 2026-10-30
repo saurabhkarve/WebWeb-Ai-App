@@ -193,8 +193,10 @@ class _AskDeckState extends State<AskDeck> {
               child: Container(
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [tint.withValues(alpha: .28), tint.withValues(alpha: 0)], stops: const [0, .8]),
-                  border: Border.all(color: tint.withValues(alpha: .4)),
+                  gradient: kinds[i] == DeckKind.headline && cardStyleOf(post) == 'poster'
+                      ? LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(solidOf(cardColorOf(post)), Colors.white, .18)!, solidOf(cardColorOf(post))])
+                      : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [tint.withValues(alpha: .28), tint.withValues(alpha: 0)], stops: const [0, .8]),
+                  border: Border.all(color: kinds[i] == DeckKind.headline && cardStyleOf(post) == 'poster' ? Colors.transparent : tint.withValues(alpha: .4)),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: _card(p, kinds[i], kinds.take(i).where((x) => x == DeckKind.photos).length),
@@ -233,70 +235,132 @@ class _AskDeckState extends State<AskDeck> {
         final visitHref = post.askType == 'visit' ? firstLink([post.title, post.description]) : null;
         // the photos sit at the card's top right: the first lines keep clear of them
         final thumbPad = thumbs ? post.images.length.clamp(1, 4) * 48.0 + 12 : 0.0;
-        final card = Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (!widget.typeAbove) ...[
-              Row(children: [
-                WIcon(categoryIcon(type.icon), size: 14, color: p.link, still: true),
-                const SizedBox(width: 6),
-                Flexible(child: Padding(padding: EdgeInsets.only(right: thumbs ? 118 : 0), child: Text(cat.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: p.link)))),
-              ]),
-              const SizedBox(height: 8),
-            ],
-            // who wants what, in a line: the idea of the ask before its details
-            Row(children: [
-              Text(type.emoji, style: const TextStyle(fontSize: 16)),
+        // the layout the asker chose (card_colors.dart: classic, banner, poster, badge): same size and colours, arranged differently
+        final style = cardStyleOf(post);
+        final colorName = cardColorOf(post);
+        final solid = solidOf(colorName);
+        final onSolid = onSolidOf(colorName);
+        final poster = style == 'poster', banner = style == 'banner';
+        final fgTitle = poster ? onSolid : p.text;
+        final fgSub = poster ? onSolid.withValues(alpha: .9) : p.text.withValues(alpha: .6);
+        final fgLabel = poster || banner ? onSolid.withValues(alpha: .92) : p.link;
+        Widget labelRow(double rightPad) => Row(mainAxisSize: poster ? MainAxisSize.min : MainAxisSize.max, children: [
+              WIcon(categoryIcon(type.icon), size: 14, color: fgLabel, still: true),
               const SizedBox(width: 6),
-              Expanded(child: Padding(padding: EdgeInsets.only(right: thumbPad), child: Text(t(sentence.key, {...sentence.vars, if (sentence.vars['what'] != null) 'what': t(sentence.vars['what']!)}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .6))))),
-            ]),
-            const SizedBox(height: 8),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(right: thumbPad),
-                child: HashtagText(
+              Flexible(child: Padding(padding: EdgeInsets.only(right: rightPad), child: Text(cat.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: fgLabel)))),
+            ]);
+        // who wants what, in a line: the idea of the ask before its details
+        Widget sentenceRow({bool emoji = true, double rightPad = 0, bool center = false}) => Row(mainAxisAlignment: center ? MainAxisAlignment.center : MainAxisAlignment.start, children: [
+              if (emoji) ...[Text(type.emoji, style: const TextStyle(fontSize: 16)), const SizedBox(width: 6)],
+              Flexible(child: Padding(padding: EdgeInsets.only(right: rightPad), child: Text(t(sentence.key, {...sentence.vars, if (sentence.vars['what'] != null) 'what': t(sentence.vars['what']!)}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fgSub)))),
+            ]);
+        Widget titleW(double size, {double rightPad = 0, bool center = false}) => Padding(
+              padding: EdgeInsets.only(right: rightPad),
+              child: HashtagText(
                 (post.title ?? '').isEmpty ? t('Your title shows here') : post.title!,
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 26 * _scale, height: 1.15, letterSpacing: -.4, fontWeight: FontWeight.w800, color: (post.title ?? '').isEmpty ? p.muted : p.text),
-                ),
+                textAlign: center ? TextAlign.center : TextAlign.start,
+                style: TextStyle(fontSize: size * _scale, height: 1.15, letterSpacing: -.4, fontWeight: FontWeight.w800, color: (post.title ?? '').isEmpty ? (poster ? onSolid.withValues(alpha: .7) : p.muted) : fgTitle),
+              ),
+            );
+        final chips = Wrap(spacing: 6, runSpacing: 6, children: [
+          if ((post.locationPref ?? '').isNotEmpty) _chip(p, WI.pin, t(post.locationPref!)),
+          if (left != null) _chip(p, WI.clock, left),
+          if (left != null && askDeadline(post) != null) _chip(p, WI.calendar, askDeadline(post)!),
+          if ((post.budget ?? '').isNotEmpty) _chip(p, WI.rupee, post.budget!),
+          if (widget.reachLabel != null) _chip(p, WI.locate, widget.reachLabel!),
+        ]);
+        Widget? cta() {
+          if (widget.preview || (visitHref == null && widget.mine)) return null;
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              if (_log) CardEvents.log(context.read<AuthProvider>().api, post.id, 'cta', 0, _kinds.length);
+              if (visitHref != null) {
+                openExternal(context, visitHref);
+              } else {
+                widget.onReply?.call();
+              }
+            },
+            child: Container(
+              height: (40 * _scale).clamp(34.0, 48.0),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(gradient: poster ? null : kGoldGradient, color: poster ? p.canvas : null, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x331E1E1E), blurRadius: 6, offset: Offset(0, 2))]),
+              child: Text(t(visitHref != null ? 'Visit website' : 'I can help'), style: TextStyle(fontSize: (14 * _scale).clamp(13.0, 16.0), fontWeight: FontWeight.w700, color: poster ? p.text : kInk)),
+            ),
+          );
+        }
+        // the chips and, when the ask is not yours, a small "I can help" on the same line: the card keeps its height
+        Widget foot({bool tray = false}) {
+          final c = cta();
+          return Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Expanded(child: tray ? Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: p.canvas.withValues(alpha: .9), borderRadius: BorderRadius.circular(16)), child: chips) : chips),
+            if (c != null) ...[const SizedBox(width: 8), c],
+          ]);
+        }
+
+        final Widget card;
+        if (banner) {
+          card = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Container(
+              color: solid,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (!widget.typeAbove) ...[labelRow(thumbs ? 118 : 0), const SizedBox(height: 6)],
+                sentenceRow(rightPad: thumbPad),
+              ]),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: titleW(26)), foot()]),
               ),
             ),
-            // the chips and, when the ask is not yours, a small "I can help" on the same line: the card keeps its height
-            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Expanded(
-                child: Wrap(spacing: 6, runSpacing: 6, children: [
-                  if ((post.locationPref ?? '').isNotEmpty) _chip(p, WI.pin, t(post.locationPref!)),
-                  if (left != null) _chip(p, WI.clock, left),
-                  if (left != null && askDeadline(post) != null) _chip(p, WI.calendar, askDeadline(post)!),
-                  if ((post.budget ?? '').isNotEmpty) _chip(p, WI.rupee, post.budget!),
-                  if (widget.reachLabel != null) _chip(p, WI.locate, widget.reachLabel!),
-                ]),
-              ),
-              if (!widget.preview && (visitHref != null || !widget.mine)) ...[
-                const SizedBox(width: 8),
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    if (_log) CardEvents.log(context.read<AuthProvider>().api, post.id, 'cta', 0, _kinds.length);
-                    if (visitHref != null) {
-                      openExternal(context, visitHref);
-                    } else {
-                      widget.onReply?.call();
-                    }
-                  },
-                  child: Container(
-                    height: (40 * _scale).clamp(34.0, 48.0),
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x331E1E1E), blurRadius: 6, offset: Offset(0, 2))]),
-                    child: Text(t(visitHref != null ? 'Visit website' : 'I can help'), style: TextStyle(fontSize: (14 * _scale).clamp(13.0, 16.0), fontWeight: FontWeight.w700, color: kInk)),
-                  ),
-                ),
-              ],
+          ]);
+        } else if (poster) {
+          card = Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (!widget.typeAbove) ...[Center(child: labelRow(0)), const SizedBox(height: 4)],
+              sentenceRow(center: true),
+              Expanded(child: Center(child: titleW(30, center: true))),
+              foot(tray: true),
             ]),
-          ]),
-        );
+          );
+        } else if (style == 'badge') {
+          card = Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(width: 48, height: 48, alignment: Alignment.center, decoration: BoxDecoration(color: solid, borderRadius: BorderRadius.circular(16), boxShadow: const [BoxShadow(color: Color(0x261E1E1E), blurRadius: 4, offset: Offset(0, 1))]), child: Text(type.emoji, style: const TextStyle(fontSize: 26, height: 1))),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    if (!widget.typeAbove) ...[labelRow(thumbs ? 118 : 0), const SizedBox(height: 4)],
+                    sentenceRow(emoji: false, rightPad: thumbPad),
+                  ]),
+                ),
+              ]),
+              const SizedBox(height: 12),
+              Expanded(child: titleW(24, rightPad: 0)),
+              Container(height: 1, color: p.text.withValues(alpha: .1), margin: const EdgeInsets.only(bottom: 10)),
+              foot(),
+            ]),
+          );
+        } else {
+          card = Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (!widget.typeAbove) ...[labelRow(thumbs ? 118 : 0), const SizedBox(height: 8)],
+              sentenceRow(rightPad: thumbPad),
+              const SizedBox(height: 8),
+              Expanded(child: titleW(26, rightPad: thumbPad)),
+              foot(),
+            ]),
+          );
+        }
         if (!thumbs) return card;
         // the photos, small: a tap opens them big, a double tap is the quick reaction
         final urls = post.images;

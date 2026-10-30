@@ -2473,5 +2473,10 @@
   "Say the amount, what it is for, and by when.": "राशि, किसलिए चाहिए और कब तक, यह बताएँ।",
   "You are {d} from this ask": "आप इस Ask से {d} दूर हैं",
   "Ad": "विज्ञापन",
-  "This is a paid ad. The business chose to reach members like you. Ads are always marked Ad, and your number is never shared with them.": "यह एक भुगतान वाला विज्ञापन है। व्यवसाय ने आप जैसे सदस्यों तक पहुँचना चुना है। विज्ञापन हमेशा 'विज्ञापन' के रूप में चिह्नित होते हैं और आपका नंबर उन्हें कभी नहीं दिया जाता।"
+  "This is a paid ad. The business chose to reach members like you. Ads are always marked Ad, and your number is never shared with them.": "यह एक भुगतान वाला विज्ञापन है। व्यवसाय ने आप जैसे सदस्यों तक पहुँचना चुना है। विज्ञापन हमेशा 'विज्ञापन' के रूप में चिह्नित होते हैं और आपका नंबर उन्हें कभी नहीं दिया जाता।",
+  "Card style": "कार्ड स्टाइल",
+  "Classic": "क्लासिक",
+  "Banner": "बैनर",
+  "Poster": "पोस्टर",
+  "Badge": "बैज"
 }

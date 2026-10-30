@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../auth_provider.dart';
 import '../ask_types.dart';
 import '../card_colors.dart';
+import '../widgets/card_look_picker.dart';
 import '../widgets/ask_deck.dart';
 import 'dart:io' show File;
 import '../api.dart';
@@ -367,6 +368,7 @@ class _AskFormState extends State<_AskForm> {
   String _urgency = '7_days';
   String _budget = '';
   String _color = randomCardColor(); // the card's colour: random until the member picks one
+  String _style = randomCardStyle(); // the layout of its headline card: random too
   int _budgetKey = 0; // rebuilds the budget fields when the value is set from outside
   ({double lat, double lng, int radiusM})? _geo;
   bool _locating = false;
@@ -513,6 +515,7 @@ class _AskFormState extends State<_AskForm> {
     _urgency = e.urgency ?? '';
     _budget = e.budget ?? '';
     _color = cardColorOf(e);
+    _style = cardStyleOf(e);
     final c = findPlace(_location);
     final lat = e.lat ?? c?.lat, lng = e.lng ?? c?.lng;
     if (lat != null && lng != null) _geo = (lat: lat, lng: lng, radiusM: e.radiusM?.toInt() ?? (c == null ? 100000 : _cityRadius(c)));
@@ -714,7 +717,7 @@ class _AskFormState extends State<_AskForm> {
       id: 'preview', kind: 'requirement', authorUid: me?.uid ?? '', authorName: me?.name ?? '', authorCompany: me?.company ?? '', authorHandle: me?.handle ?? '',
       title: _title.text.trim(), description: _desc.text, category: _category.isEmpty ? 'other' : _category,
       askType: _askType.isEmpty ? null : _askType, pollOptions: _askType == 'poll' ? _pollOpts.where((o) => o.trim().isNotEmpty).toList() : const [],
-      categoryLabel: _other.text.trim().isEmpty ? null : _other.text.trim(), cardColor: _color,
+      categoryLabel: _other.text.trim().isEmpty ? null : _other.text.trim(), cardColor: _color, cardStyle: _style,
       locationPref: _location.isEmpty ? null : _location, budget: _budget.isEmpty ? null : _budget, urgency: _urgency.isEmpty ? null : _urgency,
       radiusM: _geo?.radiusM, lat: _geo?.lat, lng: _geo?.lng, createdAt: DateTime.now(),
     );
@@ -766,6 +769,7 @@ class _AskFormState extends State<_AskForm> {
           'budget': _budget,
           'urgency': _urgency,
           'cardColor': _color,
+          'cardStyle': _style,
           if (_geo != null) ...{'radiusM': _geo!.radiusM, if (_geoMoved) ...{'lat': _geo!.lat, 'lng': _geo!.lng}},
           'images': images,
         });
@@ -783,6 +787,7 @@ class _AskFormState extends State<_AskForm> {
         if (_budget.isNotEmpty) 'budget': _budget,
         if (_urgency.isNotEmpty) 'urgency': _urgency,
         'cardColor': _color,
+        'cardStyle': _style,
         if (_geo != null) ...{'lat': _geo!.lat, 'lng': _geo!.lng, 'radiusM': _geo!.radiusM},
         'images': images,
       }) as Map;
@@ -799,6 +804,7 @@ class _AskFormState extends State<_AskForm> {
         _budgetKey++;
         _urgency = '7_days';
         _color = randomCardColor();
+        _style = randomCardStyle();
         _savedDraft = null;
         _undoTpl = null;
         _aiUndo = null;
@@ -1566,6 +1572,9 @@ class _AskFormState extends State<_AskForm> {
               reachLabel: _geo == null ? null : _radiusLabel(_geo!.radiusM),
               onCardTap: _editCard,
             ),
+            // the card's layout and colour: a random pair to start with, one tap to change either
+            const SizedBox(height: 10),
+            CardLookPicker(color: _color, style: _style, onColor: (c) => setState(() => _color = c), onStyle: (s) => setState(() => _style = s)),
           ],
         ),
         ]),

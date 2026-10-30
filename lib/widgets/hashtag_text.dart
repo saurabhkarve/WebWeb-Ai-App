@@ -23,9 +23,10 @@ class HashtagText extends StatefulWidget {
   final TextStyle? style;
   final int? maxLines;
   final TextOverflow? overflow;
+  final TextAlign? textAlign;
   /// SelectableText (the ask page and the asker's log) instead of Text
   final bool selectable;
-  const HashtagText(this.text, {super.key, this.style, this.maxLines, this.overflow, this.selectable = false});
+  const HashtagText(this.text, {super.key, this.style, this.maxLines, this.overflow, this.textAlign, this.selectable = false});
 
   @override
   State<HashtagText> createState() => _HashtagTextState();
@@ -66,7 +67,7 @@ class _HashtagTextState extends State<HashtagText> {
     if (matches.isEmpty) {
       return widget.selectable
           ? SelectableText(text, style: widget.style, maxLines: widget.maxLines)
-          : Text(text, style: widget.style, maxLines: widget.maxLines, overflow: widget.overflow);
+          : Text(text, style: widget.style, maxLines: widget.maxLines, overflow: widget.overflow, textAlign: widget.textAlign);
     }
     _clear();
     final p = Pal.of(context);
@@ -112,7 +113,7 @@ class _HashtagTextState extends State<HashtagText> {
     final span = TextSpan(style: widget.style, children: spans);
     return widget.selectable
         ? SelectableText.rich(span, maxLines: widget.maxLines)
-        : Text.rich(span, maxLines: widget.maxLines, overflow: widget.overflow);
+        : Text.rich(span, maxLines: widget.maxLines, overflow: widget.overflow, textAlign: widget.textAlign);
   }
 }
 

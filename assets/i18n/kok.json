@@ -2473,5 +2473,10 @@
   "Say the amount, what it is for, and by when.": "रक्कम, कित्याक आनी कितल्या मेरेन तें सांगात.",
   "You are {d} from this ask": "तुमी ह्या Ask सावन {d} पयस आसात",
   "Ad": "जाहिरात",
-  "This is a paid ad. The business chose to reach members like you. Ads are always marked Ad, and your number is never shared with them.": "ही पयशांची जाहिरात. ह्या धंद्यान तुमचे सारक्या सदस्यां मेरेन पावप थारायलां. जाहिराती सदांच 'जाहिरात' म्हणून दाखयतात आनी तुमचो नंबर तांकां केन्नाच दितात ना."
+  "This is a paid ad. The business chose to reach members like you. Ads are always marked Ad, and your number is never shared with them.": "ही पयशांची जाहिरात. ह्या धंद्यान तुमचे सारक्या सदस्यां मेरेन पावप थारायलां. जाहिराती सदांच 'जाहिरात' म्हणून दाखयतात आनी तुमचो नंबर तांकां केन्नाच दितात ना.",
+  "Card style": "कार्ड स्टायल",
+  "Classic": "क्लासिक",
+  "Banner": "बॅनर",
+  "Poster": "पोस्टर",
+  "Badge": "बॅज"
 }
