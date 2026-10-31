@@ -1368,7 +1368,8 @@ class _CardActionsState extends State<_CardActions> {
       final c = Container(
         constraints: BoxConstraints(minWidth: wide ? 0 : 56, minHeight: wide ? 32 : 0),
         padding: wide ? const EdgeInsets.symmetric(horizontal: 10) : const EdgeInsets.fromLTRB(10, 6, 10, 4),
-        decoration: BoxDecoration(color: fill ?? p.card, borderRadius: radius, border: wide ? Border.all(color: edge ?? p.border) : null),
+        // the same buttons as every ask card: React, Refer, Share, with no background colour
+        decoration: BoxDecoration(borderRadius: radius, border: wide ? Border.all(color: edge ?? p.border) : null),
         child: wide
             ? Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [icon, const SizedBox(width: 6), title])
             : Column(mainAxisSize: MainAxisSize.min, children: [SizedBox(height: 18, child: icon), const SizedBox(height: 4), title]),
@@ -1389,16 +1390,6 @@ class _CardActionsState extends State<_CardActions> {
         ),
       ),
       pill(
-        label: 'Reply',
-        icon: WIcon(WI.talk, size: 18, color: p.muted),
-        onTap: () {
-          widget.tap();
-          final a = widget.card.account;
-          // the house account answers (AI, api/src/house-chat.ts)
-          openChat(context, Peer(uid: a.uid, name: a.name, handle: a.handle), draft: '${t('About')} "$_text": ');
-        },
-      ),
-      pill(
         label: 'Refer',
         icon: WIcon(WI.refer, size: 18, color: p.tagText),
         color: p.tagText,
@@ -1412,7 +1403,6 @@ class _CardActionsState extends State<_CardActions> {
           if (r != null && context.mounted) toast(context, t(r.referred > 0 ? 'Referral sent' : 'Response sent'));
         },
       ),
-      Semantics(label: t('1 view'), excludeSemantics: true, child: pill(label: 'Views', icon: WIcon(WI.views, size: 18, color: p.muted))),
       pill(
         label: 'Share',
         icon: WIcon(WI.share, size: 18, color: p.muted),

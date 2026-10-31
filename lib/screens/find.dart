@@ -829,7 +829,9 @@ class _AskTile extends StatelessWidget {
           border: Border.all(color: tone.withValues(alpha: .38)),
           gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [tone.withValues(alpha: .26), tone.withValues(alpha: .08), Colors.transparent]),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // the arrow sits in the card's bottom-right corner, whatever the card's height
+        child: Stack(children: [
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             WIcon(categoryIcon(type.icon), size: 13, color: p.link, still: true),
             const SizedBox(width: 4),
@@ -844,19 +846,18 @@ class _AskTile extends StatelessWidget {
           const SizedBox(height: 4),
           Text('${a['title']}', maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: big ? 18 : 14, fontWeight: FontWeight.w700, height: 1.2, letterSpacing: -.2)),
           const SizedBox(height: 10),
-          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Expanded(
-              child: Wrap(spacing: 4, runSpacing: 4, children: [
-                if ('${a['location'] ?? ''}'.isNotEmpty) chip(WI.pin, t('${a['location']}')),
-                if (big && '${a['budget'] ?? ''}'.isNotEmpty) chip(WI.rupee, '${a['budget']}'),
-                if (left != null) chip(WI.clock, left),
-                if (big && left != null && _until() != null) chip(WI.calendar, _until()!),
-              ]),
-            ),
-            const SizedBox(width: 6),
-            // a small arrow: the whole ask is one tap away
-            Container(width: 24, height: 24, decoration: const BoxDecoration(color: kGold, shape: BoxShape.circle), child: const WIcon(WI.arrow, size: 13, color: kInk, still: true)),
-          ]),
+          Padding(
+            padding: const EdgeInsets.only(right: 32),
+            child: Wrap(spacing: 4, runSpacing: 4, children: [
+              if ('${a['location'] ?? ''}'.isNotEmpty) chip(WI.pin, t('${a['location']}')),
+              if (big && '${a['budget'] ?? ''}'.isNotEmpty) chip(WI.rupee, '${a['budget']}'),
+              if (left != null) chip(WI.clock, left),
+              if (big && left != null && _until() != null) chip(WI.calendar, _until()!),
+            ]),
+          ),
+        ]),
+        // a small arrow: the whole ask is one tap away
+        Positioned(right: 0, bottom: 0, child: Container(width: 24, height: 24, decoration: const BoxDecoration(color: kGold, shape: BoxShape.circle), child: const WIcon(WI.arrow, size: 13, color: kInk, still: true))),
         ]),
       ),
     );
