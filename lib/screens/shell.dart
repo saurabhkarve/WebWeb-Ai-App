@@ -190,13 +190,12 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
               left: wide ? side : 0,
               right: wide ? side : 0,
               top: 0,
-              bottom: wide ? 12 : 0,
+              bottom: 0,
               child: wide
                   ? Container(
                       clipBehavior: Clip.antiAlias,
                       decoration: BoxDecoration(
                         color: p.canvas,
-                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
                         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: p.dark ? .6 : .14), blurRadius: 32, spreadRadius: -14, offset: const Offset(0, 12))],
                       ),
                       child: Stack(children: [

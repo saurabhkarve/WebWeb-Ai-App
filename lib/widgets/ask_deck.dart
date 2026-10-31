@@ -340,10 +340,10 @@ class _AskDeckState extends State<AskDeck> {
           );
         }
         // the chips across the card's full width, then (when the ask is not yours) "I can help" as a full-width button
-        Widget foot({bool tray = false}) {
+        Widget foot() {
           final c = cta();
           return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            tray ? Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: p.canvas.withValues(alpha: .9), borderRadius: BorderRadius.circular(16)), child: chips) : chips,
+            chips,
             if (c != null) ...[const SizedBox(height: 2), c],
           ]);
         }
@@ -373,7 +373,7 @@ class _AskDeckState extends State<AskDeck> {
               if (!widget.typeAbove) ...[Center(child: labelRow(0)), const SizedBox(height: 4)],
               sentenceRow(center: true),
               Expanded(child: Center(child: titleW(30, center: true))),
-              foot(tray: true),
+              foot(),
             ]),
           );
         } else if (style == 'badge') {
