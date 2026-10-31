@@ -231,7 +231,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                 child: Align(alignment: Alignment.centerRight, child: SizedBox(width: (labels ? 264.0 : 84.0).clamp(0.0, side), child: _rail(p, labels))),
               ),
             // from 1280 px the column on the right, as on the website
-            if (labels) Positioned(right: 0, top: 0, bottom: 0, width: side.clamp(0.0, 344.0), child: _rightRail(p)),
+            if (labels) Positioned(left: side + sheetW, top: 0, bottom: 0, width: side.clamp(0.0, 320.0), child: _rightRail(p)),
           ]),
         ),
       ]),
@@ -285,7 +285,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       if (me != null) ('Edit profile', () => Navigator.push(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: me)))),
     ];
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 14, 16, 16),
+      padding: const EdgeInsets.fromLTRB(24, 14, 0, 16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         InkWell(
           onTap: () => _go(_dir),
@@ -316,8 +316,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
               child: Container(
                 height: 40,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(color: p.dark ? const Color(0xFFF2F0E8) : kInk, borderRadius: BorderRadius.circular(20)),
-                child: Text(t('Post an ask'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.dark ? kInk : Colors.white)),
+                decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20)),
+                child: Text(t('Post an ask'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
               ),
             ),
           ]),
