@@ -279,12 +279,6 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   @override
   void initState() {
     super.initState();
-    _qFocus.addListener(() {
-      if (_qFocus.hasFocus && !_searching) {
-        setState(() => _searching = true);
-        widget.onSearching?.call(true);
-      }
-    });
     _loadMatches();
     _readPhoneBook(ask: false);
     WidgetsBinding.instance.addPostFrameCallback((_) => _firstAsk());
@@ -372,6 +366,13 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   Future<void> _refresh() => Future.wait([_loadMatches(), _readPhoneBook(ask: false), _loadAsks()]);
 
   void _search(String v) {
+    // the directory turns into the search page when the typing starts (not when the box is only tapped), and back when
+    // the box is emptied; the box keeps its focus across the change
+    final typing = v.trim().isNotEmpty;
+    if (typing != _searching) {
+      setState(() => _searching = typing);
+      widget.onSearching?.call(typing);
+    }
     _debounce?.cancel();
     _aiTimer?.cancel();
     // Ask AI reads the need once the member pauses (or at once on the keyboard's search key)
@@ -533,7 +534,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop && _searching) _closeSearch();
         },
-        child: _searching ? _searchPage(p) : _directory(p, showAsks: !wide),
+        child: _FadeIn(key: ValueKey(_searching), child: _searching ? _searchPage(p) : _directory(p, showAsks: !wide)),
       );
       if (!wide) return directory;
       // large screens: the directory, and the asks in a column beside it
@@ -1202,6 +1203,35 @@ class _GlowBorderState extends State<_GlowBorder> with SingleTickerProviderState
         child: child,
       ),
       child: ClipRRect(borderRadius: BorderRadius.circular(widget.radius - w), child: widget.child),
+    );
+  }
+}
+
+
+/// A page that eases in (a short fade and rise) when it first shows: the directory turning into the search page, and back.
+class _FadeIn extends StatefulWidget {
+  final Widget child;
+  const _FadeIn({super.key, required this.child});
+  @override
+  State<_FadeIn> createState() => _FadeInState();
+}
+
+class _FadeInState extends State<_FadeIn> with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 220))..forward();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return widget.child;
+    final a = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+    return FadeTransition(
+      opacity: a,
+      child: SlideTransition(position: Tween(begin: const Offset(0, .015), end: Offset.zero).animate(a), child: widget.child),
     );
   }
 }

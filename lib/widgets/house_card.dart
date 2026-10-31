@@ -198,7 +198,7 @@ class _HouseCardViewState extends State<HouseCardView> {
     final post = card.post;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      foregroundDecoration: HairlineBelow(kGold.withValues(alpha: .6)),
+      foregroundDecoration: HairlineBelow(kGold.withValues(alpha: .3)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
           GestureDetector(

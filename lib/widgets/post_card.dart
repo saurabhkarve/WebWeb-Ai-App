@@ -377,7 +377,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         // reposted: the ask runs edge to edge like any other, its cards swiping into the page's side margins
         padding: framed ? const EdgeInsets.only(top: 12) : const EdgeInsets.symmetric(vertical: 10),
         // no wash behind the post: the asker's colour is on the cards and the hairline
-        foregroundDecoration: framed ? null : _HairlineDecoration(tint.withValues(alpha: .6)),
+        foregroundDecoration: framed ? null : _HairlineDecoration(tint.withValues(alpha: .3)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(
             padding: EdgeInsets.zero,
@@ -397,12 +397,21 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                         Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, height: 1.2))),
                         if (post.authorVerification > 0 || post.authorPremium || post.authorPlan != null) ...[const SizedBox(width: 6), VerifiedBadge(level: post.authorVerification, premium: post.authorPremium, plan: post.authorPlan)],
                       ]),
-                      // views sit here, above the cards, as on x.com: people who saw it (a count, not a button)
-                      Text('${isBusiness ? post.authorName : post.authorCompany} · ${timeAgo(post.createdAt)}${post.editedAt != null ? ' · ${editedLabel(post.editedAt!)}' : ''}${post.viewsCount > 0 ? ' · ${t(post.viewsCount == 1 ? '1 view' : '{n} views', {'n': compactCount(post.viewsCount)})}' : ''}',
+                      Text('${isBusiness ? post.authorName : post.authorCompany} · ${timeAgo(post.createdAt)}${post.editedAt != null ? ' · ${editedLabel(post.editedAt!)}' : ''}',
                           maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: p.muted, height: 1.2)),
                     ]),
                   ),
                 ),
+                // views sit on the right, above the pagination dots, as on x.com: people who saw it (a count, not a button)
+                if (post.viewsCount > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8, top: 5),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      WIcon(WI.views, size: 13, color: p.muted),
+                      const SizedBox(width: 3),
+                      Text(t(post.viewsCount == 1 ? '1 view' : '{n} views', {'n': compactCount(post.viewsCount)}), style: TextStyle(fontSize: 11, color: p.muted, height: 1.2)),
+                    ]),
+                  ),
                 if (!framed) ...more,
               ]),
               const SizedBox(height: 10),
@@ -591,7 +600,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     if (!framed) {
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
+        foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .3)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           card,
           const SizedBox(height: 12),
@@ -611,7 +620,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     void open() => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? '')));
     return Container(
       padding: EdgeInsets.symmetric(vertical: ask ? 10 : 20),
-      foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
+      foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .3)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (ask)
           // an ask: one slim line says who reposted it (the ask below has its own author row, so a second big avatar and
