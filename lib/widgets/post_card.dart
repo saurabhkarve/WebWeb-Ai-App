@@ -375,8 +375,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       final tint = kCardColors[cardColorOf(post)]!;
       final spotlight = Container(
         padding: framed ? const EdgeInsets.fromLTRB(12, 12, 12, 0) : const EdgeInsets.symmetric(vertical: 20),
-        // the asker's colour: a soft wash from the top-left corner and a hairline in the same colour
-        decoration: framed ? null : BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [tint.withValues(alpha: .16), tint.withValues(alpha: 0)], stops: const [0, .55])),
+        // no wash behind the post: the asker's colour is on the cards and the hairline
         foregroundDecoration: framed ? null : _HairlineDecoration(tint.withValues(alpha: .6)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(
