@@ -302,7 +302,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       ImageGrid(post.images, shareUrl: post.webUrl, shareRef: post.id),
     ]);
     // the first link in the text gets a preview card (not a fact's: its source shows under it; not inside a repost's quote)
-    final link = post.fact != null || post.repostedByName != null ? null : firstLink([post.title, post.description]);
+    final houseCards = post.houseCard != null || (isHouseHandle(post.authorHandle) && !isAsk && post.images.isEmpty);
+    final link = post.fact != null || houseCards || post.repostedByName != null ? null : firstLink([post.title, post.description]);
     final extra = <Widget>[
       if (link != null && !isAsk) LinkPreviewCard(link, key: ValueKey(link)),
     ];
@@ -1480,6 +1481,7 @@ class _FactCardState extends State<FactCard> {
         style: styleOfId('${fact.figure}${fact.title}'),
         color: 'gold',
         emoji: fact.emoji,
+        link: fact.sourceUrl.isEmpty ? null : fact.sourceUrl,
         child: SwipeDeck(cards: cards, tint: kGold, label: '📊 ${t('Facts & figures near you')}', controller: _ctl),
       ),
     );

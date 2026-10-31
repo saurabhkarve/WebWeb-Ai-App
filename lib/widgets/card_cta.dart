@@ -10,12 +10,14 @@ class DeckLook extends InheritedWidget {
   final String style, color;
   final String? emoji;
   final VoidCallback? onReply;
-  const DeckLook({super.key, required this.style, required this.color, this.emoji, this.onReply, required super.child});
+  /// the link the post carries: its preview is the deck's last card
+  final String? link;
+  const DeckLook({super.key, required this.style, required this.color, this.emoji, this.onReply, this.link, required super.child});
 
   static DeckLook? of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<DeckLook>();
 
   @override
-  bool updateShouldNotify(DeckLook old) => style != old.style || color != old.color || emoji != old.emoji;
+  bool updateShouldNotify(DeckLook old) => style != old.style || color != old.color || emoji != old.emoji || link != old.link;
 }
 
 /// A steady pick of layout from an id, the same on every screen (cardStyleOf for things that are not an ask).

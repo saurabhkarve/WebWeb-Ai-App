@@ -1439,6 +1439,7 @@ class _StyledDeck extends StatelessWidget {
       color: _tone[h] ?? 'gold',
       emoji: _kindEmoji[card.type] ?? _face[h]?.$1,
       onReply: onReply,
+      link: card.sourceUrl,
       child: _readTypes.contains(card.type) ? _HouseDeck(card, set, tap) : _PersonalDeck(card, set, tap),
     );
   }

@@ -110,8 +110,9 @@ class AskCards extends StatelessWidget {
           const SizedBox(height: 8),
           HashtagText(askText(post.askType, post.description), selectable: true, style: TextStyle(fontSize: 15, height: 1.4, color: p.text.withValues(alpha: .85))),
         ])),
-      if (post.askType == 'visit' && firstLink([post.title, post.description]) != null)
-        LinkPreviewCard(firstLink([post.title, post.description])!, key: ValueKey(post.id), visit: true, margin: EdgeInsets.zero),
+      // the link's preview is a card of the ask, as in the feed's deck
+      if (firstLink([post.title, post.description]) != null)
+        LinkPreviewCard(firstLink([post.title, post.description])!, key: ValueKey(post.id), visit: post.askType == 'visit', margin: EdgeInsets.zero),
       if (post.images.isNotEmpty) card(ImageGrid(post.images, shareUrl: post.webUrl, shareRef: post.id), pad: const EdgeInsets.all(8)),
       if (tiles.isNotEmpty)
         card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

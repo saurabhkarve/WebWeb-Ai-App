@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../card_colors.dart';
 import '../theme.dart';
+import '../links.dart' show LinkPreviewCard;
 import 'card_cta.dart';
 
 /// Lets the cards of a deck jump to another card.
@@ -33,7 +34,9 @@ class _SwipeDeckState extends State<SwipeDeck> {
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final cards = widget.cards;
+    // a post's link is the last card: the page's picture, title and a Visit button (as on an ask)
+    final link = DeckLook.of(context)?.link;
+    final cards = [...widget.cards, if (link != null) LinkPreviewCard(link, key: ValueKey('deck-link-$link'), visit: true, flat: true, margin: EdgeInsets.zero)];
     final tint = widget.tint;
     final n = cards.length;
     final i = _i.clamp(0, n - 1);
@@ -68,7 +71,7 @@ class _SwipeDeckState extends State<SwipeDeck> {
           onPageChanged: (k) => setState(() => _i = k),
           itemBuilder: (_, k) => Padding(
             padding: const EdgeInsets.only(right: 10),
-            child: _DeckCard(tint: tint, first: k == 0, look: DeckLook.of(context), child: cards[k]),
+            child: _DeckCard(tint: tint, first: k == 0, flush: link != null && k == n - 1, look: DeckLook.of(context), child: cards[k]),
           ),
         ),
       ),
@@ -80,10 +83,10 @@ class _SwipeDeckState extends State<SwipeDeck> {
 /// poster or badge) when the deck has one (web DeckCard).
 class _DeckCard extends StatelessWidget {
   final Color tint;
-  final bool first;
+  final bool first, flush;
   final DeckLook? look;
   final Widget child;
-  const _DeckCard({required this.tint, required this.first, required this.look, required this.child});
+  const _DeckCard({required this.tint, required this.first, this.flush = false, required this.look, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -113,7 +116,7 @@ class _DeckCard extends StatelessWidget {
             top: 12,
             child: Container(width: 44, height: 44, alignment: Alignment.center, decoration: BoxDecoration(color: solid, borderRadius: BorderRadius.circular(14)), child: Text(emoji, style: const TextStyle(fontSize: 24, height: 1))),
           ),
-        Padding(padding: EdgeInsets.fromLTRB(16, style == 'banner' ? 22 : 16, 16, 16), child: child),
+        if (flush) Positioned.fill(child: child) else Padding(padding: EdgeInsets.fromLTRB(16, style == 'banner' ? 22 : 16, 16, 16), child: child),
       ]),
     );
   }

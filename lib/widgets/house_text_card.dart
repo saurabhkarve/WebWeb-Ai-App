@@ -223,6 +223,7 @@ class _HouseTextCardState extends State<HouseTextCard> {
         style: kCardStyles.contains(widget.cardStyle) ? widget.cardStyle! : styleOfId(widget.id),
         color: color,
         emoji: emoji,
+        link: c.url,
         child: SwipeDeck(cards: cards, tint: kCardColors[color]!, label: '$emoji ${t(_kind[widget.handle] ?? 'From WEBWEB')}', controller: _ctl),
       ),
     );
