@@ -2660,5 +2660,15 @@
   "Link address": "લિંકનું સરનામું",
   "Open {name}": "{name} ખોલો",
   "link": "લિંક",
-  "Website": "વેબસાઇટ"
+  "Website": "વેબસાઇટ",
+  "The map could not load.": "નકશો લોડ થઈ શક્યો નહીં.",
+  "No members within {n} km yet": "{n} કિમીમાં હજી કોઈ સભ્ય નથી",
+  "{c} members within {n} km": "{n} કિમીમાં {c} સભ્યો",
+  "See the members around you": "તમારી આસપાસના સભ્યો જુઓ",
+  "Within {n} km, on a map.": "{n} કિમીમાં, નકશા પર.",
+  "Finding you…": "તમારું સ્થાન શોધી રહ્યા છીએ…",
+  "Search members on the map": "નકશા પર સભ્યો શોધો",
+  "No one matches on the map.": "નકશા પર કોઈ મળ્યું નહીં.",
+  "{d} away": "{d} દૂર",
+  "to show the members near you on the map": "નકશા પર તમારી નજીકના સભ્યો બતાવવા માટે"
 }

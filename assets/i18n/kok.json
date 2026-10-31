@@ -2660,5 +2660,15 @@
   "Link address": "लिंकाचो पत्तो",
   "Open {name}": "{name} उगडचें",
   "link": "लिंक",
-  "Website": "वेबसाईट"
+  "Website": "वेबसाईट",
+  "The map could not load.": "नकासो लोड जालो ना.",
+  "No members within {n} km yet": "{n} किमी भितर अजून सभासद ना",
+  "{c} members within {n} km": "{n} किमी भितर {c} सभासद",
+  "See the members around you": "तुमच्या सभोंवतणचे सभासद पळयात",
+  "Within {n} km, on a map.": "{n} किमी भितर, नकासेचेर.",
+  "Finding you…": "तुमची जागा सोदता…",
+  "Search members on the map": "नकासेचेर सभासद सोदात",
+  "No one matches on the map.": "नकासेचेर कोण मेळ्ळो ना.",
+  "{d} away": "{d} पयस",
+  "to show the members near you on the map": "नकासेचेर तुमच्या लागींचे सभासद दाखोवपाक"
 }

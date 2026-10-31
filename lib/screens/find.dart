@@ -12,6 +12,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/city_picker.dart';
+import '../widgets/nearby_map.dart';
 import '../widgets/post_card.dart';
 import 'p2.dart';
 import 'post_detail.dart';
@@ -230,6 +231,8 @@ class _FindScreenState extends State<FindScreen> {
           const SizedBox(height: 4),
           Text(t('Businesses, jobs and asks around you'), style: TextStyle(fontSize: 14, color: p.muted)),
           const SizedBox(height: 12),
+          const NearbyMapCard(),
+          const SizedBox(height: 14),
         ],
         // search box
         Container(
