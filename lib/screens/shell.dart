@@ -288,20 +288,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 14, 0, 16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        InkWell(
-          onTap: () => _go(_dir),
-          borderRadius: BorderRadius.circular(28),
-          child: Container(
-            height: 46,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(28), boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 18, offset: Offset(0, 6))]),
-            child: Row(children: [
-              WIcon(WI.search, size: 20, color: p.muted),
-              const SizedBox(width: 10),
-              Expanded(child: Text(t('Search people, jobs, asks'), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted))),
-            ]),
-          ),
-        ),
+        // the Directory's search, always: the AI badge, the four SkyQ colours, the microphone and where to look
+        DirectoryRailSearch(onOpen: () => _go(_dir)),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(18),

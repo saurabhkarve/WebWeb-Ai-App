@@ -281,9 +281,29 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   String _place = '';
   ({double lat, double lng})? _placeAt;
 
+  /// a search sent from the right column of wide screens (and where to look)
+  void _onRequest() {
+    final r = directoryRequest.value;
+    if (r == null || !mounted) return;
+    setState(() {
+      _place = r.place;
+      _placeAt = r.at;
+      _q.text = r.q;
+      _results = null;
+      _aiFor = null;
+      _ai = null;
+    });
+    _q.selection = TextSelection.collapsed(offset: _q.text.length);
+    if (r.q.trim().isNotEmpty) {
+      _search(r.q);
+      if (r.q.trim().length >= 4) _askAi(r.q.trim());
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    directoryRequest.addListener(_onRequest);
     _loadMatches();
     _readPhoneBook(ask: false);
     WidgetsBinding.instance.addPostFrameCallback((_) => _firstAsk());
@@ -298,9 +318,9 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
   @override
   void dispose() {
+    directoryRequest.removeListener(_onRequest);
     _debounce?.cancel();
     _aiTimer?.cancel();
-    _speech.cancel();
     _q.dispose();
     _qFocus.dispose();
     _scroll.dispose();
@@ -681,43 +701,6 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     ]);
   }
 
-  final _speech = SpeechToText();
-  bool _listening = false;
-
-  /// The search by voice: the microphone is asked for first, then what is heard fills the box, in the app's language
-  /// (Konkani is heard as Hindi).
-  Future<void> _speak() async {
-    if (_listening) {
-      await _speech.stop();
-      if (mounted) setState(() => _listening = false);
-      return;
-    }
-    final ok = await Permissions.ensure(context, Need.microphone, reason: t('To hear what you want to search for.'));
-    if (!ok || !mounted) return;
-    final ready = await _speech.initialize(onStatus: (s) {
-      if (s == 'done' || s == 'notListening') {
-        if (mounted) setState(() => _listening = false);
-      }
-    }, onError: (_) {
-      if (mounted) {
-        setState(() => _listening = false);
-        toast(context, t('Could not hear that. Try again.'), error: true);
-      }
-    });
-    if (!ready || !mounted) return;
-    final loc = switch (currentLang) { 'hi' || 'kok' => 'hi_IN', 'mr' => 'mr_IN', 'gu' => 'gu_IN', _ => 'en_IN' };
-    setState(() => _listening = true);
-    await _speech.listen(
-      listenOptions: SpeechListenOptions(partialResults: true, listenMode: ListenMode.search, localeId: loc),
-      onResult: (r) {
-        _q.text = r.recognizedWords;
-        _q.selection = TextSelection.collapsed(offset: _q.text.length);
-        _search(_q.text);
-        if (r.finalResult && mounted) setState(() => _listening = false);
-      },
-    );
-  }
-
   /// Ask AI: a name finds the contact; anything else is a need, and the AI finds who can help. The main thing of the
   /// app, so it is the one element that moves: a gold light runs round its border, with the AI badge at its start.
   Widget _searchField() => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -772,11 +755,11 @@ class _PhonebookHomeState extends State<PhonebookHome> {
                     _q.clear();
                     _search('');
                   }),
-            IconButton(
-              tooltip: t(_listening ? 'Listening… tap to stop' : 'Speak your ask'),
-              icon: WIcon(WI.mic, size: 22, color: _listening ? kGold : p.muted),
-              onPressed: _speak,
-            ),
+            MicButton(onWords: (words, _) {
+              _q.text = words;
+              _q.selection = TextSelection.collapsed(offset: _q.text.length);
+              _search(words);
+            }),
           ]),
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
@@ -1310,5 +1293,158 @@ class _FadeInState extends State<_FadeIn> with SingleTickerProviderStateMixin {
       opacity: a,
       child: SlideTransition(position: Tween(begin: const Offset(0, .015), end: Offset.zero).animate(a), child: widget.child),
     );
+  }
+}
+
+
+/// What the right column asks of the Directory: a search and where to look (a fresh value each time, so the same search
+/// can be sent again).
+final directoryRequest = ValueNotifier<({String q, String place, ({double lat, double lng})? at, int n})?>(null);
+
+/// The microphone of a search: asks for the microphone first, then listens in the app's language (Konkani is heard as
+/// Hindi) and hands the words over as they come ([done] when they are final).
+class MicButton extends StatefulWidget {
+  final void Function(String words, bool done) onWords;
+  const MicButton({super.key, required this.onWords});
+  @override
+  State<MicButton> createState() => _MicButtonState();
+}
+
+class _MicButtonState extends State<MicButton> {
+  final _speech = SpeechToText();
+  bool _listening = false;
+
+  @override
+  void dispose() {
+    _speech.cancel();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    if (_listening) {
+      await _speech.stop();
+      if (mounted) setState(() => _listening = false);
+      return;
+    }
+    final ok = await Permissions.ensure(context, Need.microphone, reason: t('To hear what you want to search for.'));
+    if (!ok || !mounted) return;
+    final ready = await _speech.initialize(onStatus: (s) {
+      if (s == 'done' || s == 'notListening') {
+        if (mounted) setState(() => _listening = false);
+      }
+    }, onError: (_) {
+      if (mounted) {
+        setState(() => _listening = false);
+        toast(context, t('Could not hear that. Try again.'), error: true);
+      }
+    });
+    if (!ready || !mounted) return;
+    final loc = switch (currentLang) { 'hi' || 'kok' => 'hi_IN', 'mr' => 'mr_IN', 'gu' => 'gu_IN', _ => 'en_IN' };
+    setState(() => _listening = true);
+    await _speech.listen(
+      listenOptions: SpeechListenOptions(partialResults: true, listenMode: ListenMode.search, localeId: loc),
+      onResult: (r) {
+        widget.onWords(r.recognizedWords, r.finalResult);
+        if (r.finalResult && mounted) setState(() => _listening = false);
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+        tooltip: t(_listening ? 'Listening… tap to stop' : 'Speak your ask'),
+        icon: WIcon(WI.mic, size: 22, color: _listening ? kGold : Pal.of(context).muted),
+        onPressed: _toggle,
+      );
+}
+
+/// The Directory's search in the right column of wide screens (web right-rail.tsx): the AI badge, the four SkyQ colours
+/// running round the box, the microphone, and where to look. Enter (or a voice search) opens the Directory with it.
+class DirectoryRailSearch extends StatefulWidget {
+  final VoidCallback onOpen;
+  const DirectoryRailSearch({super.key, required this.onOpen});
+  @override
+  State<DirectoryRailSearch> createState() => _DirectoryRailSearchState();
+}
+
+class _DirectoryRailSearchState extends State<DirectoryRailSearch> {
+  final _q = TextEditingController();
+  String _place = '';
+  ({double lat, double lng})? _at;
+  static int _n = 0;
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  void _go() {
+    directoryRequest.value = (q: _q.text.trim(), place: _place, at: _at, n: ++_n);
+    widget.onOpen();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _GlowBorder(
+        radius: 26,
+        child: Container(
+          color: p.card,
+          height: 48,
+          padding: const EdgeInsets.only(left: 10),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(14)),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('AI', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kInk, height: 1)),
+                SizedBox(width: 3),
+                Icon(Icons.auto_awesome_rounded, size: 14, color: kInk),
+              ]),
+            ),
+            Expanded(
+              child: TextField(
+                controller: _q,
+                onSubmitted: (_) => _go(),
+                textInputAction: TextInputAction.search,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                decoration: InputDecoration(
+                  hintText: t('Ask AI: a name, or what you need'),
+                  hintStyle: TextStyle(fontSize: 13.5, color: p.muted),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                ),
+              ),
+            ),
+            MicButton(onWords: (words, done) {
+              _q.text = words;
+              if (done && words.trim().isNotEmpty) _go();
+            }),
+          ]),
+        ),
+      ),
+      const SizedBox(height: 8),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: CityPill(
+          value: _place,
+          anyLabel: t('Current location'),
+          chip: true,
+          onChanged: (c) {
+            setState(() {
+              _place = c.name;
+              _at = c.lat != null && c.lng != null ? (lat: c.lat!, lng: c.lng!) : null;
+            });
+            if (_q.text.trim().isNotEmpty) _go();
+          },
+        ),
+      ),
+    ]);
   }
 }
