@@ -707,11 +707,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (_updates == null || _textUpdates == null) return _loading();
         if (_updates!.isEmpty && _textUpdates!.isEmpty) return EmptyState(title: t('No updates yet'));
         // every update as a tile, newest first: the 24-hour photo updates open the viewer, text updates their own page
-        final tiles = <({String id, DateTime at, String? imageUrl, String? text, VoidCallback onTap})>[
-          for (final s in _updates!) (id: s.id, at: s.createdAt, imageUrl: s.imageUrl, text: s.text, onTap: () => _openUpdates(_updates!)),
+        final tiles = <({String id, DateTime at, String? imageUrl, String? text, String? color, String? style, VoidCallback onTap})>[
+          for (final s in _updates!) (id: s.id, color: s.color, style: null, at: s.createdAt, imageUrl: s.imageUrl, text: s.text, onTap: () => _openUpdates(_updates!)),
           for (final x in _textUpdates!)
             (
               id: x.id,
+              color: x.cardColor,
+              style: x.cardStyle,
               at: x.createdAt,
               imageUrl: x.images.isEmpty ? null : x.images.first,
               text: x.description,
@@ -737,7 +739,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ? NetImg(s.imageUrl!)
                         : isHouseHandle(u.handle)
                             // a WEBWEB account's update is a card, in one of the layouts and colours
-                            ? HouseUpdateTile(id: s.id, handle: u.handle, text: s.text)
+                            ? HouseUpdateTile(id: s.id, handle: u.handle, text: s.text, cardColor: s.color, cardStyle: s.style)
                             : Container(
                             decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF3A3A3A), kInk], begin: Alignment.topLeft, end: Alignment.bottomRight)),
                             padding: const EdgeInsets.all(8),

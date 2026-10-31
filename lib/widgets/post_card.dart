@@ -288,7 +288,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       else if (post.fact != null)
         FactCard(post.fact!, onReply: _reply)
       else if (isHouseHandle(post.authorHandle) && !isAsk && post.images.isEmpty && (post.description ?? '').isNotEmpty)
-        HouseTextCard(id: post.id, handle: post.authorHandle, text: post.description, onReply: _reply)
+        HouseTextCard(id: post.id, handle: post.authorHandle, text: post.description, cardColor: post.cardColor, cardStyle: post.cardStyle, onReply: _reply)
       else if ((post.description ?? '').isNotEmpty)
         Padding(
           padding: EdgeInsets.only(top: isAsk ? 4 : 0),

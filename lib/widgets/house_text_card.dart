@@ -32,13 +32,15 @@ class HouseUpdateTile extends StatelessWidget {
   final String id, handle;
   final String? text;
   final bool big;
-  const HouseUpdateTile({super.key, required this.id, required this.handle, this.text, this.big = false});
+  /// the post's own colour and layout, when it has them (else a steady pick from its id)
+  final String? cardColor, cardStyle;
+  const HouseUpdateTile({super.key, required this.id, required this.handle, this.text, this.big = false, this.cardColor, this.cardStyle});
 
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final color = colorOfId(id);
-    final style = styleOfId(id);
+    final color = kCardColors.containsKey(cardColor) ? cardColor! : colorOfId(id);
+    final style = kCardStyles.contains(cardStyle) ? cardStyle! : styleOfId(id);
     final tint = kCardColors[color]!;
     final solid = solidOf(color);
     final onSolid = onSolidOf(color);
@@ -160,9 +162,9 @@ const _kind = {
 /// follows in short cards, and last what to do (open the link, Reply). The first card in the post's own layout and colour.
 class HouseTextCard extends StatefulWidget {
   final String id, handle;
-  final String? text;
+  final String? text, cardColor, cardStyle;
   final VoidCallback onReply;
-  const HouseTextCard({super.key, required this.id, required this.handle, this.text, required this.onReply});
+  const HouseTextCard({super.key, required this.id, required this.handle, this.text, this.cardColor, this.cardStyle, required this.onReply});
   @override
   State<HouseTextCard> createState() => _HouseTextCardState();
 }
@@ -180,7 +182,7 @@ class _HouseTextCardState extends State<HouseTextCard> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final c = textCards(widget.text ?? '');
-    final color = colorOfId(widget.id);
+    final color = kCardColors.containsKey(widget.cardColor) ? widget.cardColor! : colorOfId(widget.id);
     final emoji = _face[widget.handle] ?? '✨';
     final host = c.url == null ? '' : (Uri.tryParse(c.url!)?.host ?? '').replaceFirst('www.', '');
     final label = TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .6));
@@ -218,7 +220,7 @@ class _HouseTextCardState extends State<HouseTextCard> {
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: DeckLook(
-        style: styleOfId(widget.id),
+        style: kCardStyles.contains(widget.cardStyle) ? widget.cardStyle! : styleOfId(widget.id),
         color: color,
         emoji: emoji,
         child: SwipeDeck(cards: cards, tint: kCardColors[color]!, label: '$emoji ${t(_kind[widget.handle] ?? 'From WEBWEB')}', controller: _ctl),
