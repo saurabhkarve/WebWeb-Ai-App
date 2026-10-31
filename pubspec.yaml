@@ -1,7 +1,7 @@
 name: webweb_app
 description: WebWeb AI - business network app for Android and iOS (same API as the web).
 publish_to: "none"
-version: 0.1.91+91
+version: 0.1.92+92
 
 environment:
   sdk: ">=3.0.0 <4.0.0"

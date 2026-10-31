@@ -331,7 +331,7 @@ class _AskDeckState extends State<AskDeck> {
               padding: const EdgeInsets.symmetric(horizontal: 18),
               alignment: Alignment.center,
               // yellow, so the one action on the card stands out (the other buttons have no fill)
-              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x331E1E1E), blurRadius: 6, offset: Offset(0, 2))]),
+              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 3, offset: Offset(0, 1))]),
               child: Text(t(visitHref != null ? 'Visit website' : 'I can help'), style: TextStyle(fontSize: (13 * _scale).clamp(12.5, 14.5), fontWeight: FontWeight.w700, color: kInk)),
                 )),
               ),

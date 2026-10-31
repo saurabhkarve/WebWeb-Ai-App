@@ -582,7 +582,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         Expanded(
           child: SingleChildScrollView(
             child: Column(crossAxisAlignment: labels ? CrossAxisAlignment.stretch : CrossAxisAlignment.center, children: [
-              for (var k = 0; k < _items.length; k++) Padding(padding: const EdgeInsets.only(bottom: 4), child: item(k)),
+              // Directory last, in gold, as Ask is on the website's dock (on the phone it stays in the middle of the bar)
+              for (final k in [_feed, 1, _talk, _notesTab, _dir]) Padding(padding: const EdgeInsets.only(bottom: 4), child: item(k)),
             ]),
           ),
         ),
