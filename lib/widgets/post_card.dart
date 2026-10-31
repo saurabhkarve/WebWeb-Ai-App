@@ -375,7 +375,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       final tint = kCardColors[cardColorOf(post)]!;
       final spotlight = Container(
         // reposted: the ask runs edge to edge like any other, its cards swiping into the page's side margins
-        padding: framed ? const EdgeInsets.only(top: 12) : const EdgeInsets.symmetric(vertical: 20),
+        padding: framed ? const EdgeInsets.only(top: 12) : const EdgeInsets.symmetric(vertical: 10),
         // no wash behind the post: the asker's colour is on the cards and the hairline
         foregroundDecoration: framed ? null : _HairlineDecoration(tint.withValues(alpha: .6)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -466,7 +466,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               // quoted in a repost: the replies and the controls are the repost's (below)
               if (!framed) ...[
                 // air between the cards and the buttons under them
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 // the replies are on the ask page, not on the card
                 PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
               ],
@@ -610,7 +610,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     final ink = Theme.of(context).brightness == Brightness.dark ? const Color(0xFF7FD6AD) : green;
     void open() => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? '')));
     return Container(
-      padding: EdgeInsets.symmetric(vertical: ask ? 16 : 20),
+      padding: EdgeInsets.symmetric(vertical: ask ? 10 : 20),
       foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (ask)
@@ -682,7 +682,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
           ),
         ),
         if (ask) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
         ] else ...[
           const SizedBox(height: 12),

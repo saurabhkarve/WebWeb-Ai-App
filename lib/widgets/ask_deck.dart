@@ -161,11 +161,40 @@ class _AskDeckState extends State<AskDeck> {
                 ),
             ]);
           });
+    // previous / next on small and medium screens, where a swipe is not the only way people expect to move on
+    Widget arrow(bool next) {
+      final to = _i + (next ? 1 : -1);
+      if (widget.preview || to < 0 || to >= kinds.length) return const SizedBox.shrink();
+      return Positioned(
+        top: 0,
+        bottom: 0,
+        left: next ? null : 6,
+        right: next ? 6 : null,
+        child: Center(
+          child: Semantics(
+            button: true,
+            label: t(next ? 'Next card' : 'Previous card'),
+            child: GestureDetector(
+              onTap: () => _page.animateToPage(to, duration: const Duration(milliseconds: 250), curve: Curves.easeOut),
+              child: Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: p.card.withValues(alpha: .92), shape: BoxShape.circle, border: Border.all(color: p.border), boxShadow: const [BoxShadow(color: Color(0x26000000), blurRadius: 6, offset: Offset(0, 2))]),
+                child: Icon(next ? Icons.chevron_right_rounded : Icons.chevron_left_rounded, size: 22, color: p.text),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    final showArrows = MediaQuery.sizeOf(context).width < 1000;
     return Column(children: [
       if (widget.lead != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: [Expanded(child: widget.lead!), dots])),
       SizedBox(
         height: _deckH,
-        child: LayoutBuilder(builder: (context, box) {
+        child: Stack(fit: StackFit.expand, clipBehavior: Clip.none, children: [
+          Positioned.fill(child: LayoutBuilder(builder: (context, box) {
         final v = box.maxWidth + 2 * bleed;
         final f = (.88 * box.maxWidth + bleed) / v;
         if ((f - _fr).abs() > .002) {
@@ -206,7 +235,9 @@ class _AskDeckState extends State<AskDeck> {
           ),
         )),
         );
-        }),
+        })),
+          if (showArrows) ...[arrow(false), arrow(true)],
+        ]),
       ),
       if (widget.lead == null) ...[const SizedBox(height: 2), dots],
     ]);

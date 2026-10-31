@@ -2648,5 +2648,7 @@
   "Who can help, and why they fit. Attach their contact below.": "कौन मदद कर सकता है, और वे क्यों सही हैं। उनका संपर्क नीचे जोड़ें।",
   "{name} gets the contact and your note.": "{name} को संपर्क और आपका नोट मिलेगा।",
   "Only {name} sees what you send here.": "आप यहाँ जो भेजते हैं, उसे केवल {name} देखते हैं।",
-  "A photo could not be uploaded. Remove it and try again.": "एक फ़ोटो अपलोड नहीं हो सकी। उसे हटाकर फिर से कोशिश करें।"
+  "A photo could not be uploaded. Remove it and try again.": "एक फ़ोटो अपलोड नहीं हो सकी। उसे हटाकर फिर से कोशिश करें।",
+  "Next card": "अगला कार्ड",
+  "Previous card": "पिछला कार्ड"
 }

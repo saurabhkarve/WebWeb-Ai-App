@@ -385,7 +385,32 @@ class _PhonebookHomeState extends State<PhonebookHome> {
       } catch (_) {
         if (mounted) setState(() => _results = const []);
       }
+      _matchTyped(v.trim());
     });
+  }
+
+  /// A contact found by the search whose number has not been checked yet: ask which of the numbers are on WEBWEB, so
+  /// the contact and its page show as one line (POST /phonebook/match, numbers not kept).
+  Future<void> _matchTyped(String q) async {
+    final ql = q.toLowerCase();
+    final known = {for (final m in _matches ?? const <Map>[]) '${m['phone']}'};
+    final phones = <String>{};
+    for (final e in _entries) {
+      if (e.member != null || e.contact == null || !'${e.name} ${e.org}'.toLowerCase().contains(ql)) continue;
+      for (final ph in e.contact!.phones) {
+        final m = ContactSync.mobile10(ph.number);
+        if (m != null && !known.contains(m)) phones.add(m);
+      }
+      if (phones.length >= 40) break;
+    }
+    if (phones.isEmpty) return;
+    try {
+      final r = await context.read<AuthProvider>().api.post('/phonebook/match', {'phones': phones.toList()}) as Map;
+      final found = (r['matches'] as List).cast<Map>();
+      if (!mounted || found.isEmpty) return;
+      final have = {for (final m in _matches ?? const <Map>[]) '${m['uid']}'};
+      setState(() => _matches = [...?_matches, for (final m in found) if (have.add('${m['uid']}')) m]);
+    } catch (_) {}
   }
 
   /// Ask AI (POST /phonebook/ai-find): the pages that can help with what was typed, each with why.
@@ -727,6 +752,13 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     final mine = all.where((e) => '${e.name} ${e.phone ?? ''} ${e.org} ${(e.contact?.emails ?? const <Email>[]).map((m) => m.address).join(' ')} ${e.member == null ? '' : '${e.member!['name']} ${e.member!['company']} ${e.member!['category']} ${e.member!['location']} ${(e.member!['services'] as List? ?? const []).join(' ')}'}'.toLowerCase().contains(q)).toList();
     final aiMatches = _aiFor == _q.text.trim() ? ((_ai?['matches'] as List?) ?? const []).cast<Map>() : const <Map>[];
     bool shown(Map u) => mine.any((e) => e.member?['uid'] == u['uid']) || aiMatches.any((m) => m['uid'] == u['uid']);
+    // a contact whose page the search found by name, though its number was not matched: one line, the page, not two
+    String norm(String x) => x.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+    for (var i = 0; i < mine.length; i++) {
+      if (mine[i].member != null) continue;
+      final u = (_results ?? const <Map>[]).where((u) => norm(_memberName(u)) == norm(mine[i].name) || norm('${u['name'] ?? ''}') == norm(mine[i].name)).firstOrNull;
+      if (u != null) mine[i] = _Entry(mine[i].name, mine[i].phone, u, mine[i].contact);
+    }
     final others = (_results ?? const <Map>[]).where((u) => !shown(u)).take(20).toList();
     // what the member saved a page as, when it is in their contacts
     final saved = {for (final e in all) if (e.member != null) '${e.member!['uid']}': e.name};
