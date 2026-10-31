@@ -412,7 +412,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextSpan(text: ' ${t(label)}'),
         ]);
     return Transform.translate(
-      offset: const Offset(0, -28),
+      offset: const Offset(0, -44),
       child: Padding(
         padding: const EdgeInsets.only(left: 12),
         child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -423,7 +423,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // the role on the picture's edge, coloured by presence; tapping it names it
               child: GestureDetector(
                 onTap: _openPicture,
-                child: Avatar(name: name, photoUrl: u.photoUrl, size: 56, ring: u.hasUpdate, type: u.userType, uid: u.uid, badge: 22, tip: t(labelOf(kUserTypes, u.userType))),
+                child: Avatar(name: name, photoUrl: u.photoUrl, size: 96, ring: u.hasUpdate, type: u.userType, uid: u.uid, badge: 30, tip: t(labelOf(kUserTypes, u.userType))),
               ),
             ),
             if (own)

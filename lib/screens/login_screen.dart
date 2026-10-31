@@ -224,8 +224,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 384),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      const Center(child: LogoInline(size: 36, markSize: 60, tagline: true)),
-                      const SizedBox(height: 24),
+                      _brandPanel(p),
+                      const SizedBox(height: 22),
                       _Rise(
                         key: ValueKey(twoStep ? 2 : (otp ? 1 : 0)),
                         child: twoStep ? _twoStepStep(auth, p) : (otp ? _otpStep(auth, p) : _contactStep(auth, p)),
@@ -253,6 +253,54 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           ]),
         ),
       ),
+    );
+  }
+
+  /// The wide screen's brand panel on a phone: the lockup and the promise over soft gold, violet and coral colour.
+  Widget _brandPanel(Pal p) {
+    Widget blob(Color c, double size, {double? left, double? right, double? top, double? bottom}) => Positioned(
+          left: left,
+          right: right,
+          top: top,
+          bottom: bottom,
+          child: IgnorePointer(
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [c, c.withValues(alpha: 0)])),
+            ),
+          ),
+        );
+    Widget chip(IconData i, String label) => Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(i, size: 14, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00)),
+          const SizedBox(width: 5),
+          Text(t(label), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .85))),
+        ]);
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: p.dark ? const Color(0xFF1E1E1E) : const Color(0xFFFFF6D6),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFFFC700).withValues(alpha: .3)),
+        boxShadow: [BoxShadow(color: const Color(0xFFFFA000).withValues(alpha: p.dark ? .22 : .28), blurRadius: 36, spreadRadius: -14, offset: const Offset(0, 18))],
+      ),
+      child: Stack(children: [
+        blob(const Color(0xFFFFC700).withValues(alpha: p.dark ? .55 : .7), 200, left: -60, top: -60),
+        blob(const Color(0xFF7C3AED).withValues(alpha: p.dark ? .5 : .28), 220, right: -60, bottom: -70),
+        blob(const Color(0xFFFF5D73).withValues(alpha: p.dark ? .32 : .22), 150, right: 70, top: 30),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+          child: Column(children: [
+            const LogoInline(size: 34, markSize: 56, tagline: true),
+            const SizedBox(height: 14),
+            Text(t('Publish your business.'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, height: 1.2)),
+            const SizedBox(height: 4),
+            Text(t("It takes less than a minute, and it's free."), textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: p.text.withValues(alpha: .75))),
+            const SizedBox(height: 12),
+            Wrap(alignment: WrapAlignment.center, spacing: 16, runSpacing: 6, children: [chip(Icons.language, 'Free website'), chip(Icons.verified_user_outlined, 'Data never sold')]),
+          ]),
+        ),
+      ]),
     );
   }
 

@@ -202,8 +202,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                       ),
                       child: Stack(children: [
                         Positioned.fill(child: _pages(context, top, header, bottomBar, bottom, wide, sheetW)),
-                        // a gold strip with a soft glow along the top of the sheet
-                        Positioned(top: 0, left: 0, right: 0, height: 4, child: IgnorePointer(child: Container(decoration: BoxDecoration(gradient: kGoldGradient, boxShadow: [BoxShadow(color: const Color(0xFFFFC700).withValues(alpha: .55), blurRadius: 10, offset: const Offset(0, 2))])))),
+                        // a gold strip with a soft glow along the top of the sheet, on Home only
+                        if (_i == _feed) Positioned(top: 0, left: 0, right: 0, height: 4, child: IgnorePointer(child: Container(decoration: BoxDecoration(gradient: kGoldGradient, boxShadow: [BoxShadow(color: const Color(0xFFFFC700).withValues(alpha: .55), blurRadius: 10, offset: const Offset(0, 2))])))),
                       ]),
                     )
                   : _pages(context, top, header, bottomBar, bottom, wide, sheetW),
@@ -244,7 +244,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   Widget _pages(BuildContext context, double top, double header, bool bottomBar, double bottom, bool wide, double sheetW) {
     double m(double phone) => wide ? sheetW : phone;
     return Padding(
-      padding: EdgeInsets.only(top: top + header, bottom: bottomBar ? _barH + bottom : 0),
+      padding: EdgeInsets.only(top: top + header, bottom: bottomBar ? _barH + bottom + 8 : 0),
       child: MediaQuery.removePadding(
         context: context,
         removeTop: true,
@@ -356,13 +356,18 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   Widget _bar(Pal p, double bottom) => Stack(clipBehavior: Clip.none, children: [
         // the empty strip above the bar lets taps through to the page; only the raised button sits in it
         Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: _barH + bottom,
+          left: 14,
+          right: 14,
+          bottom: bottom > 8 ? bottom - 4 : 8,
+          height: _barH,
           child: Container(
-            padding: EdgeInsets.only(bottom: bottom),
-            decoration: BoxDecoration(color: p.canvas, border: Border(top: BorderSide(color: p.border.withValues(alpha: .7)))),
+            // the floating island, as on the website: a rounded pill with a soft shadow, the page showing round it
+            decoration: BoxDecoration(
+              color: p.canvas.withValues(alpha: .94),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: p.border.withValues(alpha: .7)),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: p.dark ? .5 : .16), blurRadius: 26, spreadRadius: -6, offset: const Offset(0, 10))],
+            ),
             child: Row(children: [
               for (var k = 0; k < _items.length; k++)
                 Expanded(
@@ -792,7 +797,7 @@ class _AccountMenu extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             child: Row(children: [iconBox(icon, bg: bg, fg: fg), const SizedBox(width: 12), Expanded(child: label), if (trailing != null) trailing]),
           ),
         );
@@ -1103,7 +1108,7 @@ class _ServiceContactsRowState extends State<_ServiceContactsRow> {
       onTap: _toggle,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         child: Row(children: [
           Container(
             width: 32,

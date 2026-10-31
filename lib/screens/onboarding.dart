@@ -79,13 +79,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         bottom: false,
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 448),
+            constraints: const BoxConstraints(maxWidth: 600),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Row(children: [
-                    const LogoInline(size: 30, tagline: true),
+                    const LogoInline(size: 28, markSize: 36, tagline: true),
                     const Spacer(),
                     if (created == null)
                       GestureDetector(
