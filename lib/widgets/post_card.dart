@@ -374,7 +374,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       final why = mine ? t('Your ask') : ((post.leadReason ?? '').isNotEmpty ? leadReasonText(post.leadReason!) : (match == null ? null : t(match)));
       final tint = kCardColors[cardColorOf(post)]!;
       final spotlight = Container(
-        padding: framed ? const EdgeInsets.fromLTRB(12, 12, 12, 0) : const EdgeInsets.symmetric(vertical: 20),
+        // reposted: the ask runs edge to edge like any other, its cards swiping into the page's side margins
+        padding: framed ? const EdgeInsets.only(top: 12) : const EdgeInsets.symmetric(vertical: 20),
         // no wash behind the post: the asker's colour is on the cards and the hairline
         foregroundDecoration: framed ? null : _HairlineDecoration(tint.withValues(alpha: .6)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -637,15 +638,6 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
             ),
             ...more,
           ]),
-            // the line under it bends down at both ends, over the ask it quotes
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              height: 10,
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                border: Border(top: BorderSide(color: p.border.withValues(alpha: .7)), left: BorderSide(color: p.border.withValues(alpha: .7)), right: BorderSide(color: p.border.withValues(alpha: .7))),
-              ),
-            ),
           ])
         else
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -681,8 +673,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
           // included, opens the ask, so the quote's own taps are absorbed (an ask's cards still swipe, their taps open the ask)
           child: Material(
             color: Colors.transparent,
-            // clipped, so the chips stay inside the frame
-            clipBehavior: Clip.antiAlias,
+            // clipped, so the chips stay inside the frame (an ask has none: its cards run out to the page's edges)
+            clipBehavior: ask ? Clip.none : Clip.antiAlias,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: ask ? BorderSide.none : BorderSide(color: p.border)),
             child: ask ? quote : InkWell(onTap: _openDetail, child: AbsorbPointer(child: quote)),
           ),
