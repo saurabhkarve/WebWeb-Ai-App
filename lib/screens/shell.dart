@@ -708,7 +708,8 @@ class _PagesSwitcherState extends State<_PagesSwitcher> {
     setState(() => _busy = true);
     final nav = Navigator.of(context);
     try {
-      await context.read<AuthProvider>().switchAccount(uid);
+      final auth = context.read<AuthProvider>();
+      await auth.switchAccount(uid, from: auth.userId);
       nav.popUntil((r) => r.isFirst);
     } catch (_) {
       if (mounted) setState(() => _busy = false);

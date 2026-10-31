@@ -2698,5 +2698,6 @@
   "Enter the contact's name (at least 2 letters)": "संपर्क का नाम लिखें (कम से कम 2 अक्षर)",
   "This number is already added": "यह नंबर पहले से जुड़ा है",
   "Zoom in": "ज़ूम इन",
-  "Zoom out": "ज़ूम आउट"
+  "Zoom out": "ज़ूम आउट",
+  "Could not switch page": "पेज बदला नहीं जा सका"
 }

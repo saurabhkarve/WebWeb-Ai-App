@@ -218,8 +218,13 @@ class AuthProvider extends ChangeNotifier {
   /// Business pages under this sign-in (GET /me/accounts): the page itself and the others.
   Future<List<Map>> accounts() async => ((await api.get('/me/accounts') as Map)['accounts'] as List).cast<Map>();
 
-  /// A new session for another page of this sign-in ([uid]), or for a new empty page (null; onboarding opens next).
-  Future<void> switchAccount(String? uid) async {
+  /// The page a new empty page was added from: its set-up offers "Back" to it (null once set up, or when signing out).
+  String? previousPageUid;
+
+  /// A new session for another page of this sign-in ([uid]), or for a new empty page (null; onboarding opens next,
+  /// and [from] is the page to go back to from it).
+  Future<void> switchAccount(String? uid, {String? from}) async {
+    previousPageUid = uid == null ? from : null;
     final d = (uid == null ? await api.post('/me/accounts', {}) : await api.post('/me/accounts/switch', {'uid': uid})) as Map;
     // nothing of the last page stays on screen, in the cache or in the live connection
     profile = null;
@@ -242,6 +247,7 @@ class AuthProvider extends ChangeNotifier {
     }
     token = null;
     userId = null;
+    previousPageUid = null;
     CrashReporter.setUser(null);
     profile = null;
     profileLoaded = false;

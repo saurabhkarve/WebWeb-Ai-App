@@ -2698,5 +2698,6 @@
   "Enter the contact's name (at least 2 letters)": "संपर्काचे नाव लिहा (किमान 2 अक्षरे)",
   "This number is already added": "हा नंबर आधीच जोडलेला आहे",
   "Zoom in": "झूम इन",
-  "Zoom out": "झूम आउट"
+  "Zoom out": "झूम आउट",
+  "Could not switch page": "पेज बदलता आले नाही"
 }

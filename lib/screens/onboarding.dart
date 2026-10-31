@@ -68,6 +68,21 @@ class OnboardingFlow extends StatefulWidget {
 
 class _OnboardingFlowState extends State<OnboardingFlow> {
   Profile? _created;
+  /// the page to go back to from a new page's set-up: the one it was added from, else any other page that is set up
+  String? _back;
+
+  @override
+  void initState() {
+    super.initState();
+    final auth = context.read<AuthProvider>();
+    _back = auth.previousPageUid;
+    if (_back == null) {
+      auth.accounts().then((l) {
+        final other = l.where((a) => a['active'] != true && a['handle'] != null).toList();
+        if (mounted && other.isNotEmpty) setState(() => _back = other.first['uid'] as String?);
+      }).catchError((_) {});
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,6 +100,29 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Row(children: [
+                    // a page added from the account menu: Back returns to the page they came from
+                    if (created == null && _back != null)
+                      GestureDetector(
+                        onTap: () async {
+                          try {
+                            await context.read<AuthProvider>().switchAccount(_back);
+                          } catch (_) {
+                            if (mounted) toast(context, t('Could not switch page'), error: true);
+                          }
+                        },
+                        child: Container(
+                          height: 36,
+                          margin: const EdgeInsets.only(right: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(border: Border.all(color: p.border), borderRadius: BorderRadius.circular(18)),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.arrow_back_rounded, size: 16),
+                            const SizedBox(width: 4),
+                            Text(t('Back'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                          ]),
+                        ),
+                      ),
                     const LogoInline(size: 28, markSize: 36, tagline: true),
                     const Spacer(),
                     if (created == null)
