@@ -274,7 +274,8 @@ class _AskDeckState extends State<AskDeck> {
         final onSolid = onSolidOf(colorName);
         final poster = style == 'poster', banner = style == 'banner';
         final fgTitle = poster ? onSolid : p.text;
-        final fgSub = poster ? onSolid.withValues(alpha: .9) : p.text.withValues(alpha: .6);
+        // on a dark band or poster the words are white (the colour's own on-colour), never the page's dark text
+        final fgSub = poster || banner ? onSolid.withValues(alpha: .92) : p.text.withValues(alpha: .6);
         final fgLabel = poster || banner ? onSolid.withValues(alpha: .92) : p.link;
         Widget labelRow(double rightPad) => Row(mainAxisSize: poster ? MainAxisSize.min : MainAxisSize.max, children: [
               WIcon(categoryIcon(type.icon), size: 14, color: fgLabel, still: true),
