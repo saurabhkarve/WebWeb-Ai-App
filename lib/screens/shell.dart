@@ -156,16 +156,19 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final top = MediaQuery.of(context).padding.top;
-    const header = 56.0;
+    final w = MediaQuery.sizeOf(context).width;
+    // as the website (AppShell): from 768 px the page floats as a raised 600 px sheet on a backdrop, the rail beside it
+    // (icons, then with labels from 1280 px, where the right column joins), no top bar (the logo is the rail's)
+    final wide = w >= 768;
+    final labels = w >= 1280;
+    const sheetW = 600.0;
+    final side = wide ? (w - sheetW) / 2 : 0.0;
+    final top = wide ? 0.0 : MediaQuery.of(context).padding.top;
+    final header = wide ? 0.0 : 56.0;
     final bottom = MediaQuery.of(context).padding.bottom;
     final bar = _i != _ask;
-    final w = MediaQuery.sizeOf(context).width;
-    final rail = w >= 600;
-    final railW = rail ? (w >= 1200 ? 220.0 : 88.0) : 0.0;
-    // as on the website (x.com): from 1280 px a column on the right, with a search, the ask prompt and shortcuts
-    final right = w >= 1280;
-    final rightW = right ? 320.0 : 0.0;
+    final rail = wide;
+    final backdrop = p.dark ? const Color(0xFF0B0B0B) : const HSLColor.fromAHSL(1, 43, .26, .93).toColor();
     // the bar steps aside while the keyboard is up, so what is typed has the room (the Directory's search)
     final bottomBar = bar && !rail && MediaQuery.viewInsetsOf(context).bottom == 0 && !(_i == _dir && _dirSearch);
     // without the bar on Ask, back returns to the tab it was opened from
@@ -175,45 +178,43 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         if (!didPop && _i == _ask) _go(_beforeAsk);
       },
       child: Scaffold(
+      backgroundColor: wide ? backdrop : null,
       // stretch + expand: the page area is always the full width. With a loose width, a Stack whose only unpositioned child
       // is the empty banner host (SizedBox.shrink) sized itself 0 wide, and every page in it was laid out 0 wide: a blank screen
       body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const ActiveCallBanner(),
         Expanded(
           child: Stack(fit: StackFit.expand, children: [
-            // pages, below the header
-            Positioned.fill(
-              child: Padding(
-                padding: EdgeInsets.only(top: top + header, bottom: bottomBar ? _barH + bottom : 0, left: railW, right: rightW),
-                child: MediaQuery.removePadding(
-                  context: context,
-                  removeTop: true,
-                  removeBottom: bottomBar,
-                  removeLeft: rail,
-                  child: IndexedStack(index: _i, children: [
-                    _fit(ConnectScreen(refreshTick: _feedTick, topTick: _topTick, onGoAsk: () => _go(_ask), active: _i == _feed), 680),
-                    _fit(const FindScreen(), 900),
-                    _fit(PhonebookHome(active: _i == _dir, onAsk: () => _go(_ask), onSeeAsks: () => _go(_feed), onPosted: () => setState(() => _feedTick++), onSearching: (on) => setState(() => _dirSearch = on)), right ? 680 : 1240),
-                    // Talk loads afresh each time it opens
-                    if (_i == _talk) _fit(const TalkScreen(), 900) else const SizedBox.shrink(),
-                    _fit(_NotesPanel(notes: _notes, page: true, onAsk: () => _go(_ask)), 760),
-                    _fit(
-                        AskScreen(active: _i == _ask, onBack: () => _go(_beforeAsk), onPosted: () => setState(() {
-                              _feedTick++;
-                              _i = _feed;
-                            })),
-                        760),
-                  ]),
-                ),
-              ),
+            // pages, below the header; on wide screens the raised sheet in the middle
+            Positioned(
+              left: wide ? side : 0,
+              right: wide ? side : 0,
+              top: 0,
+              bottom: wide ? 12 : 0,
+              child: wide
+                  ? Container(
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        color: p.canvas,
+                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: p.dark ? .6 : .14), blurRadius: 32, spreadRadius: -14, offset: const Offset(0, 12))],
+                      ),
+                      child: Stack(children: [
+                        Positioned.fill(child: _pages(context, top, header, bottomBar, bottom, wide, sheetW)),
+                        // a gold strip with a soft glow along the top of the sheet
+                        Positioned(top: 0, left: 0, right: 0, height: 4, child: IgnorePointer(child: Container(decoration: BoxDecoration(gradient: kGoldGradient, boxShadow: [BoxShadow(color: const Color(0xFFFFC700).withValues(alpha: .55), blurRadius: 10, offset: const Offset(0, 2))])))),
+                      ]),
+                    )
+                  : _pages(context, top, header, bottomBar, bottom, wide, sheetW),
             ),
             // header (status bar band + 56 px bar), always in view
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: _AppHeader(onHome: () => _go(_dir)),
-            ),
+            if (!wide)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: _AppHeader(onHome: () => _go(_dir)),
+              ),
             // "Waiting for network…" / "Connecting…" under the header, WhatsApp-style
             Positioned(top: top + header + 8, left: 0, right: 0, child: const ConnectionPill()),
             // a message or a new ask while the app is open: a banner with Reply (and Refer) right on it
@@ -221,12 +222,46 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             // the bar along the bottom, Contacts raised in the middle; Ask has its own Publish bar instead
             if (bottomBar) Positioned(left: 0, right: 0, bottom: 0, height: _barH + bottom + _rise, child: _bar(p, bottom)),
             // tablets and desktop: the rail down the left, under the header
-            if (rail) Positioned(left: 0, top: top + header, bottom: 0, width: railW, child: _rail(p, railW >= 200)),
-            // wide screens: the column on the right, as on the website
-            if (right) Positioned(right: 0, top: top + header, bottom: 0, width: rightW, child: _rightRail(p)),
+            if (rail)
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: side,
+                child: Align(alignment: Alignment.centerRight, child: SizedBox(width: (labels ? 264.0 : 84.0).clamp(0.0, side), child: _rail(p, labels))),
+              ),
+            // from 1280 px the column on the right, as on the website
+            if (labels) Positioned(right: 0, top: 0, bottom: 0, width: side.clamp(0.0, 344.0), child: _rightRail(p)),
           ]),
         ),
       ]),
+      ),
+    );
+  }
+
+  /// The five pages, kept alive in an IndexedStack. On the raised sheet (wide screens) every page is the sheet's 600 px.
+  Widget _pages(BuildContext context, double top, double header, bool bottomBar, double bottom, bool wide, double sheetW) {
+    double m(double phone) => wide ? sheetW : phone;
+    return Padding(
+      padding: EdgeInsets.only(top: top + header, bottom: bottomBar ? _barH + bottom : 0),
+      child: MediaQuery.removePadding(
+        context: context,
+        removeTop: true,
+        removeBottom: bottomBar,
+        child: IndexedStack(index: _i, children: [
+          _fit(ConnectScreen(refreshTick: _feedTick, topTick: _topTick, onGoAsk: () => _go(_ask), active: _i == _feed), m(680)),
+          _fit(const FindScreen(), m(900)),
+          _fit(PhonebookHome(active: _i == _dir, onAsk: () => _go(_ask), onSeeAsks: () => _go(_feed), onPosted: () => setState(() => _feedTick++), onSearching: (on) => setState(() => _dirSearch = on)), m(1240)),
+          // Talk loads afresh each time it opens
+          if (_i == _talk) _fit(const TalkScreen(), m(900)) else const SizedBox.shrink(),
+          _fit(_NotesPanel(notes: _notes, page: true, onAsk: () => _go(_ask)), m(760)),
+          _fit(
+              AskScreen(active: _i == _ask, onBack: () => _go(_beforeAsk), onPosted: () => setState(() {
+                    _feedTick++;
+                    _i = _feed;
+                  })),
+              m(760)),
+        ]),
       ),
     );
   }
@@ -428,20 +463,20 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         child: Text(n > 99 ? '99+' : '$n', style: const TextStyle(color: kInk, fontSize: 10, fontWeight: FontWeight.w700, height: 1)),
       );
 
-  /// Tablets and desktop: the five places; Directory keeps its gold. [labels]: the wide rail,
-  /// with each label beside its icon.
+  /// Tablets and desktop, as the website's side dock: the logo on top, the five places (Directory keeps its gold), and
+  /// the account at the foot. [labels]: from 1280 px each label beside its icon.
   Widget _rail(Pal p, bool labels) {
     final tone = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
+    final me = context.watch<AuthProvider>().profile;
     Widget item(int k) {
       final active = _i == k;
       final home = k == _dir;
       final badge = _badgeOf(k);
       final icon = Stack(clipBehavior: Clip.none, children: [
-        WIcon(_items[k].$1, size: 24, color: home ? kInk : (active ? tone : p.muted), strokeWidth: active || home ? 2.2 : 1.9),
+        WIcon(_items[k].$1, size: 22, color: home ? kInk : (active ? tone : p.text), strokeWidth: active || home ? 2 : 1.5),
         if (badge > 0) Positioned(right: -10, top: -6, child: _badge(badge)),
       ]);
-      final fill = home ? null : (active ? kGold.withValues(alpha: p.dark ? .25 : .22) : Colors.transparent);
-      final label = Text(t(_items[k].$2), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: labels ? 14.5 : 11.5, fontWeight: active || home ? FontWeight.w700 : FontWeight.w500, color: active ? p.text : p.muted));
+      final style = TextStyle(fontSize: labels ? 15 : 10.5, fontWeight: active || home ? FontWeight.w600 : FontWeight.w400, color: home ? kInk : (active ? tone : p.text), height: 1);
       return KeyedSubtree(
         key: Tours.key(_tourKeys[k]),
         child: Semantics(
@@ -450,40 +485,29 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
           label: t(_items[k].$2),
           child: InkWell(
             onTap: () => _go(k),
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(labels ? 26 : 16),
             child: ExcludeSemantics(
               child: labels
                   ? Container(
-                      height: 52,
+                      height: 50,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: fill,
+                        color: home ? null : (active ? p.canvas : Colors.transparent),
                         gradient: home ? kGoldGradient : null,
                         borderRadius: BorderRadius.circular(26),
-                        border: home && active ? Border.all(color: kInk.withValues(alpha: .5), width: 1.5) : null,
+                        border: active ? Border.all(color: home ? kInk.withValues(alpha: .5) : kGold, width: 1.5) : null,
                       ),
-                      child: Row(children: [icon, const SizedBox(width: 14), Expanded(child: home ? Text(t(_items[k].$2), maxLines: 1, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: kInk)) : label)]),
+                      child: Row(children: [icon, const SizedBox(width: 16), Expanded(child: Text(t(_items[k].$2), maxLines: 1, overflow: TextOverflow.ellipsis, style: style))]),
                     )
-                  : Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Column(children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: home ? 52 : 56,
-                          height: home ? 52 : 32,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: fill,
-                            gradient: home ? kGoldGradient : null,
-                            shape: home ? BoxShape.circle : BoxShape.rectangle,
-                            borderRadius: home ? null : BorderRadius.circular(16),
-                            boxShadow: home ? [BoxShadow(color: const Color(0xFFD6AA00).withValues(alpha: active ? .5 : .3), blurRadius: 14, spreadRadius: -4, offset: const Offset(0, 5))] : null,
-                          ),
-                          child: icon,
-                        ),
-                        const SizedBox(height: 4),
-                        label,
-                      ]),
+                  : Container(
+                      width: 64,
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(
+                        color: home ? null : (active ? kGold.withValues(alpha: p.dark ? .25 : .22) : Colors.transparent),
+                        gradient: home ? kGoldGradient : null,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [icon, const SizedBox(height: 5), Text(t(_items[k].$2), maxLines: 1, overflow: TextOverflow.ellipsis, style: style)]),
                     ),
             ),
           ),
@@ -491,14 +515,54 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       );
     }
 
-    return Container(
-      decoration: BoxDecoration(color: p.canvas, border: Border(right: BorderSide(color: p.border.withValues(alpha: .7)))),
-      padding: EdgeInsets.fromLTRB(labels ? 16 : 8, 16, labels ? 16 : 8, 16),
-      child: SingleChildScrollView(
-        child: Column(crossAxisAlignment: labels ? CrossAxisAlignment.stretch : CrossAxisAlignment.center, children: [
-          for (var k = 0; k < _items.length; k++) Padding(padding: const EdgeInsets.only(bottom: 6), child: item(k)),
-        ]),
-      ),
+    final account = me == null
+        ? const SizedBox.shrink()
+        : Builder(
+            builder: (ctx) => InkWell(
+              onTap: () => _openAccountMenu(ctx),
+              borderRadius: BorderRadius.circular(labels ? 28 : 16),
+              child: Padding(
+                padding: labels ? const EdgeInsets.fromLTRB(10, 8, 12, 8) : const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                child: labels
+                    ? Row(children: [
+                        Avatar(name: me.name, photoUrl: me.photoUrl, size: 40, ring: me.hasUpdate, framed: true, type: me.userType, badge: 16),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(me.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, height: 1.2)),
+                            Text('@${me.handle}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: p.muted, height: 1.3)),
+                          ]),
+                        ),
+                        Text('···', style: TextStyle(color: p.muted)),
+                      ])
+                    : Column(mainAxisSize: MainAxisSize.min, children: [
+                        Avatar(name: me.name, photoUrl: me.photoUrl, size: 40, ring: me.hasUpdate, framed: true, type: me.userType, badge: 16),
+                        const SizedBox(height: 4),
+                        Text('@${me.handle}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 9.5, color: p.muted, height: 1)),
+                      ]),
+              ),
+            ),
+          );
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(labels ? 8 : 10, 12, labels ? 16 : 10, 12),
+      child: Column(crossAxisAlignment: labels ? CrossAxisAlignment.stretch : CrossAxisAlignment.center, children: [
+        // the logo, as the web dock's: the whole lockup with its slogan, or just the mark on the narrow dock
+        Padding(
+          padding: EdgeInsets.fromLTRB(labels ? 10 : 0, 0, 0, labels ? 20 : 16),
+          child: labels
+              ? FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: LogoInline(size: 30, markSize: 44, tagline: true, onTap: () => _go(_dir)))
+              : GestureDetector(onTap: () => _go(_dir), child: const LogoMark(size: 44)),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(crossAxisAlignment: labels ? CrossAxisAlignment.stretch : CrossAxisAlignment.center, children: [
+              for (var k = 0; k < _items.length; k++) Padding(padding: const EdgeInsets.only(bottom: 4), child: item(k)),
+            ]),
+          ),
+        ),
+        account,
+      ]),
     );
   }
 }
