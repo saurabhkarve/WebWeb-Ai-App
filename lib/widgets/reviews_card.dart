@@ -36,6 +36,7 @@ class ReviewsCard extends StatefulWidget {
 class _ReviewsCardState extends State<ReviewsCard> {
   Map? _d;
   bool _all = false;
+  bool _open = false;
 
   @override
   void initState() {
@@ -99,55 +100,74 @@ class _ReviewsCardState extends State<ReviewsCard> {
     final mine = d['mine'] as Map?;
     final shown = _all ? list : list.take(3).toList();
 
+    // folded to one line so the page's tabs stay in view: average, stars, count, Review and See all
+    final canReview = !widget.own && mine == null;
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(18), border: Border.all(color: p.border)),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Column(children: [
-            Text(count > 0 ? avg.toStringAsFixed(1) : '–', style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w700, height: 1)),
-            const SizedBox(height: 4),
-            Stars(value: avg, size: 13),
-            const SizedBox(height: 2),
-            Text(t(count == 1 ? '{n} review' : '{n} reviews', {'n': count}), style: TextStyle(fontSize: 12, color: p.muted)),
-          ]),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(children: [
-              for (var s = 5; s >= 1; s--)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2.5),
-                  child: Row(children: [
-                    SizedBox(width: 12, child: Text('$s', style: TextStyle(fontSize: 11, color: p.muted))),
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(3),
-                        child: LinearProgressIndicator(value: dist[s - 1] / most, minHeight: 6, backgroundColor: p.text.withValues(alpha: .08), color: kStar),
-                      ),
-                    ),
-                  ]),
+        InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => setState(() => _open = !_open),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+            child: Row(children: [
+              Text(count > 0 ? avg.toStringAsFixed(1) : '–', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, height: 1)),
+              const SizedBox(width: 8),
+              Stars(value: avg, size: 14),
+              const SizedBox(width: 8),
+              Expanded(child: Text(t(count == 1 ? '{n} review' : '{n} reviews', {'n': count}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted))),
+              if (canReview && !_open)
+                TextButton(
+                  onPressed: _write,
+                  style: TextButton.styleFrom(backgroundColor: kStar, foregroundColor: kInk, minimumSize: const Size(0, 30), padding: const EdgeInsets.symmetric(horizontal: 12), shape: const StadiumBorder(), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                  child: Text(t('Review'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                 ),
+              if (count > 0 || _open) ...[
+                const SizedBox(width: 4),
+                Text(_open ? t('Hide') : t('See all'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link)),
+                Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 18, color: p.link),
+              ],
             ]),
           ),
-        ]),
-        if (!widget.own) ...[
-          const SizedBox(height: 14),
-          OutlinedButton.icon(
-            onPressed: _write,
-            icon: const Icon(Icons.star_outline_rounded, color: kStar),
-            label: Text(mine == null ? t('Review {name}', {'name': widget.name}) : t('Change your review'), maxLines: 1, overflow: TextOverflow.ellipsis),
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44), shape: const StadiumBorder(), foregroundColor: p.text, side: BorderSide(color: p.border)),
-          ),
-        ],
-        if (count == 0)
+        ),
+        if (_open)
           Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Text(widget.own ? t('No reviews yet. Share your page with customers and ask them to review you.') : t('No reviews yet. Be the first to review.'), style: TextStyle(fontSize: 13, color: p.muted)),
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (count > 0)
+                for (var s = 5; s >= 1; s--)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(children: [
+                      SizedBox(width: 12, child: Text('$s', style: TextStyle(fontSize: 11, color: p.muted))),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: LinearProgressIndicator(value: dist[s - 1] / most, minHeight: 6, backgroundColor: p.text.withValues(alpha: .08), color: kStar),
+                        ),
+                      ),
+                    ]),
+                  ),
+              if (!widget.own) ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _write,
+                  icon: const Icon(Icons.star_outline_rounded, color: kStar),
+                  label: Text(mine == null ? t('Review {name}', {'name': widget.name}) : t('Change your review'), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44), shape: const StadiumBorder(), foregroundColor: p.text, side: BorderSide(color: p.border)),
+                ),
+              ],
+              if (count == 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Text(widget.own ? t('No reviews yet. Share your page with customers and ask them to review you.') : t('No reviews yet. Be the first to review.'), style: TextStyle(fontSize: 13, color: p.muted)),
+                ),
+              for (final r in shown) _row(p, r),
+              if (list.length > 3 && !_all)
+                TextButton(onPressed: () => setState(() => _all = true), child: Text(t('See all {n}', {'n': list.length}))),
+            ]),
           ),
-        for (final r in shown) _row(p, r),
-        if (list.length > 3 && !_all)
-          TextButton(onPressed: () => setState(() => _all = true), child: Text(t('See all {n}', {'n': list.length}))),
       ]),
     );
   }
