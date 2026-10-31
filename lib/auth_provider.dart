@@ -11,7 +11,7 @@ import 'models.dart';
 /// Session + profile. Login is the same two calls the web uses (`/auth/send-otp`, `/auth/verify-otp`);
 /// the profile comes from `GET /me` and stays null until onboarding is finished.
 class AuthProvider extends ChangeNotifier {
-  late final Api api = Api(() => token, onUnauthorized: () => logout());
+  late final Api api = Api(() => token, onUnauthorized: () => logout(), onRenewed: _renewed);
 
   String? token;
   String? userId;
@@ -169,6 +169,14 @@ class AuthProvider extends ChangeNotifier {
       loading = false;
       notifyListeners();
     }
+  }
+
+  /// a renewed session replaces the saved one quietly (no rebuild: nothing on screen changes)
+  Future<void> _renewed(String t) async {
+    token = t;
+    try {
+      (await SharedPreferences.getInstance()).setString('token', t);
+    } catch (_) {}
   }
 
   Future<void> _signedIn(String t) async {

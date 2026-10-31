@@ -24,7 +24,9 @@ class ApiException implements Exception {
 class Api {
   final String? Function() token;
   final void Function()? onUnauthorized;
-  Api(this.token, {this.onUnauthorized});
+  /// the API renewed the session (a week old or more): the fresh token to keep
+  final void Function(String)? onRenewed;
+  Api(this.token, {this.onUnauthorized, this.onRenewed});
 
   Map<String, String> _headers({bool json = false}) => {
         if (token() != null) 'Authorization': 'Bearer ${token()!}',
@@ -48,6 +50,8 @@ class Api {
     } catch (_) {
       data = null;
     }
+    final renewed = r.headers['x-session-token'];
+    if (renewed != null && renewed.isNotEmpty && sent != null && sent == token()) onRenewed?.call(renewed);
     if (r.statusCode == 401) {
       if (sent != null && sent == token()) onUnauthorized?.call();
       throw ApiException('Please sign in again.', 401);
