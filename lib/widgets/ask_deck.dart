@@ -330,8 +330,9 @@ class _AskDeckState extends State<AskDeck> {
               constraints: BoxConstraints(minWidth: (96 * _scale).clamp(96.0, 120.0)),
               padding: const EdgeInsets.symmetric(horizontal: 18),
               alignment: Alignment.center,
-              decoration: BoxDecoration(gradient: poster ? null : kGoldGradient, color: poster ? p.canvas : null, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x331E1E1E), blurRadius: 6, offset: Offset(0, 2))]),
-              child: Text(t(visitHref != null ? 'Visit website' : 'I can help'), style: TextStyle(fontSize: (13 * _scale).clamp(12.5, 14.5), fontWeight: FontWeight.w700, color: poster ? p.text : kInk)),
+              // no background colour: a gold outline and the card's own text colour
+              decoration: BoxDecoration(border: Border.all(color: poster ? p.text.withValues(alpha: .7) : kGold, width: 1.5), borderRadius: BorderRadius.circular(20)),
+              child: Text(t(visitHref != null ? 'Visit website' : 'I can help'), style: TextStyle(fontSize: (13 * _scale).clamp(12.5, 14.5), fontWeight: FontWeight.w700, color: p.text)),
                 )),
               ),
             ),

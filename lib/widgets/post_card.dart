@@ -881,9 +881,10 @@ class PostActionsState extends State<PostActions> {
           padding: wide ? const EdgeInsets.symmetric(horizontal: 10) : const EdgeInsets.fromLTRB(10, 6, 10, 4),
           decoration: BoxDecoration(
             // dark mode on a phone: no fill or outline at all, seamless as in light mode
-            color: !wide && p.dark ? null : fill ?? p.card,
+            // no background colour on the buttons: React, Refer and Share sit on the card itself
+            color: null,
             borderRadius: radius,
-            // on a phone no outline or shadow (Refer keeps its gold fill), as on the web
+            // on a phone no outline or shadow, as on the web
             border: wide ? Border.all(color: edge ?? p.border) : null,
             boxShadow: wide ? const [BoxShadow(color: Color(0x0D1E1E1E), blurRadius: 2, offset: Offset(0, 1))] : null,
           ),
