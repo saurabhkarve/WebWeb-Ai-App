@@ -317,14 +317,14 @@ class _ReferSheetState extends State<_ReferSheet> {
             child: Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [...contacts, ...photos]),
           ),
         Container(
-          padding: const EdgeInsets.fromLTRB(4, 2, 12, 2),
+          padding: const EdgeInsets.fromLTRB(12, 2, 4, 2),
           decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border.withValues(alpha: .7)))),
           child: Row(children: [
-            tool(Icons.contact_phone_outlined, 'Contact', canContact ? _attachContact : () => toast(context, t('You can refer up to 5 contacts on one ask'))),
-            tool(Icons.add_photo_alternate_outlined, 'Photos', canPhoto ? _addPhotos : null),
-            const Spacer(),
             if (_text.text.length > 200)
               Text('${_text.text.length}/300', style: TextStyle(fontSize: 11.5, color: _text.text.length > 280 ? p.danger : p.muted, fontFeatures: const [FontFeature.tabularFigures()])),
+            const Spacer(),
+            tool(Icons.contact_phone_outlined, 'Contact', canContact ? _attachContact : () => toast(context, t('You can refer up to 5 contacts on one ask'))),
+            tool(Icons.add_photo_alternate_outlined, 'Photos', canPhoto ? _addPhotos : null),
           ]),
         ),
       ]),
