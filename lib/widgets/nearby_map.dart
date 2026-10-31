@@ -58,6 +58,7 @@ class NearbyMapCard extends StatefulWidget {
 class _NearbyMapCardState extends State<NearbyMapCard> {
   NearbyData? _data;
   bool _failed = false, _busy = false;
+  final _ctl = _MapCtl();
 
   @override
   void initState() {
@@ -102,7 +103,7 @@ class _NearbyMapCardState extends State<NearbyMapCard> {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        height: 200,
+        height: (MediaQuery.sizeOf(context).height * .38).clamp(280.0, 380.0),
         decoration: BoxDecoration(color: const Color(0xFFEDEAE3), border: Border.all(color: p.border), borderRadius: BorderRadius.circular(20)),
         child: d == null
             ? Center(child: _failed ? Text(t('The map could not load.'), style: TextStyle(color: p.muted)) : const LogoLoader(size: 32))
@@ -110,7 +111,7 @@ class _NearbyMapCardState extends State<NearbyMapCard> {
                 ? _noPlace(p)
                 : Stack(children: [
                     Positioned.fill(
-                      child: _MapView(data: d, interactive: false, onPin: _open, onTapMap: () => _open()),
+                      child: _MapView(data: d, interactive: false, ctl: _ctl, onPin: _open, onTapMap: () => _open()),
                     ),
                     Positioned(
                       left: 10,
@@ -144,6 +145,19 @@ class _NearbyMapCardState extends State<NearbyMapCard> {
                               boxShadow: const [BoxShadow(color: Color(0x261E1E1E), blurRadius: 6)]),
                           child: Icon(Icons.open_in_full_rounded, size: 17, color: p.text),
                         ),
+                      ),
+                    ),
+                    // zoom, over the tap that opens the full screen map
+                    Positioned(
+                      right: 10,
+                      bottom: 10,
+                      child: Container(
+                        decoration: BoxDecoration(color: p.canvas.withValues(alpha: .95), borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Color(0x261E1E1E), blurRadius: 6)]),
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          Semantics(label: t('Zoom in'), button: true, child: InkWell(onTap: () => _ctl.zoom(1), borderRadius: const BorderRadius.vertical(top: Radius.circular(12)), child: SizedBox(width: 38, height: 38, child: Icon(Icons.add_rounded, size: 22, color: p.text)))),
+                          Container(width: 38, height: 1, color: p.border),
+                          Semantics(label: t('Zoom out'), button: true, child: InkWell(onTap: () => _ctl.zoom(-1), borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)), child: SizedBox(width: 38, height: 38, child: Icon(Icons.remove_rounded, size: 22, color: p.text)))),
+                        ]),
                       ),
                     ),
                   ]),
