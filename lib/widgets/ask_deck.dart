@@ -212,7 +212,7 @@ class _AskDeckState extends State<AskDeck> {
     ]);
   }
 
-  Widget _label(Pal p, String s) => Text(s.toUpperCase(), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.muted));
+  Widget _label(Pal p, String s) => Text(s.toUpperCase(), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.muted));
 
   Widget _chip(Pal p, WI icon, String text) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
@@ -248,7 +248,7 @@ class _AskDeckState extends State<AskDeck> {
         Widget labelRow(double rightPad) => Row(mainAxisSize: poster ? MainAxisSize.min : MainAxisSize.max, children: [
               WIcon(categoryIcon(type.icon), size: 14, color: fgLabel, still: true),
               const SizedBox(width: 6),
-              Flexible(child: Padding(padding: EdgeInsets.only(right: rightPad), child: Text(cat.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: fgLabel)))),
+              Flexible(child: Padding(padding: EdgeInsets.only(right: rightPad), child: Text(cat.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: .4, color: fgLabel)))),
             ]);
         // who wants what, in a line: the idea of the ask before its details
         Widget sentenceRow({bool emoji = true, double rightPad = 0, bool center = false}) => Row(mainAxisAlignment: center ? MainAxisAlignment.center : MainAxisAlignment.start, children: [
@@ -266,13 +266,14 @@ class _AskDeckState extends State<AskDeck> {
                   maxLines: lines,
                   overflow: TextOverflow.ellipsis,
                   textAlign: center ? TextAlign.center : TextAlign.start,
-                  style: TextStyle(fontSize: size * _scale, height: 1.15, letterSpacing: -.4, fontWeight: FontWeight.w700, color: (post.title ?? '').isEmpty ? (poster ? onSolid.withValues(alpha: .7) : p.muted) : fgTitle),
+                  style: TextStyle(fontSize: size * _scale, height: 1.15, letterSpacing: -.4, fontWeight: FontWeight.w800, color: (post.title ?? '').isEmpty ? (poster ? onSolid.withValues(alpha: .7) : p.muted) : fgTitle),
                 );
               }),
             );
         final chips = Wrap(spacing: 6, runSpacing: 6, children: [
           if ((post.locationPref ?? '').isNotEmpty) _chip(p, WI.pin, t(post.locationPref!)),
-          if (left != null) _chip(p, WI.clock, askDeadline(post) != null ? '$left · ${askDeadline(post)}' : left),
+          if (left != null) _chip(p, WI.clock, left),
+          if (left != null && askDeadline(post) != null) _chip(p, WI.calendar, askDeadline(post)!),
           if ((post.budget ?? '').isNotEmpty) _chip(p, WI.rupee, post.budget!),
           if (widget.reachLabel != null) _chip(p, WI.locate, widget.reachLabel!),
         ]);
@@ -461,7 +462,7 @@ class _AskDeckState extends State<AskDeck> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             _label(p, t('Budget')),
             const Spacer(),
-            Text(post.budget ?? '', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700, height: 1.15, letterSpacing: -.3)),
+            Text(post.budget ?? '', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, height: 1.15, letterSpacing: -.3)),
             if (left != null) Padding(padding: const EdgeInsets.only(top: 6), child: Row(children: [WIcon(WI.clock, size: 14, color: p.muted, still: true), const SizedBox(width: 4), Text(left, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted))])),
           ]),
         );
@@ -495,7 +496,7 @@ class _AskDeckState extends State<AskDeck> {
                 Row(children: [
                   Container(width: 20, height: 20, alignment: Alignment.center, decoration: BoxDecoration(color: kGold.withValues(alpha: .25), shape: BoxShape.circle), child: WIcon(icon, size: 12, color: p.text, still: true)),
                   const SizedBox(width: 6),
-                  Flexible(child: Text(label.toUpperCase(), maxLines: 1, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.15, color: p.muted))),
+                  Flexible(child: Text(label.toUpperCase(), maxLines: 1, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: .3, color: p.muted))),
                 ]),
                 const SizedBox(height: 4),
                 Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.2)),

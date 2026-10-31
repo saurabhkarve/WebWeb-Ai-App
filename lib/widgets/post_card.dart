@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../auth_provider.dart';
 import '../ask_types.dart';
+import '../card_colors.dart';
 import 'ask_deck.dart';
 import '../i18n.dart';
 import '../links.dart';
@@ -269,7 +270,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                 margin: const EdgeInsets.only(right: 6),
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(color: kGold, borderRadius: BorderRadius.circular(4)),
-                child: Text(t('NEW'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: kInk)),
+                child: Text(t('NEW'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: .4, color: kInk)),
               ),
             ),
             TextSpan(text: post.title ?? ''),
@@ -371,10 +372,12 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     if (isAsk && !widget.detail) {
       // on "Leads for you" the card says why it is a lead for this member
       final why = mine ? t('Your ask') : ((post.leadReason ?? '').isNotEmpty ? leadReasonText(post.leadReason!) : (match == null ? null : t(match)));
+      final tint = kCardColors[cardColorOf(post)]!;
       final spotlight = Container(
-        padding: framed ? const EdgeInsets.fromLTRB(12, 12, 12, 0) : const EdgeInsets.symmetric(vertical: 12),
-        // no wash behind the post: the asker's colour is on the cards themselves; the same gold hairline as an update
-        foregroundDecoration: framed ? null : _HairlineDecoration(kGold.withValues(alpha: .6)),
+        padding: framed ? const EdgeInsets.fromLTRB(12, 12, 12, 0) : const EdgeInsets.symmetric(vertical: 20),
+        // the asker's colour: a soft wash from the top-left corner and a hairline in the same colour
+        decoration: framed ? null : BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [tint.withValues(alpha: .16), tint.withValues(alpha: 0)], stops: const [0, .55])),
+        foregroundDecoration: framed ? null : _HairlineDecoration(tint.withValues(alpha: .6)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(
             padding: EdgeInsets.zero,
@@ -462,8 +465,6 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
               if (!framed && mine) OutcomeNudge(post: post, onTap: () => _openDetail(askOutcome: true)),
               // quoted in a repost: the replies and the controls are the repost's (below)
               if (!framed) ...[
-                // air between the cards and the buttons under them
-                const SizedBox(height: 10),
                 // the replies are on the ask page, not on the card
                 PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
               ],
@@ -607,7 +608,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     final ink = Theme.of(context).brightness == Brightness.dark ? const Color(0xFF7FD6AD) : green;
     void open() => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? '')));
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: EdgeInsets.symmetric(vertical: ask ? 16 : 20),
       foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (ask)
@@ -687,9 +688,12 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
             child: ask ? quote : InkWell(onTap: _openDetail, child: AbsorbPointer(child: quote)),
           ),
         ),
-        // air between the quoted cards and the buttons, as under an ask that is not reposted
-        const SizedBox(height: 12),
-        PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
+        if (ask) ...[
+          PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
+        ] else ...[
+          const SizedBox(height: 12),
+          PostActions(key: _actionsKey, post: post, onReply: _reply, onReview: _openDetail, spotlight: true, onChanged: () => setState(() {}), tourTarget: widget.tourTarget),
+        ],
       ]),
     );
   }
