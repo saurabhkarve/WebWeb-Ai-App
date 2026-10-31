@@ -502,7 +502,7 @@ Future<void> _initLocal({DidReceiveNotificationResponseCallback? onTap}) async {
   if (_localReady && onTap == null) return;
   await _local.initialize(
     settings: const InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      android: AndroidInitializationSettings('ic_stat_notify'),
       // permission is asked later by FirebaseMessaging.requestPermission (after sign-in)
       iOS: DarwinInitializationSettings(requestAlertPermission: false, requestBadgePermission: false, requestSoundPermission: false),
     ),
