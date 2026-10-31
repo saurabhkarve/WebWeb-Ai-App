@@ -372,7 +372,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       // on "Leads for you" the card says why it is a lead for this member
       final why = mine ? t('Your ask') : ((post.leadReason ?? '').isNotEmpty ? leadReasonText(post.leadReason!) : (match == null ? null : t(match)));
       final spotlight = Container(
-        padding: framed ? const EdgeInsets.fromLTRB(12, 12, 12, 0) : const EdgeInsets.symmetric(vertical: 20),
+        padding: framed ? const EdgeInsets.fromLTRB(12, 12, 12, 0) : const EdgeInsets.symmetric(vertical: 12),
         // no wash behind the post: the asker's colour is on the cards themselves; the same gold hairline as an update
         foregroundDecoration: framed ? null : _HairlineDecoration(kGold.withValues(alpha: .6)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -587,7 +587,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     // width under it, as on the web; quoted in a repost, the controls are the repost's
     if (!framed) {
       return Container(
-        padding: const EdgeInsets.only(top: 16, bottom: 16),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           card,
@@ -607,7 +607,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     final ink = Theme.of(context).brightness == Brightness.dark ? const Color(0xFF7FD6AD) : green;
     void open() => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? '')));
     return Container(
-      padding: EdgeInsets.symmetric(vertical: ask ? 16 : 20),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .6)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (ask)

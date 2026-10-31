@@ -197,7 +197,7 @@ class _HouseCardViewState extends State<HouseCardView> {
     final face = _face[card.account.handle] ?? _face['webwebai']!;
     final post = card.post;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       foregroundDecoration: HairlineBelow(kGold.withValues(alpha: .6)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
