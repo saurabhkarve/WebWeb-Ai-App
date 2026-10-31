@@ -21,6 +21,7 @@ import '../permissions.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/area_map.dart' show askTimeLeft;
+import '../widgets/city_picker.dart';
 import '../widgets/reviews_card.dart';
 import 'find.dart';
 import 'post_detail.dart';
@@ -276,6 +277,9 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   bool _aiBusy = false;
   /// where the phone is, for nearer results first (only once location is allowed; asked for no more than that)
   ({double lat, double lng, DateTime at})? _here;
+  /// where to look: '' is the current location; or any town in India picked beside the search (with its centre when it is a new town)
+  String _place = '';
+  ({double lat, double lng})? _placeAt;
 
   @override
   void initState() {
@@ -383,7 +387,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     if (v.trim().length < 2) return setState(() => _results = null);
     _debounce = Timer(const Duration(milliseconds: 250), () async {
       try {
-        final d = await context.read<AuthProvider>().api.get('/users/search', {'q': v.trim()});
+        final d = await context.read<AuthProvider>().api.get('/users/search', {'q': v.trim(), if (_place.isNotEmpty) 'place': _place});
         if (mounted) setState(() => _results = (d as List).cast<Map>());
       } catch (_) {
         if (mounted) setState(() => _results = const []);
@@ -422,9 +426,10 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     if (q.length < 4 || (q == _aiFor && (_ai != null || _aiBusy))) return;
     setState(() => (_aiFor = q, _ai = null, _aiBusy = true));
     try {
-      final here = await _position();
+      // a picked town (with its centre when it is new), else the phone's position now
+      final here = _place.isNotEmpty ? _placeAt : await _position();
       if (!mounted) return;
-      final r = await context.read<AuthProvider>().api.post('/phonebook/ai-find', {'q': q, if (here != null) 'lat': here.lat, if (here != null) 'lng': here.lng}) as Map;
+      final r = await context.read<AuthProvider>().api.post('/phonebook/ai-find', {'q': q, if (_place.isNotEmpty) 'place': _place, if (here != null) 'lat': here.lat, if (here != null) 'lng': here.lng}) as Map;
       if (mounted && _aiFor == q) setState(() => _ai = r);
     } catch (_) {
       if (mounted && _aiFor == q) setState(() => _ai = const {'matches': []});
@@ -715,7 +720,30 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
   /// Ask AI: a name finds the contact; anything else is a need, and the AI finds who can help. The main thing of the
   /// app, so it is the one element that moves: a gold light runs round its border, with the AI badge at its start.
-  Widget _searchField() {
+  Widget _searchField() => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _searchBox(),
+        const SizedBox(height: 8),
+        // where: the current location unless another town is picked (every city of India, or any town typed)
+        Align(alignment: Alignment.centerLeft, child: CityPill(
+          value: _place,
+          anyLabel: t('Current location'),
+          chip: true,
+          onChanged: (c) {
+            setState(() {
+              _place = c.name;
+              _placeAt = c.lat != null && c.lng != null ? (lat: c.lat!, lng: c.lng!) : null;
+              _results = null;
+              _aiFor = null;
+              _ai = null;
+            });
+            final q = _q.text.trim();
+            if (q.length >= 2) _search(q);
+            if (q.length >= 4) _askAi(q);
+          },
+        )),
+      ]);
+
+  Widget _searchBox() {
     final p = Pal.of(context);
     return _GlowBorder(
       radius: 28,
