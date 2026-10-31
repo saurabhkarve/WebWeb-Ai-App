@@ -104,10 +104,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                     if (created == null && _back != null)
                       GestureDetector(
                         onTap: () async {
+                          final auth = context.read<AuthProvider>();
+                          final messenger = ScaffoldMessenger.of(context);
                           try {
-                            await context.read<AuthProvider>().switchAccount(_back);
+                            await auth.switchAccount(_back);
                           } catch (_) {
-                            if (mounted) toast(context, t('Could not switch page'), error: true);
+                            messenger.showSnackBar(SnackBar(content: Text(t('Could not switch page'))));
                           }
                         },
                         child: Container(
