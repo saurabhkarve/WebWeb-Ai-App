@@ -320,12 +320,20 @@ class _AskDeckState extends State<AskDeck> {
                 widget.onReply?.call();
               }
             },
-            child: Container(
-              height: (40 * _scale).clamp(38.0, 46.0),
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+            // a compact pill, sized to the deck (a short phone's small card, a tall one's larger), the tap area still 40 high
+            child: SizedBox(
+              height: 40,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: IntrinsicWidth(child: Container(
+              height: (30 * _scale).clamp(30.0, 36.0),
+              constraints: BoxConstraints(minWidth: (96 * _scale).clamp(96.0, 120.0)),
+              padding: const EdgeInsets.symmetric(horizontal: 18),
               alignment: Alignment.center,
               decoration: BoxDecoration(gradient: poster ? null : kGoldGradient, color: poster ? p.canvas : null, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x331E1E1E), blurRadius: 6, offset: Offset(0, 2))]),
-              child: Text(t(visitHref != null ? 'Visit website' : 'I can help'), style: TextStyle(fontSize: (14 * _scale).clamp(13.0, 16.0), fontWeight: FontWeight.w700, color: poster ? p.text : kInk)),
+              child: Text(t(visitHref != null ? 'Visit website' : 'I can help'), style: TextStyle(fontSize: (13 * _scale).clamp(12.5, 14.5), fontWeight: FontWeight.w700, color: poster ? p.text : kInk)),
+                )),
+              ),
             ),
           );
         }
@@ -334,7 +342,7 @@ class _AskDeckState extends State<AskDeck> {
           final c = cta();
           return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             tray ? Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: p.canvas.withValues(alpha: .9), borderRadius: BorderRadius.circular(16)), child: chips) : chips,
-            if (c != null) ...[const SizedBox(height: 10), c],
+            if (c != null) ...[const SizedBox(height: 2), c],
           ]);
         }
 

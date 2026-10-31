@@ -673,8 +673,13 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     ]);
   }
 
-  /// Ask AI: a name finds the contact; anything else is a need, and the AI finds who can help
-  Widget _searchField() => TextField(
+  /// Ask AI: a name finds the contact; anything else is a need, and the AI finds who can help. The main thing of the
+  /// app, so it is the one element that moves: a gold light runs round its border, with the AI badge at its start.
+  Widget _searchField() {
+    final p = Pal.of(context);
+    return _GlowBorder(
+      radius: 28,
+      child: TextField(
         key: _searchKey,
         controller: _q,
         focusNode: _qFocus,
@@ -682,12 +687,15 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         onSubmitted: (v) => _askAi(v.trim()),
         textInputAction: TextInputAction.search,
         textCapitalization: TextCapitalization.sentences,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
         decoration: InputDecoration(
-          prefixIcon: Padding(padding: const EdgeInsets.only(left: 14, right: 8), child: _aiMark(20)),
+          filled: true,
+          fillColor: p.card,
+          contentPadding: const EdgeInsets.symmetric(vertical: 17, horizontal: 8),
+          prefixIcon: Padding(padding: const EdgeInsets.only(left: 12, right: 10), child: _aiBadge()),
           prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
           hintText: t('Ask AI: a name, or what you need'),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide(color: kGold.withValues(alpha: .75), width: 1.5)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: const BorderSide(color: kGold, width: 2)),
+          hintStyle: TextStyle(fontSize: 15, color: p.muted),
           suffixIcon: _q.text.isEmpty
               ? null
               : IconButton(
@@ -696,8 +704,23 @@ class _PhonebookHomeState extends State<PhonebookHome> {
                     _q.clear();
                     _search('');
                   }),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(28)),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
         ),
+      ),
+    );
+  }
+
+  /// "AI" with the star, in gold: what the search is
+  Widget _aiBadge() => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(14)),
+        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+          Text('AI', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kInk, height: 1)),
+          SizedBox(width: 3),
+          Icon(Icons.auto_awesome_rounded, size: 14, color: kInk),
+        ]),
       );
 
   /// The search page: the search (the ask's title) with Cancel, then, down to the keyboard, what was found as it is
@@ -1126,6 +1149,59 @@ class _PhonebookHomeState extends State<PhonebookHome> {
           ),
         ]),
       ),
+    );
+  }
+}
+
+
+/// A gold light that runs round [child]'s border (a sweep gradient turning), with a soft glow; still when the phone
+/// asks for less motion.
+class _GlowBorder extends StatefulWidget {
+  final Widget child;
+  final double radius;
+  const _GlowBorder({required this.child, required this.radius});
+  @override
+  State<_GlowBorder> createState() => _GlowBorderState();
+}
+
+class _GlowBorderState extends State<_GlowBorder> with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(vsync: this, duration: const Duration(seconds: 4));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const w = 2.5;
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, child) => Container(
+        padding: const EdgeInsets.all(w),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(widget.radius),
+          gradient: SweepGradient(
+            transform: GradientRotation(_c.value * 6.2832),
+            colors: const [Color(0xFFE0A800), Color(0xFFFFF1B0), Color(0xFFE0A800), Color(0x66E0A800), Color(0xFFE0A800)],
+            stops: const [0, .12, .3, .65, 1],
+          ),
+          boxShadow: [BoxShadow(color: const Color(0xFFFFC700).withValues(alpha: .28), blurRadius: 14, spreadRadius: 0.5)],
+        ),
+        child: child,
+      ),
+      child: ClipRRect(borderRadius: BorderRadius.circular(widget.radius - w), child: widget.child),
     );
   }
 }
