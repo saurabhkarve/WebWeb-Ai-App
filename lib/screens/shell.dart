@@ -552,7 +552,32 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
           padding: EdgeInsets.fromLTRB(labels ? 10 : 0, 0, 0, labels ? 20 : 16),
           child: labels
               ? FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: LogoInline(size: 30, markSize: 44, tagline: true, onTap: () => _go(_dir)))
-              : GestureDetector(onTap: () => _go(_dir), child: const LogoMark(size: 44)),
+              : GestureDetector(
+                  onTap: () => _go(_dir),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    // the mark with a soft halo behind it, WEBWEB and the AI pill under it, a fine gold line below: the website's narrow dock
+                    Stack(alignment: Alignment.center, clipBehavior: Clip.none, children: [
+                      Container(width: 30, height: 30, decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: const Color(0xFFFFC700).withValues(alpha: .35), blurRadius: 22, spreadRadius: 6)])),
+                      const LogoMark(size: 46),
+                    ]),
+                    const SizedBox(height: 8),
+                    Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text('WEB', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, height: 1, color: p.text)),
+                      ShaderMask(
+                        blendMode: BlendMode.srcIn,
+                        shaderCallback: (r) => (p.dark
+                                ? const LinearGradient(colors: [Color(0xFFFFD84A), Color(0xFFE0AD00)])
+                                : const LinearGradient(colors: [Color(0xFFA89A2C), Color(0xFFC9AE24), Color(0xFFE8C722)]))
+                            .createShader(r),
+                        child: const Text('WEB', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, height: 1, color: Colors.white)),
+                      ),
+                    ]),
+                    const SizedBox(height: 4),
+                    const AiPill(font: 8),
+                    const SizedBox(height: 8),
+                    Container(width: 32, height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.transparent, const Color(0xFFFFC700).withValues(alpha: .7), Colors.transparent]))),
+                  ]),
+                ),
         ),
         Expanded(
           child: SingleChildScrollView(
