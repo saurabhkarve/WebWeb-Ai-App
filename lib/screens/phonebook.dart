@@ -6,6 +6,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../ask_types.dart';
@@ -295,6 +296,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   void dispose() {
     _debounce?.cancel();
     _aiTimer?.cancel();
+    _speech.cancel();
     _q.dispose();
     _qFocus.dispose();
     _scroll.dispose();
@@ -674,6 +676,43 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     ]);
   }
 
+  final _speech = SpeechToText();
+  bool _listening = false;
+
+  /// The search by voice: the microphone is asked for first, then what is heard fills the box, in the app's language
+  /// (Konkani is heard as Hindi).
+  Future<void> _speak() async {
+    if (_listening) {
+      await _speech.stop();
+      if (mounted) setState(() => _listening = false);
+      return;
+    }
+    final ok = await Permissions.ensure(context, Need.microphone, reason: t('To hear what you want to search for.'));
+    if (!ok || !mounted) return;
+    final ready = await _speech.initialize(onStatus: (s) {
+      if (s == 'done' || s == 'notListening') {
+        if (mounted) setState(() => _listening = false);
+      }
+    }, onError: (_) {
+      if (mounted) {
+        setState(() => _listening = false);
+        toast(context, t('Could not hear that. Try again.'), error: true);
+      }
+    });
+    if (!ready || !mounted) return;
+    final loc = switch (currentLang) { 'hi' || 'kok' => 'hi_IN', 'mr' => 'mr_IN', 'gu' => 'gu_IN', _ => 'en_IN' };
+    setState(() => _listening = true);
+    await _speech.listen(
+      listenOptions: SpeechListenOptions(partialResults: true, listenMode: ListenMode.search, localeId: loc),
+      onResult: (r) {
+        _q.text = r.recognizedWords;
+        _q.selection = TextSelection.collapsed(offset: _q.text.length);
+        _search(_q.text);
+        if (r.finalResult && mounted) setState(() => _listening = false);
+      },
+    );
+  }
+
   /// Ask AI: a name finds the contact; anything else is a need, and the AI finds who can help. The main thing of the
   /// app, so it is the one element that moves: a gold light runs round its border, with the AI badge at its start.
   Widget _searchField() {
@@ -697,14 +736,20 @@ class _PhonebookHomeState extends State<PhonebookHome> {
           prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
           hintText: t('Ask AI: a name, or what you need'),
           hintStyle: TextStyle(fontSize: 15, color: p.muted),
-          suffixIcon: _q.text.isEmpty
-              ? null
-              : IconButton(
+          suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (_q.text.isNotEmpty)
+              IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: () {
                     _q.clear();
                     _search('');
                   }),
+            IconButton(
+              tooltip: t(_listening ? 'Listening… tap to stop' : 'Speak your ask'),
+              icon: WIcon(WI.mic, size: 22, color: _listening ? kGold : p.muted),
+              onPressed: _speak,
+            ),
+          ]),
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
