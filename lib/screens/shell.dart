@@ -33,6 +33,7 @@ import 'profile.dart';
 import 'service_contacts_sheet.dart';
 import 'support_sheet.dart';
 import 'talk.dart';
+import 'your_asks.dart' show yourAsksRequest;
 
 /// Signed-in chrome, same as the web on phones (app-frame.tsx): the slim header (logo, bell, your
 /// avatar with the account menu) and the bar with the five places.
@@ -162,6 +163,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     final w = MediaQuery.sizeOf(context).width;
     final rail = w >= 600;
     final railW = rail ? (w >= 1200 ? 220.0 : 88.0) : 0.0;
+    // as on the website (x.com): from 1280 px a column on the right, with a search, the ask prompt and shortcuts
+    final right = w >= 1280;
+    final rightW = right ? 320.0 : 0.0;
     // the bar steps aside while the keyboard is up, so what is typed has the room (the Directory's search)
     final bottomBar = bar && !rail && MediaQuery.viewInsetsOf(context).bottom == 0 && !(_i == _dir && _dirSearch);
     // without the bar on Ask, back returns to the tab it was opened from
@@ -180,7 +184,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             // pages, below the header
             Positioned.fill(
               child: Padding(
-                padding: EdgeInsets.only(top: top + header, bottom: bottomBar ? _barH + bottom : 0, left: railW),
+                padding: EdgeInsets.only(top: top + header, bottom: bottomBar ? _barH + bottom : 0, left: railW, right: rightW),
                 child: MediaQuery.removePadding(
                   context: context,
                   removeTop: true,
@@ -189,7 +193,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                   child: IndexedStack(index: _i, children: [
                     _fit(ConnectScreen(refreshTick: _feedTick, topTick: _topTick, onGoAsk: () => _go(_ask), active: _i == _feed), 680),
                     _fit(const FindScreen(), 900),
-                    _fit(PhonebookHome(active: _i == _dir, onAsk: () => _go(_ask), onSeeAsks: () => _go(_feed), onPosted: () => setState(() => _feedTick++), onSearching: (on) => setState(() => _dirSearch = on)), 1240),
+                    _fit(PhonebookHome(active: _i == _dir, onAsk: () => _go(_ask), onSeeAsks: () => _go(_feed), onPosted: () => setState(() => _feedTick++), onSearching: (on) => setState(() => _dirSearch = on)), right ? 680 : 1240),
                     // Talk loads afresh each time it opens
                     if (_i == _talk) _fit(const TalkScreen(), 900) else const SizedBox.shrink(),
                     _fit(_NotesPanel(notes: _notes, page: true, onAsk: () => _go(_ask)), 760),
@@ -218,10 +222,86 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             if (bottomBar) Positioned(left: 0, right: 0, bottom: 0, height: _barH + bottom + _rise, child: _bar(p, bottom)),
             // tablets and desktop: the rail down the left, under the header
             if (rail) Positioned(left: 0, top: top + header, bottom: 0, width: railW, child: _rail(p, railW >= 200)),
+            // wide screens: the column on the right, as on the website
+            if (right) Positioned(right: 0, top: top + header, bottom: 0, width: rightW, child: _rightRail(p)),
           ]),
         ),
       ]),
       ),
+    );
+  }
+
+  /// Wide screens (1280 px and up), as the website's right column: a search, the ask prompt and the shortcuts.
+  Widget _rightRail(Pal p) {
+    final me = context.watch<AuthProvider>().profile;
+    BoxDecoration card() => BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(16), boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 18, offset: Offset(0, 6))]);
+    void sub(String title, Widget body) => Navigator.push(context, MaterialPageRoute(builder: (_) => SubPage(title: t(title), body: body)));
+    final links = <(String, VoidCallback)>[
+      if (me != null) ('Your public page', () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: me.handle)))),
+      ('Your asks', () {
+        yourAsksRequest.value = true;
+        _go(_ask);
+      }),
+      ('Leads for you', () => sub('Leads for you', const LeadsScreen())),
+      ('Today in your area', () => sub('Today in your area', const TodayScreen())),
+      ('Alerts', () => sub('Alerts', const AlertsScreen())),
+      ('Your week', () => sub('Your week', const WeekScreen())),
+      ('Saved asks', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedPostsScreen()))),
+      if (me != null) ('Edit profile', () => Navigator.push(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: me)))),
+    ];
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 14, 16, 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        InkWell(
+          onTap: () => _go(_dir),
+          borderRadius: BorderRadius.circular(28),
+          child: Container(
+            height: 46,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(28), boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 18, offset: Offset(0, 6))]),
+            child: Row(children: [
+              WIcon(WI.search, size: 20, color: p.muted),
+              const SizedBox(width: 10),
+              Expanded(child: Text(t('Search people, jobs, asks'), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.muted))),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: card(),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [WIcon(WI.ask, size: 20, color: p.text), const SizedBox(width: 8), Text(t('Need something?'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))]),
+            const SizedBox(height: 4),
+            Text(t('Post an ask and reach members across Navi Mumbai.'), style: TextStyle(fontSize: 13.5, height: 1.35, color: p.muted)),
+            const SizedBox(height: 14),
+            InkWell(
+              onTap: () => _go(_ask),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: p.dark ? const Color(0xFFF2F0E8) : kInk, borderRadius: BorderRadius.circular(20)),
+                child: Text(t('Post an ask'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.dark ? kInk : Colors.white)),
+              ),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: card(),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Padding(padding: const EdgeInsets.fromLTRB(8, 4, 8, 4), child: Text(t('Shortcuts').toUpperCase(), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.muted))),
+            for (final l in links)
+              InkWell(
+                onTap: l.$2,
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10), child: Text(t(l.$1), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+              ),
+          ]),
+        ),
+      ]),
     );
   }
 
