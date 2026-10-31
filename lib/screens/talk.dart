@@ -1734,7 +1734,7 @@ class _AttachSheetState extends State<_AttachSheet> {
       });
 
   Future<void> _pickContact() async {
-    final picked = await Navigator.push<List<PickedContact>>(context, MaterialPageRoute(builder: (_) => ContactPicker(askerName: widget.peerName, forChat: true, maxSelect: 1)));
+    final picked = await pickFromPhoneBook(context, askerName: widget.peerName, forChat: true, maxSelect: 1);
     if (picked == null || picked.isEmpty || !mounted) return;
     setState(() {
       _name.text = picked.first.name;

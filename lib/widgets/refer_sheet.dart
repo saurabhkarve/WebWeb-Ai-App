@@ -99,7 +99,7 @@ class _ReferSheetState extends State<_ReferSheet> {
   Future<void> _attachContact() async {
     final room = _left - _picked.length;
     if (room <= 0) return toast(context, t('You can refer up to 5 contacts on one ask'));
-    final got = await Navigator.push<List<PickedContact>>(context, MaterialPageRoute(builder: (_) => ContactPicker(askerName: _toName, maxSelect: room)));
+    final got = await pickFromPhoneBook(context, askerName: _toName, maxSelect: room);
     if (got == null || !mounted) return;
     setState(() {
       for (final c in got) {

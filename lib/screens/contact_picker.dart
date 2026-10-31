@@ -340,3 +340,15 @@ class _ReviewSheetState extends State<_ReviewSheet> {
     );
   }
 }
+
+/// Opens the phone book to pick contacts: the Contacts permission is asked for first (with why), and only when it is
+/// given does the book open. Null when the person says no or picks nothing.
+Future<List<PickedContact>?> pickFromPhoneBook(BuildContext context, {required String askerName, int maxSelect = 5, bool forChat = false}) async {
+  final ok = await Permissions.ensure(
+    context,
+    Need.contacts,
+    reason: forChat ? t('To pick a contact from your phone book and send it in this chat.') : t('To pick people from your phone book and refer them on this ask.'),
+  );
+  if (!ok || !context.mounted) return null;
+  return Navigator.push<List<PickedContact>>(context, MaterialPageRoute(builder: (_) => ContactPicker(askerName: askerName, maxSelect: maxSelect, forChat: forChat)));
+}

@@ -226,7 +226,7 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
 
   /// Refer people from the phone book who may want this item (max 5, like asks).
   Future<void> _refer() async {
-    final picked = await Navigator.push<List<PickedContact>>(context, MaterialPageRoute(builder: (_) => ContactPicker(askerName: widget.ownerName)));
+    final picked = await pickFromPhoneBook(context, askerName: widget.ownerName);
     if (picked == null || picked.isEmpty || !mounted) return;
     var ok = 0;
     String? err;

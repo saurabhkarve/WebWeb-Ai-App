@@ -390,7 +390,7 @@
   "Panvel": "પનવેલ",
   "Kalamboli": "કળંબોલી",
   "Nerul": "નેરુળ",
-  "Enter a valid 10-digit mobile number": "માન્ય 10 અંકનો મોબાઇલ નંબર લખો",
+  "Enter a valid 10-digit mobile number": "સાચો 10 અંકનો મોબાઇલ નંબર લખો",
   "Enter the 6-digit OTP": "6 અંકનો OTP લખો",
   "Enter your full name": "તમારું પૂરું નામ લખો",
   "Enter company name or current role": "કંપનીનું નામ કે હાલનો હોદ્દો લખો",
@@ -2694,5 +2694,7 @@
   "Replies, reviews and recommendations arrive here.": "જવાબ, રિવ્યૂ અને ભલામણો અહીં આવે છે.",
   "Your account and this tour": "તમારું ખાતું અને આ ટૂર",
   "Manage your page and settings here, and replay this tour any time.": "અહીં તમારું પેજ અને સેટિંગ સંભાળો, અને આ ટૂર ગમે ત્યારે ફરી જુઓ.",
-  "Swipe for more": "વધુ જોવા સ્વાઇપ કરો"
+  "Swipe for more": "વધુ જોવા સ્વાઇપ કરો",
+  "Enter the contact's name (at least 2 letters)": "સંપર્કનું નામ લખો (ઓછામાં ઓછા 2 અક્ષર)",
+  "This number is already added": "આ નંબર પહેલેથી ઉમેરાયેલો છે"
 }

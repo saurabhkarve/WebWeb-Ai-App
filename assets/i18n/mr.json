@@ -390,7 +390,7 @@
   "Panvel": "पनवेल",
   "Kalamboli": "कळंबोली",
   "Nerul": "नेरुळ",
-  "Enter a valid 10-digit mobile number": "10 अंकी वैध मोबाइल क्रमांक लिहा",
+  "Enter a valid 10-digit mobile number": "योग्य 10 अंकी मोबाइल नंबर लिहा",
   "Enter the 6-digit OTP": "6 अंकी OTP लिहा",
   "Enter your full name": "तुमचे पूर्ण नाव लिहा",
   "Enter company name or current role": "कंपनीचे नाव किंवा सध्याचे पद लिहा",
@@ -2694,5 +2694,7 @@
   "Replies, reviews and recommendations arrive here.": "उत्तरे, रिव्ह्यू आणि शिफारशी इथे येतात.",
   "Your account and this tour": "तुमचे खाते आणि हा टूर",
   "Manage your page and settings here, and replay this tour any time.": "इथे तुमचे पेज आणि सेटिंग सांभाळा, आणि हा टूर केव्हाही पुन्हा पाहा.",
-  "Swipe for more": "अधिक पाहण्यासाठी स्वाइप करा"
+  "Swipe for more": "अधिक पाहण्यासाठी स्वाइप करा",
+  "Enter the contact's name (at least 2 letters)": "संपर्काचे नाव लिहा (किमान 2 अक्षरे)",
+  "This number is already added": "हा नंबर आधीच जोडलेला आहे"
 }
