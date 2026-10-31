@@ -40,6 +40,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final _education = TextEditingController(text: widget.profile.education ?? '');
   late final _gst = TextEditingController(text: widget.profile.gstin ?? '');
   late final _handle = TextEditingController(text: widget.profile.handle);
+  /// website and social media links: the kind, its address and whether it is the main button (above the reviews)
+  late final List<({String kind, TextEditingController url})> _links = [for (final l in widget.profile.links) (kind: l.kind, url: TextEditingController(text: l.url))];
+  late int _mainLink = (() {
+    final i = widget.profile.links.indexWhere((l) => l.primary);
+    return i < 0 ? 0 : i;
+  })();
   /// idle, checking, free, yours, taken, invalid, protected, system
   String _handleState = 'idle';
   bool _handleBusy = false;
@@ -112,6 +118,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'skills': _skills.text.replaceAll(',', '\n').trim(),
         'experience': _experience.text.trim(),
         'education': _education.text.trim(),
+        'links': [
+          for (var i = 0; i < _links.length; i++)
+            if (_links[i].url.text.trim().isNotEmpty) {'kind': _links[i].kind, 'url': _links[i].url.text.trim(), 'primary': i == _mainLink},
+        ],
       });
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -196,10 +206,63 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void dispose() {
     _handleDebounce?.cancel();
-    for (final c in [_name, _company, _bio, _services, _skills, _experience, _education, _gst, _handle]) {
+    for (final c in [_name, _company, _bio, _services, _skills, _experience, _education, _gst, _handle, ..._links.map((l) => l.url)]) {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// Website and social media links; "Main button" picks the one shown above the reviews.
+  Widget _linksEditor() {
+    final p = Pal.of(context);
+    String name(String k) => k == 'website' || k == 'other' ? t(ProfileLink.names[k]!) : ProfileLink.names[k]!;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(t('Website and social links'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+      Text(t('Shown as the button above your reviews'), style: TextStyle(fontSize: 12, color: p.muted)),
+      const SizedBox(height: 8),
+      for (var i = 0; i < _links.length; i++)
+        Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(border: Border.all(color: p.border), borderRadius: BorderRadius.circular(14)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              DropdownButton<String>(
+                value: _links[i].kind,
+                underline: const SizedBox.shrink(),
+                items: [for (final k in ProfileLink.kinds) DropdownMenuItem(value: k, child: Text(name(k)))],
+                onChanged: (v) => setState(() => _links[i] = (kind: v ?? 'website', url: _links[i].url)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: AppField(controller: _links[i].url, hint: 'https://', keyboard: TextInputType.url, maxLength: 300)),
+            ]),
+            Row(children: [
+              InkWell(
+                onTap: () => setState(() => _mainLink = i),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(_mainLink == i ? Icons.radio_button_checked : Icons.radio_button_off, size: 20, color: _mainLink == i ? p.link : p.muted),
+                  const SizedBox(width: 6),
+                  Text(t('Main button'), style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _mainLink == i ? p.link : p.muted)),
+                ]),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => setState(() {
+                  _links.removeAt(i).url.dispose();
+                  if (_mainLink >= _links.length || _mainLink > i) _mainLink = _mainLink > i ? _mainLink - 1 : 0;
+                }),
+                child: Text(t('Remove link'), style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: p.danger)),
+              ),
+            ]),
+          ]),
+        ),
+      if (_links.length < 8)
+        OutlinedButton(
+          onPressed: () => setState(() => _links.add((kind: _links.isEmpty ? 'website' : 'instagram', url: TextEditingController()))),
+          style: OutlinedButton.styleFrom(shape: const StadiumBorder(), foregroundColor: p.text, side: BorderSide(color: p.border)),
+          child: Text('+ ${t('Add a link')}'),
+        ),
+    ]);
   }
 
   Widget _label(String text) => Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(text, style: const TextStyle(fontSize: 14)));
@@ -405,6 +468,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 8),
                     AppField(controller: _bio, label: t('About'), maxLines: 3, maxLength: 300, caps: TextCapitalization.sentences),
+                    const SizedBox(height: 16),
+                    _linksEditor(),
                     if (!job) ...[
                       const SizedBox(height: 16),
                       AppField(controller: _services, label: t('Services'), helper: t('One per line'), maxLines: 4, caps: TextCapitalization.sentences),

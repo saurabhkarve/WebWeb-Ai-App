@@ -2650,5 +2650,15 @@
   "Only {name} sees what you send here.": "तुमी हांगा जें धाडटात तें फकत {name} पळयतात.",
   "A photo could not be uploaded. Remove it and try again.": "एक फोटो अपलोड जावंक ना. तो काडून परत यत्न करात.",
   "Next card": "फुडलें कार्ड",
-  "Previous card": "फाटलें कार्ड"
+  "Previous card": "फाटलें कार्ड",
+  "Website and social links": "वेबसाईट आनी सोशल मिडिया लिंक",
+  "Shown as the button above your reviews": "तुमच्या रिव्ह्यूंच्या वयर बटण म्हणून दिसता",
+  "Main button": "मुखेल बटण",
+  "Remove link": "लिंक काडची",
+  "Add a link": "लिंक जोडचो",
+  "Link": "लिंक",
+  "Link address": "लिंकाचो पत्तो",
+  "Open {name}": "{name} उगडचें",
+  "link": "लिंक",
+  "Website": "वेबसाईट"
 }

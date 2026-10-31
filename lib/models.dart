@@ -121,6 +121,16 @@ class UpiId {
       UpiId(id: '${j['id']}', vpa: '${j['vpa']}', isDefault: j['isDefault'] == true, verifiedName: j['verifiedName'] as String?);
 }
 
+/// A website or social media link on a page; the primary one is the button above the reviews.
+class ProfileLink {
+  final String kind, url;
+  final bool primary;
+  const ProfileLink(this.kind, this.url, this.primary);
+  static const kinds = ['website', 'instagram', 'facebook', 'linkedin', 'youtube', 'x', 'whatsapp', 'other'];
+  /// brand names are the same in every language; the app translates Website, Other and the button's words
+  static const names = {'website': 'Website', 'instagram': 'Instagram', 'facebook': 'Facebook', 'linkedin': 'LinkedIn', 'youtube': 'YouTube', 'x': 'X', 'whatsapp': 'WhatsApp', 'other': 'Other'};
+}
+
 class Profile {
   final String uid, handle, name, company, userType, category, location;
   final String? photoUrl, bannerUrl, bio, experience, education, contactMasked;
@@ -145,13 +155,18 @@ class Profile {
   final bool hasUpdate;
   /// UPI IDs linked to the page, the default first
   final List<UpiId> upi;
+  /// website and social media links (one primary)
+  final List<ProfileLink> links;
   final DateTime createdAt;
+
+  /// the link shown as the button above the reviews: the primary one, else the first
+  ProfileLink? get mainLink => links.isEmpty ? null : links.firstWhere((l) => l.primary, orElse: () => links.first);
 
   const Profile({
     required this.uid, required this.handle, required this.name, required this.company, required this.userType,
     required this.category, required this.location, this.photoUrl, this.bannerUrl, this.gstin, this.completion, this.bio, this.experience, this.education,
     this.contactMasked, this.services = const [], this.skills = const [], this.contributions = 0,
-    this.statPosts, this.statShared, this.statWon = 0, this.statHelped, this.statReplyRate, this.statReplyMins, this.verification = 1, this.premium = false, this.plan, this.hasUpdate = false, this.upi = const [], required this.createdAt,
+    this.statPosts, this.statShared, this.statWon = 0, this.statHelped, this.statReplyRate, this.statReplyMins, this.verification = 1, this.premium = false, this.plan, this.hasUpdate = false, this.upi = const [], this.links = const [], required this.createdAt,
   });
 
   bool get isEntrepreneur => userType == 'entrepreneur';
@@ -173,6 +188,7 @@ class Profile {
       statHelped: (stats?['helped'] as num?)?.toInt(), statReplyRate: (stats?['replyRate'] as num?)?.toInt(), statReplyMins: (stats?['replyMins'] as num?)?.toInt(),
       verification: (j['verificationLevel'] as num?)?.toInt() ?? 1, premium: j['premium'] == true, plan: j['plan'] as String?, hasUpdate: stats?['hasUpdate'] == true,
       upi: [for (final u in (j['upi'] as List?) ?? const []) UpiId.fromJson(u as Map)],
+      links: [for (final l in (j['links'] as List?) ?? const []) ProfileLink('${(l as Map)['kind']}', '${l['url']}', l['primary'] == true)],
       createdAt: _ms(j['createdAt']),
     );
   }

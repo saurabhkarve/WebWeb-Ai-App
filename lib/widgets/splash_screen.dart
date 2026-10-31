@@ -38,7 +38,7 @@ class SplashScreen extends StatelessWidget {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 Text(t('from'), style: TextStyle(fontSize: small, color: p.muted, height: 1.2)),
                 SizedBox(height: small * .25),
-                Text('SkyQ', style: TextStyle(fontSize: small * 1.35, fontWeight: FontWeight.w700, letterSpacing: small * .12, color: p.text)),
+                Text('SkyQ', style: TextStyle(fontSize: small * 1.8, fontWeight: FontWeight.w700, letterSpacing: small * .02, color: p.text)),
               ]),
             ),
           ),

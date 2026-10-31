@@ -2650,5 +2650,15 @@
   "Only {name} sees what you send here.": "तुम्ही इथे जे पाठवता ते फक्त {name} पाहतात.",
   "A photo could not be uploaded. Remove it and try again.": "एक फोटो अपलोड होऊ शकला नाही. तो काढून पुन्हा प्रयत्न करा.",
   "Next card": "पुढील कार्ड",
-  "Previous card": "मागील कार्ड"
+  "Previous card": "मागील कार्ड",
+  "Website and social links": "वेबसाइट आणि सोशल मीडिया लिंक",
+  "Shown as the button above your reviews": "तुमच्या समीक्षांच्या वर बटण म्हणून दिसते",
+  "Main button": "मुख्य बटण",
+  "Remove link": "लिंक काढा",
+  "Add a link": "लिंक जोडा",
+  "Link": "लिंक",
+  "Link address": "लिंकचा पत्ता",
+  "Open {name}": "{name} उघडा",
+  "link": "लिंक",
+  "Website": "वेबसाइट"
 }

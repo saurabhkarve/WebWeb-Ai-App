@@ -2650,5 +2650,15 @@
   "Only {name} sees what you send here.": "आप यहाँ जो भेजते हैं, उसे केवल {name} देखते हैं।",
   "A photo could not be uploaded. Remove it and try again.": "एक फ़ोटो अपलोड नहीं हो सकी। उसे हटाकर फिर से कोशिश करें।",
   "Next card": "अगला कार्ड",
-  "Previous card": "पिछला कार्ड"
+  "Previous card": "पिछला कार्ड",
+  "Website and social links": "वेबसाइट और सोशल मीडिया लिंक",
+  "Shown as the button above your reviews": "आपकी समीक्षाओं के ऊपर बटन के रूप में दिखता है",
+  "Main button": "मुख्य बटन",
+  "Remove link": "लिंक हटाएँ",
+  "Add a link": "लिंक जोड़ें",
+  "Link": "लिंक",
+  "Link address": "लिंक का पता",
+  "Open {name}": "{name} खोलें",
+  "link": "लिंक",
+  "Website": "वेबसाइट"
 }

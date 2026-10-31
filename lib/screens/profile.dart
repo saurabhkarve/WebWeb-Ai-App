@@ -15,6 +15,7 @@ import '../models.dart';
 import '../safety.dart';
 import '../places.dart';
 import '../theme.dart';
+import '../links.dart' show openExternal;
 import '../widgets.dart';
 import '../widgets/reviews_card.dart';
 import '../widgets/post_card.dart';
@@ -283,6 +284,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 own ? _ownActions(p) : _visitorActions(p, u),
               ]),
             ),
+            // the page's main link (a website or a social page the member chose): the button above the reviews
+            if (u.mainLink != null) _linkButton(p, u.mainLink!),
             // reviews: the page is the member's website, so they are public (AI Phonebook)
             if (!isJob) ReviewsCard(key: _reviewsKey, uid: u.uid, own: own, name: displayName(u.userType, u.name, u.company)),
             const SizedBox(height: 16),
@@ -575,6 +578,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   /// Someone else's page: talk, call, share.
   /// A phone contact's row of round buttons: free in-app call, message and video (numbers stay private), star into
+  /// "Visit website" / "Open Instagram": the member's chosen main link, in brand yellow.
+  Widget _linkButton(Pal p, ProfileLink l) {
+    final label = l.kind == 'website' ? t('Visit website') : t('Open {name}', {'name': l.kind == 'other' ? t('link') : ProfileLink.names[l.kind] ?? l.kind});
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Semantics(
+        button: true,
+        label: label,
+        child: GestureDetector(
+          onTap: () => openExternal(context, l.url),
+          child: Container(
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(22), boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 3, offset: Offset(0, 1))]),
+            child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Favourites, share the page, and jump to the reviews.
   Widget _visitorActions(Pal p, Profile u) => ValueListenableBuilder<List<Map>>(
         valueListenable: Favourites.list,
