@@ -1155,7 +1155,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 }
 
 
-/// A gold light that runs round [child]'s border (a sweep gradient turning), with a soft glow; still when the phone
+/// The four SkyQ colours that run round [child]'s border (a sweep gradient turning), with a soft glow; still when the phone
 /// asks for less motion.
 class _GlowBorder extends StatefulWidget {
   final Widget child;
@@ -1186,7 +1186,7 @@ class _GlowBorderState extends State<_GlowBorder> with SingleTickerProviderState
 
   @override
   Widget build(BuildContext context) {
-    const w = 2.5;
+    const w = 2.0;
     return AnimatedBuilder(
       animation: _c,
       builder: (_, child) => Container(
@@ -1195,10 +1195,14 @@ class _GlowBorderState extends State<_GlowBorder> with SingleTickerProviderState
           borderRadius: BorderRadius.circular(widget.radius),
           gradient: SweepGradient(
             transform: GradientRotation(_c.value * 6.2832),
-            colors: const [Color(0xFFE0A800), Color(0xFFFFF1B0), Color(0xFFE0A800), Color(0x66E0A800), Color(0xFFE0A800)],
-            stops: const [0, .12, .3, .65, 1],
+            // the four colours of the SkyQ mark, running round the border as on Google's AI Mode button
+            colors: const [Color(0xFF0575E6), Color(0xFF34A853), Color(0xFFFFC700), Color(0xFFFF0000), Color(0xFF0575E6)],
+            stops: const [0, .25, .5, .75, 1],
           ),
-          boxShadow: [BoxShadow(color: const Color(0xFFFFC700).withValues(alpha: .28), blurRadius: 14, spreadRadius: 0.5)],
+          boxShadow: [
+            BoxShadow(color: const Color(0xFF0575E6).withValues(alpha: .18), blurRadius: 14, spreadRadius: 0.5),
+            BoxShadow(color: const Color(0xFFFFC700).withValues(alpha: .14), blurRadius: 14, spreadRadius: 0.5),
+          ],
         ),
         child: child,
       ),

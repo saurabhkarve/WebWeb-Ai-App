@@ -8,7 +8,7 @@ import '../theme.dart';
 
 enum OptionState { open, other, mine, right, wrong }
 
-/// The mark at the start of a poll or quiz option: an empty ring to tap before answering; after, a tick or cross.
+/// The mark at the start of a poll or quiz option: an empty checkbox to tap before answering; after, a tick or cross.
 class OptionMark extends StatelessWidget {
   final OptionState state;
   const OptionMark(this.state, {super.key});
@@ -16,7 +16,7 @@ class OptionMark extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     if (state == OptionState.open || state == OptionState.other) {
-      return Container(width: 22, height: 22, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: p.muted.withValues(alpha: state == OptionState.open ? .6 : .3), width: 2)));
+      return Container(width: 22, height: 22, decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), border: Border.all(color: p.muted.withValues(alpha: state == OptionState.open ? .6 : .3), width: 2)));
     }
     final bg = state == OptionState.wrong ? const Color(0xFFEF4444) : (state == OptionState.right ? const Color(0xFF059669) : kGold);
     final fg = state == OptionState.mine ? kInk : Colors.white;
@@ -24,7 +24,7 @@ class OptionMark extends StatelessWidget {
       width: 22,
       height: 22,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
       child: state == OptionState.wrong ? Text('✕', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg)) : WIcon(WI.tick, size: 14, color: fg),
     );
   }

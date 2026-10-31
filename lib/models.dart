@@ -301,6 +301,8 @@ class Post {
   final int? myVote;
   /// a WEBWEB Facts post: the figure and its source (GET /posts/facts), drawn as a data card
   final PostFact? fact;
+  /// a WEBWEB post made from a stored card (tender, news, quiz, event...): drawn as its cards
+  final HouseCard? houseCard;
 
   Post({
     required this.id, required this.kind, required this.authorUid, required this.authorName, required this.authorCompany,
@@ -308,7 +310,7 @@ class Post {
     this.urgency, this.matchReason, this.slug, this.categoryLabel, this.authorType = 'entrepreneur', this.authorVerification = 1, this.authorPremium = false, this.authorPlan, this.distanceM, this.radiusM, this.lat, this.lng, this.editedAt, this.repostedByName, this.repostedByHandle, this.repostedBy, this.repostedAt, this.images = const [], this.sharesCount = 0, this.authorHasUpdate = false, required this.createdAt,
     this.recentResponses = const [], this.latestReplies = const [], this.referrers = const [], this.reactionsCount = 0, this.repostsCount = 0, this.referralsCount = 0, this.viewsCount = 0,
     this.reacted = false, this.reposted = false, this.bookmarked = false, this.myReaction,
-    this.outcome, this.wonBy, this.leadReason, this.leadNew = false, this.fact, this.cardColor, this.cardStyle, this.askType, this.pollOptions = const [], this.pollCounts = const [], this.myVote,
+    this.outcome, this.wonBy, this.leadReason, this.leadNew = false, this.fact, this.houseCard, this.cardColor, this.cardStyle, this.askType, this.pollOptions = const [], this.pollCounts = const [], this.myVote,
   });
 
   bool get closed => outcome != null;
@@ -342,6 +344,7 @@ class Post {
         bookmarked: j['bookmarked'] == true, myReaction: j['myReaction'] as String? ?? (j['reacted'] == true ? 'heart' : null),
         outcome: j['outcome'] as String?, wonBy: j['wonBy'] as String?, leadReason: j['leadReason'] as String?, leadNew: j['leadNew'] == true, cardColor: j['cardColor'] as String?, cardStyle: j['cardStyle'] as String?, askType: j['askType'] as String?, pollOptions: _strings(j['pollOptions']), pollCounts: ((j['pollCounts'] as List?) ?? const []).map((e) => (e as num).toInt()).toList(), myVote: (j['myVote'] as num?)?.toInt(),
         fact: j['fact'] is Map ? PostFact.fromJson(j['fact'] as Map) : null,
+        houseCard: j['houseCard'] is Map ? HouseCard.fromJson(j['houseCard'] as Map) : null,
       );
 }
 
@@ -368,6 +371,8 @@ class HouseCard {
   final Map<String, dynamic>? mine, results;
   final Post? post;
   HouseCard({required this.key, required this.type, required this.account, this.ai = false, this.title, this.body, this.sourceUrl, this.sourceName, this.data = const {}, this.mine, this.results, this.post});
+  /// the same card with the real post behind it (React · Refer · Share and Reply work on it)
+  HouseCard withPost(Post p) => HouseCard(key: key, type: type, account: account, ai: ai, title: title, body: body, sourceUrl: sourceUrl, sourceName: sourceName, data: data, mine: mine, results: results, post: p);
   factory HouseCard.fromJson(Map j) {
     final a = (j['account'] as Map?) ?? const {};
     final src = j['source'] as Map?;

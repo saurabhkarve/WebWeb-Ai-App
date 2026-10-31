@@ -231,8 +231,6 @@ class _FindScreenState extends State<FindScreen> {
           const SizedBox(height: 4),
           Text(t('Businesses, jobs and asks around you'), style: TextStyle(fontSize: 14, color: p.muted)),
           const SizedBox(height: 12),
-          const NearbyMapCard(),
-          const SizedBox(height: 14),
         ],
         // search box
         Container(
@@ -306,6 +304,8 @@ class _FindScreenState extends State<FindScreen> {
               if (_urgency.isNotEmpty) goldChip(t(labelOf(kUrgencies, _urgency)), () => _set(() => _urgency = '')),
             ]),
           ),
+        // the map under the search and its filters (the page opened from a search has none)
+        if (!widget.standalone) ...[const SizedBox(height: 12), const NearbyMapCard()],
         const SizedBox(height: 12),
         if (idle) _Explore(key: _explore, scope: _scope),
         if (empty && !_loading) EmptyState(title: t('Nothing found'), hint: t('Try a different word or another tab.')),

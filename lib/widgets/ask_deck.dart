@@ -11,6 +11,7 @@ import '../i18n.dart';
 import '../icons.dart';
 import '../models.dart';
 import '../theme.dart';
+import 'card_cta.dart';
 import '../location.dart' show kNodeCoords;
 import 'area_map.dart' show AreaMap, askDeadline, askTimeLeft, showAreaViewer;
 import 'image_grid.dart' show openImageViewer;
@@ -311,8 +312,9 @@ class _AskDeckState extends State<AskDeck> {
         ]);
         Widget? cta() {
           if (widget.preview || (visitHref == null && widget.mine)) return null;
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
+          return CardCta(
+            label: visitHref != null ? 'Visit website' : 'I can help',
+            scale: _scale,
             onTap: () {
               if (_log) CardEvents.log(context.read<AuthProvider>().api, post.id, 'cta', 0, _kinds.length);
               if (visitHref != null) {
@@ -321,22 +323,6 @@ class _AskDeckState extends State<AskDeck> {
                 widget.onReply?.call();
               }
             },
-            // a compact pill, sized to the deck (a short phone's small card, a tall one's larger), the tap area still 40 high
-            child: SizedBox(
-              height: 40,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: IntrinsicWidth(child: Container(
-              height: (30 * _scale).clamp(30.0, 36.0),
-              constraints: BoxConstraints(minWidth: (96 * _scale).clamp(96.0, 120.0)),
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              alignment: Alignment.center,
-              // yellow, so the one action on the card stands out (the other buttons have no fill)
-              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 3, offset: Offset(0, 1))]),
-              child: Text(t(visitHref != null ? 'Visit website' : 'I can help'), style: TextStyle(fontSize: (13 * _scale).clamp(12.5, 14.5), fontWeight: FontWeight.w700, color: kInk)),
-                )),
-              ),
-            ),
           );
         }
         // the chips across the card's full width, then (when the ask is not yours) "I can help" as a full-width button

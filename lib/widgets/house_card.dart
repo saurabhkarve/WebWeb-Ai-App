@@ -26,6 +26,7 @@ import 'post_card.dart';
 import 'reaction_picker.dart';
 import 'refer_sheet.dart';
 import 'swipe_deck.dart';
+import 'card_cta.dart';
 
 /// A WEBWEB house card between asks on Connect (web house-card.tsx, API feed-cards.ts). Always from a house account
 /// with the WEBWEB badge (and AI when the model wrote it), never dressed as an ask; each one has something to do in it:
@@ -247,7 +248,7 @@ class _HouseCardViewState extends State<HouseCardView> {
         const SizedBox(height: 12),
         // the posts that read come as a swipeable deck of small cards, as an ask does; the others are one tinted card
         // (a row of items needs none: its item cards are the cards)
-        if (_readTypes.contains(card.type)) _HouseDeck(card, (c) => setState(() => card = c), _tap) else if (_deckTypes.contains(card.type)) _PersonalDeck(card, (c) => setState(() => card = c), _tap) else if (card.type == 'items') _body() else Builder(builder: (_) {
+        if (_deckTypes.contains(card.type)) _StyledDeck(card: card, set: (c) => setState(() => card = c), tap: _tap, onReply: post == null ? null : () => _replyPost(post)) else if (card.type == 'items') _body() else Builder(builder: (_) {
           final tint = kCardColors[_tone[card.account.handle] ?? 'gold']!;
           return Container(
             padding: const EdgeInsets.all(16),
@@ -1422,6 +1423,53 @@ const _readTypes = {'news', 'tip', 'tender', 'scheme', 'event', 'job'};
 const _deckTypes = {..._readTypes, 'missed_leads', 'improve_ask', 'pulse', 'buy_select', 'profile', 'spotlight', 'ask_ai', 'quiz', 'poll'};
 const _kindEmoji = {'news': '📰', 'tip': '💡', 'tender': '📄', 'scheme': '🏛️', 'event': '📅', 'job': '👷'};
 
+/// A deck in its own layout (classic, banner, poster or badge, a steady pick from the card), its account's colour, and
+/// Reply as the card's button (web StyledDeck).
+class _StyledDeck extends StatelessWidget {
+  final HouseCard card;
+  final ValueChanged<HouseCard> set;
+  final VoidCallback tap;
+  final VoidCallback? onReply;
+  const _StyledDeck({required this.card, required this.set, required this.tap, this.onReply});
+  @override
+  Widget build(BuildContext context) {
+    final h = card.account.handle;
+    return DeckLook(
+      style: styleOfId(card.key),
+      color: _tone[h] ?? 'gold',
+      emoji: _kindEmoji[card.type] ?? _face[h]?.$1,
+      onReply: onReply,
+      child: _readTypes.contains(card.type) ? _HouseDeck(card, set, tap) : _PersonalDeck(card, set, tap),
+    );
+  }
+}
+
+/// A stored house card as the cards of its post, where the post is shown (a profile, a search, the post page).
+class HouseCardBody extends StatefulWidget {
+  final HouseCard card;
+  final VoidCallback onReply;
+  const HouseCardBody({super.key, required this.card, required this.onReply});
+  @override
+  State<HouseCardBody> createState() => _HouseCardBodyState();
+}
+
+class _HouseCardBodyState extends State<HouseCardBody> {
+  late HouseCard card = widget.card;
+  @override
+  Widget build(BuildContext context) {
+    if (!_deckTypes.contains(card.type)) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: _StyledDeck(
+        card: card,
+        set: (c) => setState(() => card = c.post == null && card.post != null ? c.withPost(card.post!) : c),
+        tap: () => _cardEvent(context.read<AuthProvider>().api, card, 'tap'),
+        onReply: widget.onReply,
+      ),
+    );
+  }
+}
+
 /// the first words of a text, ended at a word
 String _clip(String text, int max) {
   final s = text.replaceAll(RegExp(r'\s+'), ' ').trim();
@@ -1608,6 +1656,10 @@ class _HouseDeckState extends State<_HouseDeck> {
             tap();
             openExternal(context, card.sourceUrl!);
           }),
+          const SizedBox(height: 8),
+        ],
+        if (DeckLook.of(context)?.onReply != null) ...[
+          CardCta(label: 'Reply', onTap: DeckLook.of(context)!.onReply, fill: true),
           const SizedBox(height: 8),
         ],
         if (card.post == null)

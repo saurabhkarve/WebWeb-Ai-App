@@ -26,6 +26,9 @@ import 'area_map.dart';
 import 'image_grid.dart';
 import 'reaction_picker.dart';
 import 'swipe_deck.dart';
+import 'card_cta.dart';
+import 'house_card.dart' show HouseCardBody;
+import 'house_text_card.dart';
 import 'reply_thread.dart';
 import 'p1.dart';
 import 'refer_sheet.dart';
@@ -183,6 +186,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         leadReason: p.leadReason,
         leadNew: p.leadNew,
         fact: p.fact,
+        houseCard: p.houseCard,
       );
 
   /// "Alert me for similar asks": the alert sheet, with this ask's category and place.
@@ -279,8 +283,12 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
         )
       else if (isAsk)
         HashtagText(askText(post.askType, post.title), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.375, letterSpacing: -0.18)),
-      if (post.fact != null)
-        FactCard(post.fact!)
+      if (post.houseCard != null)
+        HouseCardBody(card: post.houseCard!.withPost(post), onReply: _reply)
+      else if (post.fact != null)
+        FactCard(post.fact!, onReply: _reply)
+      else if (isHouseHandle(post.authorHandle) && !isAsk && post.images.isEmpty && (post.description ?? '').isNotEmpty)
+        HouseTextCard(id: post.id, handle: post.authorHandle, text: post.description, onOpen: _openDetail, onReply: _reply)
       else if ((post.description ?? '').isNotEmpty)
         Padding(
           padding: EdgeInsets.only(top: isAsk ? 4 : 0),
@@ -1399,7 +1407,8 @@ class ChipLine extends StatelessWidget {
 /// matters, the source.
 class FactCard extends StatefulWidget {
   final PostFact fact;
-  const FactCard(this.fact, {super.key});
+  final VoidCallback? onReply;
+  const FactCard(this.fact, {super.key, this.onReply});
   @override
   State<FactCard> createState() => _FactCardState();
 }
@@ -1459,6 +1468,7 @@ class _FactCardState extends State<FactCard> {
         const SizedBox(height: 8),
         Text(host, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
         const Spacer(),
+        if (widget.onReply != null) CardCta(label: 'Reply', onTap: widget.onReply, fill: true),
         if (fact.sourceUrl.isNotEmpty) btn(t('Read the source'), () => openExternal(context, fact.sourceUrl)),
         const SizedBox(height: 8),
         btn('📤 ${t('Share on WhatsApp')}', () => launchUrl(Uri.parse('https://wa.me/?text=${Uri.encodeComponent('${fact.figure} ${fact.label}\n${fact.title}\n${fact.sourceUrl}')}'), mode: LaunchMode.externalApplication).catchError((_) => false), soft: true),
@@ -1466,7 +1476,12 @@ class _FactCardState extends State<FactCard> {
     ];
     return Padding(
       padding: const EdgeInsets.only(top: 4),
-      child: SwipeDeck(cards: cards, tint: kGold, label: '📊 ${t('Facts & figures near you')}', controller: _ctl),
+      child: DeckLook(
+        style: styleOfId('${fact.figure}${fact.title}'),
+        color: 'gold',
+        emoji: fact.emoji,
+        child: SwipeDeck(cards: cards, tint: kGold, label: '📊 ${t('Facts & figures near you')}', controller: _ctl),
+      ),
     );
   }
 }

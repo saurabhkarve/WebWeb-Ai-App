@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../card_colors.dart';
 import '../theme.dart';
+import 'card_cta.dart';
 
 /// Lets the cards of a deck jump to another card.
 class DeckController {
@@ -66,19 +68,53 @@ class _SwipeDeckState extends State<SwipeDeck> {
           onPageChanged: (k) => setState(() => _i = k),
           itemBuilder: (_, k) => Padding(
             padding: const EdgeInsets.only(right: 10),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [tint.withValues(alpha: .28), tint.withValues(alpha: 0)], stops: const [0, .8]),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: tint.withValues(alpha: .4)),
-              ),
-              child: cards[k],
-            ),
+            child: _DeckCard(tint: tint, first: k == 0, look: DeckLook.of(context), child: cards[k]),
           ),
         ),
       ),
     ]);
+  }
+}
+
+/// One card of a deck: the same size and tint as an ask's cards; the first one in the deck's layout (classic, banner,
+/// poster or badge) when the deck has one (web DeckCard).
+class _DeckCard extends StatelessWidget {
+  final Color tint;
+  final bool first;
+  final DeckLook? look;
+  final Widget child;
+  const _DeckCard({required this.tint, required this.first, required this.look, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final style = first && look != null ? look!.style : 'classic';
+    final solid = look == null ? tint : solidOf(look!.color);
+    final emoji = look?.emoji;
+    final poster = style == 'poster';
+    final radius = BorderRadius.circular(16);
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [tint.withValues(alpha: poster ? .5 : .28), tint.withValues(alpha: poster ? .12 : 0)],
+          stops: const [0, .8],
+        ),
+        borderRadius: radius,
+        border: Border.all(color: tint.withValues(alpha: .4)),
+      ),
+      child: Stack(children: [
+        if (style == 'banner') Positioned(left: 0, right: 0, top: 0, height: 10, child: ColoredBox(color: solid)),
+        if (poster && emoji != null) Positioned(right: -6, top: -10, child: Opacity(opacity: .2, child: Text(emoji, style: const TextStyle(fontSize: 96, height: 1)))),
+        if (style == 'badge' && emoji != null)
+          Positioned(
+            right: 12,
+            top: 12,
+            child: Container(width: 44, height: 44, alignment: Alignment.center, decoration: BoxDecoration(color: solid, borderRadius: BorderRadius.circular(14)), child: Text(emoji, style: const TextStyle(fontSize: 24, height: 1))),
+          ),
+        Padding(padding: EdgeInsets.fromLTRB(16, style == 'banner' ? 22 : 16, 16, 16), child: child),
+      ]),
+    );
   }
 }
