@@ -31,6 +31,21 @@ const kConnectTour = [
   TourStep('Alerts, your week, and this tour', 'Set alerts for the asks you want first. Your week shows your leads, jobs won and rank.', 'account'),
 ];
 
+/// The Smart Phonebook tour: three picture cards for the idea (search, AI adds the facts, call or chat), one more for
+/// business owners, then a spotlight on the tabs. Same wording as the website's hero, so the translations are shared.
+const kPhonebookTourId = 'pbtour1';
+List<TourStep> phonebookTour({required bool business}) => [
+      const TourStep('Search anyone near you', 'Type a person, business, product or service. Your phonebook finds the right ones nearby.', null, 'pb-search'),
+      const TourStep('AI adds the facts', 'A plain name and number becomes a page with ratings, distance, services and reviews from people you know.', null, 'pb-facts'),
+      const TourStep('Call, chat, connect', 'Open a page and call or chat in one tap. Your number is shared only if you choose.', null, 'pb-connect'),
+      if (business) const TourStep('Your business page is free', 'You get a page and a website at webweb.ai/@yourname. Customers find you, and you reply from this app.', null, 'pb-business'),
+      const TourStep('Your phonebook', 'Your contacts live here, now with facts added by AI. Search for anything.', 'nav-contacts'),
+      const TourStep('Nearby', 'See members within 50 km on a map, closest first.', 'nav-find'),
+      const TourStep('Talk', 'Chats and calls with customers and businesses.', 'nav-talk'),
+      const TourStep('Notifications', 'Replies, reviews and recommendations arrive here.', 'nav-notes'),
+      const TourStep('Your account and this tour', 'Manage your page and settings here, and replay this tour any time.', 'account'),
+    ];
+
 /// "Take the app tour" in the account menu: the shell switches to Connect and starts the tour.
 final tourRequest = ValueNotifier<int>(0);
 
@@ -78,7 +93,8 @@ class Tours {
   }
 
   /// Show tour [id] if this member hasn't finished or skipped it yet.
-  static Future<void> maybeShow(BuildContext context, String id, List<TourStep> steps) async {
+  /// [retire]: older tours that need not show once this one has (the new first-run tour replaces the Home one).
+  static Future<void> maybeShow(BuildContext context, String id, List<TourStep> steps, {List<String> retire = const []}) async {
     if (_showing) return;
     final auth = context.read<AuthProvider>();
     final api = auth.api;
@@ -87,6 +103,8 @@ class Tours {
     final prefs = await SharedPreferences.getInstance();
     final done = prefs.getStringList(_doneKey(uid)) ?? const <String>[];
     if (done.contains(id)) return;
+    // the Home tour is retired by the first-run tour: it waits for that one, which marks it done
+    if (id == kConnectTourId && !done.contains(kPhonebookTourId)) return;
     if (_logFor != uid) {
       _logFor = uid;
       _log = null;
@@ -97,7 +115,7 @@ class Tours {
     });
     final log = await _log!;
     final seen = log[id];
-    void markDone() => prefs.setStringList(_doneKey(uid), {...done, id}.toList());
+    void markDone() => prefs.setStringList(_doneKey(uid), {...done, id, ...retire}.toList());
     if (seen is Map && seen['status'] != 'started') return markDone();
     await Future.delayed(const Duration(milliseconds: 900)); // let the page settle
     if (!context.mounted || _showing) return;
@@ -198,6 +216,7 @@ class _TourOverlayState extends State<_TourOverlay> {
           const SizedBox(height: 4),
           if (step.visual == 'give-take') ...[const _GiveTake(), const SizedBox(height: 10)],
           if (step.visual == 'ask-types') ...[const _AskTypesDemo(), const SizedBox(height: 10)],
+          if (step.visual?.startsWith('pb-') ?? false) ...[PbTourVisual(step.visual!), const SizedBox(height: 10)],
           Text(t(step.title), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
           Text(t(step.body), style: TextStyle(fontSize: 14, height: 1.4, color: p.text)),
@@ -514,5 +533,201 @@ class _AskTypesDemoState extends State<_AskTypesDemo> {
         Text(t('Pick what you want. WebWeb finds the right members.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .7))),
       ]),
     );
+  }
+}
+
+
+/// The pictures of the Smart Phonebook tour: small loops that show the idea (search, facts, connect, a business page).
+class PbTourVisual extends StatefulWidget {
+  final String kind;
+  const PbTourVisual(this.kind);
+  @override
+  State<PbTourVisual> createState() => PbTourVisualState();
+}
+
+class PbTourVisualState extends State<PbTourVisual> {
+  int _n = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 1800), (_) {
+      if (mounted) setState(() => _n++);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  static const _queries = [('👤', 'Person', 'Ramesh plumber'), ('🏪', 'Business', 'Sharma Sanitary'), ('📦', 'Product', 'water purifier'), ('🛠️', 'Service', 'AC repair')];
+
+  Widget _swap(Object key, Widget child) => AnimatedSwitcher(
+        duration: const Duration(milliseconds: 350),
+        transitionBuilder: (c, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, .15), end: Offset.zero).animate(a), child: c)),
+        child: KeyedSubtree(key: ValueKey(key), child: child),
+      );
+
+  Widget _chip(Pal p, String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(color: kGold.withValues(alpha: .22), borderRadius: BorderRadius.circular(99)),
+        child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final body = switch (widget.kind) {
+      'pb-search' => _search(p),
+      'pb-facts' => _facts(p),
+      'pb-connect' => _connect(p),
+      _ => _business(p),
+    };
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [kGold.withValues(alpha: .22), kGold.withValues(alpha: .06)]), borderRadius: BorderRadius.circular(14)),
+      child: body,
+    );
+  }
+
+  /// the search bar types a query for each of the four things you can look for
+  Widget _search(Pal p) {
+    final q = _queries[_n % 4];
+    final query = q.$3 == 'water purifier' || q.$3 == 'AC repair' ? t(q.$3) : q.$3;
+    return Column(children: [
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(99)),
+        child: Row(children: [
+          const Text('🔍', style: TextStyle(fontSize: 14)),
+          const SizedBox(width: 8),
+          Expanded(child: _swap(query, Text(query, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)))),
+        ]),
+      ),
+      const SizedBox(height: 8),
+      Row(children: [
+        for (var k = 0; k < 4; k++)
+          Expanded(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              margin: EdgeInsets.only(right: k == 3 ? 0 : 5),
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              decoration: BoxDecoration(gradient: k == _n % 4 ? kGoldGradient : null, color: k == _n % 4 ? null : p.canvas.withValues(alpha: .7), borderRadius: BorderRadius.circular(10)),
+              child: Column(children: [
+                Text(_queries[k].$1, style: const TextStyle(fontSize: 15)),
+                Text(t(_queries[k].$2), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: k == _n % 4 ? kInk : p.muted)),
+              ]),
+            ),
+          ),
+      ]),
+    ]);
+  }
+
+  /// a plain contact turns into a page with facts, and back
+  Widget _facts(Pal p) {
+    final plain = _n.isEven;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 86),
+      child: _swap(
+        plain,
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(12)),
+          child: plain
+              ? Row(children: [
+                  CircleAvatar(radius: 20, backgroundColor: p.border, child: const Text('R', style: TextStyle(fontWeight: FontWeight.w700))),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Ramesh Plumber 2', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    Text('+91 98xxx xxx21', style: TextStyle(fontSize: 12, color: p.muted)),
+                  ])),
+                ])
+              : Row(children: [
+                  Container(width: 40, height: 40, alignment: Alignment.center, decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(12)), child: const Text('R', style: TextStyle(fontWeight: FontWeight.w800, color: kInk))),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Ramesh Sanitary Works ✓', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                    Text('★ 4.6 · 21 · 1.2 km', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.text)),
+                    const SizedBox(height: 4),
+                    Wrap(spacing: 4, runSpacing: 4, children: [_chip(p, t('Leak repair')), _chip(p, t('Motor pumps'))]),
+                  ])),
+                ]),
+        ),
+      ),
+    );
+  }
+
+  /// a result with Call and Chat, one then the other lit
+  Widget _connect(Pal p) {
+    final call = _n.isEven;
+    Widget btn(String icon, String label, bool on) => Expanded(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(gradient: on ? kGoldGradient : null, border: on ? null : Border.all(color: p.border), borderRadius: BorderRadius.circular(99)),
+            child: Text('$icon $label', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: on ? kInk : p.text)),
+          ),
+        );
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(12)),
+      child: Column(children: [
+        Row(children: [
+          Container(width: 36, height: 36, alignment: Alignment.center, decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(11)), child: const Text('A', style: TextStyle(fontWeight: FontWeight.w800, color: kInk))),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Aqua Care RO ✓', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+            Text('★ 4.5 · 0.9 km', style: TextStyle(fontSize: 12, color: p.muted)),
+          ])),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [btn('📞', t('Call'), call), const SizedBox(width: 8), btn('💬', t('Chat'), !call)]),
+      ]),
+    );
+  }
+
+  /// the business page, with a notification arriving
+  Widget _business(Pal p) {
+    final note = _n.isOdd;
+    return Stack(children: [
+      Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(12)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(width: 38, height: 38, alignment: Alignment.center, decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(11)), child: const Text('S', style: TextStyle(fontWeight: FontWeight.w800, color: kInk))),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Sharma Car Care', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+              Text('webweb.ai/@sharmacarcare', style: TextStyle(fontSize: 11, color: p.muted)),
+            ])),
+            Text('● ${t('Live')}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF059669))),
+          ]),
+          const SizedBox(height: 8),
+          Wrap(spacing: 4, runSpacing: 4, children: [_chip(p, t('Car wash')), _chip(p, t('Denting and painting'))]),
+          const SizedBox(height: 22),
+        ]),
+      ),
+      Positioned(
+        left: 10,
+        right: 10,
+        bottom: 8,
+        child: AnimatedOpacity(
+          opacity: note ? 1 : 0,
+          duration: const Duration(milliseconds: 300),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(color: kInk, borderRadius: BorderRadius.circular(99)),
+            child: Text('🔔 ${t('New message from {n}', {'n': 'Rohit'})}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+          ),
+        ),
+      ),
+    ]);
   }
 }

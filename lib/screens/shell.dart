@@ -84,6 +84,10 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     });
     _pushSub = NotificationService.activity.stream.listen((_) => _refreshAll());
     tourRequest.addListener(_replayTour);
+    // the first-run tour (cards, then a spotlight on the tabs); the Home tour it replaces is retired with it
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Tours.maybeShow(context, kPhonebookTourId, phonebookTour(business: _isBusiness()), retire: const [kConnectTourId]);
+    });
     // service contacts: look quietly if the member turned it on; the one-time invitation from the third open
     _svcTimer = Timer(const Duration(seconds: 12), () async {
       if (!mounted) return;
@@ -135,14 +139,12 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  /// "Take the app tour" from the account menu: back to the top of Updates (the feed the tour points at), then the tour.
+  bool _isBusiness() => context.read<AuthProvider>().profile?.isEntrepreneur ?? false;
+
+  /// "Take the app tour" from the account menu: the Smart Phonebook tour, from its first card.
   void _replayTour() {
     if (!mounted) return;
-    setState(() {
-      _i = _feed;
-      _topTick++;
-    });
-    Tours.start(context, kConnectTourId, kConnectTour);
+    Tours.start(context, kPhonebookTourId, phonebookTour(business: _isBusiness()));
   }
 
   void _go(int k) {
