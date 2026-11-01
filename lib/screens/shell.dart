@@ -32,6 +32,7 @@ import 'phonebook.dart';
 import 'post_detail.dart';
 import 'profile.dart';
 import 'service_contacts_sheet.dart';
+import 'shared_contacts.dart';
 import 'support_sheet.dart';
 import 'talk.dart';
 import 'your_asks.dart' show yourAsksRequest;
@@ -1097,6 +1098,24 @@ class _ServiceContactsRowState extends State<_ServiceContactsRow> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final on = _on == true;
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      _toggleRow(p, on),
+      if (on)
+        InkWell(
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SharedContactsScreen())),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(56, 4, 12, 9),
+            child: Row(children: [
+              Expanded(child: Text(t('Contacts you share'), style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: p.link))),
+              Icon(Icons.chevron_right, size: 18, color: p.muted),
+            ]),
+          ),
+        ),
+    ]);
+  }
+
+  Widget _toggleRow(Pal p, bool on) {
     return InkWell(
       onTap: _toggle,
       borderRadius: BorderRadius.circular(12),

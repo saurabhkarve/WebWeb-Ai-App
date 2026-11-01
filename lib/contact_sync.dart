@@ -52,6 +52,19 @@ class ContactSync {
     }
   }
 
+  /// What this member shares, and what they removed from it (the server tags those removed).
+  static Future<SharedContacts> mine(Api api) async {
+    final d = await api.get('/contact-sync/mine') as Map;
+    List<SharedContact> rows(String k) => [for (final r in (d[k] as List? ?? const [])) SharedContact.fromJson(Map<String, dynamic>.from(r as Map))];
+    return SharedContacts(rows('shared'), rows('removed'));
+  }
+
+  /// Stop sharing one contact. The server tags it removed and the next look through the phone book skips it.
+  static Future<void> remove(Api api, String phone) => api.delete('/contact-sync/contacts/$phone');
+
+  /// Share a removed contact again.
+  static Future<void> restore(Api api, String phone) => api.post('/contact-sync/contacts/$phone/restore', {});
+
   static const _kInvites = 'svc_invites';
   static const _kInviteAt = 'svc_invite_at';
 
@@ -134,4 +147,21 @@ class ContactSync {
       _running = false;
     }
   }
+}
+
+class SharedContact {
+  final String phone, name, keyword;
+  final DateTime at;
+  const SharedContact(this.phone, this.name, this.keyword, this.at);
+  factory SharedContact.fromJson(Map<String, dynamic> j) => SharedContact(
+        '${j['phone']}',
+        '${j['name']}',
+        '${j['keyword']}',
+        DateTime.fromMillisecondsSinceEpoch((j['at'] as num?)?.toInt() ?? 0),
+      );
+}
+
+class SharedContacts {
+  final List<SharedContact> shared, removed;
+  const SharedContacts(this.shared, this.removed);
 }

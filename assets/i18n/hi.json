@@ -2706,5 +2706,17 @@
   "Not all your contacts will be synced: only service providers. If you allow it, it is a great contribution for other users looking for someone they can trust nearby.": "आपके सभी संपर्क सिंक नहीं होंगे: केवल सेवा प्रदाता। अगर आप अनुमति देते हैं, तो यह आसपास किसी भरोसेमंद व्यक्ति को ढूँढ रहे दूसरे उपयोगकर्ताओं के लिए बड़ा योगदान है।",
   "Allow location on your phone": "अपने फ़ोन पर लोकेशन की अनुमति दें",
   "Share service contacts from your phone": "अपने फ़ोन से सेवा संपर्क साझा करें",
-  "So we can show you people and asks near you.": "ताकि हम आपको आसपास के लोग और asks दिखा सकें।"
+  "So we can show you people and asks near you.": "ताकि हम आपको आसपास के लोग और asks दिखा सकें।",
+  "Contacts you share": "आपके साझा किए संपर्क",
+  "Stop sharing this contact?": "यह संपर्क साझा करना बंद करें?",
+  "{name} will be tagged removed on our server and will not be shared again. The contact stays on your phone.": "{name} हमारे सर्वर पर \"हटाया गया\" टैग होगा और दोबारा साझा नहीं होगा। संपर्क आपके फ़ोन में रहेगा।",
+  "Removed. It will not be shared again.": "हटा दिया। यह दोबारा साझा नहीं होगा।",
+  "Share again": "फिर साझा करें",
+  "Could not do that. Try again.": "यह नहीं हो सका। फिर कोशिश करें।",
+  "Could not load. Check your connection.": "लोड नहीं हो सका। कनेक्शन जाँचें।",
+  "Retry": "दोबारा",
+  "Only contacts saved with a word like plumber or cabs are shared, with their number. Remove any you do not want to share.": "केवल वही संपर्क साझा होते हैं जो plumber या cabs जैसे शब्द के साथ सेव हैं, नंबर सहित। जो साझा नहीं करना चाहते उन्हें हटाएँ।",
+  "removed": "हटाए",
+  "Search your shared contacts": "साझा संपर्क खोजें",
+  "You are not sharing any contact right now.": "अभी आप कोई संपर्क साझा नहीं कर रहे हैं।"
 }

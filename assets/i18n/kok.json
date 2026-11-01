@@ -2706,5 +2706,17 @@
   "Not all your contacts will be synced: only service providers. If you allow it, it is a great contribution for other users looking for someone they can trust nearby.": "तुमचे सगळे संपर्क सिंक जायनात: फकत सेवा पुरवठादार. तुमी परवानगी दिल्यार, लागींच विश्वासू मनीस सोदपी दुसऱ्या वापरप्यांक हें व्हडलें योगदान आसा.",
   "Allow location on your phone": "तुमच्या फोनार लोकेशनाची परवानगी दियात",
   "Share service contacts from your phone": "तुमच्या फोनांतल्यान सेवा संपर्क शेअर करात",
-  "So we can show you people and asks near you.": "जाका आमी तुमकां लागींचे लोक आनी asks दाखोंक शकतले."
+  "So we can show you people and asks near you.": "जाका आमी तुमकां लागींचे लोक आनी asks दाखोंक शकतले.",
+  "Contacts you share": "तुमी शेअर केल्ले संपर्क",
+  "Stop sharing this contact?": "हो संपर्क शेअर करप थांबोवचो?",
+  "{name} will be tagged removed on our server and will not be shared again. The contact stays on your phone.": "{name} आमच्या सर्व्हरार \"काडिल्लो\" अशें टॅग जातलो आनी परतून शेअर जावचो ना. संपर्क तुमच्या फोनांत उरतलो.",
+  "Removed. It will not be shared again.": "काडलो. तो परतून शेअर जावचो ना.",
+  "Share again": "परतून शेअर करचें",
+  "Could not do that. Try again.": "हें जालें ना. परत यत्न करात.",
+  "Could not load. Check your connection.": "लोड जालें ना. कनेक्शन पळयात.",
+  "Retry": "परत",
+  "Only contacts saved with a word like plumber or cabs are shared, with their number. Remove any you do not want to share.": "plumber वा cabs सारख्या उतरा सयत सेव्ह केल्ले संपर्क फकत नंबरा सयत शेअर जातात. जे शेअर करचे ना ते काडचे.",
+  "removed": "काडिल्ले",
+  "Search your shared contacts": "शेअर केल्ले संपर्क सोदचे",
+  "You are not sharing any contact right now.": "आतां तुमी कसलोच संपर्क शेअर करीनात."
 }
