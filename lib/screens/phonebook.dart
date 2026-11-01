@@ -1333,6 +1333,72 @@ final directoryRequest = ValueNotifier<({String q, String place, ({double lat, d
 
 /// The microphone of a search: asks for the microphone first, then listens in the app's language (Konkani is heard as
 /// Hindi) and hands the words over as they come ([done] when they are final).
+/// The Directory's search bar for any search: the AI badge, the four SkyQ colours round the box, the microphone.
+class AiSearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final ValueChanged<String> onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final FocusNode? focusNode;
+  final Widget? trailing;
+  const AiSearchField({super.key, required this.controller, required this.hint, required this.onChanged, this.onSubmitted, this.focusNode, this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return _GlowBorder(
+      radius: 28,
+      child: TextField(
+        controller: controller,
+        focusNode: focusNode,
+        onChanged: onChanged,
+        onSubmitted: onSubmitted,
+        textInputAction: TextInputAction.search,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: p.card,
+          contentPadding: const EdgeInsets.symmetric(vertical: 17, horizontal: 8),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.only(left: 12, right: 10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(14)),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('AI', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kInk, height: 1)),
+                SizedBox(width: 3),
+                Icon(Icons.auto_awesome_rounded, size: 14, color: kInk),
+              ]),
+            ),
+          ),
+          prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+          hintText: hint,
+          hintStyle: TextStyle(fontSize: 15, color: p.muted),
+          suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (trailing != null) trailing!,
+            if (controller.text.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  controller.clear();
+                  onChanged('');
+                },
+              ),
+            MicButton(onWords: (words, _) {
+              controller.text = words;
+              controller.selection = TextSelection.collapsed(offset: words.length);
+              onChanged(words);
+            }),
+          ]),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+        ),
+      ),
+    );
+  }
+}
+
 class MicButton extends StatefulWidget {
   final void Function(String words, bool done) onWords;
   const MicButton({super.key, required this.onWords});

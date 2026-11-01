@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'phonebook.dart' show AiSearchField;
 
 import '../api.dart' show smallImage;
 import '../auth_provider.dart';
@@ -232,42 +233,12 @@ class _FindScreenState extends State<FindScreen> {
           Text(t('Businesses, jobs and asks around you'), style: TextStyle(fontSize: 14, color: p.muted)),
           const SizedBox(height: 12),
         ],
-        // search box
-        Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(30)),
-          child: Row(children: [
-            WIcon(WI.search, size: 18, color: p.muted),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                controller: _q,
-                onChanged: (_) => _changed(),
-                textInputAction: TextInputAction.search,
-                style: const TextStyle(fontSize: 15),
-                decoration: InputDecoration(
-                  hintText: t('Search businesses, jobs, people, asks'),
-                  hintStyle: TextStyle(color: p.muted, fontWeight: FontWeight.w500),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  filled: false,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ),
-            if (_loading) const LogoLoader(size: 22)
-            else if (_q.text.isNotEmpty)
-              GestureDetector(
-                onTap: () {
-                  _q.clear();
-                  _changed();
-                },
-                child: WIcon(WI.close, size: 18, color: p.muted),
-              ),
-          ]),
+        // search box: the Directory's
+        AiSearchField(
+          controller: _q,
+          hint: t('Search businesses, jobs, people, asks'),
+          onChanged: (_) => _changed(),
+          trailing: _loading ? const Padding(padding: EdgeInsets.only(right: 4), child: LogoLoader(size: 22)) : null,
         ),
         const SizedBox(height: 10),
         // scopes, then the two filters as chips in the same row
