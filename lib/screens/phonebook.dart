@@ -267,6 +267,8 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   List<Contact>? _device;
   bool _canRead = false, _reading = false;
   List<Map>? _results;
+  /// service providers other members saved and WEBWEB approved (plumber, carpenter...), after my own contacts
+  List<Map> _service = const [];
   List<Post>? _asks;
   Map? _mine;
   Timer? _debounce, _aiTimer;
@@ -404,13 +406,25 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     // Ask AI reads the need once the member pauses (or at once on the keyboard's search key)
     if (v.trim().length >= 4) _aiTimer = Timer(const Duration(milliseconds: 1200), () => _askAi(v.trim()));
     setState(() {});
-    if (v.trim().length < 2) return setState(() => _results = null);
+    if (v.trim().length < 2) {
+      return setState(() {
+        _results = null;
+        _service = const [];
+      });
+    }
+    final api = context.read<AuthProvider>().api;
     _debounce = Timer(const Duration(milliseconds: 250), () async {
       try {
-        final d = await context.read<AuthProvider>().api.get('/users/search', {'q': v.trim(), if (_place.isNotEmpty) 'place': _place});
+        final d = await api.get('/users/search', {'q': v.trim(), if (_place.isNotEmpty) 'place': _place});
         if (mounted) setState(() => _results = (d as List).cast<Map>());
       } catch (_) {
         if (mounted) setState(() => _results = const []);
+      }
+      try {
+        final d = await api.get('/service-contacts/search', {'q': v.trim()});
+        if (mounted && _q.text.trim() == v.trim()) setState(() => _service = ((d as Map)['contacts'] as List? ?? const []).cast<Map>());
+      } catch (_) {
+        if (mounted) setState(() => _service = const []);
       }
       _matchTyped(v.trim());
     });
@@ -818,7 +832,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     final q = _q.text.trim().toLowerCase();
     if (q.length < 2) return false;
     final ai = _aiFor == _q.text.trim() ? ((_ai?['matches'] as List?) ?? const []) : const [];
-    return _mineFor(q).isNotEmpty || ai.isNotEmpty || (_results ?? const <Map>[]).isNotEmpty;
+    return _mineFor(q).isNotEmpty || ai.isNotEmpty || (_results ?? const <Map>[]).isNotEmpty || _service.isNotEmpty;
   }
 
   /// What the search found, above the ask: in my contacts, what Ask AI found (with why), others on WEBWEB; then the
@@ -875,6 +889,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     return [
       if (mine.isNotEmpty) ...[_label(p, t('In your contacts')), for (final e in mine.take(30)) _row(p, e)],
       ..._aiSection(p, aiMatches, saved),
+      ..._serviceSection(p, mine),
       if (others.isNotEmpty) ...[_label(p, t('On WEBWEB')), for (final u in others) _row(p, _Entry(_memberName(u), null, u))],
       Align(
         alignment: Alignment.centerLeft,
@@ -885,6 +900,29 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         ),
       ),
       ...heading,
+    ];
+  }
+
+  /// Service providers saved by other members and approved by WEBWEB: name, trade, and call / WhatsApp. Left out when
+  /// the same number is already in my own contacts.
+  List<Widget> _serviceSection(Pal p, List<_Entry> mine) {
+    String d10(String? x) => ContactSync.mobile10(x ?? '') ?? '';
+    final have = {for (final e in mine) d10(e.phone), for (final e in mine) ...(e.contact?.phones ?? const <Phone>[]).map((ph) => d10(ph.number))};
+    final list = _service.where((c) => !have.contains('${c['phone']}')).toList();
+    if (list.isEmpty) return const [];
+    return [
+      _label(p, t('Service contacts')),
+      for (final c in list)
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          leading: CircleAvatar(backgroundColor: kGold.withValues(alpha: .2), child: const Icon(Icons.handyman_rounded, size: 20, color: kStar)),
+          title: Text('${c['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text(((c['tags'] as List?) ?? const []).join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted)),
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            IconButton(tooltip: t('Call'), onPressed: () => _open('tel:+91${c['phone']}'), icon: const Icon(Icons.call_rounded, color: Color(0xFF1E9E5A))),
+            IconButton(tooltip: 'WhatsApp', onPressed: () => _open('https://wa.me/91${c['phone']}'), icon: const Icon(Icons.chat_rounded, color: Color(0xFF25D366))),
+          ]),
+        ),
     ];
   }
 
