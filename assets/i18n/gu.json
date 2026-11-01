@@ -2730,5 +2730,7 @@
   "Shared by 1 member": "1 સભ્યએ શેર કર્યું",
   "Shared by {n} members": "{n} સભ્યોએ શેર કર્યું",
   "Shared by {names} and {n} more": "{names} અને બીજા {n}એ શેર કર્યું",
-  "Shared by {names}": "{names}એ શેર કર્યું"
+  "Shared by {names}": "{names}એ શેર કર્યું",
+  "Known by {names}": "{names}ને ખબર છે",
+  "Known by {names} and {n} more of your contacts": "{names} અને તમારા વધુ {n} સંપર્કોને ખબર છે"
 }

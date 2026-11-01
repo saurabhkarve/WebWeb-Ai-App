@@ -631,7 +631,7 @@ class PbTourVisualState extends State<PbTourVisual> {
   Widget _facts(Pal p) {
     final plain = _n.isEven;
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 86),
+      constraints: const BoxConstraints(minHeight: 110),
       child: _swap(
         plain,
         Container(
@@ -640,7 +640,7 @@ class PbTourVisualState extends State<PbTourVisual> {
           decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(12)),
           child: plain
               ? Row(children: [
-                  CircleAvatar(radius: 20, backgroundColor: p.border, child: const Text('R', style: TextStyle(fontWeight: FontWeight.w700))),
+                  CircleAvatar(radius: 20, backgroundColor: p.border, child: const Text('RP', style: TextStyle(fontWeight: FontWeight.w700))),
                   const SizedBox(width: 12),
                   Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('Ramesh Plumber 2', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
@@ -655,6 +655,21 @@ class PbTourVisualState extends State<PbTourVisual> {
                     Text('★ 4.6 · 21 · 1.2 km', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.text)),
                     const SizedBox(height: 4),
                     Wrap(spacing: 4, runSpacing: 4, children: [_chip(p, t('Leak repair')), _chip(p, t('Motor pumps'))]),
+                    const SizedBox(height: 6),
+                    // the contacts in MY phone book who know it, by the names I saved them under
+                    Row(children: [
+                      for (final m in const ['S', 'M'])
+                        Container(
+                          width: 18,
+                          height: 18,
+                          margin: const EdgeInsets.only(right: 3),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(color: p.border, shape: BoxShape.circle, border: Border.all(color: p.canvas, width: 1.5)),
+                          child: Text(m, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800)),
+                        ),
+                      const SizedBox(width: 3),
+                      Expanded(child: Text(t('Known by {names} and {n} more of your contacts', {'names': 'Sachin & Meena Tai', 'n': 1}), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: p.muted))),
+                    ]),
                   ])),
                 ]),
         ),
