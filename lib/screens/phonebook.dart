@@ -18,14 +18,17 @@ import '../links.dart';
 import '../location.dart' show PermissionNotGiven, currentLocation;
 import '../models.dart';
 import '../permissions.dart';
+import '../places.dart' show placeAt;
 import '../theme.dart';
 import '../widgets.dart';
 import '../widgets/area_map.dart' show askTimeLeft;
 import '../widgets/city_picker.dart';
 import '../widgets/reviews_card.dart';
+import '../widgets/whatsapp_icon.dart';
 import 'find.dart';
 import 'post_detail.dart';
 import 'profile.dart';
+import 'service_page.dart';
 import 'service_contacts_sheet.dart' show showServiceContactsSheet;
 import 'ask.dart' show SearchAskForm;
 
@@ -282,6 +285,18 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   /// where to look: '' is the current location; or any town in India picked beside the search (with its centre when it is a new town)
   String _place = '';
   ({double lat, double lng})? _placeAt;
+  /// the city the phone is in (when location is already allowed): shown in the dropdown in place of "Current location"
+  String? _hereCity;
+
+  Future<void> _detectCity() async {
+    final h = await _position();
+    final city = h == null ? null : placeAt(h.lat, h.lng)?.name;
+    if (mounted && city != _hereCity) setState(() => _hereCity = city);
+  }
+
+  void _onFocusRequest() {
+    if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) => _qFocus.requestFocus());
+  }
 
   /// a search sent from the right column of wide screens (and where to look)
   void _onRequest() {
@@ -306,9 +321,11 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   void initState() {
     super.initState();
     directoryRequest.addListener(_onRequest);
+    directoryFocus.addListener(_onFocusRequest);
     _loadMatches();
     _readPhoneBook(ask: false);
     WidgetsBinding.instance.addPostFrameCallback((_) => _firstAsk());
+    _detectCity();
     _loadAsks();
     final me = context.read<AuthProvider>().profile;
     if (me != null) {
@@ -321,6 +338,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   @override
   void dispose() {
     directoryRequest.removeListener(_onRequest);
+    directoryFocus.removeListener(_onFocusRequest);
     _debounce?.cancel();
     _aiTimer?.cancel();
     _q.dispose();
@@ -499,6 +517,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
       if (mounted && '$e'.isNotEmpty) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
       return;
     }
+    _detectCity();
     final q = _q.text.trim();
     _aiFor = null;
     _askAi(q);
@@ -726,7 +745,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         // where: the current location unless another town is picked (every city of India, or any town typed)
         Align(alignment: Alignment.centerLeft, child: CityPill(
           value: _place,
-          anyLabel: t('Current location'),
+          anyLabel: _hereCity ?? t('Current location'),
           chip: true,
           onChanged: (c) {
             setState(() {
@@ -934,6 +953,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
       for (final c in list)
         ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ServicePageScreen(phone: '${c['phone']}', initial: c, shared: sharedBy(c)))),
           leading: CircleAvatar(backgroundColor: kGold.withValues(alpha: .2), child: const Icon(Icons.handyman_rounded, size: 20, color: kStar)),
           title: Text('${c['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
           subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -954,7 +974,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
             if ('${c['website'] ?? ''}'.isNotEmpty) IconButton(tooltip: t('Website'), onPressed: () => _open('${c['website']}'), icon: Icon(Icons.language_rounded, color: p.muted)),
             IconButton(tooltip: t('Call'), onPressed: () => _open('tel:+91${c['phone']}'), icon: const Icon(Icons.call_rounded, color: Color(0xFF1E9E5A))),
-            IconButton(tooltip: 'WhatsApp', onPressed: () => _open('https://wa.me/91${c['phone']}'), icon: const Icon(Icons.chat_rounded, color: Color(0xFF25D366))),
+            IconButton(tooltip: 'WhatsApp', onPressed: () => _open('https://wa.me/91${c['phone']}'), icon: const WhatsAppIcon(size: 24)),
           ]),
         ),
     ];
@@ -1155,6 +1175,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         }
 
         Widget icon(IconData i, Color color, String tip, VoidCallback onTap) => IconButton(tooltip: tip, onPressed: onTap, icon: Icon(i, color: color));
+        Widget iconW(Widget w, String tip, VoidCallback onTap) => IconButton(tooltip: tip, onPressed: onTap, icon: w);
         return SafeArea(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * .8),
@@ -1174,7 +1195,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
                     onTap: () => go('tel:${ph.replaceAll(RegExp(r'[^\d+]'), '')}'),
                     trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                       icon(Icons.call_rounded, const Color(0xFF1E9E5A), t('Call'), () => go('tel:${ph.replaceAll(RegExp(r'[^\d+]'), '')}')),
-                      if (ContactSync.mobile10(ph) != null) icon(Icons.chat_rounded, const Color(0xFF25D366), 'WhatsApp', () => go('https://wa.me/91${ContactSync.mobile10(ph)}')),
+                      if (ContactSync.mobile10(ph) != null) iconW(const WhatsAppIcon(size: 24), 'WhatsApp', () => go('https://wa.me/91${ContactSync.mobile10(ph)}')),
                     ]),
                   ),
                 for (final m in emails)
@@ -1372,6 +1393,9 @@ class _GlowBorderState extends State<_GlowBorder> with SingleTickerProviderState
 
 /// What the right column asks of the Directory: a search and where to look (a fresh value each time, so the same search
 /// can be sent again).
+/// the search icon of the top bar: open the Directory with its search box ready to type in
+final directoryFocus = ValueNotifier<int>(0);
+
 final directoryRequest = ValueNotifier<({String q, String place, ({double lat, double lng})? at, int n})?>(null);
 
 /// The microphone of a search: asks for the microphone first, then listens in the app's language (Konkani is heard as

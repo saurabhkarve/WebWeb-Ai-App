@@ -572,11 +572,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   /// Own page: edit, share, and the QR card one tap away.
   Widget _ownActions(Pal p) => Row(children: [
-        Expanded(child: _ActionBtn(label: t('Edit profile'), wi: WI.edit, gold: true, onTap: _edit)),
+        Expanded(child: ProfileActionBtn(label: t('Edit profile'), wi: WI.edit, gold: true, onTap: _edit)),
         const SizedBox(width: 8),
-        Expanded(child: _ActionBtn(label: t('Share profile'), wi: WI.share, onTap: () => showShareProfileSheet(context, _u!, isSelf: true))),
+        Expanded(child: ProfileActionBtn(label: t('Share profile'), wi: WI.share, onTap: () => showShareProfileSheet(context, _u!, isSelf: true))),
         const SizedBox(width: 8),
-        SizedBox(width: 44, child: _ActionBtn(wi: WI.qr, label: '', semantic: t('QR code'), onTap: () => showShareProfileSheet(context, _u!, isSelf: true, openQr: true))),
+        SizedBox(width: 44, child: ProfileActionBtn(wi: WI.qr, label: '', semantic: t('QR code'), onTap: () => showShareProfileSheet(context, _u!, isSelf: true, openQr: true))),
       ]);
 
   /// Someone else's page: talk, call, share.
@@ -609,15 +609,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         builder: (_, __, ___) {
           final fav = Favourites.has(u.uid);
           return Row(children: [
-            Expanded(child: _ActionBtn(label: t('Talk'), wi: WI.talk, gold: true, onTap: _message)),
+            Expanded(child: ProfileActionBtn(label: t('Talk'), wi: WI.talk, gold: true, onTap: _message)),
             const SizedBox(width: 8),
-            Expanded(child: _ActionBtn(label: t('Call'), wi: WI.phone, onTap: () => placeCall(context, Peer.fromProfile(u), false))),
+            Expanded(child: ProfileActionBtn(label: t('Call'), wi: WI.phone, onTap: () => placeCall(context, Peer.fromProfile(u), false))),
             const SizedBox(width: 8),
-            SizedBox(width: 44, child: _ActionBtn(wi: WI.share, label: '', semantic: t('Share profile'), onTap: () => showShareProfileSheet(context, u, isSelf: false))),
+            SizedBox(width: 44, child: ProfileActionBtn(wi: WI.share, label: '', semantic: t('Share profile'), onTap: () => showShareProfileSheet(context, u, isSelf: false))),
             const SizedBox(width: 8),
-            SizedBox(width: 44, child: _ActionBtn(wi: WI.video, label: '', semantic: t('Video'), onTap: () => placeCall(context, Peer.fromProfile(u), true))),
+            SizedBox(width: 44, child: ProfileActionBtn(wi: WI.video, label: '', semantic: t('Video'), onTap: () => placeCall(context, Peer.fromProfile(u), true))),
             const SizedBox(width: 8),
-            SizedBox(width: 44, child: _ActionBtn(wi: WI.heart, gold: fav, label: '', semantic: t('Favourite'), onTap: () => Favourites.toggle(u))),
+            SizedBox(width: 44, child: ProfileActionBtn(wi: WI.heart, gold: fav, label: '', semantic: t('Favourite'), onTap: () => Favourites.toggle(u))),
           ]);
         },
       );
@@ -1067,13 +1067,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 /// Profile action button (web Button, 40 px, 13 px text): gold for the main action, cream otherwise.
-class _ActionBtn extends StatelessWidget {
+class ProfileActionBtn extends StatelessWidget {
   final String label;
   final String? semantic;
   final WI? wi;
+  /// a picture of its own instead of [wi] (the WhatsApp logo)
+  final Widget? leading;
   final bool gold;
   final VoidCallback? onTap;
-  const _ActionBtn({required this.label, this.semantic, this.wi, this.gold = false, this.onTap});
+  const ProfileActionBtn({super.key, required this.label, this.semantic, this.wi, this.leading, this.gold = false, this.onTap});
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
@@ -1099,8 +1101,9 @@ class _ActionBtn extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  if (leading != null) leading!,
                   if (wi != null) WIcon(wi!, size: 16, color: fg, strokeWidth: 1.9, still: true),
-                  if (wi != null && label.isNotEmpty) const SizedBox(width: 6),
+                  if ((wi != null || leading != null) && label.isNotEmpty) const SizedBox(width: 6),
                   // a long label (Hindi, Marathi…) wraps to a second line inside the button instead of being cut, as on the web
                   if (label.isNotEmpty)
                     Flexible(

@@ -2732,5 +2732,11 @@
   "Shared by {names} and {n} more": "{names} आणि आणखी {n} जणांनी शेअर केले",
   "Shared by {names}": "{names} यांनी शेअर केले",
   "Known by {names}": "{names} यांना माहीत आहे",
-  "Known by {names} and {n} more of your contacts": "{names} आणि तुमच्या आणखी {n} संपर्कांना माहीत आहे"
+  "Known by {names} and {n} more of your contacts": "{names} आणि तुमच्या आणखी {n} संपर्कांना माहीत आहे",
+  "Log in to see this page.": "हे पेज पाहण्यासाठी लॉग इन करा.",
+  "Ask people to review": "लोकांना परीक्षण लिहायला सांगा",
+  "Is this your business? Join WEBWEB": "हा तुमचा बिझनेस आहे का? WEBWEB वर सामील व्हा",
+  "Review {name} on WEBWEB": "WEBWEB वर {name} चे परीक्षण लिहा",
+  "members share this": "सदस्य शेअर करतात",
+  "Not verified": "सत्यापित नाही"
 }

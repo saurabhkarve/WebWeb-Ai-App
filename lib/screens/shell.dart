@@ -219,7 +219,10 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                 top: 0,
                 left: 0,
                 right: 0,
-                child: _AppHeader(onHome: () => _go(_dir)),
+                child: _AppHeader(onHome: () => _go(_dir), onSearch: () {
+                  _go(_dir);
+                  directoryFocus.value++;
+                }),
               ),
             // "Waiting for network…" / "Connecting…" under the header, WhatsApp-style
             Positioned(top: top + header + 8, left: 0, right: 0, child: const ConnectionPill()),
@@ -372,7 +375,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             ]),
           ),
         ),
-        Positioned(top: 0, left: 0, right: 0, child: Center(child: KeyedSubtree(key: Tours.key(_tourKeys[_dir]), child: _dirButton(p, 60)))),
+        // the bar floats higher on phones with a home indicator (iPhone 15...): the button comes down with it, so its gap to the label stays small
+        Positioned(top: bottom > 8 ? 12 : 0, left: 0, right: 0, child: Center(child: KeyedSubtree(key: Tours.key(_tourKeys[_dir]), child: _dirButton(p, 60)))),
       ]);
 
   /// Directory, the heart of the app: always the gold round button, raised in the middle of the bar.
@@ -595,8 +599,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
 // ======================= header =======================
 
 class _AppHeader extends StatelessWidget {
-  final VoidCallback onHome;
-  const _AppHeader({required this.onHome});
+  final VoidCallback onHome, onSearch;
+  const _AppHeader({required this.onHome, required this.onSearch});
 
   @override
   Widget build(BuildContext context) {
@@ -629,7 +633,17 @@ class _AppHeader extends StatelessWidget {
                 child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: LogoInline(size: 28, markSize: 36, tagline: true, onTap: onHome)),
               ),
             ),
-            const SizedBox(width: 6),
+            // the Directory's search, one tap from any tab: beside the account
+            Semantics(
+              button: true,
+              label: t('Search'),
+              child: InkResponse(
+                onTap: onSearch,
+                radius: 22,
+                child: SizedBox(width: 40, height: 40, child: Center(child: WIcon(WI.search, size: 24, color: p.text, strokeWidth: 1.9))),
+              ),
+            ),
+            const SizedBox(width: 4),
             Builder(
               builder: (ctx) => GestureDetector(
                 onTap: () => _openAccountMenu(ctx),
