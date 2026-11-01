@@ -421,7 +421,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         if (mounted) setState(() => _results = const []);
       }
       try {
-        final d = await api.get('/service-contacts/search', {'q': v.trim()});
+        final d = await api.get('/service-contacts/search', {'q': v.trim(), if (_place.isNotEmpty) 'place': _place, if (_placeAt != null) ...{'lat': '${_placeAt!.lat}', 'lng': '${_placeAt!.lng}'}});
         if (mounted && _q.text.trim() == v.trim()) setState(() => _service = ((d as Map)['contacts'] as List? ?? const []).cast<Map>());
       } catch (_) {
         if (mounted) setState(() => _service = const []);
@@ -916,7 +916,16 @@ class _PhonebookHomeState extends State<PhonebookHome> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 4),
           leading: CircleAvatar(backgroundColor: kGold.withValues(alpha: .2), child: const Icon(Icons.handyman_rounded, size: 20, color: kStar)),
           title: Text('${c['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-          subtitle: Text(((c['tags'] as List?) ?? const []).join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.muted)),
+          subtitle: Text(
+            [
+              ...((c['tags'] as List?) ?? const []).take(2),
+              if ('${c['place'] ?? ''}'.isNotEmpty) '${c['place']}',
+              if (c['km'] is num) t('{n} km', {'n': (c['km'] as num) < 10 ? (c['km'] as num).toStringAsFixed(1) : (c['km'] as num).round()}),
+            ].join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: p.muted),
+          ),
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
             IconButton(tooltip: t('Call'), onPressed: () => _open('tel:+91${c['phone']}'), icon: const Icon(Icons.call_rounded, color: Color(0xFF1E9E5A))),
             IconButton(tooltip: 'WhatsApp', onPressed: () => _open('https://wa.me/91${c['phone']}'), icon: const Icon(Icons.chat_rounded, color: Color(0xFF25D366))),
