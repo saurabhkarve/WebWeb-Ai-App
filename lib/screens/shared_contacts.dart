@@ -179,7 +179,7 @@ class _SharedContactsScreenState extends State<SharedContactsScreen> {
                         decoration: BoxDecoration(color: p.danger, borderRadius: BorderRadius.circular(16)),
                         child: const Icon(Icons.delete_outline, color: Colors.white),
                       ),
-                      child: _Row(c: c, p: p, action: t('Remove'), danger: true, onTap: () => _move(c, remove: true), onEdit: () => _edit(c), onRate: (n) => _save(c, rating: n)),
+                      child: _Row(c: c, p: p, action: t("Don't sync"), danger: true, onTap: () => _move(c, remove: true), onEdit: () => _edit(c), onRate: (n) => _save(c, rating: n)),
                     ),
                 if (_removed!.isNotEmpty) ...[
                   const SizedBox(height: 12),
@@ -301,16 +301,6 @@ class _Row extends StatelessWidget {
                 style: TextButton.styleFrom(foregroundColor: p.link, padding: const EdgeInsets.symmetric(horizontal: 8), minimumSize: const Size(0, 36)),
                 child: Text(action, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
               )
-            else
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, size: 20, color: p.muted),
-                padding: EdgeInsets.zero,
-                onSelected: (v) => v == 'edit' ? onEdit!() : onTap(),
-                itemBuilder: (_) => [
-                  PopupMenuItem(value: 'edit', child: Text(t('Edit'))),
-                  PopupMenuItem(value: 'remove', child: Text(action, style: TextStyle(color: p.danger))),
-                ],
-              ),
           ]),
           if (onRate != null)
             Padding(
@@ -329,6 +319,25 @@ class _Row extends StatelessWidget {
                   Flexible(child: Text(c.place, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted))),
                   const SizedBox(width: 8),
                 ],
+              ]),
+            ),
+          if (onEdit != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(50, 6, 4, 2),
+              child: Row(children: [
+                OutlinedButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: Text(t('Edit')),
+                  style: OutlinedButton.styleFrom(foregroundColor: p.text, side: BorderSide(color: p.border), visualDensity: VisualDensity.compact, textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: onTap,
+                  icon: const Icon(Icons.sync_disabled, size: 16),
+                  label: Text(action),
+                  style: OutlinedButton.styleFrom(foregroundColor: p.danger, side: BorderSide(color: p.danger.withValues(alpha: .4)), visualDensity: VisualDensity.compact, textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                ),
               ]),
             ),
         ]),
