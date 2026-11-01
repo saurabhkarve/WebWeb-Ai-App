@@ -81,14 +81,14 @@ class _SharedContactsScreenState extends State<SharedContactsScreen> {
     }
   }
 
-  Future<void> _edit(SharedContact c) async {
+  Future<void> _edit(SharedContact c, [String field = 'name']) async {
     final p = Pal.of(context);
     final r = await showModalBottomSheet<Map<String, String>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: p.canvas,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => _EditSheet(c: c, city: _city, tags: _tags),
+      builder: (_) => _EditSheet(c: c, city: _city, tags: _tags, focus: field),
     );
     if (r == null) return;
     await _save(c,
@@ -179,7 +179,7 @@ class _SharedContactsScreenState extends State<SharedContactsScreen> {
                         decoration: BoxDecoration(color: p.danger, borderRadius: BorderRadius.circular(16)),
                         child: const Icon(Icons.delete_outline, color: Colors.white),
                       ),
-                      child: _Row(c: c, p: p, action: t("Don't sync"), danger: true, onTap: () => _move(c, remove: true), onEdit: () => _edit(c), onRate: (n) => _save(c, rating: n)),
+                      child: _Row(c: c, p: p, action: t("Don't sync"), danger: true, onTap: () => _move(c, remove: true), onEdit: (f) => _edit(c, f), onRate: (n) => _save(c, rating: n)),
                     ),
                 if (_removed!.isNotEmpty) ...[
                   const SizedBox(height: 12),
@@ -263,7 +263,7 @@ class _Row extends StatelessWidget {
   final String action;
   final bool danger, dim;
   final VoidCallback onTap;
-  final VoidCallback? onEdit;
+  final ValueChanged<String>? onEdit;
   final ValueChanged<int>? onRate;
   const _Row({required this.c, required this.p, required this.action, required this.danger, required this.onTap, this.dim = false, this.onEdit, this.onRate});
   @override
@@ -272,7 +272,7 @@ class _Row extends StatelessWidget {
     return Opacity(
       opacity: dim ? .6 : 1,
       child: GestureDetector(
-        onTap: onEdit,
+        onTap: onEdit == null ? null : () => onEdit!('name'),
         behavior: HitTestBehavior.opaque,
         child: Container(
         margin: const EdgeInsets.only(top: 8),
@@ -290,9 +290,9 @@ class _Row extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
+                _Editable(onTap: onEdit == null ? null : () => onEdit!('name'), p: p, child: Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600))),
                 const SizedBox(height: 2),
-                Text('${c.phone} · $cat', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+                _Editable(onTap: onEdit == null ? null : () => onEdit!('tag'), p: p, child: Text('${c.phone} · $cat', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted))),
               ]),
             ),
             if (onEdit == null)
@@ -304,21 +304,28 @@ class _Row extends StatelessWidget {
           ]),
           if (onRate != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(50, 0, 0, 2),
-              child: Row(children: [
-                for (var n = 1; n <= 5; n++)
-                  GestureDetector(
-                    onTap: () => onRate!(c.rating == n ? 0 : n),
-                    behavior: HitTestBehavior.opaque,
-                    child: Padding(padding: const EdgeInsets.only(right: 2, top: 2, bottom: 2), child: Icon(n <= c.rating ? Icons.star_rounded : Icons.star_outline_rounded, size: 22, color: n <= c.rating ? kGold : p.border)),
-                  ),
-                const Spacer(),
-                if (c.place.isNotEmpty) ...[
-                  Icon(Icons.place_outlined, size: 14, color: p.muted),
+              padding: const EdgeInsets.fromLTRB(50, 6, 0, 0),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  for (var n = 1; n <= 5; n++)
+                    GestureDetector(
+                      onTap: () => onRate!(c.rating == n ? 0 : n),
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(padding: const EdgeInsets.only(right: 4, top: 2, bottom: 2), child: Icon(n <= c.rating ? Icons.star_rounded : Icons.star_outline_rounded, size: 34, color: n <= c.rating ? kGold : p.border)),
+                    ),
                   const SizedBox(width: 2),
-                  Flexible(child: Text(c.place, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted))),
-                  const SizedBox(width: 8),
-                ],
+                  Icon(Icons.edit_outlined, size: 14, color: p.muted),
+                ]),
+                const SizedBox(height: 2),
+                _Editable(
+                  onTap: onEdit == null ? null : () => onEdit!('place'),
+                  p: p,
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.place_outlined, size: 15, color: p.muted),
+                    const SizedBox(width: 3),
+                    Flexible(child: Text(c.place.isEmpty ? t('City') : c.place, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: p.muted))),
+                  ]),
+                ),
               ]),
             ),
           if (onEdit != null)
@@ -326,7 +333,7 @@ class _Row extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(50, 6, 4, 2),
               child: Row(children: [
                 OutlinedButton.icon(
-                  onPressed: onEdit,
+                  onPressed: () => onEdit!('name'),
                   icon: const Icon(Icons.edit_outlined, size: 16),
                   label: Text(t('Edit')),
                   style: OutlinedButton.styleFrom(foregroundColor: p.text, side: BorderSide(color: p.border), visualDensity: VisualDensity.compact, textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
@@ -347,12 +354,37 @@ class _Row extends StatelessWidget {
   }
 }
 
+/// A value with a small pencil after it; tapping either opens the editor on that field.
+class _Editable extends StatelessWidget {
+  final Widget child;
+  final Pal p;
+  final VoidCallback? onTap;
+  const _Editable({required this.child, required this.p, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    if (onTap == null) return child;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Flexible(child: child),
+          const SizedBox(width: 6),
+          Icon(Icons.edit_outlined, size: 14, color: p.muted),
+        ]),
+      ),
+    );
+  }
+}
+
 /// Edit what the member says about a contact: its name, category and the place it is in (their own city until changed).
 class _EditSheet extends StatefulWidget {
   final SharedContact c;
   final String city;
   final List<String> tags;
-  const _EditSheet({required this.c, required this.city, required this.tags});
+  final String focus;
+  const _EditSheet({required this.c, required this.city, required this.tags, this.focus = 'name'});
   @override
   State<_EditSheet> createState() => _EditSheetState();
 }
@@ -393,9 +425,9 @@ class _EditSheetState extends State<_EditSheet> {
           Text(t('Edit contact'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
           Text(widget.c.phone, style: TextStyle(fontSize: 12, color: p.muted)),
           _label(p, t('Name')),
-          TextField(controller: _name, decoration: _dec(p, t('Name'))),
+          TextField(controller: _name, autofocus: widget.focus == 'name', decoration: _dec(p, t('Name'))),
           _label(p, t('Category')),
-          TextField(controller: _tag, onChanged: (_) => setState(() {}), decoration: _dec(p, t('Plumber, Sweet shop, Restaurant…'))),
+          TextField(controller: _tag, autofocus: widget.focus == 'tag', onChanged: (_) => setState(() {}), decoration: _dec(p, t('Plumber, Sweet shop, Restaurant…'))),
           const SizedBox(height: 8),
           Wrap(spacing: 6, runSpacing: 6, children: [
             for (final x in picks)
@@ -406,7 +438,7 @@ class _EditSheetState extends State<_EditSheet> {
               ),
           ]),
           _label(p, t('Location')),
-          TextField(controller: _place, decoration: _dec(p, widget.city.isEmpty ? t('City') : widget.city)),
+          TextField(controller: _place, autofocus: widget.focus == 'place', decoration: _dec(p, widget.city.isEmpty ? t('City') : widget.city)),
           if (widget.city.isNotEmpty)
             Align(
               alignment: Alignment.centerLeft,
