@@ -51,7 +51,7 @@ const Map<WI, (String, double?)> _body = {
   WI.compliance: (r'<path d="M6.5 3.5h8l4 4v13h-12v-17z" /> <path d="M14.5 3.5v4h4M9.5 14l2 2 3.5-4" />', null),
   WI.connect: (r'<path d="M11 3l1.9 6.1L19 11l-6.1 1.9L11 19l-1.9-6.1L3 11l6.1-1.9z" fill="{C}" stroke-width="1.2" /> <path d="M19 2.6l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8z" fill="{C}" stroke-width="1" />', null),
   // the Directory (web PhonebookIcon): an address book with its A to Z tabs and a person on the cover
-  WI.directory: (r'<rect x="5.5" y="3.5" width="14" height="17" rx="2.2" /> <path d="M3.5 8h3M3.5 12h3M3.5 16h3" /> <circle cx="12.5" cy="10" r="2.3" /> <path d="M8.8 16.5a3.9 3.9 0 0 1 7.4 0" />', null),
+  WI.directory: (r'<circle cx="10.5" cy="13.5" r="6" /> <path d="m15 18 5 4" /> <path d="M18.5 2.5c.4 2.2 1.3 3.1 3.5 3.5-2.2.4-3.1 1.3-3.5 3.5-.4-2.2-1.3-3.1-3.5-3.5 2.2-.4 3.1-1.3 3.5-3.5z" />', null),
   WI.contactCard: (r'<rect x="3" y="5" width="18" height="14" rx="2.6" /> <circle cx="9" cy="10.7" r="2.1" /> <path d="M5.6 16.4c.4-1.5 1.7-2.4 3.4-2.4s3 .9 3.4 2.4M14.6 9.8h3.4M14.6 13h3.4" />', null),
   WI.deals: (r'<circle cx="9" cy="12" r="5.2" /> <circle cx="15" cy="12" r="5.2" />', null),
   WI.digital: (r'<rect x="3.5" y="4.5" width="17" height="12" rx="2" /> <path d="M8 20h8M12 16.5V20M10 8.5 8 10.5l2 2M14 8.5l2 2-2 2" />', null),
