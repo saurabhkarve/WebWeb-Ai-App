@@ -2715,8 +2715,15 @@
   "Could not do that. Try again.": "हें जालें ना. परत यत्न करात.",
   "Could not load. Check your connection.": "लोड जालें ना. कनेक्शन पळयात.",
   "Retry": "परत",
-  "Only contacts saved with a word like plumber or cabs are shared, with their number. Remove any you do not want to share.": "plumber वा cabs सारख्या उतरा सयत सेव्ह केल्ले संपर्क फकत नंबरा सयत शेअर जातात. जे शेअर करचे ना ते काडचे.",
   "removed": "काडिल्ले",
   "Search your shared contacts": "शेअर केल्ले संपर्क सोदचे",
-  "You are not sharing any contact right now.": "आतां तुमी कसलोच संपर्क शेअर करीनात."
+  "You are not sharing any contact right now.": "आतां तुमी कसलोच संपर्क शेअर करीनात.",
+  "Edit contact": "संपर्क बदला",
+  "Plumber, Sweet shop, Restaurant…": "प्लंबर, मिठायेचें दुकान, रेस्टॉरंट…",
+  "Use my city ({city})": "म्हजें शार ({city})",
+  "Only contacts saved with a word like plumber or cabs are shared, with their number. Rate them, fix the name, category or location, or remove any you do not want to share.": "plumber वा cabs सारख्या उतरा सयत सेव्ह केल्ले संपर्क नंबरा सयत शेअर जातात. तांकां रेटिंग दियात, नांव, वर्ग वा जाग सुदारात, वा शेअर करचे ना ते काडचे.",
+  "contacts you share": "तुमी शेअर करपी संपर्क",
+  "Only contacts saved as a plumber, cabs, sweet shop and the like are shared, with their number. Swipe left to stop sharing one.": "प्लंबर, कॅब, मिठायेचें दुकान अशा नांवान सेव्ह केल्ले संपर्क फकत नंबरा सयत शेअर जातात. एक थांबोवपाक दावे वटेन स्वाइप करात.",
+  "All rated. Thank you!": "सगळ्यांक रेटिंग दिलें. उपकार!",
+  "{n} still to rate: your stars help others choose.": "{n} जाणांक रेटिंग दिवपाचें उरलां: तुमचे स्टार हेरांक वेंचपाक मदत करतात."
 }

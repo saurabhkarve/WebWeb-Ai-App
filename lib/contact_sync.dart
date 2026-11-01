@@ -56,11 +56,18 @@ class ContactSync {
   static Future<SharedContacts> mine(Api api) async {
     final d = await api.get('/contact-sync/mine') as Map;
     List<SharedContact> rows(String k) => [for (final r in (d[k] as List? ?? const [])) SharedContact.fromJson(Map<String, dynamic>.from(r as Map))];
-    return SharedContacts(rows('shared'), rows('removed'));
+    return SharedContacts(rows('shared'), rows('removed'), place: '${d['place'] ?? ''}', tags: [for (final x in (d['tags'] as List? ?? const [])) '$x']);
   }
 
   /// Stop sharing one contact. The server tags it removed and the next look through the phone book skips it.
   static Future<void> remove(Api api, String phone) => api.delete('/contact-sync/contacts/$phone');
+
+  /// Rate (1-5, 0 clears), rename, set the category or the place of a shared contact. Only what is passed is changed;
+  /// an empty [place] goes back to the member's own city.
+  static Future<void> update(Api api, String phone, {int? rating, String? name, String? tag, String? place}) => api.patch(
+        '/contact-sync/contacts/$phone',
+        {if (rating != null) 'rating': rating, if (name != null) 'name': name, if (tag != null) 'tag': tag, if (place != null) 'place': place},
+      );
 
   /// Share a removed contact again.
   static Future<void> restore(Api api, String phone) => api.post('/contact-sync/contacts/$phone/restore', {});
@@ -150,18 +157,27 @@ class ContactSync {
 }
 
 class SharedContact {
-  final String phone, name, keyword;
+  final String phone, name, keyword, place, tag;
+  final int rating;
   final DateTime at;
-  const SharedContact(this.phone, this.name, this.keyword, this.at);
+  const SharedContact(this.phone, this.name, this.keyword, this.at, {this.rating = 0, this.place = '', this.tag = ''});
   factory SharedContact.fromJson(Map<String, dynamic> j) => SharedContact(
         '${j['phone']}',
         '${j['name']}',
         '${j['keyword']}',
         DateTime.fromMillisecondsSinceEpoch((j['at'] as num?)?.toInt() ?? 0),
+        rating: (j['rating'] as num?)?.toInt() ?? 0,
+        place: '${j['place'] ?? ''}',
+        tag: '${j['tag'] ?? ''}',
       );
+  SharedContact copyWith({String? name, String? place, String? tag, int? rating}) =>
+      SharedContact(phone, name ?? this.name, keyword, at, rating: rating ?? this.rating, place: place ?? this.place, tag: tag ?? this.tag);
 }
 
 class SharedContacts {
   final List<SharedContact> shared, removed;
-  const SharedContacts(this.shared, this.removed);
+  /// The member's own city (the place of every contact until they change it), and the categories to pick from.
+  final String place;
+  final List<String> tags;
+  const SharedContacts(this.shared, this.removed, {this.place = '', this.tags = const []});
 }

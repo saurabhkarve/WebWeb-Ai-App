@@ -2715,8 +2715,15 @@
   "Could not do that. Try again.": "આ થઈ શક્યું નહીં. ફરી પ્રયત્ન કરો.",
   "Could not load. Check your connection.": "લોડ થયું નહીં. કનેક્શન તપાસો.",
   "Retry": "ફરી",
-  "Only contacts saved with a word like plumber or cabs are shared, with their number. Remove any you do not want to share.": "plumber કે cabs જેવા શબ્દ સાથે સેવ કરેલા સંપર્કો જ નંબર સાથે શેર થાય છે. જે શેર કરવા ન હોય તે દૂર કરો.",
   "removed": "દૂર",
   "Search your shared contacts": "શેર કરેલા સંપર્કો શોધો",
-  "You are not sharing any contact right now.": "હાલ તમે કોઈ સંપર્ક શેર કરતા નથી."
+  "You are not sharing any contact right now.": "હાલ તમે કોઈ સંપર્ક શેર કરતા નથી.",
+  "Edit contact": "સંપર્ક બદલો",
+  "Plumber, Sweet shop, Restaurant…": "પ્લમ્બર, મીઠાઈની દુકાન, રેસ્ટોરન્ટ…",
+  "Use my city ({city})": "મારું શહેર ({city})",
+  "Only contacts saved with a word like plumber or cabs are shared, with their number. Rate them, fix the name, category or location, or remove any you do not want to share.": "plumber કે cabs જેવા શબ્દ સાથે સેવ કરેલા સંપર્કો નંબર સાથે શેર થાય છે. તેમને રેટિંગ આપો, નામ, શ્રેણી કે સ્થળ સુધારો, અથવા શેર ન કરવા હોય તે દૂર કરો.",
+  "contacts you share": "તમે શેર કરતા સંપર્કો",
+  "Only contacts saved as a plumber, cabs, sweet shop and the like are shared, with their number. Swipe left to stop sharing one.": "માત્ર પ્લમ્બર, કેબ, મીઠાઈની દુકાન જેવા નામથી સેવ કરેલા સંપર્કો નંબર સાથે શેર થાય છે. એક બંધ કરવા ડાબે સ્વાઇપ કરો.",
+  "All rated. Thank you!": "બધાને રેટિંગ મળ્યું. આભાર!",
+  "{n} still to rate: your stars help others choose.": "{n}ને રેટિંગ આપવાનું બાકી: તમારા સ્ટાર અન્યને પસંદ કરવામાં મદદ કરે છે."
 }
