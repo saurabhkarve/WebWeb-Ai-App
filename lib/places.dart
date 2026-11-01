@@ -15,8 +15,30 @@ class Place {
   final double radiusKm;
   const Place(this.name, this.state, this.stateName, this.tier, this.lat, this.lng, this.radiusKm);
 
-  /// "Navi Mumbai, Maharashtra" for an area, the state for a city.
-  String get subtitle => tier == 0 ? 'Navi Mumbai, $stateName' : stateName;
+  /// "Vashi's" big city, "Navi Mumbai, Maharashtra" for an area, the state for a city.
+  String get subtitle => tier == 0 ? '$parentCity, $stateName' : stateName;
+
+  /// The big city an area belongs to: the nearest tier I city (Vashi: Navi Mumbai, Andheri: Mumbai, Whitefield: Bengaluru).
+  String get parentCity {
+    const named = {
+      'Rabale': 'Navi Mumbai', 'Airoli': 'Navi Mumbai', 'Bhandup': 'Mumbai', 'Mulund': 'Mumbai', 'Borivali': 'Mumbai', 'Kandivali': 'Mumbai',
+      'Malad': 'Mumbai', 'Dahisar': 'Mumbai', 'Nalasopara': 'Vasai-Virar', 'Indirapuram': 'Ghaziabad',
+    };
+    if (named[name] != null) return named[name]!;
+    if (lat == null || lng == null) return stateName;
+    var best = stateName;
+    var d = double.infinity;
+    for (final c in kPlaces) {
+      // twin and satellite tier I cities: an area near one belongs to the main city (Gachibowli: Hyderabad, not Secunderabad)
+      if (c.tier != 1 || const {'Secunderabad', 'New Delhi', 'Howrah', 'Pimpri-Chinchwad'}.contains(c.name) || c.lat == null) continue;
+      final k = distanceKm(lat!, lng!, c.lat!, c.lng!);
+      if (k < d) {
+        d = k;
+        best = c.name;
+      }
+    }
+    return best;
+  }
 }
 
 final List<Place> kPlaces = [
