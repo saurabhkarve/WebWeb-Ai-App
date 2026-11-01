@@ -921,12 +921,15 @@ class _PhonebookHomeState extends State<PhonebookHome> {
               ...((c['tags'] as List?) ?? const []).take(2),
               if ('${c['place'] ?? ''}'.isNotEmpty) '${c['place']}',
               if (c['km'] is num) t('{n} km', {'n': (c['km'] as num) < 10 ? (c['km'] as num).toStringAsFixed(1) : (c['km'] as num).round()}),
+              // from Google (Places)
+              if (c['rating'] is num) '★ ${(c['rating'] as num).toStringAsFixed(1)}${c['ratings'] is num ? ' (${c['ratings']})' : ''} Google',
             ].join(' · '),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(color: p.muted),
           ),
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            if ('${c['website'] ?? ''}'.isNotEmpty) IconButton(tooltip: t('Website'), onPressed: () => _open('${c['website']}'), icon: Icon(Icons.language_rounded, color: p.muted)),
             IconButton(tooltip: t('Call'), onPressed: () => _open('tel:+91${c['phone']}'), icon: const Icon(Icons.call_rounded, color: Color(0xFF1E9E5A))),
             IconButton(tooltip: 'WhatsApp', onPressed: () => _open('https://wa.me/91${c['phone']}'), icon: const Icon(Icons.chat_rounded, color: Color(0xFF25D366))),
           ]),
