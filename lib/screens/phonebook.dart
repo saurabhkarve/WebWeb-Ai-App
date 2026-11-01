@@ -578,7 +578,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop && _searching) _closeSearch();
         },
-        child: _FadeIn(key: ValueKey(_searching), child: _searching ? _searchPage(p) : _directory(p, showAsks: !wide)),
+        child: KeyedSubtree(key: ValueKey(_searching), child: _searching ? _searchPage(p) : _directory(p, showAsks: !wide)),
       );
       if (!wide) return directory;
       // large screens: the directory, and the asks in a column beside it
@@ -764,20 +764,20 @@ class _PhonebookHomeState extends State<PhonebookHome> {
           prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
           hintText: t('Ask AI: a name, or what you need'),
           hintStyle: TextStyle(fontSize: 15, color: p.muted),
-          suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (_q.text.isNotEmpty)
-              IconButton(
+          // text in the box: a clear icon in the place of the microphone (clearing leaves the search)
+          suffixIcon: _q.text.isNotEmpty
+              ? IconButton(
+                  tooltip: t('Clear'),
                   icon: const Icon(Icons.close),
                   onPressed: () {
                     _q.clear();
                     _search('');
-                  }),
-            MicButton(onWords: (words, _) {
-              _q.text = words;
-              _q.selection = TextSelection.collapsed(offset: _q.text.length);
-              _search(words);
-            }),
-          ]),
+                  })
+              : MicButton(onWords: (words, _) {
+                  _q.text = words;
+                  _q.selection = TextSelection.collapsed(offset: _q.text.length);
+                  _search(words);
+                }),
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
@@ -803,10 +803,9 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
   Widget _searchPage(Pal p) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Row(children: [
             Expanded(child: _searchField()),
-            TextButton(onPressed: _closeSearch, child: Text(t('Cancel'))),
           ]),
         ),
         Expanded(
@@ -1336,35 +1335,6 @@ class _GlowBorderState extends State<_GlowBorder> with SingleTickerProviderState
 }
 
 
-/// A page that eases in (a short fade and rise) when it first shows: the directory turning into the search page, and back.
-class _FadeIn extends StatefulWidget {
-  final Widget child;
-  const _FadeIn({super.key, required this.child});
-  @override
-  State<_FadeIn> createState() => _FadeInState();
-}
-
-class _FadeInState extends State<_FadeIn> with SingleTickerProviderStateMixin {
-  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 220))..forward();
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (MediaQuery.disableAnimationsOf(context)) return widget.child;
-    final a = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
-    return FadeTransition(
-      opacity: a,
-      child: SlideTransition(position: Tween(begin: const Offset(0, .015), end: Offset.zero).animate(a), child: widget.child),
-    );
-  }
-}
-
-
 /// What the right column asks of the Directory: a search and where to look (a fresh value each time, so the same search
 /// can be sent again).
 final directoryRequest = ValueNotifier<({String q, String place, ({double lat, double lng})? at, int n})?>(null);
@@ -1414,19 +1384,22 @@ class AiSearchField extends StatelessWidget {
           hintStyle: TextStyle(fontSize: 15, color: p.muted),
           suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
             if (trailing != null) trailing!,
+            // text in the box: a clear icon in the place of the microphone
             if (controller.text.isNotEmpty)
               IconButton(
+                tooltip: t('Clear'),
                 icon: const Icon(Icons.close),
                 onPressed: () {
                   controller.clear();
                   onChanged('');
                 },
-              ),
-            MicButton(onWords: (words, _) {
-              controller.text = words;
-              controller.selection = TextSelection.collapsed(offset: words.length);
-              onChanged(words);
-            }),
+              )
+            else
+              MicButton(onWords: (words, _) {
+                controller.text = words;
+                controller.selection = TextSelection.collapsed(offset: words.length);
+                onChanged(words);
+              }),
           ]),
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
