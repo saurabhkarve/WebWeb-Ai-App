@@ -61,7 +61,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   static const _items = [(WI.home, 'Home'), (WI.pin, 'Nearby'), (WI.directory, 'Directory'), (WI.talk, 'Talk'), (WI.bell, 'Notifications')];
   static const _tourKeys = ['nav-feed', 'nav-find', 'nav-contacts', 'nav-talk', 'nav-notes'];
   /// how far the Contacts button rises above the bar
-  static const _rise = 20.0;
+  static const _rise = 32.0;
   static const _feed = 0, _dir = 2, _talk = 3, _notesTab = 4, _ask = 5;
   static const _barH = 64.0;
   int _beforeAsk = _feed;
