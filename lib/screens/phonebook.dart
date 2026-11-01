@@ -495,7 +495,10 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     _q.clear();
     _search('');
     _qFocus.unfocus();
-    setState(() => _searching = false);
+    setState(() {
+      _searching = false;
+      _askOpen = false;
+    });
     widget.onSearching?.call(false);
   }
 
@@ -782,6 +785,8 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
   /// The search page: the search (the ask's title) with Cancel, then, down to the keyboard, what was found as it is
   /// typed and the new ask to post when no one fits.
+  bool _askOpen = false;
+
   Widget _searchPage(Pal p) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
@@ -791,7 +796,9 @@ class _PhonebookHomeState extends State<PhonebookHome> {
           ]),
         ),
         Expanded(
-          child: SearchAskForm(
+          child: _hasFound() && !_askOpen
+              ? ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, children: _found(p, tuck: true))
+              : SearchAskForm(
             title: _q,
             focus: _qFocus,
             lead: _found(p),
@@ -803,11 +810,34 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         ),
       ]);
 
+  /// My contacts (and the pages saved as contacts) that the search text matches.
+  List<_Entry> _mineFor(String q) => _entries.where((e) => '${e.name} ${e.phone ?? ''} ${e.org} ${(e.contact?.emails ?? const <Email>[]).map((m) => m.address).join(' ')} ${e.member == null ? '' : '${e.member!['name']} ${e.member!['company']} ${e.member!['category']} ${e.member!['location']} ${(e.member!['services'] as List? ?? const []).join(' ')}'}'.toLowerCase().contains(q)).toList();
+
+  /// Whether the search found anyone: then the ask to post is tucked away until asked for.
+  bool _hasFound() {
+    final q = _q.text.trim().toLowerCase();
+    if (q.length < 2) return false;
+    final ai = _aiFor == _q.text.trim() ? ((_ai?['matches'] as List?) ?? const []) : const [];
+    return _mineFor(q).isNotEmpty || ai.isNotEmpty || (_results ?? const <Map>[]).isNotEmpty;
+  }
+
   /// What the search found, above the ask: in my contacts, what Ask AI found (with why), others on WEBWEB; then the
   /// heading of the ask to post when none of them fits.
-  List<Widget> _found(Pal p) {
+  List<Widget> _found(Pal p, {bool tuck = false}) {
     final q = _q.text.trim().toLowerCase();
-    final heading = [
+    final heading = tuck ? [
+      const SizedBox(height: 8),
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: OutlinedButton.icon(
+          onPressed: () => setState(() => _askOpen = true),
+          icon: const Icon(Icons.campaign_rounded, size: 18, color: kStar),
+          label: Text(t('Not the right one? Post it as an ask')),
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46), foregroundColor: p.text, side: BorderSide(color: p.border), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+        ),
+      ),
+      const SizedBox(height: 24),
+    ] : [
       Padding(
         padding: const EdgeInsets.only(top: 18, bottom: 4),
         child: Row(children: [
@@ -829,7 +859,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
       ];
     }
     final all = _entries;
-    final mine = all.where((e) => '${e.name} ${e.phone ?? ''} ${e.org} ${(e.contact?.emails ?? const <Email>[]).map((m) => m.address).join(' ')} ${e.member == null ? '' : '${e.member!['name']} ${e.member!['company']} ${e.member!['category']} ${e.member!['location']} ${(e.member!['services'] as List? ?? const []).join(' ')}'}'.toLowerCase().contains(q)).toList();
+    final mine = _mineFor(q);
     final aiMatches = _aiFor == _q.text.trim() ? ((_ai?['matches'] as List?) ?? const []).cast<Map>() : const <Map>[];
     bool shown(Map u) => mine.any((e) => e.member?['uid'] == u['uid']) || aiMatches.any((m) => m['uid'] == u['uid']);
     // a contact whose page the search found by name, though its number was not matched: one line, the page, not two
