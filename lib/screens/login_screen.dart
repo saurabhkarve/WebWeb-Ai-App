@@ -290,7 +290,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         blob(const Color(0xFFFF5D73).withValues(alpha: p.dark ? .32 : .22), 150, right: 70, top: 30),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-          child: Column(children: [
+          // full width, so the content is centred in the card (a Stack otherwise shrinks it to its widest line, at the left)
+          child: SizedBox(width: double.infinity, child: Column(children: [
             const LogoInline(size: 34, markSize: 56, tagline: true),
             const SizedBox(height: 14),
             Text(t('Publish your business.'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, height: 1.2)),
@@ -298,7 +299,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             Text(t("It takes less than a minute, and it's free."), textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: p.text.withValues(alpha: .75))),
             const SizedBox(height: 12),
             Wrap(alignment: WrapAlignment.center, spacing: 16, runSpacing: 6, children: [chip(Icons.language, 'Free website'), chip(Icons.verified_user_outlined, 'Data never sold')]),
-          ]),
+          ])),
         ),
       ]),
     );
