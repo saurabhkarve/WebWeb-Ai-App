@@ -2726,5 +2726,9 @@
   "Only contacts saved as a plumber, cabs, sweet shop and the like are shared, with their number. Swipe left to stop sharing one.": "केवल प्लंबर, कैब, मिठाई की दुकान जैसे सेव संपर्क नंबर सहित साझा होते हैं। किसी को रोकने के लिए बाएँ स्वाइप करें।",
   "All rated. Thank you!": "सब रेट हो गए। धन्यवाद!",
   "{n} still to rate: your stars help others choose.": "{n} को रेट करना बाकी है: आपके स्टार दूसरों को चुनने में मदद करते हैं।",
-  "Don't sync": "सिंक न करें"
+  "Don't sync": "सिंक न करें",
+  "Shared by 1 member": "1 सदस्य ने साझा किया",
+  "Shared by {n} members": "{n} सदस्यों ने साझा किया",
+  "Shared by {names} and {n} more": "{names} और {n} और ने साझा किया",
+  "Shared by {names}": "{names} ने साझा किया"
 }

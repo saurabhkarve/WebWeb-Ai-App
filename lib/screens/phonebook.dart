@@ -909,6 +909,26 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     final have = {for (final e in mine) d10(e.phone), for (final e in mine) ...(e.contact?.phones ?? const <Phone>[]).map((ph) => d10(ph.number))};
     final list = _service.where((c) => !have.contains('${c['phone']}')).toList();
     if (list.isEmpty) return const [];
+    // who shares it, by the name saved in MY phone book (never the name the sharer is known by elsewhere)
+    final saved = <String, String>{};
+    for (final e in mine) {
+      for (final n in {d10(e.phone), ...(e.contact?.phones ?? const <Phone>[]).map((ph) => d10(ph.number))}) {
+        if (n.isNotEmpty) saved.putIfAbsent(ContactSync.sharerId(n), () => e.name);
+      }
+    }
+    String? sharedBy(Map c) {
+      final s = c['sharedBy'];
+      if (s is! Map) return null;
+      final n = (s['count'] as num?)?.toInt() ?? 0;
+      if (n <= 0) return null;
+      final known = {
+        for (final id in (s['ids'] as List? ?? const [])) if (saved['$id'] != null) saved['$id']!,
+      }.toList();
+      if (known.isEmpty) return n == 1 ? t('Shared by 1 member') : t('Shared by {n} members', {'n': n});
+      final others = n - known.take(2).length;
+      final names = known.take(2).join(' & ');
+      return others > 0 ? t('Shared by {names} and {n} more', {'names': names, 'n': others}) : t('Shared by {names}', {'names': names});
+    }
     return [
       _label(p, t('Service contacts')),
       for (final c in list)
@@ -916,7 +936,8 @@ class _PhonebookHomeState extends State<PhonebookHome> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 4),
           leading: CircleAvatar(backgroundColor: kGold.withValues(alpha: .2), child: const Icon(Icons.handyman_rounded, size: 20, color: kStar)),
           title: Text('${c['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-          subtitle: Text(
+          subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
             [
               ...((c['tags'] as List?) ?? const []).take(2),
               if ('${c['place'] ?? ''}'.isNotEmpty) '${c['place']}',
@@ -928,6 +949,8 @@ class _PhonebookHomeState extends State<PhonebookHome> {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(color: p.muted),
           ),
+            if (sharedBy(c) != null) Text(sharedBy(c)!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.link, fontSize: 12.5, fontWeight: FontWeight.w600)),
+          ]),
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
             if ('${c['website'] ?? ''}'.isNotEmpty) IconButton(tooltip: t('Website'), onPressed: () => _open('${c['website']}'), icon: Icon(Icons.language_rounded, color: p.muted)),
             IconButton(tooltip: t('Call'), onPressed: () => _open('tel:+91${c['phone']}'), icon: const Icon(Icons.call_rounded, color: Color(0xFF1E9E5A))),

@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -32,6 +35,10 @@ class ContactSync {
     }
     return RegExp(r'^[6-9]\d{9}$').hasMatch(d) ? d : null;
   }
+
+  /// What the server sends for each member who shares a contact: a salted hash of their number, never the number.
+  /// The phone hashes the numbers in its own phone book the same way to tell which sharers the member has saved.
+  static String sharerId(String phone10) => sha256.convert(utf8.encode('wwsc1:$phone10')).toString().substring(0, 16);
 
   static String _cut(String s) => s.length > 120 ? s.substring(0, 120) : s;
 
