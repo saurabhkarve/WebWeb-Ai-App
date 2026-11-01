@@ -1538,6 +1538,24 @@ class _DirectoryRailSearchState extends State<DirectoryRailSearch> {
   String _place = '';
   ({double lat, double lng})? _at;
   static int _n = 0;
+  /// the city the phone is in (when location is already allowed), shown for "Current location"
+  String? _hereCity;
+
+  @override
+  void initState() {
+    super.initState();
+    _detectCity();
+  }
+
+  Future<void> _detectCity() async {
+    if (!ContactSync.supported || !await Permissions.granted(Need.location)) return;
+    try {
+      final p = await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 6)))
+          .catchError((_) async => (await Geolocator.getLastKnownPosition())!);
+      final city = placeAt(p.latitude, p.longitude)?.name;
+      if (mounted && city != _hereCity) setState(() => _hereCity = city);
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -1600,7 +1618,7 @@ class _DirectoryRailSearchState extends State<DirectoryRailSearch> {
         alignment: Alignment.centerLeft,
         child: CityPill(
           value: _place,
-          anyLabel: t('Current location'),
+          anyLabel: _hereCity ?? t('Current location'),
           chip: true,
           onChanged: (c) {
             setState(() {
