@@ -269,6 +269,8 @@ class _Row extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cat = c.tag.isNotEmpty ? c.tag : c.keyword;
+    // on a very narrow phone the buttons shrink to icons so the name and the five stars keep their room
+    final narrow = MediaQuery.of(context).size.width < 350;
     return Opacity(
       opacity: dim ? .6 : 1,
       child: GestureDetector(
@@ -276,77 +278,76 @@ class _Row extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         child: Container(
         margin: const EdgeInsets.only(top: 8),
-        padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+        padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
         decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle),
-              child: Text(initials(c.name), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.muted)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle),
+            child: Text(initials(c.name), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.muted)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: LayoutBuilder(builder: (context, box) {
+              // the stars shrink on a narrow phone so the five of them always fit beside the buttons
+              final star = ((box.maxWidth - 24) / 5).clamp(18.0, 34.0);
+              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _Editable(onTap: onEdit == null ? null : () => onEdit!('name'), p: p, child: Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600))),
                 const SizedBox(height: 2),
                 _Editable(onTap: onEdit == null ? null : () => onEdit!('tag'), p: p, child: Text('${c.phone} · $cat', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted))),
-              ]),
-            ),
-            if (onEdit == null)
-              TextButton(
-                onPressed: onTap,
-                style: TextButton.styleFrom(foregroundColor: p.link, padding: const EdgeInsets.symmetric(horizontal: 8), minimumSize: const Size(0, 36)),
-                child: Text(action, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-              )
-          ]),
-          if (onRate != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(50, 6, 0, 0),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  for (var n = 1; n <= 5; n++)
-                    GestureDetector(
-                      onTap: () => onRate!(c.rating == n ? 0 : n),
-                      behavior: HitTestBehavior.opaque,
-                      child: Padding(padding: const EdgeInsets.only(right: 4, top: 2, bottom: 2), child: Icon(n <= c.rating ? Icons.star_rounded : Icons.star_outline_rounded, size: 34, color: n <= c.rating ? kGold : p.border)),
-                    ),
-                  const SizedBox(width: 2),
-                  Icon(Icons.edit_outlined, size: 14, color: p.muted),
-                ]),
-                const SizedBox(height: 2),
-                _Editable(
-                  onTap: onEdit == null ? null : () => onEdit!('place'),
-                  p: p,
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.place_outlined, size: 15, color: p.muted),
-                    const SizedBox(width: 3),
-                    Flexible(child: Text(c.place.isEmpty ? t('City') : c.place, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: p.muted))),
+                if (onRate != null) ...[
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    for (var n = 1; n <= 5; n++)
+                      GestureDetector(
+                        onTap: () => onRate!(c.rating == n ? 0 : n),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(padding: const EdgeInsets.only(right: 2, top: 2, bottom: 2), child: Icon(n <= c.rating ? Icons.star_rounded : Icons.star_outline_rounded, size: star, color: n <= c.rating ? kGold : p.border)),
+                      ),
                   ]),
-                ),
-              ]),
-            ),
-          if (onEdit != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(50, 6, 4, 2),
-              child: Row(children: [
+                  _Editable(
+                    onTap: onEdit == null ? null : () => onEdit!('place'),
+                    p: p,
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.place_outlined, size: 15, color: p.muted),
+                      const SizedBox(width: 3),
+                      Flexible(child: Text(c.place.isEmpty ? t('City') : c.place, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: p.muted))),
+                    ]),
+                  ),
+                ],
+              ]);
+            }),
+          ),
+          const SizedBox(width: 8),
+          // both buttons on the right of the card, one above the other, the same width on every phone
+          SizedBox(
+            width: narrow ? 44 : 108,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (onEdit != null) ...[
                 OutlinedButton.icon(
                   onPressed: () => onEdit!('name'),
-                  icon: const Icon(Icons.edit_outlined, size: 16),
-                  label: Text(t('Edit')),
-                  style: OutlinedButton.styleFrom(foregroundColor: p.text, side: BorderSide(color: p.border), visualDensity: VisualDensity.compact, textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  icon: const Icon(Icons.edit_outlined, size: 15),
+                  label: narrow ? const SizedBox.shrink() : Text(t('Edit')),
+                  style: OutlinedButton.styleFrom(foregroundColor: p.text, side: BorderSide(color: p.border), padding: EdgeInsets.symmetric(horizontal: narrow ? 0 : 8), iconAlignment: IconAlignment.start, visualDensity: VisualDensity.compact, textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
                 ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: onTap,
-                  icon: const Icon(Icons.sync_disabled, size: 16),
-                  label: Text(action),
-                  style: OutlinedButton.styleFrom(foregroundColor: p.danger, side: BorderSide(color: p.danger.withValues(alpha: .4)), visualDensity: VisualDensity.compact, textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+              ],
+              OutlinedButton.icon(
+                onPressed: onTap,
+                icon: Icon(onEdit != null ? Icons.sync_disabled : Icons.sync, size: 15),
+                label: narrow ? const SizedBox.shrink() : FittedBox(fit: BoxFit.scaleDown, child: Text(action)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: danger ? p.danger : p.link,
+                  side: BorderSide(color: (danger ? p.danger : p.link).withValues(alpha: .4)),
+                  padding: EdgeInsets.symmetric(horizontal: narrow ? 0 : 8),
+                  visualDensity: VisualDensity.compact,
+                  textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
                 ),
-              ]),
-            ),
+              ),
+            ]),
+          ),
         ]),
       ),
       ),
