@@ -6,6 +6,7 @@ import 'phonebook.dart' show AiSearchField;
 
 import '../api.dart' show smallImage;
 import '../auth_provider.dart';
+import '../cover_default.dart';
 import '../card_colors.dart';
 import '../ask_types.dart';
 import '../i18n.dart';
@@ -856,7 +857,7 @@ class _BusinessCard extends StatelessWidget {
         // its old room and ran the card past its row)
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Stack(clipBehavior: Clip.none, alignment: Alignment.topCenter, children: [
-            SizedBox(height: 56, width: double.infinity, child: (u.bannerUrl ?? '').isNotEmpty ? NetImg(smallImage(u.bannerUrl!)) : CoverPattern(seed: u.handle)),
+            SizedBox(height: 56, width: double.infinity, child: (u.bannerUrl ?? '').isNotEmpty ? NetImg(smallImage(u.bannerUrl!)) : NetImg(defaultCoverUrl(u.handle, userType: u.userType, category: u.category).replaceFirst('.jpg', '_750.jpg'), fallback: CoverPattern(seed: u.handle))),
             Positioned(
               top: 32,
               child: Container(padding: const EdgeInsets.all(2), decoration: BoxDecoration(color: p.card, shape: BoxShape.circle), child: Avatar(name: name, photoUrl: u.photoUrl, size: 48)),

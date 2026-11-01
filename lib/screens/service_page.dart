@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../auth_provider.dart';
+import '../cover_default.dart';
 import '../i18n.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -176,7 +177,7 @@ class _ServicePageScreenState extends State<ServicePageScreen> {
       SizedBox(
         height: top + band,
         child: Stack(fit: StackFit.expand, children: [
-          CoverPattern(seed: phone),
+          NetImg(defaultCoverUrl(phone, words: tags), alignment: Alignment.topCenter, fallback: CoverPattern(seed: phone)),
           Positioned(
             top: top,
             left: 8,
@@ -184,7 +185,7 @@ class _ServicePageScreenState extends State<ServicePageScreen> {
             child: Semantics(
               button: true,
               label: t('Back'),
-              child: GestureDetector(onTap: () => Navigator.maybePop(context), child: const Padding(padding: EdgeInsets.all(8), child: WIcon(WI.back, size: 28, color: kInk))),
+              child: GestureDetector(onTap: () => Navigator.maybePop(context), child: Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: Colors.white.withValues(alpha: .75), shape: BoxShape.circle), child: const WIcon(WI.back, size: 28, color: kInk))),
             ),
           ),
         ]),

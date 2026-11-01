@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
+import '../cover_default.dart';
 import '../device_perms.dart';
 import '../config.dart';
 import '../i18n.dart';
@@ -342,7 +343,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onTap: onTap,
             child: Container(
               padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(color: hasBanner ? Colors.white.withValues(alpha: .75) : Colors.transparent, shape: BoxShape.circle),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: .75), shape: BoxShape.circle),
               child: child,
             ),
           ),
@@ -366,7 +367,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       height: top + band,
       child: Stack(fit: StackFit.expand, children: [
         if (!hasBanner)
-          CoverPattern(seed: u.handle.isEmpty ? u.name : u.handle)
+          // not set by the member: a design of their business group, picked from their handle
+          NetImg(defaultCoverUrl(u.handle.isEmpty ? u.name : u.handle, userType: u.userType, category: u.category), alignment: Alignment.topCenter, fallback: CoverPattern(seed: u.handle.isEmpty ? u.name : u.handle))
         else ...[
           if (top > 0) ClipRect(child: ImageFiltered(imageFilter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14), child: NetImg(u.bannerUrl!, alignment: Alignment.topCenter))),
           Positioned(top: top, left: 0, right: 0, height: band, child: NetImg(u.bannerUrl!)),

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
+import '../cover_default.dart';
 import '../i18n.dart';
 import '../location.dart';
 import '../models.dart';
@@ -321,7 +322,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         clipBehavior: Clip.antiAlias,
                         decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
                         child: Stack(fit: StackFit.expand, children: [
-                          if ((banner ?? '').isNotEmpty) NetImg(banner!, fit: BoxFit.cover) else CoverPattern(seed: me.handle.isNotEmpty ? me.handle : me.name),
+                          if ((banner ?? '').isNotEmpty) NetImg(banner!, fit: BoxFit.cover) else NetImg(defaultCoverUrl(me.handle.isNotEmpty ? me.handle : me.name, userType: me.userType, category: me.category), fallback: CoverPattern(seed: me.handle.isNotEmpty ? me.handle : me.name)),
                           Positioned(
                             right: 8,
                             bottom: 8,
