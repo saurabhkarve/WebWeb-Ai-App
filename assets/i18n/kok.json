@@ -2702,5 +2702,9 @@
   "Could not switch page": "पान बदलूंक जालें ना",
   "To hear what you want to search for.": "तुमकां कितें सोदपाचें आसा तें आयकूंक.",
   "Speak your search": "आवाजान सोदचें",
-  "Current location": "सद्याचें थळ"
+  "Current location": "सद्याचें थळ",
+  "Not all your contacts will be synced: only service providers. If you allow it, it is a great contribution for other users looking for someone they can trust nearby.": "तुमचे सगळे संपर्क सिंक जायनात: फकत सेवा पुरवठादार. तुमी परवानगी दिल्यार, लागींच विश्वासू मनीस सोदपी दुसऱ्या वापरप्यांक हें व्हडलें योगदान आसा.",
+  "Allow location on your phone": "तुमच्या फोनार लोकेशनाची परवानगी दियात",
+  "Share service contacts from your phone": "तुमच्या फोनांतल्यान सेवा संपर्क शेअर करात",
+  "So we can show you people and asks near you.": "जाका आमी तुमकां लागींचे लोक आनी asks दाखोंक शकतले."
 }

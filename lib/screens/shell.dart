@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../auth_provider.dart';
+import '../device_perms.dart';
 import '../config.dart';
 import '../contact_sync.dart';
 import '../i18n.dart';
@@ -88,8 +89,10 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) Tours.maybeShow(context, kPhonebookTourId, phonebookTour(business: _isBusiness()), retire: const [kConnectTourId]);
     });
-    // service contacts: look quietly if the member turned it on; the one-time invitation from the third open
-    _svcTimer = Timer(const Duration(seconds: 12), () async {
+    // the phone's location and contacts count towards the profile's strength: read them now
+    DevicePerms.i.refresh();
+    // service contacts: look quietly if the member turned it on; else the invitation (first open, then a week apart, 3 times at most)
+    _svcTimer = Timer(const Duration(seconds: 8), () async {
       if (!mounted) return;
       final api = context.read<AuthProvider>().api;
       if (await ContactSync.isOn(api).catchError((_) => true)) {
@@ -105,6 +108,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState s) {
     if (s == AppLifecycleState.resumed) {
       _loadUnread();
+      DevicePerms.i.refresh();
       _notes.refresh(context.read<AuthProvider>());
       ContactSync.run(context.read<AuthProvider>().api); // once a day at most, and only when it is on
     }

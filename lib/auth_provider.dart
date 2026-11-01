@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api.dart';
 import 'config.dart';
 import 'crash_reporter.dart';
+import 'device_perms.dart';
 import 'offline_cache.dart';
 import 'outbox.dart';
 import 'models.dart';
@@ -11,6 +12,11 @@ import 'models.dart';
 /// Session + profile. Login is the same two calls the web uses (`/auth/send-otp`, `/auth/verify-otp`);
 /// the profile comes from `GET /me` and stays null until onboarding is finished.
 class AuthProvider extends ChangeNotifier {
+  AuthProvider() {
+    // the strength counts what the phone allows: it changes when the member answers a prompt
+    DevicePerms.i.addListener(notifyListeners);
+  }
+
   late final Api api = Api(() => token, onUnauthorized: () => logout(), onRenewed: _renewed);
 
   String? token;
@@ -36,6 +42,9 @@ class AuthProvider extends ChangeNotifier {
   bool captchaGate = false;
 
   bool get isLoggedIn => token != null;
+
+  /// The page's strength with the phone's location and contacts steps (see DevicePerms).
+  Completion? get completion => DevicePerms.i.apply(profile?.completion);
 
   /// Runs while the token is still valid (e.g. to drop this device's push token).
   Future<void> Function()? beforeLogout;

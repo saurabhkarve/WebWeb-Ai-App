@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
+import '../device_perms.dart';
 import '../config.dart';
 import '../i18n.dart';
 import '../models.dart';
@@ -243,8 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final own = _own;
     final tabs = own && !isJob ? [_Tab.posts, _Tab.deals, _Tab.updates, _Tab.products] : [_Tab.products, _Tab.posts, _Tab.deals, _Tab.updates];
     final tab = _tabSel ?? (own && !isJob ? _Tab.posts : _Tab.products);
-    final me = context.watch<AuthProvider>().profile;
-    final completion = own ? me?.completion : null;
+    final completion = own ? context.watch<AuthProvider>().completion : null;
 
     return Scaffold(
       backgroundColor: p.canvas,
@@ -280,7 +280,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 6),
                 _tags(p, u, own),
                 if (own && completion != null && completion.badges.isNotEmpty) _badges(p, completion.badges),
-                if (own && completion != null && completion.percent < 100) _StrengthCard(completion: completion, onTap: _edit),
+                if (own && completion != null && completion.percent < 100) _StrengthCard(completion: completion, onTap: () async {
+                      if (!await DevicePerms.handle(context, completion.next)) _edit();
+                    }),
                 const SizedBox(height: 8),
                 own ? _ownActions(p) : _visitorActions(p, u),
               ]),

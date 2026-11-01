@@ -2702,5 +2702,9 @@
   "Could not switch page": "पेज बदला नहीं जा सका",
   "To hear what you want to search for.": "आप जो खोजना चाहते हैं, उसे सुनने के लिए।",
   "Speak your search": "आवाज़ से खोजें",
-  "Current location": "मौजूदा स्थान"
+  "Current location": "मौजूदा स्थान",
+  "Not all your contacts will be synced: only service providers. If you allow it, it is a great contribution for other users looking for someone they can trust nearby.": "आपके सभी संपर्क सिंक नहीं होंगे: केवल सेवा प्रदाता। अगर आप अनुमति देते हैं, तो यह आसपास किसी भरोसेमंद व्यक्ति को ढूँढ रहे दूसरे उपयोगकर्ताओं के लिए बड़ा योगदान है।",
+  "Allow location on your phone": "अपने फ़ोन पर लोकेशन की अनुमति दें",
+  "Share service contacts from your phone": "अपने फ़ोन से सेवा संपर्क साझा करें",
+  "So we can show you people and asks near you.": "ताकि हम आपको आसपास के लोग और asks दिखा सकें।"
 }

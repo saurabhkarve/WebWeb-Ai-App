@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
+import '../device_perms.dart';
 import '../i18n.dart';
 import 'your_asks.dart';
 import '../models.dart';
@@ -328,8 +329,9 @@ class _StrengthNudgeState extends State<_StrengthNudge> {
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final me = context.watch<AuthProvider>().profile;
-    final c = me?.completion;
+    final auth = context.watch<AuthProvider>();
+    final me = auth.profile;
+    final c = auth.completion;
     if (c == null || c.percent >= 100 || _hidden) return const SizedBox(height: 0);
     final next = c.next;
     final ink = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
@@ -365,6 +367,8 @@ class _StrengthNudgeState extends State<_StrengthNudge> {
             Flexible(
               child: GestureDetector(
                 onTap: () async {
+                  if (await DevicePerms.handle(context, next)) return;
+                  if (!context.mounted) return;
                   final auth = context.read<AuthProvider>();
                   if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: me!))) == true) auth.loadProfile();
                 },

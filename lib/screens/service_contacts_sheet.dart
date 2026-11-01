@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../auth_provider.dart';
 import '../contact_sync.dart';
+import '../device_perms.dart';
 import '../i18n.dart';
 import '../permissions.dart';
 import '../theme.dart';
@@ -62,6 +63,7 @@ class _SheetState extends State<_Sheet> {
     setState(() => _busy = true);
     try {
       final allowed = await Permissions.ensure(context, Need.contacts, reason: t('To find service providers saved in your phone book.'));
+      await DevicePerms.i.refresh();
       if (!allowed || !mounted) return;
       await ContactSync.setOn(api, true);
       final n = await ContactSync.run(api, force: true);
@@ -112,6 +114,10 @@ class _SheetState extends State<_Sheet> {
           const SizedBox(height: 10),
           Text(t('Help build a trusted list of local service providers: the plumbers, electricians, cabs and carpenters people already call.'),
               style: TextStyle(fontSize: 14, color: p.muted, height: 1.4)),
+          const SizedBox(height: 8),
+          // honest about how little is taken, and why it matters
+          Text(t('Not all your contacts will be synced: only service providers. If you allow it, it is a great contribution for other users looking for someone they can trust nearby.'),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, height: 1.4)),
           const SizedBox(height: 16),
           point(WI.search, 'The app looks through your phone book on your phone for contacts saved with a service word, like plumber, electrician, cab or carpenter.'),
           point(WI.send, 'Only those contacts are sent: the name you saved, the mobile number and the word that matched.'),

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
@@ -14,7 +15,6 @@ class ContactSync {
   static const _kSent = 'svc_contacts_sent';
   static const _kLast = 'svc_contacts_last';
   static const _kAsked = 'svc_contacts_asked';
-  static const _kOpens = 'svc_contacts_opens';
   static bool _running = false;
 
   static bool get supported => !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
@@ -52,20 +52,33 @@ class ContactSync {
     }
   }
 
-  /// Show the one-time invitation? From the member's third app open, once, when it is not on yet.
+  static const _kInvites = 'svc_invites';
+  static const _kInviteAt = 'svc_invite_at';
+
+  /// Show the invitation now? Not on every open: the first time at the start, then at most 3 times in all, a week
+  /// apart, and never once it is on, or when the phone will not ask again (the profile's strength then points to
+  /// Settings). The caller has checked that it is not on yet.
   static Future<bool> shouldInvite() async {
     if (!supported) return false;
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(_kAsked) == true) return false;
-    final opens = (prefs.getInt(_kOpens) ?? 0) + 1;
-    await prefs.setInt(_kOpens, opens);
-    return opens >= 3;
+    final n = prefs.getInt(_kInvites) ?? 0;
+    final at = prefs.getInt(_kInviteAt) ?? 0;
+    if (n >= 3) return false;
+    if (n > 0 && DateTime.now().millisecondsSinceEpoch - at < const Duration(days: 7).inMilliseconds) return false;
+    final s = await Permission.contacts.status;
+    if (s.isPermanentlyDenied || s.isRestricted) return false;
+    return true;
   }
 
   /// Has the member been offered it (or chosen) on this phone?
   static Future<bool> wasAsked() async => (await SharedPreferences.getInstance()).getBool(_kAsked) == true;
 
-  static Future<void> markInvited() async => (await SharedPreferences.getInstance()).setBool(_kAsked, true);
+  static Future<void> markInvited() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kAsked, true);
+    await prefs.setInt(_kInvites, (prefs.getInt(_kInvites) ?? 0) + 1);
+    await prefs.setInt(_kInviteAt, DateTime.now().millisecondsSinceEpoch);
+  }
 
   /// Look and send, if it is on and contacts are allowed. Never asks for anything; returns how many were sent.
   /// [force] skips the once-a-day limit (right after turning it on).
