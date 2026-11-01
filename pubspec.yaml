@@ -70,6 +70,7 @@ flutter_launcher_icons:
   adaptive_icon_background: assets/icon_bg.png
   adaptive_icon_foreground: assets/icon_fg.png
   adaptive_icon_foreground_inset: 0
+  adaptive_icon_monochrome: assets/icon_mono.png
   web:
     generate: true
     image_path: assets/icon.png
