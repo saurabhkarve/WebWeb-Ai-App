@@ -993,6 +993,27 @@ class _CoverPainter extends CustomPainter {
 
 /// A page pushed on top of the tabs: the app header's cream bar with a back chevron and a title
 /// (the web keeps its header on these pages; the phone needs a way back).
+/// A pushed page at the shell's width on a wide screen: from 768 px it is a centred 600 px column on the page colour
+/// (as the raised sheet of the main pages, shell.dart), and the page is told the width it really has. On a phone it is
+/// the page as it is.
+class WideColumn extends StatelessWidget {
+  final Widget child;
+  const WideColumn({super.key, required this.child});
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    if (mq.size.width < 768) return child;
+    const w = 600.0;
+    return ColoredBox(
+      color: Pal.of(context).canvas,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: SizedBox(width: w, child: MediaQuery(data: mq.copyWith(size: Size(w, mq.size.height)), child: child)),
+      ),
+    );
+  }
+}
+
 class SubPage extends StatelessWidget {
   final String? title;
   final Widget? titleWidget;

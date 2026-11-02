@@ -126,7 +126,9 @@ class _ServicePageScreenState extends State<ServicePageScreen> {
       );
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => WideColumn(child: _body(context));
+
+  Widget _body(BuildContext context) {
     final p = Pal.of(context);
     final c = _c;
     if (c == null) {

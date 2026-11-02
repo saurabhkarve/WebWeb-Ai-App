@@ -230,7 +230,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => WideColumn(child: _page(context));
+
+  Widget _page(BuildContext context) {
     final p = Pal.of(context);
     final u = _u;
     if (u == null) {
