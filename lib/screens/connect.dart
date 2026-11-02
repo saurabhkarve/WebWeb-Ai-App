@@ -23,7 +23,6 @@ import '../widgets/story_viewer.dart';
 import '../widgets/tour.dart';
 import 'edit_profile.dart';
 import 'find.dart';
-import 'leads.dart';
 import 'p2.dart';
 
 /// Connect (home), same as the web feed (feed-page.tsx): profile-strength strip, Updates row, then the
@@ -60,7 +59,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
   int _offset = 0;
   final _scroll = ScrollController();
   final _updatesKey = GlobalKey<_UpdatesBarState>();
-  final _todayKey = GlobalKey<TodayStripState>();
   Timer? _poll;
   bool _tourTried = false;
 
@@ -153,7 +151,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
       _load(),
       _loadCards(),
       _updatesKey.currentState?.load() ?? Future.value(),
-      _todayKey.currentState?.load() ?? Future.value(),
       context.read<AuthProvider>().loadProfile(),
     ]);
   }
@@ -223,8 +220,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
     final houseShown = blocks.take(slotCount).whereType<HouseCard>().length;
     final children = <Widget>[
       const _StrengthNudge(),
-      // at the start of the week, your week (leads and Today are circles in Updates)
-      TodayStrip(key: _todayKey),
       const SizedBox(height: 12),
       KeyedSubtree(key: Tours.key('updates'), child: _UpdatesBar(key: _updatesKey)),
       const SizedBox(height: 12),
@@ -413,6 +408,7 @@ class _UpdatesBarState extends State<_UpdatesBar> {
   List<FeedAd> _ads = [];
   TodayFeed? _today;
   List<Profile>? _biz;
+  WeekStats? _week;
   Set<String> _dailySeen = {};
   Set<String> _seen = {};
   bool _hasMore = false;
@@ -464,6 +460,9 @@ class _UpdatesBarState extends State<_UpdatesBar> {
       }).catchError((_) {}),
       api.get('/today/new-businesses').then((d) {
         if (mounted) setState(() => _biz = [for (final e in d as List) Profile.fromJson(e as Map)]);
+      }).catchError((_) {}),
+      api.get('/me/week').then((d) {
+        if (mounted) setState(() => _week = WeekStats.fromJson(d as Map));
       }).catchError((_) {}),
     ]);
   }
@@ -593,7 +592,7 @@ class _UpdatesBarState extends State<_UpdatesBar> {
     final mineIdx = _groups.indexWhere((g) => g.uid == me?.uid);
     final others = [for (var i = 0; i < _groups.length; i++) if (_groups[i].uid != me?.uid) i];
     final api = context.read<AuthProvider>().api;
-    final dailies = buildDailyGroups(leads: _leadList, today: _today, biz: _biz, seen: _dailySeen, api: api);
+    final dailies = buildDailyGroups(leads: _leadList, today: _today, biz: _biz, week: _week, seen: _dailySeen, api: api);
     // circles with something new come before people's updates, the ones already seen after them, as seen updates do
     final order = [...dailies.where((g) => g.fresh > 0), ...dailies.where((g) => g.fresh == 0)];
     Widget circle(DailyGroup g) => DailyCircle(

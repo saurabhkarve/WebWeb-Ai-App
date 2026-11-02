@@ -1102,7 +1102,7 @@ class DailyGroup {
 
 /// The circles from Leads for you, Today and the businesses that just joined; [seen] is what this phone has shown
 /// (a lead the server no longer calls new counts as seen too).
-List<DailyGroup> buildDailyGroups({required List<Post>? leads, required TodayFeed? today, required List<Profile>? biz, required Set<String> seen, required Api api}) {
+List<DailyGroup> buildDailyGroups({required List<Post>? leads, required TodayFeed? today, required List<Profile>? biz, WeekStats? week, required Set<String> seen, required Api api}) {
   final out = <DailyGroup>[];
   // ---- Leads for you, by kind of ask (the three busiest, then the rest together)
   if (leads != null && leads.isNotEmpty) {
@@ -1194,6 +1194,22 @@ List<DailyGroup> buildDailyGroups({required List<Post>? leads, required TodayFee
         ],
       ));
     }
+  }
+  // ---- Your week: the scorecard of the last 7 days, one card; gold until seen this week
+  if (week != null && week.hasNews) {
+    final now = DateTime.now().toUtc().add(const Duration(minutes: 330));
+    final monday = now.subtract(Duration(days: now.weekday - 1));
+    final key = 'week:${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
+    out.add(DailyGroup(
+      id: 'week',
+      emoji: week.won > 0 ? '🏆' : '📊',
+      label: t('Your week'),
+      title: t('Your week'),
+      tone: _tone['rates'],
+      allLabel: t('Your week'),
+      allPage: () => SubPage(title: t('Your week'), body: const WeekScreen()),
+      cards: [DailyCard(id: key, fresh: !seen.contains(key), bg: _bg['rates']!, ms: 9000, build: (go) => _WeekCard(w: week, go: go))],
+    ));
   }
   // ---- New here: businesses that just joined, the member's city first
   if (biz != null && biz.isNotEmpty) {
@@ -1810,6 +1826,50 @@ class _PollStory extends StatelessWidget {
 }
 
 /// A business that just joined: who they are and what they do; View profile, or Say hello.
+class _WeekCard extends StatelessWidget {
+  final WeekStats w;
+  final DailyGo go;
+  const _WeekCard({required this.w, required this.go});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    Widget tile(int n, String label, {bool gold = false}) => Container(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+          decoration: BoxDecoration(
+            gradient: gold ? kGoldGradient : null,
+            color: gold ? null : p.card,
+            border: Border.all(color: gold ? kGold : p.border),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(children: [
+            Text('$n', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: gold ? kInk : p.text, fontFeatures: const [FontFeature.tabularFigures()])),
+            const SizedBox(height: 2),
+            Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: gold ? kInk.withValues(alpha: .75) : p.muted)),
+          ]),
+        );
+    return _Shell(
+      strip: '${w.won > 0 ? '🏆' : '📊'} ${t('Your week')}',
+      stripColors: const [Color(0xFF22875C), Color(0xFF2FA36F)],
+      right: t('This week'),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(child: tile(w.leads, t(w.leads == 1 ? 'lead' : 'leads'))),
+          const SizedBox(width: 8),
+          Expanded(child: tile(w.replied, t(w.replied == 1 ? 'reply sent' : 'replies sent'))),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: tile(w.won, t('won'), gold: w.won > 0)),
+          const SizedBox(width: 8),
+          Expanded(child: tile(w.askViews, t('views on your asks'))),
+        ]),
+        const SizedBox(height: 16),
+        _Cta(emoji: '📊', label: t('Your week'), onTap: () => go(SubPage(title: t('Your week'), body: const WeekScreen()))),
+      ]),
+    );
+  }
+}
+
 class _NewBizCard extends StatefulWidget {
   final Profile u;
   final DailyGo go;

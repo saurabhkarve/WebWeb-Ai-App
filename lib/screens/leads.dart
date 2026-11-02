@@ -11,15 +11,10 @@ import 'catalog.dart';
 import 'edit_profile.dart';
 import 'p2.dart';
 
-/// P1 (docs/P1-MICRO-PLAN.md), as on the web: the Today strip at the top of Connect (today-strip.tsx), "Leads for
-/// you" (/leads) and "Your week" (/week).
+/// P1 (docs/P1-MICRO-PLAN.md), as on the web: "Leads for you" (/leads) and "Your week" (/week); both have a circle
+/// at the front of Updates (p2.dart).
 
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-bool _startOfWeekIST() {
-  final day = DateTime.now().toUtc().add(const Duration(minutes: 330)).weekday;
-  return day == DateTime.monday || day == DateTime.tuesday;
-}
 
 
 Future<void> openLeads(BuildContext context) =>
@@ -32,75 +27,6 @@ Future<void> _editProfile(BuildContext context) async {
   final me = auth.profile;
   if (me == null) return;
   if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: me))) == true) auth.loadProfile();
-}
-
-/// Above Updates at the start of the week: "Your week". Leads for you and Today in your area are circles at the front
-/// of the Updates row (connect.dart), where members already tap every day.
-class TodayStrip extends StatefulWidget {
-  const TodayStrip({super.key});
-  @override
-  State<TodayStrip> createState() => TodayStripState();
-}
-
-class TodayStripState extends State<TodayStrip> {
-  WeekStats? _week;
-
-  @override
-  void initState() {
-    super.initState();
-    load();
-  }
-
-  Future<void> load() async {
-    if (!_startOfWeekIST()) return;
-    try {
-      final w = WeekStats.fromJson(await context.read<AuthProvider>().api.get('/me/week') as Map);
-      if (mounted) setState(() => _week = w);
-    } catch (_) {}
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Pal.of(context);
-    final w = _week;
-    if (w == null || !w.hasNews) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Material(
-        color: Colors.transparent,
-        child: Ink(
-          decoration: BoxDecoration(color: p.card, border: Border.all(color: p.border), borderRadius: BorderRadius.circular(18)),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: () => openWeek(context),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Row(children: [
-                Text(w.won > 0 ? '🏆' : '📊', style: const TextStyle(fontSize: 18)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(t('Your week'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                    Text(
-                      [
-                        t(w.leads == 1 ? '{n} lead' : '{n} leads', {'n': w.leads}),
-                        t(w.replied == 1 ? '{n} reply' : '{n} replies', {'n': w.replied}),
-                        t('{n} won', {'n': w.won}),
-                      ].join(' · '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: p.muted),
-                    ),
-                  ]),
-                ),
-                Text('›', style: TextStyle(fontSize: 20, color: p.muted)),
-              ]),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// "Leads for you": open asks matched to what this member does, new ones first. Each card says why it fits and how
