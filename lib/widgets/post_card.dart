@@ -89,18 +89,18 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
   bool get _isOwner => context.read<AuthProvider>().profile?.uid == post.authorUid;
 
   void _openAuthor() {
-    if (post.authorHandle.isNotEmpty) Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.authorHandle)));
+    if (post.authorHandle.isNotEmpty) Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: post.authorHandle)));
   }
 
   Future<void> _openDetail({bool expandResponses = false, bool askOutcome = false}) async {
     if (widget.detail) return;
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: post.id, expandResponses: expandResponses, askOutcome: askOutcome)));
+    await Navigator.push(context, WideRoute(builder: (_) => PostDetailScreen(postId: post.id, expandResponses: expandResponses, askOutcome: askOutcome)));
     widget.onChanged?.call();
   }
 
   void _openFind({String? location, String? budget, String? urgency}) => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => FindScreen(standalone: true, initialLocation: location, initialBudget: budget, initialUrgency: urgency)),
+        WideRoute(builder: (_) => FindScreen(standalone: true, initialLocation: location, initialBudget: budget, initialUrgency: urgency)),
       );
 
   final _actionsKey = GlobalKey<PostActionsState>();
@@ -224,7 +224,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     if (!mounted || choice == null) return;
     if (choice == 'save') return _actionsKey.currentState?.toggleBookmark();
     if (choice == 'edit') {
-      final saved = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => SubPage(title: t('Edit ask'), body: AskScreen(onPosted: () {}, edit: post))));
+      final saved = await Navigator.push<bool>(context, WideRoute(builder: (_) => SubPage(title: t('Edit ask'), body: AskScreen(onPosted: () {}, edit: post))));
       if (saved == true) widget.onChanged?.call();
       return;
     }
@@ -626,7 +626,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     final r = post.repostedBy ?? const {};
     const green = Color(0xFF1F7A52);
     final ink = Theme.of(context).brightness == Brightness.dark ? const Color(0xFF7FD6AD) : green;
-    void open() => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? '')));
+    void open() => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: post.repostedByHandle ?? '')));
     return Container(
       padding: EdgeInsets.symmetric(vertical: ask ? 10 : 20),
       foregroundDecoration: _HairlineDecoration(kGold.withValues(alpha: .3)),
@@ -1119,7 +1119,7 @@ class ReplyBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     const bubble = BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(14), bottomLeft: Radius.circular(14), bottomRight: Radius.circular(14));
-    void openProfile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
+    void openProfile(String handle) => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: handle)));
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         GestureDetector(onTap: () => openProfile(r.handle), child: Avatar(name: r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name, photoUrl: r.photoUrl, size: 24)),
         const SizedBox(width: 8),
@@ -1241,7 +1241,7 @@ class _AllRepliesState extends State<AllReplies> {
     if (items.isEmpty) return const SizedBox.shrink();
     final rest = items.length - _shown;
     final p = Pal.of(context);
-    void openProfile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
+    void openProfile(String handle) => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: handle)));
     String shown(ResponseLog r) => r.userType == 'entrepreneur' && r.company.isNotEmpty ? r.company : r.name;
     return Padding(
       padding: const EdgeInsets.only(top: 16),
@@ -1338,7 +1338,7 @@ class ResponseActivity extends StatelessWidget {
               // who responded: tapping the row opens their page
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: r.handle.isEmpty ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: r.handle))),
+                onTap: r.handle.isEmpty ? null : () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: r.handle))),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(children: [

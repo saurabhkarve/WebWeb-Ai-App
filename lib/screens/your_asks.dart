@@ -112,7 +112,7 @@ class _AskRow extends StatelessWidget {
     final when = a.lastAt ?? a.createdAt;
     return InkWell(
       borderRadius: BorderRadius.circular(12),
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: a.id, expandResponses: true))),
+      onTap: () => Navigator.push(context, WideRoute(builder: (_) => PostDetailScreen(postId: a.id, expandResponses: true))),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         decoration: a.fresh > 0 ? BoxDecoration(color: kGold.withValues(alpha: .08), borderRadius: BorderRadius.circular(12)) : null,

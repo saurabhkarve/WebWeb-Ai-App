@@ -112,7 +112,7 @@ class _SponsoredCardState extends State<SponsoredCard> {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               (ad.advertiserHandle ?? '').isNotEmpty
-                  ? GestureDetector(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: ad.advertiserHandle!))), child: name)
+                  ? GestureDetector(onTap: () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: ad.advertiserHandle!))), child: name)
                   : name,
               const SizedBox(height: 3),
               Container(

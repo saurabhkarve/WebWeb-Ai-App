@@ -1,65 +1,25 @@
-import 'dart:async';
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
 import '../i18n.dart';
-import '../indic.dart';
-import '../location.dart';
-import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import '../widgets/city_picker.dart';
-import '../widgets/image_cropper.dart';
-import '../widgets/picture_picker.dart';
-
-/// Handles the API will refuse; checked here too so the message shows while typing.
-const _reserved = {'admin', 'api', 'talk', 'ask', 'find', 'chat', 'post', 'profile', 'login', 'onboarding', 'update', 'u', 'me', 'saved', 'features', 'webweb', 'support', 'help'};
-/// Letters and digits for the page link; a name in an Indian script is spelled in Latin letters.
-String _slug(String s) => linkSlug(s);
-
-/// The link made from a name ("राम" → "rambiz"): at least 5 letters, as links need.
-String _linkFromName(String s) {
-  final l = linkSlug(s);
-  return l.isNotEmpty && l.length < 5 ? '${l}biz' : l;
-}
 
 const _green = Color(0xFF2F9E6B);
-const _emerald600 = Color(0xFF059669);
 
-/// Keyword hints that suggest a sector from a business name or role (web suggestCategory).
-const _categoryHints = <String, List<String>>{
-  'Manufacturing': ['manufactur', 'industr', 'fabricat', 'engineer', 'cnc', 'machin', 'tools', 'plastic', 'packag', 'steel', 'casting', 'mill', 'works', 'operator', 'welder', 'fitter', 'turner'],
-  'Trading / Wholesale': ['trader', 'trading', 'wholesale', 'distribut', 'agenc', 'suppl', 'export', 'import', 'merchant', 'enterprise'],
-  'Retail': ['store', 'shop', 'mart', 'retail', 'boutique', 'supermarket', 'bazaar', 'emporium', 'salesman', 'cashier'],
-  'IT & Software': ['tech', 'soft', 'digital', 'web', 'app', 'cloud', 'cyber', 'data', 'developer', 'programmer', 'designer', 'seo', 'network'],
-  'Logistics & Transport': ['logistic', 'transport', 'cargo', 'courier', 'freight', 'carrier', 'travels', 'driver', 'warehouse', 'mover', 'packers', 'fleet'],
-  'Construction & Real Estate': ['construct', 'builder', 'realty', 'real estate', 'infra', 'contractor', 'interior', 'architect', 'civil', 'developers', 'plumb', 'electric'],
-  'Food & Beverage': ['food', 'restaurant', 'cafe', 'kitchen', 'cater', 'bakery', 'sweet', 'hotel', 'tiffin', 'juice', 'chef', 'dhaba', 'snack'],
-  'Healthcare': ['clinic', 'hospital', 'pharma', 'medical', 'health', 'diagnostic', 'dental', 'doctor', 'nurse', 'lab', 'ayurved'],
-  'Education & Training': ['school', 'class', 'academy', 'institute', 'tuition', 'coaching', 'training', 'educat', 'teacher', 'tutor'],
-  'Professional Services': ['consult', 'associate', 'chartered', 'advocate', 'legal', 'account', 'audit', 'tax', 'ca ', 'finance', 'insurance', 'services'],
-};
+/// The business categories, in their usual order; the sub-categories come from GET /service-contacts/categories.
+const _parents = [
+  'Manufacturing', 'Trading / Wholesale', 'Retail', 'IT & Software', 'Logistics & Transport', 'Construction & Real Estate',
+  'Food & Beverage', 'Healthcare', 'Education & Training', 'Professional Services', 'Other',
+];
 
-String? _suggestCategory(String text) {
-  final s = ' ${text.toLowerCase()} ';
-  String? best;
-  var score = 0;
-  _categoryHints.forEach((cat, words) {
-    final n = words.where(s.contains).length;
-    if (n > score) {
-      score = n;
-      best = cat;
-    }
-  });
-  return best;
-}
+/// What they do: business, freelancing, a job, or nothing. "Nothing" joins as a plain member.
+enum _Doing { business, freelancing, job, nothing }
 
-/// First sign-in, as the web /onboarding: step 1 makes the page (type, name, @link), step 2 offers
-/// optional extras (photo, business / role, sector, location, one line) that fill the strength bar.
+/// First sign-in (as the web /onboarding): after the phone number and the code, one question (what do you do?), then,
+/// unless the answer is "Nothing", the categories and sub-categories that fit. That is all; the rest is done from the profile.
 class OnboardingFlow extends StatefulWidget {
   const OnboardingFlow({super.key});
   @override
@@ -67,7 +27,9 @@ class OnboardingFlow extends StatefulWidget {
 }
 
 class _OnboardingFlowState extends State<OnboardingFlow> {
-  Profile? _created;
+  _Doing? _doing;
+  bool _busy = false;
+  String? _error;
   /// the page to go back to from a new page's set-up: the one it was added from, else any other page that is set up
   String? _back;
 
@@ -84,10 +46,33 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
   }
 
+  /// The one call that makes the account: only what they do and their categories.
+  Future<void> _create(_Doing d, {String? category, List<String> subs = const []}) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final auth = context.read<AuthProvider>();
+    try {
+      await auth.createProfile({
+        'userType': d == _Doing.nothing ? 'consumer' : d == _Doing.job ? 'job_seeker' : 'entrepreneur',
+        if (category != null) 'category': category,
+        if (subs.isNotEmpty) 'services': subs.join('\n'),
+      });
+      await auth.loadProfile(); // the app opens
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = t('Could not create your page. Try again.'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
-    final created = _created;
+    final more = _doing != null && _doing != _Doing.nothing;
     return Scaffold(
       backgroundColor: p.canvas,
       body: SafeArea(
@@ -101,7 +86,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Row(children: [
                     // a page added from the account menu: Back returns to the page they came from
-                    if (created == null && _back != null)
+                    if (!more && _back != null)
                       GestureDetector(
                         onTap: () async {
                           final auth = context.read<AuthProvider>();
@@ -127,12 +112,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                       ),
                     const LogoInline(size: 28, markSize: 36, tagline: true),
                     const Spacer(),
-                    if (created == null)
+                    if (!more)
                       GestureDetector(
                         onTap: () => context.read<AuthProvider>().logout(),
                         child: Padding(padding: const EdgeInsets.only(right: 12), child: Text(t('Log out'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted))),
                       ),
-                    Text('${created == null ? 1 : 2} / 2', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
+                    Text('${more ? 2 : 1} / 2', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
                   ]),
                   const SizedBox(height: 16),
                   Row(children: [
@@ -142,16 +127,34 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
                         height: 4,
-                        decoration: BoxDecoration(color: created == null ? p.chip : kGold, borderRadius: BorderRadius.circular(2)),
+                        decoration: BoxDecoration(color: more ? kGold : p.chip, borderRadius: BorderRadius.circular(2)),
                       ),
                     ),
                   ]),
                 ]),
               ),
               Expanded(
-                child: created == null
-                    ? _CreateStep(onCreated: (pr) => setState(() => _created = pr))
-                    : _BoostStep(initial: created, onFinish: () => context.read<AuthProvider>().loadProfile()),
+                child: more
+                    ? _CategoryStep(
+                        busy: _busy,
+                        error: _error,
+                        onBack: () => setState(() {
+                          _doing = null;
+                          _error = null;
+                        }),
+                        onDone: (c, subs) => _create(_doing!, category: c, subs: subs),
+                      )
+                    : _DoingStep(
+                        busy: _busy,
+                        error: _error,
+                        onPick: (d) {
+                          setState(() {
+                            _error = null;
+                            _doing = d;
+                          });
+                          if (d == _Doing.nothing) _create(d);
+                        },
+                      ),
               ),
             ]),
           ),
@@ -161,277 +164,228 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 }
 
-// ----------------------------- step 1: required -----------------------------
+// ----------------------------- step 1: what do you do? -----------------------------
 
-class _CreateStep extends StatefulWidget {
-  final ValueChanged<Profile> onCreated;
-  const _CreateStep({required this.onCreated});
-  @override
-  State<_CreateStep> createState() => _CreateStepState();
-}
-
-class _CreateStepState extends State<_CreateStep> {
-  String _type = 'entrepreneur';
-  /// business sector (or a job seeker's field): optional, it picks the starter photo and cover
-  String? _category;
-  final _name = TextEditingController();
-  final _company = TextEditingController();
-  final _handle = TextEditingController();
-  bool _handleTouched = false;
-  String _avail = 'idle'; // idle checking free taken reserved protected
-  bool _busy = false;
-  String? _error;
-  Timer? _debounce;
-  int _checkSeq = 0;
-
-  bool get _business => _type == 'entrepreneur';
-  bool get _valid => _name.text.trim().length >= 2 && (!_business || _company.text.trim().length >= 2) && RegExp(r'^[a-z0-9]{5,20}$').hasMatch(_handle.text);
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _name.dispose();
-    _company.dispose();
-    _handle.dispose();
-    super.dispose();
-  }
-
-  /// a business's link follows the business name (the person's name while there is none), until the person edits it
-  void _nameChanged([String? _]) {
-    if (!_handleTouched) _setHandle(_linkFromName(_business && _company.text.trim().isNotEmpty ? _company.text : _name.text));
-    setState(() {});
-  }
-
-  void _setHandle(String h) {
-    _handle.value = TextEditingValue(text: h, selection: TextSelection.collapsed(offset: h.length));
-    _check(h);
-  }
-
-  void _check(String h) {
-    _debounce?.cancel();
-    final seq = ++_checkSeq;
-    if (!RegExp(r'^[a-z0-9]{5,20}$').hasMatch(h)) return setState(() => _avail = 'idle');
-    if (_reserved.contains(h)) return setState(() => _avail = 'reserved');
-    setState(() => _avail = 'checking');
-    _debounce = Timer(const Duration(milliseconds: 350), () async {
-      try {
-        final r = await context.read<AuthProvider>().api.get('/public/handle-check/$h') as Map;
-        final st = '${r['status']}';
-        if (mounted && seq == _checkSeq) setState(() => _avail = st == 'yours' ? 'free' : st == 'free' || st == 'taken' || st == 'protected' ? st : 'reserved');
-      } catch (_) {
-        if (mounted && seq == _checkSeq) setState(() => _avail = 'idle'); // the server decides on submit
-      }
-    });
-  }
-
-  Future<void> _submit() async {
-    if (!_valid || _busy || _avail == 'taken' || _avail == 'reserved' || _avail == 'protected') return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final pr = await context.read<AuthProvider>().createProfile({
-        'name': _name.text.trim(),
-        if (_business) 'company': _company.text.trim(),
-        'handle': _handle.text,
-        'userType': _type,
-        if (_category != null) 'category': _category,
-      });
-      widget.onCreated(pr);
-    } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
-    } catch (_) {
-      if (mounted) setState(() => _error = t('Could not create your page. Try again.'));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
+class _DoingStep extends StatelessWidget {
+  final bool busy;
+  final String? error;
+  final ValueChanged<_Doing> onPick;
+  const _DoingStep({required this.busy, required this.error, required this.onPick});
 
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final auth = context.watch<AuthProvider>();
-    final phone = auth.phone;
-    final email = auth.accountEmail ?? auth.email;
-    final h = _handle.text;
-    InputDecoration deco(String hint) => InputDecoration(
-          isCollapsed: true,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          hintText: hint,
-          hintStyle: TextStyle(fontSize: 16, color: p.muted, fontWeight: FontWeight.w400),
-        );
-    BoxDecoration box() => BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border));
-
-    return ListView(padding: const EdgeInsets.fromLTRB(16, 24, 16, 24), children: [
-      Text(t('Create your free page'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1.25)),
+    final opts = [
+      (_Doing.business, 'Business', 'I run a shop, a company or a service', WI.business),
+      (_Doing.freelancing, 'Freelancing', 'I work for myself', WI.user),
+      (_Doing.job, 'Job', 'I work in a job, or look for one', WI.job),
+      (_Doing.nothing, 'Nothing', 'I am just looking', WI.search),
+    ];
+    return ListView(padding: const EdgeInsets.fromLTRB(16, 24, 16, 32), children: [
+      Text(t('What do you do?'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1.2)),
       const SizedBox(height: 4),
-      Text(t('Under a minute. Only your name is required.'), style: TextStyle(fontSize: 14, color: p.muted)),
-      if (phone.isNotEmpty || (email ?? '').isNotEmpty) ...[
+      Text(t('One tap. You can change it later.'), style: TextStyle(fontSize: 14, color: p.muted)),
+      if (auth.phone.isNotEmpty || auth.accountEmail != null) ...[
         const SizedBox(height: 12),
-        Align(alignment: Alignment.centerLeft, child: _VerifiedPill(phone: phone, email: email)),
+        Align(alignment: Alignment.centerLeft, child: _VerifiedPill(phone: auth.phone, email: auth.accountEmail)),
       ],
       const SizedBox(height: 20),
-      Row(children: [
-        for (final (i, o) in const [('entrepreneur', 'Business', 'I sell or serve', WI.business), ('job_seeker', 'Job seeker', 'I look for work', WI.user)].indexed) ...[
-          if (i > 0) const SizedBox(width: 8),
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                setState(() => _type = o.$1);
-                _nameChanged();
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                constraints: const BoxConstraints(minHeight: 56),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _type == o.$1 ? kGold.withValues(alpha: .1) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _type == o.$1 ? kGold : p.border),
-                ),
+      for (final (d, label, hint, icon) in opts)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: busy ? null : () => onPick(d),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 68),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(border: Border.all(color: p.border), borderRadius: BorderRadius.circular(18)),
                 child: Row(children: [
                   Container(
-                    width: 36,
-                    height: 36,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(shape: BoxShape.circle, color: _type == o.$1 ? p.ink : p.chip),
-                    child: WIcon(o.$4, size: 18, strokeWidth: 2, color: _type == o.$1 ? p.onInk : p.muted),
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle),
+                    child: Center(child: WIcon(icon, size: 22, color: p.muted)),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(t(o.$2), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25)),
-                      Text(t(o.$3), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted, height: 1.25)),
+                      Text(t(label), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      Text(t(hint), style: TextStyle(fontSize: 13.5, height: 1.3, color: p.muted)),
                     ]),
                   ),
+                  if (busy && d == _Doing.nothing) const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: kGold)),
                 ]),
               ),
             ),
           ),
-        ],
-      ]),
-      if (_business) ...[
-        const SizedBox(height: 20),
-        Text(t('Business name'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 6),
-        Container(
-          height: 48,
-          decoration: box(),
-          child: TextField(
-            controller: _company,
-            maxLength: 80,
-            textCapitalization: TextCapitalization.words,
-            autofillHints: const [AutofillHints.organizationName],
-            textInputAction: TextInputAction.next,
-            onChanged: _nameChanged,
-            style: const TextStyle(fontSize: 16),
-            decoration: deco(t('e.g. Sharma Traders')).copyWith(counterText: ''),
-          ),
         ),
-      ],
-      const SizedBox(height: 20),
-      Text(t('Your name'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-      const SizedBox(height: 6),
-      Container(
-        height: 48,
-        decoration: box(),
-        child: TextField(
-          controller: _name,
-          maxLength: 60,
-          textCapitalization: TextCapitalization.words,
-          autofillHints: const [AutofillHints.name],
-          textInputAction: TextInputAction.next,
-          onChanged: _nameChanged,
-          style: const TextStyle(fontSize: 16),
-          decoration: deco(t('e.g. Rahul Sharma')).copyWith(counterText: ''),
-        ),
-      ),
-      const SizedBox(height: 6),
-      Text(t('In any language: हिंदी, मराठी, ગુજરાતી, English…'), style: TextStyle(fontSize: 12, color: Pal.of(context).muted)),
-      const SizedBox(height: 20),
-      Text(t('Your page link'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-      const SizedBox(height: 6),
-      Container(
-        height: 48,
-        clipBehavior: Clip.antiAlias,
-        decoration: box(),
-        child: Row(children: [
-          Container(
-            height: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            alignment: Alignment.center,
-            color: p.chip.withValues(alpha: .7),
-            child: Text('@', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.muted)),
-          ),
-          Expanded(
-            child: TextField(
-              controller: _handle,
-              maxLength: 20,
-              autocorrect: false,
-              enableSuggestions: false,
-              onChanged: (v) {
-                _handleTouched = true;
-                _setHandle(_slug(v));
-              },
-              onSubmitted: (_) => _submit(),
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-              decoration: deco('yourname').copyWith(counterText: '', contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14)),
-            ),
-          ),
-        ]),
-      ),
-      const SizedBox(height: 6),
-      ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 16),
-        child: switch (_avail) {
-          'checking' => Text(t('Checking…'), style: TextStyle(fontSize: 12, color: p.muted)),
-          'free' => Text('✓ ${t('Available')}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _emerald600)),
-          'taken' => Text(t('Taken. Try another.'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.danger)),
-          'reserved' => Text(t('Not available. Try another.'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.danger)),
-          'protected' => Text(t('A protected name (a place, an industry or an institution). Choose another, or claim it with documents.'),
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.danger)),
-          _ => Text(t(h.isNotEmpty && h.length < 5 ? 'At least 5 letters or numbers' : 'Letters and numbers only'), style: TextStyle(fontSize: 12, color: p.muted)),
-        },
-      ),
-      const SizedBox(height: 16),
-      // one tap: it picks a starter photo and cover made for that trade
-      Text.rich(
-        TextSpan(children: [
-          TextSpan(text: t(_type == 'job_seeker' ? 'Field you work in' : 'What does your business do?')),
-          TextSpan(text: ' (${t('optional')})', style: TextStyle(fontWeight: FontWeight.w400, color: p.muted)),
-        ]),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-      ),
-      const SizedBox(height: 8),
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        for (final c in kProfileCategories)
-          GestureDetector(
-            onTap: () => setState(() => _category = _category == c.value ? null : c.value),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              constraints: const BoxConstraints(minHeight: 40),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                color: _category == c.value ? kGold.withValues(alpha: .15) : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _category == c.value ? kGold : p.border),
-              ),
-              child: Text('${_category == c.value ? '✓ ' : ''}${t(c.label)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-            ),
-          ),
-      ]),
-      if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
-      const SizedBox(height: 20),
-      GoldButton(
-        label: t('Create my page'),
-        loading: _busy,
-        onPressed: !_valid || _avail == 'taken' || _avail == 'reserved' || _avail == 'checking' || _avail == 'protected' ? null : _submit,
-      ),
-      const SizedBox(height: 20),
-      Text(t('Next you can add a photo and more, or skip.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.muted)),
+      if (error != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(error!, style: const TextStyle(color: Colors.red, fontSize: 13.5))),
     ]);
+  }
+}
+
+// ----------------------------- step 2: categories and sub-categories -----------------------------
+
+class _CategoryStep extends StatefulWidget {
+  final bool busy;
+  final String? error;
+  final VoidCallback onBack;
+  final void Function(String? category, List<String> subs) onDone;
+  const _CategoryStep({required this.busy, required this.error, required this.onBack, required this.onDone});
+  @override
+  State<_CategoryStep> createState() => _CategoryStepState();
+}
+
+class _CategoryStepState extends State<_CategoryStep> {
+  List<Map>? _cats;
+  String? _open;
+  final _parentsPicked = <String>[];
+  final _subs = <String>[];
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<AuthProvider>().api.get('/service-contacts/categories').then((d) {
+      if (mounted) setState(() => _cats = ((d as Map)['categories'] as List).cast<Map>());
+    }).catchError((_) {
+      if (mounted) setState(() => _cats = const []);
+    });
+  }
+
+  List<Map> _under(String parent) => (_cats ?? const <Map>[]).where((c) => c['parent'] == parent).toList()..sort((a, b) => '${a['tag']}'.compareTo('${b['tag']}'));
+
+  String? get _primary {
+    if (_parentsPicked.isNotEmpty) return _parentsPicked.first;
+    if (_subs.isEmpty) return null;
+    return (_cats ?? const <Map>[]).where((c) => c['tag'] == _subs.first).map((c) => '${c['parent']}').firstOrNull;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final any = _parentsPicked.isNotEmpty || _subs.isNotEmpty;
+    final groups = [for (final g in _parents) if (g != 'Other' || _under('Other').isNotEmpty) g];
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Expanded(
+        child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
+          GestureDetector(
+            onTap: widget.onBack,
+            child: Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('← ${t('Back')}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.muted))),
+          ),
+          Text(t('Pick your categories'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1.2)),
+          const SizedBox(height: 4),
+          Text(t('Choose a category, then what fits under it. As many as you like.'), style: TextStyle(fontSize: 14, color: p.muted)),
+          const SizedBox(height: 16),
+          if (_cats == null)
+            const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: kGold)))
+          else
+            for (final g in groups) _group(p, g),
+          if (widget.error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(widget.error!, style: const TextStyle(color: Colors.red, fontSize: 13.5))),
+        ]),
+      ),
+      Container(
+        padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + MediaQuery.paddingOf(context).bottom),
+        decoration: BoxDecoration(color: p.canvas, border: Border(top: BorderSide(color: p.border))),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          SizedBox(
+            height: 50,
+            child: FilledButton(
+              onPressed: !any || widget.busy ? null : () => widget.onDone(_primary, List.of(_subs)),
+              style: FilledButton.styleFrom(backgroundColor: kGold, foregroundColor: kInk, shape: const StadiumBorder(), textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              child: widget.busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: kInk)) : Text(t('Continue')),
+            ),
+          ),
+          TextButton(onPressed: widget.busy ? null : () => widget.onDone(null, const []), child: Text(t('Skip for now'), style: TextStyle(fontWeight: FontWeight.w700, color: p.muted))),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _group(Pal p, String parent) {
+    final items = _under(parent);
+    final on = _parentsPicked.contains(parent);
+    final n = items.where((c) => _subs.contains(c['tag'])).length;
+    final open = _open == parent;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: on ? kGold.withValues(alpha: .1) : null,
+        border: Border.all(color: on ? kGold : p.border),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(children: [
+        Row(children: [
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => setState(() => on ? _parentsPicked.remove(parent) : _parentsPicked.add(parent)),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 52),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                child: Row(children: [
+                  Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(color: on ? kGold : null, border: Border.all(color: on ? kGold : p.border), borderRadius: BorderRadius.circular(6)),
+                    child: on ? const Icon(Icons.check_rounded, size: 15, color: kInk) : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible(child: Text(t(parent), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+                  if (n > 0) ...[
+                    const SizedBox(width: 8),
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1), decoration: BoxDecoration(color: kGold.withValues(alpha: .3), borderRadius: BorderRadius.circular(10)), child: Text('$n', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
+                  ],
+                ]),
+              ),
+            ),
+          ),
+          if (items.isNotEmpty)
+            IconButton(
+              onPressed: () => setState(() => _open = open ? null : parent),
+              icon: Icon(open ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: p.muted),
+            ),
+        ]),
+        if (open)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final c in items) _chip(p, c),
+              ]),
+            ),
+          ),
+      ]),
+    );
+  }
+
+  Widget _chip(Pal p, Map c) {
+    final tag = '${c['tag']}';
+    final sel = _subs.contains(tag);
+    return GestureDetector(
+      onTap: () => setState(() {
+        if (sel) {
+          _subs.remove(tag);
+        } else {
+          _subs.add(tag);
+          if (!_parentsPicked.contains('${c['parent']}')) _parentsPicked.add('${c['parent']}');
+        }
+      }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          gradient: sel ? kGoldGradient : null,
+          color: sel ? null : p.card,
+          border: sel ? null : Border.all(color: p.border),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text('${c['emoji'] ?? ''} ${t(tag)}', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: sel ? kInk : p.text)),
+      ),
+    );
   }
 }
 
@@ -456,471 +410,5 @@ class _VerifiedPill extends StatelessWidget {
         Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg))),
       ]),
     );
-  }
-}
-
-// ----------------------------- step 2: optional -----------------------------
-
-class _BoostStep extends StatefulWidget {
-  final Profile initial;
-  final Future<void> Function() onFinish;
-  const _BoostStep({required this.initial, required this.onFinish});
-  @override
-  State<_BoostStep> createState() => _BoostStepState();
-}
-
-class _BoostStepState extends State<_BoostStep> {
-  late Profile _profile = widget.initial;
-  String? _open = 'location';
-  String? _busy;
-  String? _error;
-  String? _justEarned;
-  bool _locating = false;
-  /// WEBWEB is hyperlocal: the phone's location must be read once here before the feed opens
-  bool _gps = false;
-  bool _finishing = false;
-  final _company = TextEditingController();
-  final _bio = TextEditingController();
-
-  static const _order = ['location', 'photo', 'company', 'category', 'bio'];
-
-  bool get _isJob => _profile.userType == 'job_seeker';
-
-  /// A starter picture picked at sign-up for the member's role and category (not their own photo yet).
-  static bool _starter(String? url) => (url ?? '').startsWith('/defaults/');
-
-  bool _done(String k, [Profile? pr]) {
-    final x = pr ?? _profile;
-    return switch (k) {
-      'photo' => (x.photoUrl ?? '').isNotEmpty && !_starter(x.photoUrl),
-      'company' => x.company.isNotEmpty,
-      'category' => x.category.isNotEmpty,
-      'location' => x.location.isNotEmpty && _gps,
-      _ => (x.bio ?? '').isNotEmpty,
-    };
-  }
-
-  /// Change the photo or cover in the picker, then show what was chosen (straight from GET /me: reloading the
-  /// account here would end onboarding).
-  Future<void> _change(String kind) async {
-    if (!await showPicturePicker(context, kind) || !mounted) return;
-    try {
-      final d = await context.read<AuthProvider>().api.get('/me') as Map;
-      if (mounted && d['profile'] != null) setState(() => _profile = Profile.fromJson(d['profile'] as Map));
-    } catch (_) {}
-  }
-
-  /// The photo and cover picked at sign-up: change either now, or keep them and carry on.
-  Widget _look(Pal p) {
-    final photo = _profile.photoUrl ?? '', cover = _profile.bannerUrl ?? '';
-    final starter = _starter(photo) || _starter(cover);
-    Widget btn(String label, String kind) => Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () => _change(kind),
-            icon: const Icon(Icons.photo_camera_outlined, size: 18),
-            label: Text(t(label), style: const TextStyle(fontWeight: FontWeight.w700)),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: p.text,
-              side: BorderSide(color: p.border),
-              minimumSize: const Size.fromHeight(42),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-            ),
-          ),
-        );
-    return Container(
-      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Stack(clipBehavior: Clip.none, children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
-            child: AspectRatio(aspectRatio: 3, child: cover.isEmpty ? ColoredBox(color: p.chip) : NetImg(smallImage(cover))),
-          ),
-          if (photo.isNotEmpty)
-            Positioned(
-              left: 14,
-              bottom: -30,
-              child: Container(
-                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: p.card, width: 4)),
-                child: ClipOval(child: SizedBox(width: 64, height: 64, child: NetImg(smallImage(photo)))),
-              ),
-            ),
-        ]),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 38, 14, 14),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(t(starter ? 'We picked a photo and cover for you' : 'Your photo and cover'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 2),
-            Text(t('Change them now or keep them. You can change them any time from your page.'), style: TextStyle(fontSize: 13, color: p.muted)),
-            const SizedBox(height: 12),
-            Row(children: [btn('Change photo', 'avatar'), const SizedBox(width: 8), btn('Change cover', 'cover')]),
-          ]),
-        ),
-      ]),
-    );
-  }
-
-  int _weight(String k) {
-    for (final i in _profile.completion?.items ?? const <CompletionItem>[]) {
-      if (i.key == k) return i.weight;
-    }
-    return 0;
-  }
-
-  @override
-  void dispose() {
-    _company.dispose();
-    _bio.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save(String key, Map<String, dynamic> patch, [String? badge]) async {
-    setState(() {
-      _busy = key;
-      _error = null;
-    });
-    try {
-      final next = await context.read<AuthProvider>().patchProfile(patch);
-      if (!mounted) return;
-      setState(() {
-        _profile = next;
-        if (badge != null) _justEarned = badge;
-        // on to the next thing that is still empty
-        _open = _order.where((k) => k != key && !_done(k, next)).firstOrNull;
-      });
-      if (badge != null) {
-        Future.delayed(const Duration(milliseconds: 2200), () {
-          if (mounted) setState(() => _justEarned = null);
-        });
-      }
-    } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
-    } catch (_) {
-      if (mounted) setState(() => _error = t('Could not save. Try again.'));
-    } finally {
-      if (mounted) setState(() => _busy = null);
-    }
-  }
-
-  Future<void> _pickPhoto() async {
-    final auth = context.read<AuthProvider>();
-    final Uint8List? f;
-    try {
-      f = await pickAndCrop(context, kAvatarCrop);
-    } catch (e) {
-      if (mounted) setState(() => _error = '$e');
-      return;
-    }
-    if (f == null || !mounted) return;
-    setState(() {
-      _busy = 'photo';
-      _error = null;
-    });
-    try {
-      final url = await auth.uploadAvatar(f, 'avatar.png');
-      if (!mounted) return;
-      await _save('photo', {'photoURL': url}, t('Photo added'));
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e is ApiException ? e.message : '$e';
-          _busy = null;
-        });
-      }
-    }
-  }
-
-  Future<void> _detect() async {
-    setState(() => _locating = true);
-    try {
-      final here = await currentLocation(
-        context,
-        reason: t('WEBWEB is a local network: your location connects you with businesses, jobs and asks near you. It is needed to continue.'),
-        source: 'onboarding',
-      );
-      if (!mounted) return;
-      setState(() {
-        _locating = false;
-        _gps = true;
-      });
-      if (here.node.isNotEmpty) {
-        await _save('location', {'location': here.node}, t('Location set'));
-      } else if (_profile.location.isNotEmpty) {
-        // outside the cities we know: a city already chosen stays
-        await _save('location', {'location': _profile.location}, t('Location set'));
-      } else {
-        // a town not in our list: ask its name; it is added with where they are
-        final c = await showCitySheet(context, near: (lat: here.lat, lng: here.lng));
-        if (c != null && c.name.isNotEmpty && mounted) {
-          await _save('location', {'location': c.name, 'locationLat': here.lat, 'locationLng': here.lng}, t('Location set'));
-        }
-      }
-    } on PermissionNotGiven {
-      if (mounted) {
-        setState(() {
-          _locating = false;
-          _error = t('Location is needed to continue. Tap "Use my location" and allow it.');
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _locating = false;
-          _error = '$e'.isEmpty ? t('Could not get your location. Please try again.') : '$e';
-        });
-      }
-    }
-  }
-
-  Future<void> _finish() async {
-    setState(() => _finishing = true);
-    await widget.onFinish();
-    if (mounted) setState(() => _finishing = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Pal.of(context);
-    final completion = _profile.completion ?? const Completion(0, [], []);
-    final suggested = _suggestCategory('${_profile.name} ${_profile.company}');
-    final tasks = [
-      ('location', 'Where you are', 'Required: matches you with nearby asks', _weight('location') == 0 ? 5 : _weight('location')),
-      ('photo', 'Add a photo', 'People reply to faces', _weight('photo') == 0 ? 10 : _weight('photo')),
-      ('company', _isJob ? 'Your current role' : 'Your business name', _isJob ? 'For example: CNC operator' : 'Shown on your page', _weight('company') == 0 ? 5 : _weight('company')),
-      ('category', _isJob ? 'Field you work in' : 'Business sector', 'Helps the right people find you', _weight('category') == 0 ? 5 : _weight('category')),
-      ('bio', 'One line about you', 'Up to 160 characters', _weight('bio') == 0 ? 10 : _weight('bio')),
-    ];
-    final anyAdded = _order.any(_done);
-    final goldText = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
-
-    Widget chip(String label, VoidCallback? onTap, {bool hint = false}) => GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: hint ? kGold.withValues(alpha: .1) : Colors.transparent,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: hint ? kGold : p.border),
-            ),
-            child: Text(t(label), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-          ),
-        );
-
-    Widget inputBox(TextEditingController c, String hint, {int lines = 1, int max = 80}) => Container(
-          constraints: BoxConstraints(minHeight: lines > 1 ? 0 : 44),
-          decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
-          child: TextField(
-            controller: c,
-            autofocus: true,
-            maxLines: lines,
-            maxLength: max,
-            textCapitalization: TextCapitalization.sentences,
-            onChanged: (_) => setState(() {}),
-            style: const TextStyle(fontSize: 16),
-            decoration: InputDecoration(
-              isCollapsed: true,
-              border: InputBorder.none,
-              counterText: '',
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-              hintText: hint,
-              hintStyle: TextStyle(fontSize: 16, color: p.muted),
-            ),
-          ),
-        );
-
-    Widget body(String key) => switch (key) {
-          'photo' => GoldButton(label: t('Choose a photo'), wi: WI.camera, outlined: true, height: 40, loading: _busy == 'photo', onPressed: _pickPhoto),
-          'company' => Row(children: [
-              Expanded(child: inputBox(_company, t(_isJob ? 'e.g. CNC operator' : 'e.g. Rahul Traders'))),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 84,
-                child: GoldButton(
-                  label: t('Save'),
-                  height: 40,
-                  loading: _busy == 'company',
-                  onPressed: _company.text.trim().length < 2 ? null : () => _save('company', {'company': _company.text.trim()}),
-                ),
-              ),
-            ]),
-          'category' => Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final c in kProfileCategories) chip(c.label, _busy == 'category' ? null : () => _save('category', {'category': c.value}, t('Sector added')), hint: suggested == c.value),
-            ]),
-          'location' => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              GoldButton(label: t('Use my location'), wi: WI.pin, height: 44, loading: _locating, onPressed: _locating ? null : _detect),
-              const SizedBox(height: 8),
-              Text(t('Used only while you use the app, never in the background. Your exact location is never shown to other members.'),
-                  style: TextStyle(fontSize: 12, color: p.muted, height: 1.4)),
-            ]),
-          _ => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              inputBox(_bio, t('What you do, in one line'), lines: 2, max: 160),
-              const SizedBox(height: 8),
-              Row(children: [
-                Text('${_bio.text.length}/160', style: TextStyle(fontSize: 12, color: p.muted)),
-                const Spacer(),
-                SizedBox(
-                  width: 84,
-                  child: GoldButton(
-                    label: t('Save'),
-                    height: 40,
-                    loading: _busy == 'bio',
-                    onPressed: _bio.text.trim().length < 3 ? null : () => _save('bio', {'bio': _bio.text.trim()}, t('About added')),
-                  ),
-                ),
-              ]),
-            ]),
-        };
-
-    return Column(children: [
-      Expanded(
-        child: ListView(padding: const EdgeInsets.fromLTRB(16, 24, 16, 16), children: [
-          Text('${t('Your page is live')} 🎉', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1.25)),
-          const SizedBox(height: 4),
-          Text('@${_profile.handle} · ${t('Allow your location to continue. The rest is optional and earns badges.')}', style: TextStyle(fontSize: 14, color: p.muted)),
-          const SizedBox(height: 20),
-          if ((_profile.photoUrl ?? '').isNotEmpty || (_profile.bannerUrl ?? '').isNotEmpty) ...[
-            _look(p),
-            const SizedBox(height: 16),
-          ],
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Row(children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Container(
-                      height: 8,
-                      color: p.chip,
-                      alignment: Alignment.centerLeft,
-                      child: AnimatedFractionallySizedBox(
-                        duration: const Duration(milliseconds: 500),
-                        widthFactor: completion.percent.clamp(0, 100) / 100,
-                        child: Container(decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(4))),
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: 48,
-                  child: Text('${completion.percent}%', textAlign: TextAlign.right, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()])),
-                ),
-              ]),
-              if (completion.badges.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Wrap(spacing: 6, runSpacing: 6, children: [
-                  for (final b in completion.badges)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: kGold.withValues(alpha: .15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: _justEarned == b ? kGold : Colors.transparent, width: 2),
-                      ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        WIcon(WI.checkCircle, size: 12, color: goldText),
-                        const SizedBox(width: 4),
-                        Text(t(b), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: goldText)),
-                      ]),
-                    ),
-                ]),
-              ],
-            ]),
-          ),
-          const SizedBox(height: 20),
-          for (final task in tasks) ...[
-            Builder(builder: (_) {
-              final done = _done(task.$1);
-              final open = _open == task.$1 && !done;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.only(bottom: 8),
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: done ? _green.withValues(alpha: .05) : p.card,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: done ? _green.withValues(alpha: .4) : p.border),
-                ),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  InkWell(
-                    onTap: done ? null : () => setState(() => _open = open ? null : task.$1),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      child: Row(children: [
-                        Container(
-                          width: 28,
-                          height: 28,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(shape: BoxShape.circle, color: done ? _green : p.chip),
-                          child: WIcon(WI.checkCircle, size: 16, color: done ? Colors.white : p.muted),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(t(task.$2), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25)),
-                            Text(t(task.$3), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted, height: 1.25)),
-                          ]),
-                        ),
-                        if (!done)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(color: kGold.withValues(alpha: .2), borderRadius: BorderRadius.circular(20)),
-                            child: Text('+${task.$4}%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: goldText)),
-                          ),
-                      ]),
-                    ),
-                  ),
-                  if (done && task.$1 == 'location')
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                      decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border))),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(t('Not quite right? Pick your city:'), style: TextStyle(fontSize: 12, color: p.muted)),
-                        const SizedBox(height: 8),
-                        CityPill(
-                          value: _profile.location,
-                          onChanged: (c) {
-                            if (_busy == 'location' || c.name.isEmpty) return;
-                            _save('location', {'location': c.name, if (c.lat != null) ...{'locationLat': c.lat, 'locationLng': c.lng}});
-                          },
-                        ),
-                      ]),
-                    ),
-                  if (open)
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-                      decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border))),
-                      child: body(task.$1),
-                    ),
-                ]),
-              );
-            }),
-          ],
-          if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
-        ]),
-      ),
-      // stays reachable while the cards are long
-      Container(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 16),
-        decoration: BoxDecoration(color: p.canvas.withValues(alpha: .95), border: Border(top: BorderSide(color: p.border))),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          GoldButton(
-            label: t(!_done('location') ? 'Allow location to continue' : anyAdded ? 'Done, take me to my feed' : 'Go to my feed'),
-            loading: _finishing || _locating,
-            onPressed: !_done('location') ? (_locating ? null : _detect) : _finish,
-          ),
-          if (!anyAdded && _done('location')) ...[
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: _finishing ? null : _finish,
-              child: Text(t('Skip for now'), textAlign: TextAlign.center, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.muted)),
-            ),
-          ],
-          const SizedBox(height: 8),
-          Text(t('You can finish the rest from your profile any time.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.muted)),
-        ]),
-      ),
-    ]);
   }
 }

@@ -106,9 +106,9 @@ class _NotifyBannerHostState extends State<NotifyBannerHost> {
     if (b == null) return;
     setState(() => _b = null);
     if (b.chatId != null && b.peer != null) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: b.chatId!, peer: b.peer!)));
+      Navigator.push(context, WideRoute(builder: (_) => ChatThread(chatId: b.chatId!, peer: b.peer!)));
     } else if (b.postId != null) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: b.postId!)));
+      Navigator.push(context, WideRoute(builder: (_) => PostDetailScreen(postId: b.postId!)));
     }
   }
 

@@ -6,6 +6,7 @@ import '../links.dart';
 import '../screens/find.dart';
 import '../screens/profile.dart';
 import '../theme.dart';
+import '../widgets.dart' show WideRoute;
 
 /// A #hashtag: letters, digits, marks (Devanagari and Gujarati vowel signs) and _, 2 to 40 long, not glued to a word
 /// or a link before it (so "a#b" and "/page#top" stay text). Same rule as the web's hashtag-text.tsx.
@@ -50,10 +51,10 @@ class _HashtagTextState extends State<HashtagText> {
 
   void _open(String tag) => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => FindScreen(standalone: true, initialQuery: '#$tag', initialScope: 'asks')),
+        WideRoute(builder: (_) => FindScreen(standalone: true, initialQuery: '#$tag', initialScope: 'asks')),
       );
 
-  void _profile(String handle) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
+  void _profile(String handle) => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: handle)));
 
   @override
   Widget build(BuildContext context) {

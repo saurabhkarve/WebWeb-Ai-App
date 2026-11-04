@@ -87,7 +87,7 @@ class _AccountSettingsTabState extends State<AccountSettingsTab> {
             outlined: _twoStep == true,
             height: 40,
             onPressed: () async {
-              await Navigator.push(context, MaterialPageRoute(builder: (_) => const TwoStepScreen()));
+              await Navigator.push(context, WideRoute(builder: (_) => const TwoStepScreen()));
               _load();
             },
           ),
@@ -99,7 +99,7 @@ class _AccountSettingsTabState extends State<AccountSettingsTab> {
         const SizedBox(height: 2),
         sub(t('People you blocked cannot message or call you.')),
         const SizedBox(height: 10),
-        GoldButton(label: t('See blocked people'), outlined: true, height: 40, onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BlockedPeopleScreen()))),
+        GoldButton(label: t('See blocked people'), outlined: true, height: 40, onPressed: () => Navigator.push(context, WideRoute(builder: (_) => const BlockedPeopleScreen()))),
       ]),
       const SizedBox(height: 12),
       card([

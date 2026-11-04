@@ -2,15 +2,19 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_contacts/flutter_contacts.dart' show FlutterContacts, ContactProperty;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../auth_provider.dart';
 import '../call_manager.dart';
+import '../config.dart';
+import '../contact_sync.dart';
 import '../i18n.dart';
 import '../links.dart';
 import '../permissions.dart';
@@ -26,6 +30,7 @@ import '../widgets/active_call_banner.dart';
 import '../widgets/connection_pill.dart';
 import '../widgets/image_grid.dart';
 import '../widgets/upi.dart';
+import '../widgets/whatsapp_icon.dart';
 import 'contact_picker.dart';
 import 'post_detail.dart';
 import 'profile.dart';
@@ -48,7 +53,7 @@ Future<void> openChat(BuildContext context, Peer peer, {Map<String, dynamic>? at
   final api = context.read<AuthProvider>().api;
   try {
     final id = (await api.post('/chats', {'userId': peer.uid}) as Map)['id'] as String;
-    if (context.mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: id, peer: peer, pending: attachment, draft: draft)));
+    if (context.mounted) await Navigator.push(context, WideRoute(builder: (_) => ChatThread(chatId: id, peer: peer, pending: attachment, draft: draft)));
   } catch (e) {
     if (context.mounted) toast(context, '$e', error: true);
   }
@@ -180,8 +185,21 @@ class _TalkScreenState extends State<TalkScreen> {
   List<ChatSummary>? _chats;
   List<CallLog> _calls = [];
   List<Profile> _people = [];
+  // chats | contacts | calls
   String _tab = 'chats';
+  bool _unreadOnly = false;
+  // the "chat or call anyone" guide, shown until it is closed once (kept on this phone)
+  bool _guideSeen = true;
+  static const _guideKey = 'talk_guide_seen';
   final _q = TextEditingController();
+  // the contacts list: scroll position, and a key per letter heading for the A-Z rail
+  final _listScroll = ScrollController();
+  final Map<String, GlobalKey> _letterKeys = {};
+  // the phone book: number -> saved name, and which of those numbers are WEBWEB members (null until it has been looked at)
+  Map<String, String>? _book;
+  Set<String> _memberPhones = {};
+  bool _bookBusy = false;
+  String? _railLetter;
   StreamSubscription? _sub;
   Timer? _debounce, _peopleDebounce, _poll;
 
@@ -192,7 +210,11 @@ class _TalkScreenState extends State<TalkScreen> {
   void initState() {
     super.initState();
     _load();
+    _loadBook();
     _loadPeople();
+    SharedPreferences.getInstance().then((sp) {
+      if (mounted) setState(() => _guideSeen = sp.getBool(_guideKey) ?? false);
+    });
     _sub = context.read<RealtimeService>().events.listen((e) {
       if (const {'msg', 'read', 'delivered', 'call_log'}.contains(e['type'])) {
         _debounce?.cancel();
@@ -219,6 +241,44 @@ class _TalkScreenState extends State<TalkScreen> {
     }
   }
 
+  /// Looks through the phone book for numbers that are not on WEBWEB, so they can be invited from here. Asks for
+  /// contacts only when [ask]; the numbers are checked once (POST /phonebook/match, not stored), names stay on the phone.
+  Future<void> _loadBook({bool ask = false}) async {
+    if (!ContactSync.supported || _bookBusy) return;
+    if (!await Permissions.granted(Need.contacts)) {
+      if (!ask || !mounted) return;
+      final ok = await Permissions.ensure(context, Need.contacts, reason: t('To show which of your contacts are on WEBWEB, and let you invite the rest. Numbers are checked and not kept.'));
+      if (!ok || !mounted) return;
+    }
+    setState(() => _bookBusy = true);
+    try {
+      final all = await FlutterContacts.getAll(properties: {ContactProperty.phone});
+      final book = <String, String>{};
+      for (final c in all) {
+        for (final ph in c.phones) {
+          final m = ContactSync.mobile10(ph.number);
+          final name = (c.displayName ?? '').trim();
+          if (m != null && name.isNotEmpty) book.putIfAbsent(m, () => name);
+        }
+      }
+      var members = <String>{};
+      if (book.isNotEmpty && mounted) {
+        final r = await _api.post('/phonebook/match', {'phones': book.keys.take(3000).toList()}) as Map;
+        members = {for (final m in (r['matches'] as List).cast<Map>()) '${m['phone']}'};
+      }
+      if (mounted) setState(() => (_book = book, _memberPhones = members, _bookBusy = false));
+    } catch (_) {
+      if (mounted) setState(() => _bookBusy = false);
+    }
+  }
+
+  /// The invitation, sent on WhatsApp to the number, with the member's own link.
+  void _invite(String phone) {
+    final me = context.read<AuthProvider>().profile;
+    final msg = '${t('Join me on WEBWEB AI, where businesses share contacts and get things done.')}\n$siteUrl${me == null ? '' : '/@${me.handle}'}';
+    openExternal(context, 'https://wa.me/91$phone?text=${Uri.encodeComponent(msg)}');
+  }
+
   /// People matching the search box (newest members when empty), so a new chat can be started.
   Future<void> _loadPeople() async {
     try {
@@ -240,6 +300,7 @@ class _TalkScreenState extends State<TalkScreen> {
     _peopleDebounce?.cancel();
     _poll?.cancel();
     _q.dispose();
+    _listScroll.dispose();
     super.dispose();
   }
 
@@ -260,7 +321,7 @@ class _TalkScreenState extends State<TalkScreen> {
   }
 
   Future<void> _open(ChatSummary c) async {
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: c.id, peer: c.peer)));
+    await Navigator.push(context, WideRoute(builder: (_) => ChatThread(chatId: c.id, peer: c.peer)));
     _load();
   }
 
@@ -271,53 +332,51 @@ class _TalkScreenState extends State<TalkScreen> {
     final q = _q.text.trim().toLowerCase();
     final unreadCount = (all ?? const []).where((c) => c.unread).length;
     final chats = (all ?? const <ChatSummary>[]).where((c) {
-      if (_tab == 'unread' && !c.unread) return false;
+      if (_unreadOnly && !c.unread) return false;
       if (q.isEmpty) return true;
       return '${c.peer.name} ${c.peer.company} ${c.lastMessage ?? ''}'.toLowerCase().contains(q);
     }).toList();
-    final chatted = (all ?? const <ChatSummary>[]).map((c) => c.peer.uid).toSet();
-    final morePeople = _people.where((u) => !chatted.contains(u.uid)).toList();
     final n = all?.length ?? 0;
+    // contacts A to Z by the name shown; the rail down the side jumps between the letters
+    // members and the phone's contacts that are not on WEBWEB yet, in one A to Z list
+    final people = <_Person>[
+      for (final u in _people) _Person(_nameOf(u), member: u),
+      for (final e in (_book ?? const <String, String>{}).entries)
+        if (!_memberPhones.contains(e.key) && (q.isEmpty || e.value.toLowerCase().contains(q))) _Person(e.value, phone: e.key),
+    ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    final showRail = _tab == 'contacts' && q.isEmpty && people.length >= 8;
 
-    Widget tabChip(String id, String label) {
-      final on = _tab == id;
-      return GestureDetector(
-        onTap: () => setState(() => _tab = id),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            gradient: on ? kGoldGradient : null,
-            color: on ? null : p.chip,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: on ? const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 2, offset: Offset(0, 1))] : null,
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Text(t(label), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: on ? kInk : p.muted)),
-            if (id == 'unread' && unreadCount > 0) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                decoration: BoxDecoration(color: kInk, borderRadius: BorderRadius.circular(10)),
-                child: Text('$unreadCount', style: const TextStyle(fontSize: 11, height: 16 / 11, fontWeight: FontWeight.w700, color: kGold)),
-              ),
-            ],
-          ]),
-        ),
-      );
-    }
-
-    return LogoRefresh(
+    final body = LogoRefresh(
       onRefresh: () async {
         await _load();
         await _loadPeople();
       },
       child: ListView(
+        controller: _listScroll,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(16, 16, 16, islandSpace(context)),
+        padding: EdgeInsets.fromLTRB(16, 16, showRail ? 24 : 16, islandSpace(context)),
         children: [
-          Text(t('Talk'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1)),
+          // title, with the way into a new conversation always in reach
+          Row(children: [
+            Expanded(child: Text(t('Talk'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, height: 1))),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(30),
+                onTap: () => setState(() => _tab = 'contacts'),
+                child: Ink(
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(30)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const WIcon(WI.plus, size: 18, color: kInk, strokeWidth: 2.2),
+                    const SizedBox(width: 6),
+                    Text(t('New chat'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: kInk)),
+                  ]),
+                ),
+              ),
+            ),
+          ]),
           const SizedBox(height: 4),
           Text(
             all == null
@@ -325,7 +384,12 @@ class _TalkScreenState extends State<TalkScreen> {
                 : '$n ${t(n == 1 ? 'conversation' : 'conversations')}${unreadCount > 0 ? ' · $unreadCount ${t('unread')}' : ''}',
             style: TextStyle(fontSize: 14, color: p.muted),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+          // what Talk is for, in one card: choose a contact, then chat or call
+          if (!_guideSeen) _guide(p),
+          // Chats | Contacts | Calls
+          _segments(p, unreadCount),
+          const SizedBox(height: 14),
           if (_tab != 'calls') ...[
             Container(
               height: 44,
@@ -340,7 +404,7 @@ class _TalkScreenState extends State<TalkScreen> {
                     onChanged: _onSearch,
                     style: const TextStyle(fontSize: 14),
                     decoration: InputDecoration(
-                      hintText: t('Search people or messages'),
+                      hintText: t(_tab == 'contacts' ? 'Search contacts' : 'Search people or messages'),
                       hintStyle: TextStyle(color: p.muted, fontSize: 14),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -355,43 +419,406 @@ class _TalkScreenState extends State<TalkScreen> {
             ),
             const SizedBox(height: 12),
           ],
-          // the chips scroll from edge to edge of the page (its 16 px margins), whatever width the page has
-          SizedBox(
-            height: 36,
-            child: LayoutBuilder(
-              builder: (context, c) => OverflowBox(
-              maxWidth: c.maxWidth + 32,
-              child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16), children: [
-                tabChip('chats', 'All chats'),
+          if (_tab == 'calls') ...[
+            if (_calls.isEmpty) _emptyGo(p, WI.phone, 'No calls yet', 'Choose a contact to start chatting or calling.'),
+            for (final c in _calls) ...[_callTile(c, p)],
+          ] else if (_tab == 'contacts') ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                WIcon(WI.talk, size: 15, color: p.muted),
+                const SizedBox(width: 6),
+                WIcon(WI.phone, size: 15, color: p.muted),
                 const SizedBox(width: 8),
-                tabChip('unread', 'Unread'),
-                const SizedBox(width: 8),
-                tabChip('calls', 'Calls'),
+                Expanded(child: Text(t('Tap Chat or Call on a contact'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.muted))),
               ]),
             ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (_tab == 'calls') ...[
-            if (_calls.isEmpty) const _Empty(WI.phone, 'No calls yet', 'Open a chat and tap the call or video icon.'),
-            for (final c in _calls) ...[_callTile(c, p)],
+            // the phone's own contacts: one tap to allow, then the ones not on WEBWEB can be invited from this list
+            if (_book == null && ContactSync.supported) _bookCard(p),
+            if (people.isEmpty) _Empty(WI.users, q.isEmpty ? 'No contacts yet' : 'No matches', q.isEmpty ? 'People you connect with show here.' : 'Try a different name or word.'),
+            if (people.isNotEmpty) _contactsList(people, p, showRail),
           ] else if (all == null)
             const Padding(padding: EdgeInsets.symmetric(vertical: 48), child: Center(child: LogoLoader()))
           else ...[
-            if (chats.isEmpty && _tab == 'chats' && q.isEmpty && morePeople.isEmpty) const _Empty(WI.talk, 'No messages yet', 'Open a public page or a post and tap Message.'),
-            if (chats.isEmpty && (_tab == 'unread' || q.isNotEmpty) && (_tab == 'unread' || morePeople.isEmpty))
-              _Empty(WI.search, _tab == 'unread' && q.isEmpty ? "You're all caught up" : 'No matches', _tab == 'unread' && q.isEmpty ? 'No unread conversations.' : 'Try a different name or word.'),
+            if (all.isEmpty) _emptyGo(p, WI.talk, 'No chats yet', 'Choose a contact to start chatting or calling.'),
+            if (all.isNotEmpty && chats.isEmpty)
+              _Empty(WI.search, _unreadOnly && q.isEmpty ? "You're all caught up" : 'No matches', _unreadOnly && q.isEmpty ? 'No unread conversations.' : 'Try a different name or word.'),
             for (final c in chats) ...[_chatTile(c, p)],
-            if (_tab == 'chats' && morePeople.isNotEmpty) ...[
+            if (chats.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(top: 16, bottom: 6),
-                child: Text(t(q.isEmpty ? 'Start a new chat' : 'People'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.muted)),
+                padding: const EdgeInsets.only(top: 16),
+                child: Center(
+                  child: TextButton.icon(
+                    onPressed: () => setState(() => _tab = 'contacts'),
+                    icon: const WIcon(WI.plus, size: 16),
+                    label: Text(t('Choose a contact')),
+                  ),
+                ),
               ),
-              for (final u in morePeople) ...[_personTile(u, p)],
-            ],
           ],
         ],
       ),
+    );
+    if (!showRail) return body;
+    return Stack(children: [
+      body,
+      Positioned(
+        top: 8,
+        right: 0,
+        bottom: islandSpace(context) + 4,
+        child: _alphaRail(people, p),
+      ),
+    ]);
+  }
+
+  String _nameOf(Profile u) => u.company.isNotEmpty ? u.company : u.name;
+
+  static String _letterOf(String name) {
+    final c = name.trim().isEmpty ? '#' : name.trim()[0].toUpperCase();
+    return RegExp(r'[A-Z]').hasMatch(c) ? c : '#';
+  }
+
+  /// the contacts under their letter headings, so the rail has somewhere to jump
+  Widget _contactsList(List<_Person> people, Pal p, bool headings) {
+    final kids = <Widget>[];
+    String? last;
+    for (final u in people) {
+      final l = _letterOf(u.name);
+      if (headings && l != last) {
+        last = l;
+        final key = _letterKeys.putIfAbsent(l, GlobalKey.new);
+        kids.add(Padding(
+          key: key,
+          padding: const EdgeInsets.only(top: 12, bottom: 2, left: 2),
+          child: Text(l, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 1, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00))),
+        ));
+      }
+      kids.add(u.member != null ? _contactCard(u.member!, p) : _inviteRow(u, p));
+    }
+    return Padding(padding: EdgeInsets.zero, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: kids));
+  }
+
+  void _jumpTo(String letter) {
+    // the letter itself, or the next one that has contacts
+    final order = ['#', ...List.generate(26, (i) => String.fromCharCode(65 + i))];
+    final from = order.indexOf(letter);
+    for (var i = from; i < order.length; i++) {
+      final ctx = _letterKeys[order[i]]?.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(ctx, alignment: 0, duration: const Duration(milliseconds: 90), curve: Curves.easeOut);
+        return;
+      }
+    }
+    // past the last letter: the end of the list
+    if (_listScroll.hasClients) _listScroll.animateTo(_listScroll.position.maxScrollExtent, duration: const Duration(milliseconds: 90), curve: Curves.easeOut);
+  }
+
+  /// A to Z down the right edge, like a phonebook: tap or slide a finger along it to jump; a bubble shows the letter.
+  Widget _alphaRail(List<_Person> people, Pal p) {
+    final present = {for (final u in people) _letterOf(u.name)};
+    const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '#'];
+    return LayoutBuilder(builder: (context, c) {
+      final h = c.maxHeight;
+      void at(double dy) {
+        final i = (dy / h * letters.length).floor().clamp(0, letters.length - 1);
+        final l = letters[i];
+        if (l != _railLetter) {
+          HapticFeedback.selectionClick();
+          setState(() => _railLetter = l);
+          _jumpTo(l == '#' ? '#' : l);
+        }
+      }
+
+      final tone = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
+      return Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        if (_railLetter != null)
+          Container(
+            width: 52,
+            height: 52,
+            margin: const EdgeInsets.only(right: 10),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .25), blurRadius: 12, offset: const Offset(0, 4))]),
+            child: Text(_railLetter!, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: kInk)),
+          ),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (d) => at(d.localPosition.dy),
+          onTapUp: (_) => setState(() => _railLetter = null),
+          onTapCancel: () => setState(() => _railLetter = null),
+          onVerticalDragStart: (d) => at(d.localPosition.dy),
+          onVerticalDragUpdate: (d) => at(d.localPosition.dy),
+          onVerticalDragEnd: (_) => setState(() => _railLetter = null),
+          onVerticalDragCancel: () => setState(() => _railLetter = null),
+          child: Container(
+            width: 20,
+            height: h,
+            decoration: BoxDecoration(color: p.canvas.withValues(alpha: .55), borderRadius: BorderRadius.circular(11)),
+            child: Column(children: [
+              for (final l in letters)
+                Expanded(
+                  child: Center(
+                    child: FittedBox(
+                      child: Text(l,
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: _railLetter == l ? tone : (present.contains(l) ? p.text : p.muted.withValues(alpha: .45)))),
+                    ),
+                  ),
+                ),
+            ]),
+          ),
+        ),
+      ]);
+    });
+  }
+
+  /// Chats | Contacts | Calls as one rounded switch; the unread count rides on Chats.
+  Widget _segments(Pal p, int unread) {
+    Widget seg(String id, String label, WI icon, {int count = 0}) {
+      final on = _tab == id;
+      return Expanded(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => setState(() {
+            _tab = id;
+            _unreadOnly = false;
+          }),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            height: 42,
+            decoration: BoxDecoration(gradient: on ? kGoldGradient : null, borderRadius: BorderRadius.circular(26)),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              WIcon(icon, size: 17, color: on ? kInk : p.muted, strokeWidth: on ? 2.2 : 1.8),
+              const SizedBox(width: 6),
+              Flexible(child: Text(t(label), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: on ? FontWeight.w800 : FontWeight.w600, color: on ? kInk : p.muted))),
+              if (count > 0) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  decoration: BoxDecoration(color: on ? kInk : kGold, borderRadius: BorderRadius.circular(10)),
+                  child: Text('$count', style: TextStyle(fontSize: 11, height: 16 / 11, fontWeight: FontWeight.w800, color: on ? kGold : kInk)),
+                ),
+              ],
+            ]),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(30)),
+      child: Row(children: [
+        seg('chats', 'Chats', WI.talk, count: unread),
+        seg('contacts', 'Contacts', WI.users),
+        seg('calls', 'Calls', WI.phone),
+      ]),
+    );
+  }
+
+  /// The one-time guide: how to start a chat or a call.
+  Widget _guide(Pal p) => Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: p.dark ? [kGold.withValues(alpha: .22), kGold.withValues(alpha: .06)] : const [Color(0xFFFFF0B0), Color(0xFFFFF8DC)]),
+          border: Border.all(color: kGold.withValues(alpha: .4)),
+        ),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(shape: BoxShape.circle, gradient: kGoldGradient),
+            child: const Center(child: WIcon(WI.phone, size: 22, color: kInk, strokeWidth: 2)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(t('Chat or call anyone'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 3),
+              Text(t('Pick a contact from the Contacts tab, then tap Chat to message or Call to talk. Video calls work too.'), style: TextStyle(fontSize: 13.5, height: 1.35, color: p.muted)),
+              const SizedBox(height: 8),
+              Row(children: [
+                GestureDetector(
+                  onTap: () => setState(() => _tab = 'contacts'),
+                  child: Text(t('Choose a contact'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: p.link)),
+                ),
+                const SizedBox(width: 18),
+                GestureDetector(
+                  onTap: () async {
+                    setState(() => _guideSeen = true);
+                    (await SharedPreferences.getInstance()).setBool(_guideKey, true);
+                  },
+                  child: Text(t('Got it'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.muted)),
+                ),
+              ]),
+            ]),
+          ),
+        ]),
+      );
+
+  /// An empty list that points at what to do: choose a contact.
+  Widget _emptyGo(Pal p, WI icon, String title, String hint) => Column(children: [
+        _Empty(icon, title, hint),
+        const SizedBox(height: 14),
+        Center(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(30),
+              onTap: () => setState(() => _tab = 'contacts'),
+              child: Ink(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(30)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const WIcon(WI.users, size: 18, color: kInk),
+                  const SizedBox(width: 8),
+                  Text(t('Choose a contact'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: kInk)),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ]);
+
+  /// Offer to look through the phone book (only on a tap; the phone asks for contacts then).
+  Widget _bookCard(Pal p) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(18), border: Border.all(color: kGold.withValues(alpha: .45))),
+        child: Row(children: [
+          Container(width: 42, height: 42, decoration: const BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle), child: const Center(child: WIcon(WI.users, size: 22, color: kInk))),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(t('Your phone contacts'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 2),
+              Text(t('See who is on WEBWEB, and invite the rest.'), style: TextStyle(fontSize: 13, color: p.muted, height: 1.3)),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _bookBusy ? null : () => _loadBook(ask: true),
+            child: Container(
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20)),
+              child: _bookBusy
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: kInk))
+                  : Text(t('Show'), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: kInk)),
+            ),
+          ),
+        ]),
+      );
+
+  /// A phone contact that is not on WEBWEB: who, and an Invite button.
+  Widget _inviteRow(_Person r, Pal p) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
+        child: Row(children: [
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _invite(r.phone!),
+              child: Row(children: [
+                Avatar(name: r.name, size: 40),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(r.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.25)),
+                    const SizedBox(height: 2),
+                    Text(t('Not on WEBWEB yet'), style: TextStyle(fontSize: 13, color: p.muted)),
+                  ]),
+                ),
+              ]),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => _invite(r.phone!),
+              child: Ink(
+                height: 36,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: kGold, width: 1.4)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const WhatsAppIcon(size: 16),
+                  const SizedBox(width: 6),
+                  Text(t('Invite'), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800)),
+                ]),
+              ),
+            ),
+          ),
+        ]),
+      );
+
+  /// A contact in one slim row: who, then Chat, Call and Video as round buttons.
+  Widget _contactCard(Profile u, Pal p) {
+    final peer = Peer.fromProfile(u);
+    Future<void> chat() async {
+      await openChat(context, peer);
+      _load();
+    }
+
+    Widget action(WI icon, String label, VoidCallback onTap, {bool filled = false}) => Padding(
+          padding: const EdgeInsets.only(left: 6),
+          child: Semantics(
+            button: true,
+            label: t(label),
+            child: Tooltip(
+              message: t(label),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onTap,
+                  child: Ink(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: filled ? kGoldGradient : null,
+                      shape: BoxShape.circle,
+                      border: filled ? null : Border.all(color: p.border),
+                    ),
+                    child: Center(child: WIcon(icon, size: 19, color: filled ? kInk : p.text, strokeWidth: 2)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
+      child: Row(children: [
+        Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: chat,
+            child: Row(children: [
+              _avatar(peer),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _nameLine(p, peer),
+                  const SizedBox(height: 2),
+                  Text(u.location.isEmpty ? '@${u.handle}' : u.location, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: p.muted)),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+        action(WI.talk, 'Chat', chat, filled: true),
+        action(WI.phone, 'Call', () => placeCall(context, peer, false)),
+        action(WI.video, 'Video', () => placeCall(context, peer, true)),
+      ]),
     );
   }
 
@@ -479,26 +906,6 @@ class _TalkScreenState extends State<TalkScreen> {
         ),
       );
 
-  Widget _personTile(Profile u, Pal p) {
-    final peer = Peer.fromProfile(u);
-    Future<void> chat() async {
-      await openChat(context, peer);
-      _load();
-    }
-
-    return _row(
-      p,
-      onTap: chat,
-      avatar: _avatar(peer),
-      top: _nameLine(p, peer),
-      bottom: Text('@${u.handle}${u.location.isEmpty ? '' : ' · ${u.location}'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, height: 1.25, color: p.muted)),
-      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-        _roundIcon(p, WI.phone, t('Call'), () => placeCall(context, peer, false)),
-        _roundIcon(p, WI.talk, t('Message'), chat),
-      ]),
-    );
-  }
-
   Widget _roundIcon(Pal p, WI icon, String label, VoidCallback onTap) => Semantics(
         button: true,
         label: label,
@@ -556,6 +963,7 @@ class ChatThread extends StatefulWidget {
 
 class _ChatThreadState extends State<ChatThread> {
   late final _input = TextEditingController(text: widget.draft);
+  final _inputFocus = FocusNode();
   final _scroll = ScrollController();
   List<Msg> _msgs = [];
   List<CallLog> _calls = [];
@@ -870,11 +1278,66 @@ class _ChatThreadState extends State<ChatThread> {
     _iTypingOff?.cancel();
     _poll?.cancel();
     _input.dispose();
+    _inputFocus.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
   List<_Item> get _timeline => [..._msgs.map(_Item.msg), ..._calls.map(_Item.call)]..sort((a, b) => a.at.compareTo(b.at));
+
+  /// Nothing said or called yet: a few ways to begin. A tap puts the words in the box (to change or send).
+  Widget _firstMessage(Pal p) {
+    final first = _peer.name.trim().split(RegExp(r'\s+')).first;
+    final starts = [
+      t('Hi {name}, I found you on WEBWEB. Nice to connect!', {'name': first}),
+      t('Hello! Could you share your services and rates?'),
+      t('Hi {name}, are you free for a quick call today?', {'name': first}),
+      t("Hi {name}, I'd like to know more about what you offer.", {'name': first}),
+      t("Hi, can we work together? Let's talk."),
+    ];
+    return LayoutBuilder(
+      builder: (context, c) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: c.maxHeight - 40),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Avatar(name: _peer.name, photoUrl: _peer.photoUrl, size: 64, type: _peer.userType, badge: 20, uid: _peer.uid),
+            const SizedBox(height: 12),
+            Text(t('Start the conversation'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(t('Tap a message to use it, or write your own.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: p.muted)),
+            const SizedBox(height: 16),
+            for (final m in starts)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: p.card,
+                  borderRadius: BorderRadius.circular(18),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () {
+                      _input.value = TextEditingValue(text: m, selection: TextSelection.collapsed(offset: m.length));
+                      _inputFocus.requestFocus();
+                      setState(() {});
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: p.border)),
+                      child: Row(children: [
+                        const WIcon(WI.sparkle, size: 16, color: kGold),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(m, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, height: 1.3))),
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
+          ]),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -900,7 +1363,7 @@ class _ChatThreadState extends State<ChatThread> {
             Expanded(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: _peer.handle.isEmpty ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: _peer.handle))),
+                onTap: _peer.handle.isEmpty ? null : () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: _peer.handle))),
                 child: Row(children: [
                   Avatar(name: _peer.name, photoUrl: _peer.photoUrl, size: 36, type: _peer.userType, badge: 16, uid: _peer.uid),
                   const SizedBox(width: 8),
@@ -965,7 +1428,7 @@ class _ChatThreadState extends State<ChatThread> {
             child: !_loaded
                 ? const Center(child: LogoLoader())
                 : items.isEmpty
-                    ? Center(child: Text(t('Say hello 👋'), style: TextStyle(color: p.muted, fontWeight: FontWeight.w600)))
+                    ? _firstMessage(p)
                     : ListView.builder(
                         controller: _scroll,
                         padding: const EdgeInsets.all(16),
@@ -1003,6 +1466,7 @@ class _ChatThreadState extends State<ChatThread> {
                 Expanded(
                   child: TextField(
                     controller: _input,
+                    focusNode: _inputFocus,
                     // an item or post tagged on the way in: the box is ready for the message about it
                     autofocus: widget.pending != null,
                     minLines: 1,
@@ -1264,7 +1728,7 @@ class _ChatThreadState extends State<ChatThread> {
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg, height: 1.3)),
               if (a['title'] != null && a['postId'] != null)
                 GestureDetector(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${a['postId']}'))),
+                  onTap: () => Navigator.push(context, WideRoute(builder: (_) => PostDetailScreen(postId: '${a['postId']}'))),
                   child: Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(t('About: {title}', {'title': '${a['title']}'}), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: fg.withValues(alpha: .75))),
@@ -1329,7 +1793,7 @@ class _ChatThreadState extends State<ChatThread> {
         return box(
           goldEdge: true,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${a['postId']}'))),
+          onTap: () => Navigator.push(context, WideRoute(builder: (_) => PostDetailScreen(postId: '${a['postId']}'))),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             Flexible(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
@@ -1345,7 +1809,7 @@ class _ChatThreadState extends State<ChatThread> {
       case 'profile':
         return box(
           goldEdge: true,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: '${a['handle']}'))),
+          onTap: () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: '${a['handle']}'))),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Avatar(name: '${a['name']}', photoUrl: a['photoURL'] as String?, size: 44),
             const SizedBox(width: 12),
@@ -1366,7 +1830,7 @@ class _ChatThreadState extends State<ChatThread> {
         return box(
           goldEdge: true,
           onTap: shared
-              ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: '${a['handle']}', itemId: a['itemId'] as String?)))
+              ? () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: '${a['handle']}', itemId: a['itemId'] as String?)))
               : null,
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             ClipRRect(
@@ -1894,4 +2358,12 @@ class MapPreview extends StatelessWidget {
       ),
     );
   }
+}
+
+/// One line of the Contacts list: a WEBWEB member, or a contact from the phone that is not on WEBWEB yet (invite).
+class _Person {
+  final String name;
+  final Profile? member;
+  final String? phone;
+  const _Person(this.name, {this.member, this.phone});
 }

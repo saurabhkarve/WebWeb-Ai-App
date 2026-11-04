@@ -71,8 +71,8 @@ String _money(num? n) {
 }
 
 Future<void> openToday(BuildContext context, {String? poll}) =>
-    Navigator.push(context, MaterialPageRoute(builder: (_) => SubPage(title: t('Today in your area'), body: TodayScreen(poll: poll))));
-Future<void> openAlerts(BuildContext context) => Navigator.push(context, MaterialPageRoute(builder: (_) => SubPage(title: t('Alerts'), body: const AlertsScreen())));
+    Navigator.push(context, WideRoute(builder: (_) => SubPage(title: t('Today in your area'), body: TodayScreen(poll: poll))));
+Future<void> openAlerts(BuildContext context) => Navigator.push(context, WideRoute(builder: (_) => SubPage(title: t('Alerts'), body: const AlertsScreen())));
 
 // ===================== Today =====================
 
@@ -1428,7 +1428,7 @@ class _DailyStoriesState extends State<DailyStories> with SingleTickerProviderSt
     _start();
   }
 
-  void _go(Widget page) => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
+  void _go(Widget page) => Navigator.pushReplacement(context, WideRoute(builder: (_) => page));
 
   @override
   Widget build(BuildContext context) {

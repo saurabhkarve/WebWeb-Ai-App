@@ -350,5 +350,5 @@ Future<List<PickedContact>?> pickFromPhoneBook(BuildContext context, {required S
     reason: forChat ? t('To pick a contact from your phone book and send it in this chat.') : t('To pick people from your phone book and refer them on this ask.'),
   );
   if (!ok || !context.mounted) return null;
-  return Navigator.push<List<PickedContact>>(context, MaterialPageRoute(builder: (_) => ContactPicker(askerName: askerName, maxSelect: maxSelect, forChat: forChat)));
+  return Navigator.push<List<PickedContact>>(context, WideRoute(builder: (_) => ContactPicker(askerName: askerName, maxSelect: maxSelect, forChat: forChat)));
 }

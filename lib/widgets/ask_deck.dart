@@ -12,6 +12,7 @@ import '../icons.dart';
 import '../models.dart';
 import '../theme.dart';
 import 'card_cta.dart';
+import '../screens/talk.dart' show openChat;
 import '../location.dart' show kNodeCoords;
 import 'area_map.dart' show AreaMap, askDeadline, askTimeLeft, showAreaViewer;
 import 'image_grid.dart' show openImageViewer;
@@ -325,12 +326,26 @@ class _AskDeckState extends State<AskDeck> {
             },
           );
         }
-        // the chips across the card's full width, then (when the ask is not yours) "I can help" as a full-width button
+        // Talk: a chat with whoever asked, beside "I can help" (not on your own ask)
+        Widget? talk() {
+          if (widget.preview || widget.mine || post.authorUid.isEmpty) return null;
+          return CardCta(
+            label: 'Talk',
+            scale: _scale,
+            outlined: true,
+            onTap: () {
+              if (_log) CardEvents.log(context.read<AuthProvider>().api, post.id, 'cta', 0, _kinds.length);
+              openChat(context, Peer(uid: post.authorUid, name: post.authorName, company: post.authorCompany, handle: post.authorHandle));
+            },
+          );
+        }
+        // the chips across the card's full width, then (when the ask is not yours) "I can help" and Talk side by side
         Widget foot() {
           final c = cta();
+          final tk = c == null ? null : talk();
           return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             chips,
-            if (c != null) ...[const SizedBox(height: 2), c],
+            if (c != null) ...[const SizedBox(height: 2), tk == null ? c : Row(children: [c, const SizedBox(width: 8), tk])],
           ]);
         }
 
@@ -581,7 +596,8 @@ class _AskDeckState extends State<AskDeck> {
             else
               Align(
                 alignment: Alignment.centerLeft,
-                child: GestureDetector(
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 // the reply sheet right here: one tap to answer, no trip to the ask first
                 onTap: widget.preview
@@ -604,6 +620,21 @@ class _AskDeckState extends State<AskDeck> {
                   child: Text(t(post.askType == 'visit' && firstLink([post.title, post.description]) != null ? 'Visit website' : (widget.mine ? 'Review responses' : 'I can help')), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kInk)),
                 ),
               ),
+                if (!widget.preview && !widget.mine && post.authorUid.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => openChat(context, Peer(uid: post.authorUid, name: post.authorName, company: post.authorCompany, handle: post.authorHandle)),
+                    child: Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(border: Border.all(color: kGold, width: 1.5), borderRadius: BorderRadius.circular(18)),
+                      child: Text(t('Talk'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Pal.of(context).text)),
+                    ),
+                  ),
+                ],
+                ]),
               ),
           ]),
         );

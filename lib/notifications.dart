@@ -330,11 +330,11 @@ class NotificationService with WidgetsBindingObserver {
     final nv = nav.currentState;
     final ctx = nav.currentContext;
     if (nv == null || ctx == null || auth.profile == null) return;
-    nv.push(MaterialPageRoute(builder: (_) => PostDetailScreen(postId: postId!)));
+    nv.push(WideRoute(builder: (_) => PostDetailScreen(postId: postId!)));
     try {
       final mine = ((await auth.api.get('/app/posts/$postId/referrals/mine')) as List).length;
       if (mine >= 5) return;
-      final picked = await nv.push<List<PickedContact>>(MaterialPageRoute(builder: (_) => ContactPicker(askerName: asker, maxSelect: 5 - mine)));
+      final picked = await nv.push<List<PickedContact>>(WideRoute(builder: (_) => ContactPicker(askerName: asker, maxSelect: 5 - mine)));
       var ok = 0;
       for (final c in picked ?? const <PickedContact>[]) {
         try {
@@ -373,40 +373,40 @@ class NotificationService with WidgetsBindingObserver {
       if (!isChat) {
         // "Your week" (the Monday scorecard)
         if (path == '/week') {
-          nv.push(MaterialPageRoute(builder: (_) => SubPage(title: t('Your week'), body: const WeekScreen())));
+          nv.push(WideRoute(builder: (_) => SubPage(title: t('Your week'), body: const WeekScreen())));
           return;
         }
         // P2: Today (a morning notice, a question's result), alerts (the 8 pm summary goes to Leads), an update's reach
         if (path.startsWith('/today')) {
           final poll = Uri.tryParse(path)?.queryParameters['poll'];
-          nv.push(MaterialPageRoute(builder: (_) => SubPage(title: t('Today in your area'), body: TodayScreen(poll: poll))));
+          nv.push(WideRoute(builder: (_) => SubPage(title: t('Today in your area'), body: TodayScreen(poll: poll))));
           return;
         }
         if (path == '/alerts') {
-          nv.push(MaterialPageRoute(builder: (_) => SubPage(title: t('Alerts'), body: const AlertsScreen())));
+          nv.push(WideRoute(builder: (_) => SubPage(title: t('Alerts'), body: const AlertsScreen())));
           return;
         }
         if (path == '/leads') {
-          nv.push(MaterialPageRoute(builder: (_) => SubPage(title: t('Leads for you'), body: const LeadsScreen())));
+          nv.push(WideRoute(builder: (_) => SubPage(title: t('Leads for you'), body: const LeadsScreen())));
           return;
         }
         if (path.startsWith('/update/') && auth.profile != null) {
-          nv.push(MaterialPageRoute(builder: (_) => ProfileScreen(handle: auth.profile!.handle)));
+          nv.push(WideRoute(builder: (_) => ProfileScreen(handle: auth.profile!.handle)));
           return;
         }
         if (d['postId'] != null) {
           // "Did you find someone?" opens the ask with the question in view
-          nv.push(MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${d['postId']}', askOutcome: d['kind'] == 'ask_outcome' || path.contains('outcome=1'))));
+          nv.push(WideRoute(builder: (_) => PostDetailScreen(postId: '${d['postId']}', askOutcome: d['kind'] == 'ask_outcome' || path.contains('outcome=1'))));
           return;
         }
         final post = RegExp(r'^/post/([0-9a-f-]{36})').firstMatch(path)?.group(1);
         if (post != null) {
-          nv.push(MaterialPageRoute(builder: (_) => PostDetailScreen(postId: post)));
+          nv.push(WideRoute(builder: (_) => PostDetailScreen(postId: post)));
           return;
         }
         // a page: /@handle (contact requests, catalog items)
         final handle = RegExp(r'^/@([a-z0-9_.-]+)$').firstMatch(path)?.group(1);
-        if (handle != null) nv.push(MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
+        if (handle != null) nv.push(WideRoute(builder: (_) => ProfileScreen(handle: handle)));
         return; // anything else (catch-ups, feed) just opens the app
       }
       var chatId = '${d['chatId'] ?? ''}';
@@ -414,7 +414,7 @@ class NotificationService with WidgetsBindingObserver {
       if (chatId.isEmpty && _sender(d) != null) chatId = (await auth.api.post('/chats', {'userId': _sender(d)}) as Map)['id'] as String;
       if (chatId.isEmpty || activeChat == chatId) return;
       final c = ChatSummary.fromJson(await auth.api.get('/chats/$chatId') as Map, auth.profile!.uid);
-      nv.push(MaterialPageRoute(builder: (_) => ChatThread(chatId: chatId, peer: c.peer)));
+      nv.push(WideRoute(builder: (_) => ChatThread(chatId: chatId, peer: c.peer)));
     } catch (_) {}
   }
 }

@@ -17,6 +17,7 @@ import '../widgets.dart';
 import '../widgets/invite_card.dart';
 import '../widgets/catalog_strip.dart';
 import '../widgets/house_card.dart';
+import '../widgets/house_text_card.dart' show isHouseHandle;
 import '../widgets/post_card.dart';
 import '../widgets/sponsored_card.dart';
 import '../widgets/story_viewer.dart';
@@ -58,7 +59,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
   Set<String> _blocked = {};
   int _offset = 0;
   final _scroll = ScrollController();
-  final _updatesKey = GlobalKey<_UpdatesBarState>();
   Timer? _poll;
   bool _tourTried = false;
 
@@ -118,12 +118,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
     try {
       final raw = (await _api.get('/posts', {'matched': 1, 'limit': _page}) as List).map((e) => Post.fromJson(e as Map)).toList();
       _blocked = await loadBlocked(_api);
-      final d = raw.where((p) => !_blocked.contains(p.authorUid)).toList();
+      // WEBWEB house accounts post no asks here (their updates stay in the Updates strip)
+      final d = raw.where((p) => !_blocked.contains(p.authorUid) && !isHouseHandle(p.authorHandle)).toList();
       if (!mounted) return;
       setState(() {
         _posts = d;
-        _offset = d.length;
-        _hasMore = d.length == _page;
+        _offset = raw.length;
+        _hasMore = raw.length == _page;
         _error = null;
         _fresh = [];
       });
@@ -133,16 +134,9 @@ class _ConnectScreenState extends State<ConnectScreen> {
     }
   }
 
-  /// The WEBWEB cards and facts (optional: the feed works without them).
+  /// WEBWEB house accounts post no cards or facts on this page any more (their updates stay in the Updates strip).
   Future<void> _loadCards() async {
-    await Future.wait([
-      loadHouseCards(_api).then((c) {
-        if (mounted) setState(() => _house = c);
-      }).catchError((_) {}),
-      loadFactPosts(_api).then((f) {
-        if (mounted) setState(() => _facts = f);
-      }).catchError((_) {}),
-    ]);
+    if (mounted && (_house.isNotEmpty || _facts.isNotEmpty)) setState(() => (_house = const [], _facts = const []));
   }
 
   /// Pull to refresh: posts, updates and the profile strength.
@@ -150,7 +144,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
     await Future.wait([
       _load(),
       _loadCards(),
-      _updatesKey.currentState?.load() ?? Future.value(),
       context.read<AuthProvider>().loadProfile(),
     ]);
   }
@@ -164,7 +157,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       _offset += d.length;
       setState(() {
         final seen = _posts!.map((p) => p.id).toSet();
-        _posts = [..._posts!, ...d.where((p) => !seen.contains(p.id) && !_blocked.contains(p.authorUid))];
+        _posts = [..._posts!, ...d.where((p) => !seen.contains(p.id) && !_blocked.contains(p.authorUid) && !isHouseHandle(p.authorHandle))];
         _hasMore = d.length == _page;
       });
     } catch (_) {
@@ -182,7 +175,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       final latest = (await _api.get('/posts', {'limit': 20}) as List).map((e) => Post.fromJson(e as Map)).toList();
       final seen = cur.map((p) => p.id).toSet();
       final newest = cur.fold<int>(0, (m, p) => p.createdAt.millisecondsSinceEpoch > m ? p.createdAt.millisecondsSinceEpoch : m);
-      final fresh = latest.where((p) => !seen.contains(p.id) && p.createdAt.millisecondsSinceEpoch > newest).toList();
+      final fresh = latest.where((p) => !seen.contains(p.id) && p.createdAt.millisecondsSinceEpoch > newest && !isHouseHandle(p.authorHandle)).toList();
       if (mounted && fresh.length != _fresh.length) setState(() => _fresh = fresh);
     } catch (_) {}
   }
@@ -221,8 +214,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
     final children = <Widget>[
       const _StrengthNudge(),
       const SizedBox(height: 12),
-      KeyedSubtree(key: Tours.key('updates'), child: _UpdatesBar(key: _updatesKey)),
-      const SizedBox(height: 12),
       Row(children: [Expanded(child: RuleHeading(WI.ask, t('Asks'))), const SizedBox(width: 8), YourAsksPill(onOpen: widget.onGoAsk)]),
       if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
       if (posts == null && _error == null) const PageLoader(),
@@ -250,7 +241,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       if (posts != null && posts.isNotEmpty)
         (_loadingMore || _hasMore)
             ? const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Center(child: LogoLoader(size: 40)))
-            : _EndOfFeed(count: posts.length, onAsk: widget.onGoAsk, onFind: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FindScreen(standalone: true))), onTop: _toTop),
+            : _EndOfFeed(count: posts.length, onAsk: widget.onGoAsk, onFind: () => Navigator.push(context, WideRoute(builder: (_) => const FindScreen(standalone: true))), onTop: _toTop),
     ];
     return Stack(children: [
       LogoRefresh(
@@ -365,7 +356,7 @@ class _StrengthNudgeState extends State<_StrengthNudge> {
                   if (await DevicePerms.handle(context, next)) return;
                   if (!context.mounted) return;
                   final auth = context.read<AuthProvider>();
-                  if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: me!))) == true) auth.loadProfile();
+                  if (await Navigator.push<bool>(context, WideRoute(builder: (_) => EditProfileScreen(profile: me!))) == true) auth.loadProfile();
                 },
                 child: Text('${t('Add')} ${t(next.label)} · +${next.weight}%', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: ink)),
               ),
@@ -390,17 +381,17 @@ const _dailySeenKey = 'webweb_seen_daily';
 
 /// Updates row above the feed (web updates-bar.tsx): your tile first ("+" always adds), then everyone
 /// else; gold ring = unseen, grey ring = seen.
-class _UpdatesBar extends StatefulWidget {
-  const _UpdatesBar({super.key});
+class UpdatesBar extends StatefulWidget {
+  const UpdatesBar({super.key});
   @override
-  State<_UpdatesBar> createState() => _UpdatesBarState();
+  State<UpdatesBar> createState() => UpdatesBarState();
 }
 
 /// Paged: the first 12 people, then the next 12 as the row is swiped towards its end (and when the viewer
 /// passes the last loaded person).
 const _updatesPage = 12;
 
-class _UpdatesBarState extends State<_UpdatesBar> {
+class UpdatesBarState extends State<UpdatesBar> {
   List<StoryGroup> _groups = [];
   // the daily circles: Leads for you by kind of ask, Today in your area by kind of item, New here
   LeadSummary? _leads;
@@ -556,7 +547,7 @@ class _UpdatesBarState extends State<_UpdatesBar> {
           onTap: () async {
             final auth = context.read<AuthProvider>();
             if (auth.profile == null) return;
-            if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: auth.profile!))) == true) auth.loadProfile();
+            if (await Navigator.push<bool>(context, WideRoute(builder: (_) => EditProfileScreen(profile: auth.profile!))) == true) auth.loadProfile();
             _daily();
           },
           child: Container(

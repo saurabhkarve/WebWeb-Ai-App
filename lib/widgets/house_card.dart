@@ -203,7 +203,7 @@ class _HouseCardViewState extends State<HouseCardView> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
           GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: card.account.handle))),
+            onTap: () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: card.account.handle))),
             child: Container(
               width: 40,
               height: 40,
@@ -370,7 +370,7 @@ class _Btn extends StatelessWidget {
 Widget _title(String text, {double size = 19}) => Text(text, style: TextStyle(fontSize: size, fontWeight: FontWeight.w700, height: 1.3));
 Widget _hint(BuildContext context, String text) => Padding(padding: const EdgeInsets.only(top: 4), child: Text(text, style: TextStyle(fontSize: 14, color: Pal.of(context).muted)));
 
-void _push(BuildContext context, Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+void _push(BuildContext context, Widget screen) => Navigator.push(context, WideRoute(builder: (_) => screen));
 
 // ---------- bodies ----------
 
@@ -688,7 +688,7 @@ class _ItemTileState extends State<_ItemTile> {
       api.post('/products/${it.id}/enquire', {}).catchError((_) => null);
       if (open) {
         setState(() => _state = 'idle');
-        if (mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: chatId, peer: it.owner, pending: _about)));
+        if (mounted) await Navigator.push(context, WideRoute(builder: (_) => ChatThread(chatId: chatId, peer: it.owner, pending: _about)));
         return;
       }
       await api.post('/chats/$chatId/messages', {
@@ -844,7 +844,7 @@ class _ProfileStep extends StatelessWidget {
             tap();
             final auth = context.read<AuthProvider>();
             if (auth.profile == null) return;
-            if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: auth.profile!))) == true) auth.loadProfile();
+            if (await Navigator.push<bool>(context, WideRoute(builder: (_) => EditProfileScreen(profile: auth.profile!))) == true) auth.loadProfile();
           }),
         ]),
       ),
@@ -941,7 +941,7 @@ class _AskAiState extends State<_AskAi> {
       final chatId = (await api.post('/chats', {'userId': a.uid}) as Map)['id'] as String;
       await api.post('/chats/$chatId/messages', {'text': text});
       _text.clear();
-      if (mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: chatId, peer: Peer(uid: a.uid, name: a.name, handle: a.handle))));
+      if (mounted) await Navigator.push(context, WideRoute(builder: (_) => ChatThread(chatId: chatId, peer: Peer(uid: a.uid, name: a.name, handle: a.handle))));
     } catch (_) {
       if (mounted) toast(context, t('Could not open the chat'), error: true);
     } finally {
@@ -1732,7 +1732,7 @@ class _PersonalDeckState extends State<_PersonalDeck> {
       final chatId = (await api.post('/chats', {'userId': a.uid}) as Map)['id'] as String;
       await api.post('/chats/$chatId/messages', {'text': text});
       _text.clear();
-      if (mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: chatId, peer: Peer(uid: a.uid, name: a.name, handle: a.handle))));
+      if (mounted) await Navigator.push(context, WideRoute(builder: (_) => ChatThread(chatId: chatId, peer: Peer(uid: a.uid, name: a.name, handle: a.handle))));
     } catch (_) {
       if (mounted) toast(context, t('Could not open the chat'), error: true);
     } finally {
@@ -1910,7 +1910,7 @@ class _PersonalDeckState extends State<_PersonalDeck> {
             tap();
             final auth = context.read<AuthProvider>();
             if (auth.profile == null) return;
-            if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: auth.profile!))) == true) auth.loadProfile();
+            if (await Navigator.push<bool>(context, WideRoute(builder: (_) => EditProfileScreen(profile: auth.profile!))) == true) auth.loadProfile();
           }),
         ]));
       case 'buy_select':
@@ -1986,7 +1986,7 @@ class _PersonalDeckState extends State<_PersonalDeck> {
             tap();
             final auth = context.read<AuthProvider>();
             if (auth.profile == null) return;
-            if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: auth.profile!))) == true) auth.loadProfile();
+            if (await Navigator.push<bool>(context, WideRoute(builder: (_) => EditProfileScreen(profile: auth.profile!))) == true) auth.loadProfile();
           }),
         ]));
       case 'spotlight':

@@ -24,8 +24,10 @@ class CityPill extends StatelessWidget {
   final bool rounded;
   /// a filter chip: short, soft, gold once a city is chosen
   final bool chip;
+  /// no fill or border: sits inside another box (the Find search)
+  final bool flat;
   final ({double lat, double lng})? near;
-  const CityPill({super.key, required this.value, required this.onChanged, this.placeholder = 'Choose your city', this.anyLabel, this.height = 44, this.rounded = false, this.chip = false, this.near});
+  const CityPill({super.key, required this.value, required this.onChanged, this.placeholder = 'Choose your city', this.anyLabel, this.height = 44, this.rounded = false, this.chip = false, this.flat = false, this.near});
 
   @override
   Widget build(BuildContext context) {
@@ -37,12 +39,14 @@ class CityPill extends StatelessWidget {
         if (c != null) onChanged(c);
       },
       child: Container(
-        height: chip ? 34 : height,
-        padding: const EdgeInsets.only(left: 12, right: 10),
-        decoration: chip
+        height: chip || flat ? 34 : height,
+        padding: EdgeInsets.only(left: flat ? 4 : 12, right: 10),
+        decoration: flat
+            ? null
+            : chip
             ? BoxDecoration(color: value.isEmpty ? p.chip : kGold.withValues(alpha: .25), borderRadius: BorderRadius.circular(30))
             : BoxDecoration(color: p.card, border: Border.all(color: p.border), borderRadius: BorderRadius.circular(rounded ? height : 10)),
-        child: Row(mainAxisSize: chip ? MainAxisSize.min : MainAxisSize.max, children: [
+        child: Row(mainAxisSize: chip || flat ? MainAxisSize.min : MainAxisSize.max, children: [
           WIcon(WI.pin, size: 16, color: p.muted),
           const SizedBox(width: 6),
           Flexible(

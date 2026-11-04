@@ -44,7 +44,9 @@ class CardCta extends StatelessWidget {
   final VoidCallback? onTap;
   final double scale;
   final bool fill;
-  const CardCta({super.key, required this.label, required this.onTap, this.scale = 1, this.fill = false});
+  /// a gold outline, no fill: the second button beside the main one (Talk)
+  final bool outlined;
+  const CardCta({super.key, required this.label, required this.onTap, this.scale = 1, this.fill = false, this.outlined = false});
 
   @override
   Widget build(BuildContext context) {
@@ -53,8 +55,8 @@ class CardCta extends StatelessWidget {
       constraints: BoxConstraints(minWidth: (96 * scale).clamp(96.0, 120.0)),
       padding: const EdgeInsets.symmetric(horizontal: 18),
       alignment: Alignment.center,
-      decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 3, offset: Offset(0, 1))]),
-      child: Text(t(label), style: TextStyle(fontSize: (13 * scale).clamp(12.5, 14.5), fontWeight: FontWeight.w700, color: kInk)),
+      decoration: outlined ? BoxDecoration(border: Border.all(color: kGold, width: 1.5), borderRadius: BorderRadius.circular(20)) : BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 3, offset: Offset(0, 1))]),
+      child: Text(t(label), style: TextStyle(fontSize: (13 * scale).clamp(12.5, 14.5), fontWeight: FontWeight.w700, color: outlined ? Pal.of(context).text : kInk)),
     );
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

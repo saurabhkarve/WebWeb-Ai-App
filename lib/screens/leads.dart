@@ -18,15 +18,15 @@ const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 
 
 
 Future<void> openLeads(BuildContext context) =>
-    Navigator.push(context, MaterialPageRoute(builder: (_) => SubPage(title: t('Leads for you'), body: const LeadsScreen())));
+    Navigator.push(context, WideRoute(builder: (_) => SubPage(title: t('Leads for you'), body: const LeadsScreen())));
 Future<void> openWeek(BuildContext context) =>
-    Navigator.push(context, MaterialPageRoute(builder: (_) => SubPage(title: t('Your week'), body: const WeekScreen())));
+    Navigator.push(context, WideRoute(builder: (_) => SubPage(title: t('Your week'), body: const WeekScreen())));
 
 Future<void> _editProfile(BuildContext context) async {
   final auth = context.read<AuthProvider>();
   final me = auth.profile;
   if (me == null) return;
-  if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: me))) == true) auth.loadProfile();
+  if (await Navigator.push<bool>(context, WideRoute(builder: (_) => EditProfileScreen(profile: me))) == true) auth.loadProfile();
 }
 
 /// "Leads for you": open asks matched to what this member does, new ones first. Each card says why it fits and how
@@ -126,7 +126,7 @@ class _LeadsScreenState extends State<LeadsScreen> {
           if (_sum?.catalogAdd != null)
             GestureDetector(
               onTap: () async {
-                await Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogScreen()));
+                await Navigator.push(context, WideRoute(builder: (_) => const CatalogScreen()));
                 _load();
               },
               child: Container(

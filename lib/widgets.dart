@@ -63,7 +63,9 @@ class LogoInline extends StatefulWidget {
   /// "SMART PHONEBOOK" under the wordmark, spread across its width in a quiet grey (the web site header);
   /// puts the AI pill beside the wordmark
   final bool tagline;
-  const LogoInline({super.key, this.size = 36, this.markSize, this.onTap, this.stacked = true, this.tagline = false});
+  /// 0 to 1: the slogan folds away (the phone header while the page is scrolled down)
+  final double fold;
+  const LogoInline({super.key, this.size = 36, this.markSize, this.onTap, this.stacked = true, this.tagline = false, this.fold = 0});
   @override
   State<LogoInline> createState() => _LogoInlineState();
 }
@@ -122,8 +124,8 @@ class _LogoInlineState extends State<LogoInline> {
       child: SizedBox(
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
         word,
-        SizedBox(height: font * .45),
-        Semantics(
+        SizedBox(height: font * .45 * (1 - widget.fold)),
+        ClipRect(child: Align(heightFactor: 1 - widget.fold, child: Opacity(opacity: 1 - widget.fold, child: Semantics(
           label: tag,
           child: ExcludeSemantics(
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -132,6 +134,7 @@ class _LogoInlineState extends State<LogoInline> {
                     style: TextStyle(fontSize: font, fontWeight: FontWeight.w500, height: 1, color: p.dark ? const Color(0xFF9C9584) : const Color(0xFF8C8472))),
             ]),
           ),
+        ))),
         ),
         ]),
       ),
@@ -1012,6 +1015,12 @@ class WideColumn extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A pushed page: the page itself on a phone, a centred 600 px column on a wide screen (see [WideColumn]). Pages that
+/// should fill the screen (fullscreenDialog: maps, the story player, the cropper) keep using MaterialPageRoute.
+class WideRoute<T> extends MaterialPageRoute<T> {
+  WideRoute({required WidgetBuilder builder, super.settings, super.maintainState}) : super(builder: (c) => WideColumn(child: builder(c)));
 }
 
 class SubPage extends StatelessWidget {

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../auth_provider.dart';
+import '../config.dart';
 import '../cover_default.dart';
 import '../i18n.dart';
 import '../theme.dart';
@@ -53,7 +55,7 @@ class _ServicePageScreenState extends State<ServicePageScreen> {
       final handle = (r['registered'] as Map?)?['handle'];
       if (handle != null) {
         // the owner has joined: the page is theirs now
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: '$handle')));
+        Navigator.pushReplacement(context, WideRoute(builder: (_) => ProfileScreen(handle: '$handle')));
         return;
       }
       setState(() {
@@ -266,8 +268,19 @@ class _ServicePageScreenState extends State<ServicePageScreen> {
                 const SizedBox(width: 8),
                 Expanded(child: ProfileActionBtn(label: 'WhatsApp', leading: const Padding(padding: EdgeInsets.only(right: 6), child: WhatsAppIcon(size: 17)), onTap: () => _open('https://wa.me/91$phone'))),
                 const SizedBox(width: 8),
-                SizedBox(width: 44, child: ProfileActionBtn(wi: WI.share, label: '', semantic: t('Share profile'), onTap: () => _open('https://wa.me/?text=${Uri.encodeComponent(shareText)}'))),
+                SizedBox(width: 44, child: ProfileActionBtn(wi: WI.share, label: '', semantic: t('Share profile'), onTap: () => SharePlus.instance.share(ShareParams(text: shareText)))),
               ]),
+              const SizedBox(height: 8),
+              // this number is not a member: invite them to claim their page
+              ProfileActionBtn(
+                label: t('Invite to WEBWEB'),
+                leading: const Padding(padding: EdgeInsets.only(right: 6), child: WhatsAppIcon(size: 17)),
+                onTap: () {
+                  final me = context.read<AuthProvider>().profile;
+                  final msg = '${t('Join me on WEBWEB AI, where businesses share contacts and get things done.')}\n$siteUrl${me == null ? '' : '/@${me.handle}'}';
+                  _open('https://wa.me/91$phone?text=${Uri.encodeComponent(msg)}');
+                },
+              ),
             ]),
           ),
           if (site.isNotEmpty)

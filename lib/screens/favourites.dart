@@ -149,7 +149,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                     final m = favs[i];
                     final name = displayName('${m['userType']}', '${m['name']}', '${m['company'] ?? ''}');
                     return GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: '${m['handle']}'))),
+                      onTap: () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: '${m['handle']}'))),
                       child: SizedBox(
                         width: 64,
                         child: Column(children: [
@@ -189,7 +189,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
     final outgoing = c != null && c.callerUid == me;
     final missed = c != null && !outgoing && c.status != 'completed';
     return InkWell(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: r.peer.handle))),
+      onTap: () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: r.peer.handle))),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border.withValues(alpha: .6)))),

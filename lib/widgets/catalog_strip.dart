@@ -28,7 +28,7 @@ class CatalogStrip extends StatelessWidget {
     final p = Pal.of(context);
     final o = group.owner;
     final name = displayName(o.userType, o.name, o.company);
-    void openOwner() => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: o.handle)));
+    void openOwner() => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: o.handle)));
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -260,7 +260,7 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
       setState(() => it.enquiriesCount++);
       if (!mounted) return;
       if (open) {
-        await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: chatId, peer: widget.owner, pending: _about)));
+        await Navigator.push(context, WideRoute(builder: (_) => ChatThread(chatId: chatId, peer: widget.owner, pending: _about)));
       } else {
         toast(context, t('Message sent'));
       }

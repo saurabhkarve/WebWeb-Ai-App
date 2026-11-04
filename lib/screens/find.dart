@@ -393,7 +393,7 @@ List<Widget> _divided(Pal p, List<Widget> rows) => [
     ];
 
 void _openProfile(BuildContext context, String handle) =>
-    Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
+    Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: handle)));
 
 /// Search hit for a member (web MemberRow).
 class _MemberRow extends StatelessWidget {
@@ -606,7 +606,7 @@ class _ExploreState extends State<_Explore> {
             child: Column(children: _divided(p, [
               for (final j in hiring)
                 InkWell(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${j['id']}'))),
+                  onTap: () => Navigator.push(context, WideRoute(builder: (_) => PostDetailScreen(postId: '${j['id']}'))),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     child: Row(children: [
@@ -795,7 +795,7 @@ class _AskTile extends StatelessWidget {
           ]),
         );
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${a['id']}'))),
+      onTap: () => Navigator.push(context, WideRoute(builder: (_) => PostDetailScreen(postId: '${a['id']}'))),
       child: Container(
         constraints: BoxConstraints(minHeight: big ? 176 : 150),
         padding: EdgeInsets.all(big ? 12 : 10),

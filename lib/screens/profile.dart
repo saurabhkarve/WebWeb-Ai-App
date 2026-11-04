@@ -16,6 +16,7 @@ import '../i18n.dart';
 import '../models.dart';
 import '../safety.dart';
 import '../places.dart';
+import '../approx_distance.dart';
 import '../theme.dart';
 import '../widgets/house_text_card.dart';
 import '../links.dart' show openExternal;
@@ -35,7 +36,6 @@ import '../share_log.dart';
 import '../widgets/picture_picker.dart';
 import '../widgets/resume.dart';
 import '../widgets/upi.dart';
-import '../widgets/p1.dart' show OfferChips;
 import '../widgets/area_map.dart' show AreaMap, showAreaViewer;
 
 /// One profile for everyone (web profile-view.tsx): your own page ([handle] == null) and any member's.
@@ -50,9 +50,7 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-enum _Tab { posts, deals, updates, products }
-
-const _kindText = {'contact': 'contact', 'media': 'a photo', 'info': 'information'};
+enum _Tab { posts, updates, products }
 
 class _ProfileScreenState extends State<ProfileScreen> {
   Profile? _u;
@@ -63,8 +61,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<Post>? _posts;
   // text updates (posts that aren't asks) live under Updates, with the 24-hour photo updates
   List<Post>? _textUpdates;
-  List<Deal>? _deals;
-  List<AskItem> _asks = [];
   List<StoryItem>? _updates;
   List<Product>? _products;
   List<Map<String, dynamic>>? _areas;
@@ -128,20 +124,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }).catchError((_) {
       if (mounted) setState(() => _areas = []);
     });
-    _loadDeals(u);
-  }
-
-  void _loadDeals(Profile u) {
-    _api.get('/users/${u.uid}/deals').then((d) {
-      if (mounted) setState(() => _deals = (d as List).map((e) => Deal.fromJson(e as Map)).toList());
-    }).catchError((_) {
-      if (mounted) setState(() => _deals = []);
-    });
-    if (_own) {
-      _api.get('/posts/asks/me').then((d) {
-        if (mounted) setState(() => _asks = (d as List).map((e) => AskItem.fromJson(e as Map)).toList());
-      }).catchError((_) {});
-    }
   }
 
   bool _linkedItemDone = false;
@@ -167,7 +149,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _edit() async {
     final u = _u;
     if (u == null) return;
-    if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: u))) == true) {
+    if (await Navigator.push<bool>(context, WideRoute(builder: (_) => EditProfileScreen(profile: u))) == true) {
       if (!mounted) return;
       await context.read<AuthProvider>().loadProfile();
       _load();
@@ -245,7 +227,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     final isJob = u.isJobSeeker;
     final own = _own;
-    final tabs = own && !isJob ? [_Tab.posts, _Tab.deals, _Tab.updates, _Tab.products] : [_Tab.products, _Tab.posts, _Tab.deals, _Tab.updates];
+    final tabs = own && !isJob ? [_Tab.posts, _Tab.updates, _Tab.products] : [_Tab.products, _Tab.posts, _Tab.updates];
     final tab = _tabSel ?? (own && !isJob ? _Tab.posts : _Tab.products);
     final completion = own ? context.watch<AuthProvider>().completion : null;
 
@@ -464,9 +446,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   TextSpan(children: [
                     stat(u.statPosts?.toString(), 'Asks'),
                     const TextSpan(text: ' · '),
-                    stat(u.statShared?.toString(), 'Connects'),
-                    const TextSpan(text: ' · '),
-                    stat('${u.contributions}', 'Contributions'),
+                    stat('${u.contributions}', 'Referred'),
                     // deals: asks whose owner chose them (only once there is one)
                     if (u.statWon > 0) ...[
                       const TextSpan(text: ' · '),
@@ -516,7 +496,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             final pl = u.location == 'Other' ? null : findPlace(u.location);
             return tag(
               icon: WI.pin,
-              text: u.location == 'Other' ? t('Other') : u.location,
+              text: u.location == 'Other'
+                  ? t('Other')
+                  : () {
+                      // about how far, from where this phone last was (not on your own page)
+                      final away = _own ? '' : ApproxDistance.label(ApproxDistance.km(ApproxDistance.base(at: null), u.location));
+                      return away.isEmpty ? u.location : '${u.location} · $away';
+                    }(),
               onTap: pl?.lat == null || pl?.lng == null ? null : () => showAreaViewer(ctx, lat: pl!.lat!, lng: pl.lng!, radiusM: 0, label: u.location),
             );
           }),
@@ -536,7 +522,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (own && u.upi.isEmpty)
           GestureDetector(
             onTap: () async {
-              if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: u, tab: 'upi'))) == true && mounted) {
+              if (await Navigator.push<bool>(context, WideRoute(builder: (_) => EditProfileScreen(profile: u, tab: 'upi'))) == true && mounted) {
                 context.read<AuthProvider>().loadProfile();
               }
             },
@@ -630,14 +616,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   static WI _tabIcon(_Tab t) => switch (t) {
         _Tab.posts => WI.ask,
-        _Tab.deals => WI.deals,
         _Tab.updates => WI.updates,
         _Tab.products => WI.box,
       };
 
   static String _tabLabel(_Tab t, bool job) => switch (t) {
         _Tab.posts => 'Asks',
-        _Tab.deals => 'Connects',
         _Tab.updates => 'Updates',
         _Tab.products => job ? 'Resume' : 'Catalog',
       };
@@ -683,8 +667,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           offset: const Offset(0, -16),
           child: Column(children: [for (final x in _posts!) PostCard(key: ValueKey(x.id), post: x, onChanged: () => _loadTabs(u))]),
         );
-      case _Tab.deals:
-        return _dealsBody(p);
       case _Tab.updates:
         if (_updates == null || _textUpdates == null) return _loading();
         if (_updates!.isEmpty && _textUpdates!.isEmpty) return EmptyState(title: t('No updates yet'));
@@ -699,7 +681,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               at: x.createdAt,
               imageUrl: x.images.isEmpty ? null : x.images.first,
               text: x.description,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: x.id))),
+              onTap: () => Navigator.push(context, WideRoute(builder: (_) => PostDetailScreen(postId: x.id))),
             ),
         ]..sort((a, b) => b.at.compareTo(a.at));
         return GridView.count(
@@ -747,57 +729,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _areasSection(p, u),
           u.isJobSeeker ? _resume(u, p) : _catalog(u, p),
         ]);
-    }
-  }
-
-  Widget _dealsBody(Pal p) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      if (_own && _asks.isNotEmpty) ...[
-        Text(t('Asked to share'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-        for (final a in _asks)
-          Container(
-            margin: const EdgeInsets.only(top: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text.rich(
-                TextSpan(children: [
-                  TextSpan(text: a.ownerName, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  TextSpan(text: ' (${a.ownerCompany}) asked you to reveal ${_kindText[a.kind] ?? a.kind} for '),
-                  WidgetSpan(
-                    child: GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: a.postId))),
-                      child: Text(a.postTitle, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, decoration: TextDecoration.underline)),
-                    ),
-                  ),
-                ]),
-                style: const TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 8),
-              Row(children: [
-                Expanded(child: GoldButton(label: t('Approve'), height: 32, onPressed: () => _answer(a, true))),
-                const SizedBox(width: 8),
-                Expanded(child: GoldButton(label: t('Decline'), height: 32, outlined: true, onPressed: () => _answer(a, false))),
-              ]),
-            ]),
-          ),
-        const SizedBox(height: 12),
-      ],
-      if (_deals == null)
-        _loading()
-      else if (_deals!.isEmpty)
-        EmptyState(title: t('No connects yet'), hint: t('Contacts shared in closed loop show up here, without the contact itself.'))
-      else
-        _ConnectList(deals: _deals!, own: _own, name: _u == null ? '' : (_u!.userType == 'entrepreneur' && _u!.company.isNotEmpty ? _u!.company : _u!.name)),
-    ]);
-  }
-
-  Future<void> _answer(AskItem a, bool approve) async {
-    try {
-      await _api.post('/posts/${a.postId}/share/answer', {'approve': approve});
-      if (mounted && _u != null) _loadDeals(_u!);
-    } catch (e) {
-      if (mounted) toast(context, '$e', error: true);
     }
   }
 
@@ -953,7 +884,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           outlined: true,
           height: 40,
           onPressed: () async {
-            await Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogScreen()));
+            await Navigator.push(context, WideRoute(builder: (_) => const CatalogScreen()));
             if (_u != null) _loadTabs(_u!);
           },
         ),
@@ -1048,7 +979,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Wrap(spacing: 6, runSpacing: 6, children: [
           for (final s in u.skills)
             GestureDetector(
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FindScreen(standalone: true, initialQuery: s, initialScope: 'people'))),
+              onTap: () => Navigator.push(context, WideRoute(builder: (_) => FindScreen(standalone: true, initialQuery: s, initialScope: 'people'))),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20), border: Border.all(color: p.border.withValues(alpha: .7))),
@@ -1645,99 +1576,6 @@ class SavedPostsScreenState extends State<SavedPostsScreen> {
 }
 
 
-/// A profile's Connects (web connect-list.tsx): the asks this member answered. A line says what the list is (and, to
-/// the owner, that only the asker sees their contact), then one row per ask: who asked and what, how this member
-/// answered (never the contact), the asker's feedback and how the ask ended. The whole row opens the ask.
-class _ConnectList extends StatelessWidget {
-  final List<Deal> deals;
-  final bool own;
-  final String name;
-  const _ConnectList({required this.deals, required this.own, required this.name});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Pal.of(context);
-    final won = deals.where((d) => d.won).length;
-    final liked = deals.where((d) => d.rating == 1).length;
-    Widget pill(String text, {Color? bg, Color? fg, FontWeight w = FontWeight.w600, Widget? lead}) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(color: bg ?? p.chip, borderRadius: BorderRadius.circular(99)),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (lead != null) ...[lead, const SizedBox(width: 3)],
-            Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: w, color: fg ?? p.muted))),
-          ]),
-        );
-    final goldText = p.dark ? kGold : const Color(0xFF7A5A00);
-    final green = p.dark ? const Color(0xFF34D399) : const Color(0xFF059669);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text(own ? t('Asks you answered. Only the asker sees your contact.') : t('Asks {name} answered. Contacts stay private between them and the asker.', {'name': name}),
-          style: TextStyle(fontSize: 12, color: p.muted)),
-      const SizedBox(height: 6),
-      Wrap(spacing: 6, runSpacing: 4, children: [
-        pill(t('{n} answered', {'n': deals.length}), fg: p.text),
-        if (won > 0) pill('🏆 ${t('{n} won', {'n': won})}', bg: kGold.withValues(alpha: .25), fg: goldText),
-        if (liked > 0) pill('👍 $liked', fg: p.text),
-      ]),
-      const SizedBox(height: 4),
-      for (var i = 0; i < deals.length; i++)
-        Builder(builder: (_) {
-          final d = deals[i];
-          final feedback = '${d.rating == 1 ? '👍 ' : d.rating == -1 ? '👎 ' : ''}${d.reaction == null ? '' : '${kReactionEmoji[d.reaction] ?? ''} '}';
-          return InkWell(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: d.postId))),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: i == 0 ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border))),
-              child: Row(children: [
-                Avatar(name: d.askerName, photoUrl: d.ownerPhotoUrl, size: 36),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    // who asked, what kind of ask, when this member answered
-                    Row(children: [
-                      Flexible(child: Text(t("{name}'s ask", {'name': d.askerName}), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .85)))),
-                      if (d.ownerVerification > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: d.ownerVerification, size: 12)],
-                      if (d.category != null) ...[
-                        Text('  ·  ', style: TextStyle(fontSize: 11, color: p.muted)),
-                        WIcon(categoryIcon(d.category), size: 12, color: p.link, still: true),
-                        const SizedBox(width: 3),
-                        Flexible(child: Text(t(d.categoryText).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.2, color: p.link))),
-                      ],
-                      const Spacer(),
-                      Text(timeAgo(d.createdAt), style: TextStyle(fontSize: 11, color: p.muted)),
-                    ]),
-                    const SizedBox(height: 2),
-                    Text(d.postTitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.3)),
-                    const SizedBox(height: 6),
-                    // how they answered, how the asker took it, how the ask ended
-                    Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                      if (d.kind == 'contact')
-                        pill(t('Shared a contact privately'), bg: Colors.transparent, lead: WIcon(WI.lock, size: 12, color: p.muted))
-                      else if (d.kind == 'media')
-                        pill(t('Sent a photo'))
-                      else if (d.canDo || (d.quote ?? '').isNotEmpty || d.readyWhen != null)
-                        OfferChips(canDo: d.canDo, quote: d.quote, readyWhen: d.readyWhen)
-                      else
-                        pill(t('Replied')),
-                      if (d.won)
-                        pill('🏆 ${t(own ? 'You won this job' : 'Won this job')}', bg: kGold.withValues(alpha: .3), fg: goldText, w: FontWeight.w700)
-                      else if (d.outcome != null)
-                        pill(t('Closed'))
-                      else
-                        pill(t('Open'), bg: green.withValues(alpha: .12), fg: green),
-                      if (feedback.isNotEmpty) pill('$feedback${t('from the asker')}'),
-                    ]),
-                  ]),
-                ),
-                const SizedBox(width: 6),
-                Text('›', style: TextStyle(fontSize: 18, color: p.muted)),
-              ]),
-            ),
-          );
-        }),
-    ]);
-  }
-}
 
 /// "20 min", "3 hr", "2 days"
 String _replyTime(int mins) {

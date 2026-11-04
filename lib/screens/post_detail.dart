@@ -220,7 +220,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Future<void> _editAsk() async {
     // an ask is edited in the full Ask editor; an update in the small sheet
     if (_post!.isRequirement) {
-      final saved = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => SubPage(title: t('Edit ask'), body: AskScreen(onPosted: () {}, edit: _post))));
+      final saved = await Navigator.push<bool>(context, WideRoute(builder: (_) => SubPage(title: t('Edit ask'), body: AskScreen(onPosted: () {}, edit: _post))));
       if (saved == true) _load();
       return;
     }
@@ -238,7 +238,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   /// A chip opens Find with every ask sharing that city / budget / timing (as on the feed card).
   void _openFind({String? location, String? budget, String? urgency}) => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => FindScreen(standalone: true, initialLocation: location, initialBudget: budget, initialUrgency: urgency)),
+        WideRoute(builder: (_) => FindScreen(standalone: true, initialLocation: location, initialBudget: budget, initialUrgency: urgency)),
       );
 
   @override
@@ -277,13 +277,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             // author row
             Row(children: [
               GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.authorHandle))),
+                onTap: () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: post.authorHandle))),
                 child: Avatar(name: post.shownName, photoUrl: post.authorPhotoUrl, size: 40, ring: post.authorHasUpdate, type: post.authorType, uid: post.authorUid, badge: 15),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: GestureDetector(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: post.authorHandle))),
+                  onTap: () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: post.authorHandle))),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
                       Flexible(child: Text(post.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25))),
@@ -629,7 +629,7 @@ class _ShareTileState extends State<_ShareTile> {
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: (s.sharerHandle ?? '').isEmpty ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: s.sharerHandle!))),
+              onTap: (s.sharerHandle ?? '').isEmpty ? null : () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: s.sharerHandle!))),
               child: Row(children: [
                 Avatar(name: s.sharerName, photoUrl: s.sharerPhotoUrl, size: 44, type: s.sharerType, badge: 18, uid: s.sharerUid),
                 const SizedBox(width: 12),

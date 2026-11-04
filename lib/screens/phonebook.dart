@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../approx_distance.dart';
 import '../ask_types.dart';
 import '../auth_provider.dart';
 import '../card_colors.dart';
@@ -25,6 +26,8 @@ import '../widgets/area_map.dart' show askTimeLeft;
 import '../widgets/city_picker.dart';
 import '../widgets/reviews_card.dart';
 import '../widgets/whatsapp_icon.dart';
+import 'connect.dart' show UpdatesBar;
+import '../widgets/tour.dart' show Tours;
 import 'find.dart';
 import 'post_detail.dart';
 import 'profile.dart';
@@ -157,7 +160,7 @@ class _PhonebookScreenState extends State<PhonebookScreen> {
     final services = (m['services'] as List? ?? const []).take(3).join(' · ');
     final where = ['${m['category'] ?? ''}', '${m['location'] ?? ''}'].where((s) => s.isNotEmpty).join(' · ');
     return InkWell(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: '${m['handle']}'))),
+      onTap: () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: '${m['handle']}'))),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(children: [
@@ -179,6 +182,7 @@ class _PhonebookScreenState extends State<PhonebookScreen> {
               Stars(value: rating, size: 11),
               Text('${rating.toStringAsFixed(1)} · $reviews', style: TextStyle(fontSize: 11, color: p.muted)),
             ]),
+          Padding(padding: const EdgeInsets.only(left: 4), child: Icon(Icons.chevron_right_rounded, size: 24, color: p.muted)),
         ]),
       ),
     );
@@ -211,6 +215,17 @@ class PhonebookCache {
 }
 
 /// One line of the directory: a contact saved on the phone, a WEBWEB page (from the last check), or both.
+/// One service contact or Ask AI page in the merged results: its row and what the sort options order by.
+class _Hit {
+  _Hit(this.d, this.dist, this.shared, this.rating, this.reviews, this.w);
+  final double d; // metres from the server, for the recommended order
+  final double dist; // metres, server's or the offline estimate (infinity when unknown)
+  final int shared;
+  final double rating;
+  final int reviews;
+  final Widget w;
+}
+
 class _Entry {
   final String name;
   final String? phone;
@@ -273,6 +288,11 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   /// service providers other members saved and WEBWEB approved (plumber, carpenter...), after my own contacts
   List<Map> _service = const [];
   List<Post>? _asks;
+  /// every sub-category (service-contact category) with its icon, for the tiles under the search
+  List<Map> _cats = const [];
+  /// the last searches, on this phone only
+  List<String> _recent = const [];
+  bool _allCats = false;
   Map? _mine;
   Timer? _debounce, _aiTimer;
   String? _scrubbing;
@@ -280,6 +300,8 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   Map? _ai;
   String? _aiFor;
   bool _aiBusy = false;
+  // how the results are ordered: rec (Ask AI's order), near, shared, rated
+  String _sort = 'rec';
   /// where the phone is, for nearer results first (only once location is allowed; asked for no more than that)
   ({double lat, double lng, DateTime at})? _here;
   /// where to look: '' is the current location; or any town in India picked beside the search (with its centre when it is a new town)
@@ -288,10 +310,24 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   /// the city the phone is in (when location is already allowed): shown in the dropdown in place of "Current location"
   String? _hereCity;
 
+  /// where results are measured from: the point or town picked, else where the phone is or was last
+  ({double lat, double lng})? get _base => ApproxDistance.base(at: _placeAt, place: _place, here: _here == null ? null : (lat: _here!.lat, lng: _here!.lng));
+
   Future<void> _detectCity() async {
     final h = await _position();
     final city = h == null ? null : placeAt(h.lat, h.lng)?.name;
     if (mounted && city != _hereCity) setState(() => _hereCity = city);
+  }
+
+  /// the island's Speak button: clear what is typed, then the microphone listens
+  void _onSpeak() {
+    if (!mounted) return;
+    final had = _q.text.isNotEmpty;
+    if (had) {
+      _q.clear();
+      _search('');
+    }
+    Future.delayed(Duration(milliseconds: had ? 150 : 0), () => directoryVoice.value++);
   }
 
   void _onFocusRequest() {
@@ -322,11 +358,17 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     super.initState();
     directoryRequest.addListener(_onRequest);
     directoryFocus.addListener(_onFocusRequest);
+    directorySpeak.addListener(_onSpeak);
+    ApproxDistance.init().then((_) => mounted ? setState(() {}) : null);
     _loadMatches();
     _readPhoneBook(ask: false);
     WidgetsBinding.instance.addPostFrameCallback((_) => _firstAsk());
     _detectCity();
     _loadAsks();
+    _loadCats();
+    SharedPreferences.getInstance().then((sp) {
+      if (mounted) setState(() => _recent = (sp.getStringList('webweb_recent_finds') ?? const []).take(6).toList());
+    });
     final me = context.read<AuthProvider>().profile;
     if (me != null) {
       context.read<AuthProvider>().api.get('/users/${me.uid}/reviews', {'limit': '1'}).then((d) {
@@ -339,6 +381,8 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   void dispose() {
     directoryRequest.removeListener(_onRequest);
     directoryFocus.removeListener(_onFocusRequest);
+    directorySpeak.removeListener(_onSpeak);
+    directoryBusy.value = false;
     _debounce?.cancel();
     _aiTimer?.cancel();
     _q.dispose();
@@ -395,6 +439,13 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         await ContactSync.markInvited();
         if (mounted) showServiceContactsSheet(context, invite: true);
       }
+    } catch (_) {}
+  }
+
+  Future<void> _loadCats() async {
+    try {
+      final d = await context.read<AuthProvider>().api.get('/service-contacts/categories') as Map;
+      if (mounted) setState(() => _cats = (d['categories'] as List).cast<Map>());
     } catch (_) {}
   }
 
@@ -473,9 +524,23 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   }
 
   /// Ask AI (POST /phonebook/ai-find): the pages that can help with what was typed, each with why.
+  Future<void> _remember(String q) async {
+    final next = [q, ..._recent.where((x) => x.toLowerCase() != q.toLowerCase())].take(6).toList();
+    if (mounted) setState(() => _recent = next);
+    final sp = await SharedPreferences.getInstance();
+    await sp.setStringList('webweb_recent_finds', next);
+  }
+
+  Future<void> _clearRecent() async {
+    setState(() => _recent = const []);
+    final sp = await SharedPreferences.getInstance();
+    await sp.remove('webweb_recent_finds');
+  }
+
   Future<void> _askAi(String q) async {
     _aiTimer?.cancel();
     if (q.length < 4 || (q == _aiFor && (_ai != null || _aiBusy))) return;
+    _remember(q);
     setState(() => (_aiFor = q, _ai = null, _aiBusy = true));
     try {
       // a picked town (with its centre when it is new), else the phone's position now
@@ -500,6 +565,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
       final p = await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 6)))
           .catchError((_) async => (await Geolocator.getLastKnownPosition())!);
       _here = (lat: p.latitude, lng: p.longitude, at: DateTime.now());
+      ApproxDistance.rememberHere(p.latitude, p.longitude);
       return (lat: p.latitude, lng: p.longitude);
     } catch (_) {
       return null;
@@ -511,6 +577,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     try {
       final h = await currentLocation(context, reason: t('To show people near you first.'), source: 'ask-ai');
       _here = (lat: h.lat, lng: h.lng, at: DateTime.now());
+      ApproxDistance.rememberHere(h.lat, h.lng);
     } on PermissionNotGiven {
       return;
     } catch (e) {
@@ -536,7 +603,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   }
 
   Future<void> _openCheck() async {
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => SubPage(title: t('Phonebook'), body: const PhonebookScreen())));
+    await Navigator.push(context, WideRoute(builder: (_) => SubPage(title: t('Phonebook'), body: const PhonebookScreen())));
     _loadMatches();
   }
 
@@ -590,6 +657,9 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
+    // a search is running: the ring round the island's button turns
+    final busy = _aiBusy || (_searching && _results == null);
+    WidgetsBinding.instance.addPostFrameCallback((_) => directoryBusy.value = busy);
     return LayoutBuilder(builder: (context, c) {
       final wide = c.maxWidth >= 900;
       final directory = PopScope(
@@ -623,13 +693,121 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     final all = _entries;
 
     final top = Column(key: _topKey, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-        Text(t('Directory'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
-        const SizedBox(width: 8),
-        if (all.isNotEmpty) Text('${all.length}', style: TextStyle(fontSize: 15, color: p.muted)),
+      // the updates (people, leads, Today, new businesses) come first, above the search
+      _fold(!_searching, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Column(key: Tours.key('updates'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        // a small gold title with a fading rule, so the circles read as their own strip without a box
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+          child: Row(children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: kGold, boxShadow: [BoxShadow(color: kGold.withValues(alpha: .25), spreadRadius: 3)]),
+            ),
+            const SizedBox(width: 8),
+            Text(t('Updates').toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1.6, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00))),
+            const SizedBox(width: 10),
+            Expanded(child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [kGold.withValues(alpha: .6), kGold.withValues(alpha: 0)])))),
+          ]),
+        ),
+        const UpdatesBar(),
       ]),
-      const SizedBox(height: 10),
-      _searchField(),
+      const SizedBox(height: 12),
+      ])),
+      // the page the app opens on: a greeting, what to ask, the search with where to look inside it, and things to try
+      AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.fromLTRB(16, _searching ? 10 : 18, 16, 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: p.dark ? kGold.withValues(alpha: .25) : const Color(0x99F0D77A)),
+          boxShadow: p.dark ? null : const [BoxShadow(color: Color(0x40B48200), blurRadius: 30, offset: Offset(0, 10), spreadRadius: -14)],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: p.dark ? [kGold.withValues(alpha: .22), kGold.withValues(alpha: .04)] : const [Color(0xFFFFF0B0), Color(0xFFFFF8DC), Color(0xFFFFFDF3)],
+          ),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _fold(!_searching, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (me != null && me.name.trim().isNotEmpty)
+            Text('${t('Hi {name}', {'name': me.name.trim().split(' ').first})} 👋', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00))),
+          const SizedBox(height: 2),
+          Text(t('What are you looking for?'), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, height: 1.1)),
+          const SizedBox(height: 6),
+          Text(t('Search your phonebook, trusted service contacts and businesses near you.'), style: TextStyle(fontSize: 14, height: 1.35, color: p.text.withValues(alpha: .65))),
+          const SizedBox(height: 16),
+          ])),
+          _searchField(),
+          _fold(!_searching, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const SizedBox(height: 16),
+          Text(t('Popular searches').toUpperCase(), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.text.withValues(alpha: .6))),
+          const SizedBox(height: 6),
+          _bleed(
+            38,
+            ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              scrollDirection: Axis.horizontal,
+              itemCount: _trades.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) => InkWell(
+                borderRadius: BorderRadius.circular(30),
+                onTap: () => _pick(_trades[i]),
+                child: Container(
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.only(left: 10, right: 14),
+                  decoration: BoxDecoration(color: p.card.withValues(alpha: .9), border: Border.all(color: kGold.withValues(alpha: .5)), borderRadius: BorderRadius.circular(30)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_tradeEmoji[_trades[i]] ?? '', style: const TextStyle(fontSize: 16)),
+                    const SizedBox(width: 6),
+                    Text(t(_trades[i]), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+          if (_recent.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(child: Text(t('Recent searches').toUpperCase(), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.text.withValues(alpha: .6)))),
+              GestureDetector(onTap: _clearRecent, behavior: HitTestBehavior.opaque, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2), child: Text(t('Clear'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.link)))),
+            ]),
+            const SizedBox(height: 6),
+            _bleed(
+              34,
+              ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                scrollDirection: Axis.horizontal,
+                itemCount: _recent.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) => InkWell(
+                  borderRadius: BorderRadius.circular(30),
+                  onTap: () => _pick(_recent[i]),
+                  child: Container(
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(color: p.card.withValues(alpha: .7), borderRadius: BorderRadius.circular(30)),
+                    child: Text('↺  ${_recent[i]}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: p.text.withValues(alpha: .8))),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          ])),
+        ]),
+      ),
+      _fold(!_searching, _categoryTiles(p)),
+      // two more ways in under the categories: see which of your contacts have a page, and look round the area
+      _fold(!_searching, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: _shortcut(p, Icons.contacts_outlined, 'Check my contacts', _openCheck)),
+          const SizedBox(width: 12),
+          Expanded(child: _shortcut(p, Icons.near_me_outlined, 'Search nearby', () => Navigator.push(context, WideRoute(builder: (_) => SubPage(title: t('Nearby'), body: const FindScreen()))))),
+        ]),
+      ])),
       ...[
         // my card, as at the top of a phone's contacts
         if (me != null) ...[const SizedBox(height: 14), _myCard(p, me.handle, displayName(me.userType, me.name, me.company), me.photoUrl)],
@@ -739,80 +917,299 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
   /// Ask AI: a name finds the contact; anything else is a need, and the AI finds who can help. The main thing of the
   /// app, so it is the one element that moves: a gold light runs round its border, with the AI badge at its start.
-  Widget _searchField() => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _searchBox(),
-        const SizedBox(height: 8),
-        // where: the current location unless another town is picked (every city of India, or any town typed)
-        Align(alignment: Alignment.centerLeft, child: CityPill(
-          value: _place,
-          anyLabel: _hereCity ?? t('Current location'),
-          chip: true,
-          onChanged: (c) {
-            setState(() {
-              _place = c.name;
-              _placeAt = c.lat != null && c.lng != null ? (lat: c.lat!, lng: c.lng!) : null;
-              _results = null;
-              _aiFor = null;
-              _ai = null;
-            });
-            final q = _q.text.trim();
-            if (q.length >= 2) _search(q);
-            if (q.length >= 4) _askAi(q);
-          },
-        )),
-      ]);
+  /// The search; where to look is inside its box, under the text.
+  Widget _searchField() => _searchBox();
 
-  Widget _searchBox() {
+  /// A tap on a category or a trade: that word is searched.
+  void _pick(String word) {
+    _q.text = word;
+    _q.selection = TextSelection.collapsed(offset: _q.text.length);
+    _search(word);
+    _qFocus.requestFocus();
+  }
+
+  static const _tradeEmoji = {'Plumber': '🔧', 'Electrician': '⚡', 'Printer': '🖨️', 'Carpenter': '🪚', 'Tutor': '📚', 'Caterer': '🍽️', 'Transport': '🚚', 'Chartered accountant': '🧾', 'Mobile repair': '📱', 'Tailor': '🧵'};
+  static const _trades = ['Plumber', 'Electrician', 'Printer', 'Carpenter', 'Tutor', 'Caterer', 'Transport', 'Chartered accountant', 'Mobile repair', 'Tailor'];
+
+  /// A category's icon and name; a tap searches it.
+  Widget _catTile(Map c, {double w = 78}) {
+    final tag = '${c['tag']}';
     final p = Pal.of(context);
-    return _GlowBorder(
-      radius: 28,
-      child: TextField(
-        key: _searchKey,
-        controller: _q,
-        focusNode: _qFocus,
-        onChanged: _search,
-        onSubmitted: (v) => _askAi(v.trim()),
-        textInputAction: TextInputAction.search,
-        textCapitalization: TextCapitalization.sentences,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-        decoration: InputDecoration(
-          filled: true,
-          fillColor: p.card,
-          contentPadding: const EdgeInsets.symmetric(vertical: 17, horizontal: 8),
-          prefixIcon: Padding(padding: const EdgeInsets.only(left: 12, right: 10), child: _aiBadge()),
-          prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-          hintText: t('Ask AI: a name, or what you need'),
-          hintStyle: TextStyle(fontSize: 15, color: p.muted),
-          // text in the box: a clear icon in the place of the microphone (clearing leaves the search)
-          suffixIcon: _q.text.isNotEmpty
-              ? IconButton(
-                  tooltip: t('Clear'),
-                  icon: const Icon(Icons.close),
-                  onPressed: () {
-                    _q.clear();
-                    _search('');
-                  })
-              : MicButton(onWords: (words, _) {
-                  _q.text = words;
-                  _q.selection = TextSelection.collapsed(offset: _q.text.length);
-                  _search(words);
-                }),
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
+    // every tile is the same card: the icon in a round on top, the name in a fixed two-line box under it, so rows line up whatever the name
+    return Opacity(
+      opacity: ((c['n'] as num?) ?? 1) == 0 ? .55 : 1,
+      child: SizedBox(
+        width: w,
+        child: Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: Material(
+            color: kGold.withValues(alpha: p.dark ? .1 : .08),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: kGold.withValues(alpha: .25))),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => _pick(tag),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: p.card,
+                      border: Border.all(color: kGold.withValues(alpha: .4)),
+                      boxShadow: const [BoxShadow(color: Color(0x59785A00), blurRadius: 6, spreadRadius: -2, offset: Offset(0, 2))],
+                    ),
+                    child: Text('${c['emoji'] ?? '✨'}', style: const TextStyle(fontSize: 24, height: 1)),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 28,
+                    child: Text(t(tag), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, height: 1.15)),
+                  ),
+                ]),
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 
+  /// Every sub-category of the business categories as icon tiles under the search field: one scrolling row, or all of
+  /// them under their business category.
+  /// A row that runs out to the edges of the yellow card (its padding is 16) and starts back inside it, so the swipe is end to end.
+  Widget _bleed(double h, Widget list) => SizedBox(
+        height: h,
+        child: LayoutBuilder(
+          builder: (_, box) => Transform.translate(
+            offset: const Offset(-16, 0),
+            child: OverflowBox(
+              alignment: Alignment.centerLeft,
+              minWidth: box.maxWidth + 32,
+              maxWidth: box.maxWidth + 32,
+              child: SizedBox(width: box.maxWidth + 32, child: list),
+            ),
+          ),
+        ),
+      );
+
+  /// Folds a block away smoothly (height and fade) while a search is on, and brings it back when the box is cleared.
+  Widget _fold(bool open, Widget child) => TweenAnimationBuilder<double>(
+        tween: Tween(end: open ? 1.0 : 0.0),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+        child: child,
+        // one fixed chain of wrappers, so the block (the updates, the typed text) keeps its state while folded
+        builder: (_, v, c) => Offstage(
+          offstage: v <= 0,
+          child: IgnorePointer(
+            ignoring: v < 1,
+            child: ClipRect(
+              clipBehavior: v >= 1 ? Clip.none : Clip.hardEdge,
+              child: Align(alignment: Alignment.topCenter, heightFactor: v >= 1 ? null : v, child: Opacity(opacity: v, child: c)),
+            ),
+          ),
+        ),
+      );
+
+  Widget _shortcut(Pal p, IconData icon, String label, VoidCallback onTap) => Material(
+        color: kGold.withValues(alpha: p.dark ? .1 : .08),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: kGold.withValues(alpha: .3))),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              Container(width: 40, height: 40, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: kGoldGradient), child: Icon(icon, size: 20, color: kInk)),
+              const SizedBox(width: 10),
+              Expanded(child: Text(t(label), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, height: 1.15))),
+            ]),
+          ),
+        ),
+      );
+
+  Widget _categoryTiles(Pal p) {
+    if (_cats.isEmpty) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const SizedBox(height: 18),
+      Row(children: [
+        Expanded(child: Text(t('Browse by category'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800))),
+        GestureDetector(
+          onTap: () => setState(() => _allCats = !_allCats),
+          behavior: HitTestBehavior.opaque,
+          child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4), child: Text(t(_allCats ? 'Hide' : 'See all'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link))),
+        ),
+      ]),
+      const SizedBox(height: 4),
+      if (!_allCats)
+        SizedBox(
+          height: 112,
+          // a whole number of tiles plus a half, so the last one is cut off and hints the row scrolls
+          child: LayoutBuilder(builder: (_, box) {
+            final shown = box.maxWidth < 400 ? 4.5 : (box.maxWidth < 560 ? 5.5 : 6.5);
+            // out to both screen edges (the page's side padding is 16) and back in at the start, so the swipe runs end to end
+            return Transform.translate(
+              offset: const Offset(-16, 0),
+              child: OverflowBox(
+                alignment: Alignment.centerLeft,
+                minWidth: box.maxWidth + 32,
+                maxWidth: box.maxWidth + 32,
+                child: SizedBox(
+                  width: box.maxWidth + 32,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _cats.length,
+                    itemBuilder: (_, i) => _catTile(_cats[i], w: box.maxWidth / shown),
+                  ),
+                ),
+              ),
+            );
+          }),
+        )
+      else
+        for (final parent in kProfileCategories.map((c) => c.value))
+          if (_cats.any((c) => c['parent'] == parent)) ...[
+            Padding(padding: const EdgeInsets.only(top: 8, bottom: 6), child: Text(t(parent), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800))),
+            Wrap(runSpacing: 6, spacing: 4, children: [for (final c in _cats.where((c) => c['parent'] == parent)) _catTile(c)]),
+          ],
+    ]);
+  }
+
+  /// The search with where to look inside the box, under the text: the current location unless another town is picked
+  /// (every city of India, or any town typed).
+  Widget _searchBox() {
+    final p = Pal.of(context);
+    return _GlowBorder(
+      radius: 26,
+      child: ColoredBox(
+        color: p.card,
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          TextField(
+            key: _searchKey,
+            controller: _q,
+            focusNode: _qFocus,
+            onChanged: _search,
+            onSubmitted: (v) => _askAi(v.trim()),
+            textInputAction: TextInputAction.search,
+            textCapitalization: TextCapitalization.sentences,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: p.card,
+              contentPadding: const EdgeInsets.symmetric(vertical: 17, horizontal: 8),
+              prefixIcon: Padding(padding: const EdgeInsets.only(left: 12, right: 10), child: _aiBadge()),
+              prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+              hintText: t('Ask AI: a name, or what you need'),
+              hintStyle: TextStyle(fontSize: 15, color: p.muted),
+              // text in the box: a clear icon in the place of the microphone (clearing leaves the search)
+              suffixIcon: _q.text.isNotEmpty
+                  ? IconButton(
+                      tooltip: t('Clear'),
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        _q.clear();
+                        _search('');
+                      })
+                  : MicButton(island: true, onWords: (words, _) {
+                      _q.text = words;
+                      _q.selection = TextSelection.collapsed(offset: _q.text.length);
+                      _search(words);
+                    }),
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+            ),
+          ),
+          Divider(height: 1, thickness: 1, color: p.border.withValues(alpha: .6)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 3, 12, 3),
+            child: Row(children: [
+              Expanded(
+                child: Align(
+              alignment: Alignment.centerLeft,
+              child: CityPill(
+                value: _place,
+                anyLabel: _hereCity ?? t('Current location'),
+                flat: true,
+                onChanged: (c) {
+                  setState(() {
+                    _place = c.name;
+                    _placeAt = c.lat != null && c.lng != null ? (lat: c.lat!, lng: c.lng!) : null;
+                    _results = null;
+                    _aiFor = null;
+                    _ai = null;
+                  });
+                  final q = _q.text.trim();
+                  if (q.length >= 2) _search(q);
+                  if (q.length >= 4) _askAi(q);
+                },
+              ),
+            ),
+              ),
+              // the same as the keyboard's search key: searches now, or puts the cursor in the box when it is empty
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(30),
+                  onTap: () {
+                    final q = _q.text.trim();
+                    if (q.isEmpty) {
+                      _qFocus.requestFocus();
+                    } else {
+                      _qFocus.unfocus();
+                      _search(q);
+                      if (q.length >= 4) _askAi(q);
+                    }
+                  },
+                  child: Ink(
+                    height: 38,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(30), gradient: kGoldGradient),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.search, size: 18, color: Color(0xFF1E1E1E)),
+                      const SizedBox(width: 6),
+                      Text(t('Find'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF1E1E1E))),
+                    ]),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+
   /// "AI" with the star, in gold: what the search is
-  Widget _aiBadge() => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(14)),
-        child: const Row(mainAxisSize: MainAxisSize.min, children: [
-          Text('AI', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kInk, height: 1)),
-          SizedBox(width: 3),
-          Icon(Icons.auto_awesome_rounded, size: 14, color: kInk),
+  /// a gold orb with the sparkle, the AI tag on its corner like the app's count badges
+  Widget _aiBadge() => SizedBox(
+        width: 46,
+        height: 44,
+        child: Stack(clipBehavior: Clip.none, alignment: Alignment.centerLeft, children: [
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: kGoldGradient,
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: const Color(0xFFD6AA00).withValues(alpha: .45), blurRadius: 10, offset: const Offset(0, 4))],
+            ),
+            child: const Icon(Icons.auto_awesome_rounded, size: 21, color: kInk),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 1,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
+              decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(8), border: Border.all(color: Pal.of(context).card, width: 2)),
+              child: const Text('AI', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFFFFD84A), height: 1, letterSpacing: .4)),
+            ),
+          ),
         ]),
       );
 
@@ -820,7 +1217,25 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   /// typed and the new ask to post when no one fits.
   bool _askOpen = false;
 
-  Widget _searchPage(Pal p) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+  /// The results page draws nothing over the rows: no grey press / focus / hover highlight left on a row after opening it and
+  /// coming back, and no grey stretch or glow at the ends of the list.
+  Widget _noGrey(Widget child) => Theme(
+        data: Theme.of(context).copyWith(
+          splashFactory: NoSplash.splashFactory,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          hoverColor: Colors.transparent,
+          focusColor: Colors.transparent,
+        ),
+        child: ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
+          child: child,
+        ),
+      );
+
+  Widget _searchPage(Pal p) => _noGrey(_searchColumn(p));
+
+  Widget _searchColumn(Pal p) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Row(children: [
@@ -905,14 +1320,12 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     // what the member saved a page as, when it is in their contacts
     final saved = {for (final e in all) if (e.member != null) '${e.member!['uid']}': e.name};
     return [
-      if (mine.isNotEmpty) ...[_label(p, t('In your contacts')), for (final e in mine.take(30)) _row(p, e)],
-      ..._aiSection(p, aiMatches, saved),
-      ..._serviceSection(p, mine),
+      ..._resultsSection(p, aiMatches, saved, mine),
       if (others.isNotEmpty) ...[_label(p, t('On WEBWEB')), for (final u in others) _row(p, _Entry(_memberName(u), null, u))],
       Align(
         alignment: Alignment.centerLeft,
         child: TextButton.icon(
-          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FindScreen(standalone: true, initialQuery: _q.text.trim()))),
+          onPressed: () => Navigator.push(context, WideRoute(builder: (_) => FindScreen(standalone: true, initialQuery: _q.text.trim()))),
           icon: const Icon(Icons.place_rounded, size: 16),
           label: Text(t('Search nearby')),
         ),
@@ -921,9 +1334,9 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     ];
   }
 
-  /// Service providers saved by other members and approved by WEBWEB: name, trade, and call / WhatsApp. Left out when
-  /// the same number is already in my own contacts.
-  List<Widget> _serviceSection(Pal p, List<_Entry> mine) {
+  /// Service providers saved by other members and approved by WEBWEB: name, trade, and call / WhatsApp, each with its
+  /// distance (metres, for the merge with Ask AI's pages). Left out when the same number is already in my own contacts.
+  List<_Hit> _serviceItems(Pal p, List<_Entry> mine) {
     String d10(String? x) => ContactSync.mobile10(x ?? '') ?? '';
     final have = {for (final e in mine) d10(e.phone), for (final e in mine) ...(e.contact?.phones ?? const <Phone>[]).map((ph) => d10(ph.number))};
     final list = _service.where((c) => !have.contains('${c['phone']}')).toList();
@@ -949,35 +1362,106 @@ class _PhonebookHomeState extends State<PhonebookHome> {
       return others > 0 ? t('Shared by {names} and {n} more', {'names': names, 'n': others}) : t('Shared by {names}', {'names': names});
     }
     return [
-      _label(p, t('Service contacts')),
       for (final c in list)
-        ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ServicePageScreen(phone: '${c['phone']}', initial: c, shared: sharedBy(c)))),
-          leading: CircleAvatar(backgroundColor: kGold.withValues(alpha: .2), child: const Icon(Icons.handyman_rounded, size: 20, color: kStar)),
-          title: Text('${c['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-          subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(
-            [
-              ...((c['tags'] as List?) ?? const []).take(2),
-              if ('${c['place'] ?? ''}'.isNotEmpty) '${c['place']}',
-              if (c['km'] is num) t('{n} km', {'n': (c['km'] as num) < 10 ? (c['km'] as num).toStringAsFixed(1) : (c['km'] as num).round()}),
-              // from Google (Places)
-              if (c['rating'] is num) '★ ${(c['rating'] as num).toStringAsFixed(1)}${c['ratings'] is num ? ' (${c['ratings']})' : ''} Google',
-            ].join(' · '),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: p.muted),
+        _Hit(
+          c['km'] is num ? (c['km'] as num).toDouble() * 1000 : double.infinity,
+          c['km'] is num ? (c['km'] as num).toDouble() * 1000 : (ApproxDistance.km(_base, '${c['place'] ?? ''}') ?? double.infinity / 1000) * 1000,
+          ((c['sharedBy'] is Map ? (c['sharedBy'] as Map)['count'] : 0) as num?)?.toInt() ?? 0,
+          (c['rating'] as num?)?.toDouble() ?? 0,
+          (c['ratings'] as num?)?.toInt() ?? 0,
+          // the same row as an Ask AI page: the picture (initials, no gold W), the name with no verified mark, the trade and place
+          InkWell(
+            onTap: () => Navigator.push(context, WideRoute(builder: (_) => ServicePageScreen(phone: '${c['phone']}', initial: c, shared: sharedBy(c)))),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: _rowH),
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(children: [
+                Avatar(name: '${c['name']}', size: 44),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('${c['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    Text(
+                      [
+                        ...((c['tags'] as List?) ?? const []).take(2),
+                        if ('${c['place'] ?? ''}'.isNotEmpty) '${c['place']}',
+                        if (c['km'] is num)
+                          t('{n} km', {'n': (c['km'] as num) < 10 ? (c['km'] as num).toStringAsFixed(1) : (c['km'] as num).round()})
+                        else
+                          ApproxDistance.label(ApproxDistance.km(_base, '${c['place'] ?? ''}')),
+                        // from Google (Places)
+                        if (c['rating'] is num) '★ ${(c['rating'] as num).toStringAsFixed(1)}${c['ratings'] is num ? ' (${c['ratings']})' : ''} Google',
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: p.muted),
+                    ),
+                    if (sharedBy(c) != null) Text(sharedBy(c)!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.link, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ]),
+                ),
+                // the page has Call and WhatsApp and the details: the arrow says there is more
+                Padding(padding: const EdgeInsets.only(left: 4), child: Icon(Icons.chevron_right_rounded, size: 24, color: p.muted)),
+              ]),
+            ),
           ),
-            if (sharedBy(c) != null) Text(sharedBy(c)!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.link, fontSize: 12.5, fontWeight: FontWeight.w600)),
-          ]),
-          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-            if ('${c['website'] ?? ''}'.isNotEmpty) IconButton(tooltip: t('Website'), onPressed: () => _open('${c['website']}'), icon: Icon(Icons.language_rounded, color: p.muted)),
-            IconButton(tooltip: t('Call'), onPressed: () => _open('tel:+91${c['phone']}'), icon: const Icon(Icons.call_rounded, color: Color(0xFF1E9E5A))),
-            IconButton(tooltip: 'WhatsApp', onPressed: () => _open('https://wa.me/91${c['phone']}'), icon: const WhatsAppIcon(size: 24)),
-          ]),
         ),
     ];
+  }
+
+  /// The hits in the order chosen with the sort chips ([merged]: already in the recommended order).
+  List<_Hit> _sorted(List<_Hit> l, {bool merged = false}) {
+    final o = [...l];
+    switch (_sort) {
+      case 'near':
+        o.sort((a, b) => a.dist.compareTo(b.dist));
+      case 'shared':
+        o.sort((a, b) => b.shared != a.shared ? b.shared.compareTo(a.shared) : a.dist.compareTo(b.dist));
+      case 'rated':
+        o.sort((a, b) => b.rating != a.rating ? b.rating.compareTo(a.rating) : b.reviews != a.reviews ? b.reviews.compareTo(a.reviews) : a.dist.compareTo(b.dist));
+    }
+    return o;
+  }
+
+  Widget _sortBar(Pal p) {
+    const opts = [('rec', 'Recommended'), ('near', 'Nearest'), ('shared', 'Shared by many'), ('rated', 'Top rated')];
+    return SizedBox(
+      height: 44,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.only(top: 6, bottom: 4),
+        children: [
+          for (final (k, label) in opts)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: () => setState(() => _sort = k),
+                child: Container(
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    gradient: _sort == k ? kGoldGradient : null,
+                    borderRadius: BorderRadius.circular(16),
+                    border: _sort == k ? null : Border.all(color: p.border),
+                  ),
+                  child: Text(t(label), style: TextStyle(fontSize: 13, fontWeight: _sort == k ? FontWeight.w800 : FontWeight.w600, color: _sort == k ? const Color(0xFF3d3500) : p.muted)),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Ask AI's pages and the service contacts as one list under one heading, nearest first where both know the distance.
+  List<Widget> _resultsSection(Pal p, List<Map> matches, Map<String, String> saved, List<_Entry> mine) {
+    final svc = _serviceItems(p, mine);
+    // the contacts saved on this phone look the same as the rest, at the top of the one list
+    final own = [for (final e in mine.take(30)) _row(p, e)];
+    if (_q.text.trim().length < 4) {
+      if (own.isEmpty && svc.isEmpty) return const [];
+      return [_label(p, t(own.isNotEmpty ? 'In your contacts' : 'Service contacts')), ...own, for (final s in _sorted(svc)) s.w];
+    }
+    return _aiSection(p, matches, saved, svc, own);
   }
 
   /// What is missing before the directory is whole: contacts not allowed yet, or never matched to pages.
@@ -1030,7 +1514,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
       );
 
   /// What Ask AI found for the search: looking, the pages with why each fits, or that none fits yet.
-  List<Widget> _aiSection(Pal p, List<Map> matches, Map<String, String> saved) {
+  List<Widget> _aiSection(Pal p, List<Map> matches, Map<String, String> saved, [List<_Hit> svc = const [], List<Widget> own = const []]) {
     final q = _q.text.trim();
     if (q.length < 4) return const [];
     // nearest first: from the place named, from where you are, or a tap to allow location
@@ -1069,20 +1553,36 @@ class _PhonebookHomeState extends State<PhonebookHome> {
             Expanded(child: Text(_aiFor == q ? t('Looking for who can help…') : t('Press search to ask AI who can help'), style: TextStyle(color: p.muted))),
           ]),
         ),
+        ...own,
+        for (final s in svc) s.w,
       ];
     }
-    if (matches.isEmpty) return [head, Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(t('No page fits this yet.'), style: TextStyle(color: p.muted)))];
-    return [
-      head,
-      for (final m in matches) _row(p, _Entry(saved['${m['uid']}'] ?? _memberName(m), null, m), why: '${m['why'] ?? ''}'),
+    if (matches.isEmpty && svc.isEmpty) return [if (own.isNotEmpty) ...[_label(p, t('In your contacts')), ...own], head, Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(t('No page fits this yet.'), style: TextStyle(color: p.muted)))];
+    // one list: the pages and the service contacts, nearest first (a page with no distance keeps its place at the top)
+    final pages = [
+      for (final m in matches)
+        _Hit(
+          (m['distanceM'] as num?)?.toDouble() ?? 0.0,
+          (m['distanceM'] as num?)?.toDouble() ?? (ApproxDistance.km(_base, '${m['location'] ?? ''}') ?? double.infinity / 1000) * 1000,
+          0,
+          (m['rating'] as num?)?.toDouble() ?? 0,
+          (m['reviews'] as num?)?.toInt() ?? 0,
+          _row(p, _Entry(saved['${m['uid']}'] ?? _memberName(m), null, m), why: '${m['why'] ?? ''}'),
+        ),
     ];
+    final mixed = <_Hit>[];
+    var i = 0, j = 0;
+    while (i < pages.length || j < svc.length) {
+      mixed.add(j >= svc.length || (i < pages.length && pages[i].d <= svc[j].d) ? pages[i++] : svc[j++]);
+    }
+    return [head, if (mixed.length >= 2) _sortBar(p), ...own, for (final h in _sorted(mixed, merged: true)) h.w];
   }
 
   Widget _row(Pal p, _Entry e, {String? why}) {
     final m = e.member;
     final who = m == null ? '' : _memberName(m);
     final d = (m?['distanceM'] as num?)?.toDouble();
-    final away = d == null ? '' : (d < 1000 ? t('under 1 km') : t('{n} km', {'n': (d / 1000).toStringAsFixed(d < 10000 ? 1 : 0)}));
+    final away = d == null ? ApproxDistance.label(ApproxDistance.km(_base, '${m?['location'] ?? ''}')) : (d < 1000 ? t('under 1 km') : t('{n} km', {'n': (d / 1000).toStringAsFixed(d < 10000 ? 1 : 0)}));
     final sub = m == null
         ? [e.org, e.phone ?? ''].where((s) => s.isNotEmpty).join(' · ')
         : [if (who != e.name) who, '${m['category'] ?? ''}', '${m['location'] ?? ''}', away].where((s) => s.isNotEmpty).join(' · ');
@@ -1090,7 +1590,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     final rating = (m?['rating'] as num?)?.toDouble() ?? 0;
     final level = (m?['verificationLevel'] as num?)?.toInt() ?? 0;
     return InkWell(
-      onTap: () => m != null ? Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: '${m['handle']}'))) : _contactSheet(e),
+      onTap: () => m != null ? Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: '${m['handle']}'))) : _contactSheet(e),
       child: Container(
         constraints: BoxConstraints(minHeight: _rowH, maxHeight: why == null || why.isEmpty ? _rowH : double.infinity),
         padding: EdgeInsets.symmetric(vertical: why == null || why.isEmpty ? 0 : 8),
@@ -1117,6 +1617,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
               Row(children: [
                 Flexible(child: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: m != null ? FontWeight.w700 : FontWeight.w500))),
                 if (level > 0) ...[const SizedBox(width: 4), VerifiedBadge(level: level, size: 14)],
+                if (reviews > 0) ...[const SizedBox(width: 6), Text('★ ${rating.toStringAsFixed(1)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.tagText))],
               ]),
               if (sub.isNotEmpty) Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
               if (why != null && why.isNotEmpty)
@@ -1130,11 +1631,6 @@ class _PhonebookHomeState extends State<PhonebookHome> {
                 ),
             ]),
           ),
-          if (reviews > 0)
-            Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Stars(value: rating, size: 11),
-              Text('${rating.toStringAsFixed(1)} · $reviews', style: TextStyle(fontSize: 11, color: p.muted)),
-            ]),
         ]),
       ),
     );
@@ -1274,7 +1770,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     final tint = kCardColors[cardColorOf(a)]!;
     final meta = [a.locationPref ?? '', askTimeLeft(a) ?? ''].where((s) => s.isNotEmpty).join(' · ');
     return InkWell(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: a.id))),
+      onTap: () => Navigator.push(context, WideRoute(builder: (_) => PostDetailScreen(postId: a.id))),
       borderRadius: BorderRadius.circular(18),
       child: Container(
         width: vertical ? null : 236,
@@ -1306,7 +1802,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     final avg = (_mine?['avg'] as num?)?.toDouble() ?? 0;
     final ask = '${t('Thank you for your business! Could you review {name} on WEBWEB? It takes a minute:', {'name': name})} https://webweb.ai/@$handle#reviews';
     return InkWell(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle))),
+      onTap: () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: handle))),
       borderRadius: BorderRadius.circular(18),
       child: Container(
         padding: const EdgeInsets.all(12),
@@ -1396,6 +1892,15 @@ class _GlowBorderState extends State<_GlowBorder> with SingleTickerProviderState
 /// the search icon of the top bar: open the Directory with its search box ready to type in
 final directoryFocus = ValueNotifier<int>(0);
 
+/// The island's Speak button (shown on the Find page): [directorySpeak] is tapped; the page clears its box and bumps
+/// [directoryVoice], which its microphone listens to. [directoryBusy]: a search is running (the ring round the button turns).
+final directorySpeak = ValueNotifier<int>(0);
+final directoryVoice = ValueNotifier<int>(0);
+final directoryBusy = ValueNotifier<bool>(false);
+
+/// The loudness of the member's voice, 0..1, while the microphone listens (-1 when it does not): the ring round the Find button follows it.
+final directoryLevel = ValueNotifier<double>(-1);
+
 final directoryRequest = ValueNotifier<({String q, String place, ({double lat, double lng})? at, int n})?>(null);
 
 /// The microphone of a search: asks for the microphone first, then listens in the app's language (Konkani is heard as
@@ -1471,7 +1976,9 @@ class AiSearchField extends StatelessWidget {
 
 class MicButton extends StatefulWidget {
   final void Function(String words, bool done) onWords;
-  const MicButton({super.key, required this.onWords});
+  /// the island's Speak button starts this one (the box of the Find page)
+  final bool island;
+  const MicButton({super.key, required this.onWords, this.island = false});
   @override
   State<MicButton> createState() => _MicButtonState();
 }
@@ -1481,7 +1988,18 @@ class _MicButtonState extends State<MicButton> {
   bool _listening = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.island) directoryVoice.addListener(_fromIsland);
+  }
+
+  void _fromIsland() {
+    if (mounted) _toggle();
+  }
+
+  @override
   void dispose() {
+    directoryVoice.removeListener(_fromIsland);
     _speech.cancel();
     super.dispose();
   }
@@ -1489,6 +2007,7 @@ class _MicButtonState extends State<MicButton> {
   Future<void> _toggle() async {
     if (_listening) {
       await _speech.stop();
+      directoryLevel.value = -1;
       if (mounted) setState(() => _listening = false);
       return;
     }
@@ -1496,9 +2015,11 @@ class _MicButtonState extends State<MicButton> {
     if (!ok || !mounted) return;
     final ready = await _speech.initialize(onStatus: (s) {
       if (s == 'done' || s == 'notListening') {
+        directoryLevel.value = -1;
         if (mounted) setState(() => _listening = false);
       }
     }, onError: (_) {
+      directoryLevel.value = -1;
       if (mounted) {
         setState(() => _listening = false);
         toast(context, t('Could not hear that. Try again.'), error: true);
@@ -1507,11 +2028,20 @@ class _MicButtonState extends State<MicButton> {
     if (!ready || !mounted) return;
     final loc = switch (currentLang) { 'hi' || 'kok' => 'hi_IN', 'mr' => 'mr_IN', 'gu' => 'gu_IN', _ => 'en_IN' };
     setState(() => _listening = true);
+    directoryLevel.value = 0;
     await _speech.listen(
+      onSoundLevelChange: (db) {
+        // about -2 (quiet) to 10 (loud) dB on both platforms, eased so the ring does not flicker
+        final v = ((db + 2) / 12).clamp(0.0, 1.0);
+        directoryLevel.value = v > directoryLevel.value ? v : directoryLevel.value * 0.8 + v * 0.2;
+      },
       listenOptions: SpeechListenOptions(partialResults: true, listenMode: ListenMode.search, localeId: loc),
       onResult: (r) {
         widget.onWords(r.recognizedWords, r.finalResult);
-        if (r.finalResult && mounted) setState(() => _listening = false);
+        if (r.finalResult) {
+          directoryLevel.value = -1;
+          if (mounted) setState(() => _listening = false);
+        }
       },
     );
   }

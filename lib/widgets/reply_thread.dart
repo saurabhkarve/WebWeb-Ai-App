@@ -331,7 +331,7 @@ class _ThreadReplyState extends State<_ThreadReply> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final c = widget.c;
-    void profile() => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: c.handle)));
+    void profile() => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: c.handle)));
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       GestureDetector(onTap: profile, child: Avatar(name: c.display, photoUrl: c.photoUrl, size: 24, uid: c.uid)),
       const SizedBox(width: 8),
@@ -394,7 +394,7 @@ class _RequestShareState extends State<RequestShare> {
 
   void _openChat() {
     if (_chatId == null || widget.peer == null) return;
-    Navigator.push(context, MaterialPageRoute(builder: (_) => ChatThread(chatId: _chatId!, peer: widget.peer!)));
+    Navigator.push(context, WideRoute(builder: (_) => ChatThread(chatId: _chatId!, peer: widget.peer!)));
   }
 
   @override

@@ -533,7 +533,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         label: t('Manage products & services'),
                         outlined: true,
                         height: 40,
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogScreen())),
+                        onPressed: () => Navigator.push(context, WideRoute(builder: (_) => const CatalogScreen())),
                       ),
                     ),
                   ],

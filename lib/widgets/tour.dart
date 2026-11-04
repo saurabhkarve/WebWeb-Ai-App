@@ -33,16 +33,17 @@ const kConnectTour = [
 
 /// The Smart Phonebook tour: three picture cards for the idea (search, AI adds the facts, call or chat), one more for
 /// business owners, then a spotlight on the tabs. Same wording as the website's hero, so the translations are shared.
-const kPhonebookTourId = 'pbtour1';
+const kPhonebookTourId = 'pbtour2';
 List<TourStep> phonebookTour({required bool business}) => [
-      const TourStep('Search anyone near you', 'Type a person, business, product or service. Your phonebook finds the right ones nearby.', null, 'pb-search'),
+      const TourStep('Find anyone, by typing or speaking', 'Type or tap the mic and say a person, business, product or service. Your phonebook finds the right ones nearby.', null, 'pb-search'),
       const TourStep('AI adds the facts', 'A plain name and number becomes a page with ratings, distance, services and reviews from people you know.', null, 'pb-facts'),
+      const TourStep('Sort the way you like', 'Recommended, Nearest, Shared by many or Top rated. One tap re-orders the results.', null, 'pb-sort'),
       const TourStep('Call, chat, connect', 'Open a page and call or chat in one tap. Your number is shared only if you choose.', null, 'pb-connect'),
       if (business) const TourStep('Your business page is free', 'You get a page and a website at webweb.ai/@yourname. Customers find you, and you reply from this app.', null, 'pb-business'),
-      const TourStep('Your phonebook', 'Your contacts live here, now with facts added by AI. Search for anything.', 'nav-contacts'),
-      const TourStep('Nearby', 'See members within 50 km on a map, closest first.', 'nav-find'),
-      const TourStep('Talk', 'Chats and calls with customers and businesses.', 'nav-talk'),
-      const TourStep('Notifications', 'Replies, reviews and recommendations arrive here.', 'nav-notes'),
+      const TourStep('Updates and your week', 'Daily updates from people you know. The circle at the front is your week, gold until you have seen it.', 'updates'),
+      const TourStep('Refer', 'Recommend trusted contacts to people who need them.', 'nav-feed'),
+      const TourStep('Find and Speak', 'Tap Find to search your phonebook. On the Find page the button turns into Speak: tap it and say what you need.', 'nav-contacts'),
+      const TourStep('Talk', 'Chats and voice or video calls with customers and businesses.', 'nav-talk'),
       const TourStep('Your account and this tour', 'Manage your page and settings here, and replay this tour any time.', 'account'),
     ];
 
@@ -583,6 +584,7 @@ class PbTourVisualState extends State<PbTourVisual> {
     final body = switch (widget.kind) {
       'pb-search' => _search(p),
       'pb-facts' => _facts(p),
+      'pb-sort' => _sort(p),
       'pb-connect' => _connect(p),
       _ => _business(p),
     };
@@ -675,6 +677,52 @@ class PbTourVisualState extends State<PbTourVisual> {
         ),
       ),
     );
+  }
+
+  static const _sorts = ['Recommended', 'Nearest', 'Shared by many', 'Top rated'];
+
+  /// the sort chips, one lit at a time, and the first result changing with it
+  Widget _sort(Pal p) {
+    final k = _n % 4;
+    const rows = [
+      ('Ravi Electricals ✓', '★ 4.8 · 1.2 km'),
+      ('Shree Electricals', '★ 4.4 · 0.4 km'),
+      ('Om Power Works ✓', '★ 4.6 · 2.1 km · 9 contacts'),
+      ('Patil Electric ✓', '★ 4.9 · 3.0 km'),
+    ];
+    return Column(children: [
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        child: Row(children: [
+          for (var i = 0; i < 4; i++)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(gradient: i == k ? kGoldGradient : null, color: i == k ? null : p.canvas.withValues(alpha: .7), borderRadius: BorderRadius.circular(99)),
+              child: Text(t(_sorts[i]), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: i == k ? kInk : p.muted)),
+            ),
+        ]),
+      ),
+      const SizedBox(height: 8),
+      _swap(
+        k,
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(12)),
+          child: Row(children: [
+            Container(width: 36, height: 36, alignment: Alignment.center, decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(11)), child: Text(rows[k].$1[0], style: const TextStyle(fontWeight: FontWeight.w800, color: kInk))),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(rows[k].$1, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+              Text(rows[k].$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+            ])),
+          ]),
+        ),
+      ),
+    ]);
   }
 
   /// a result with Call and Chat, one then the other lit

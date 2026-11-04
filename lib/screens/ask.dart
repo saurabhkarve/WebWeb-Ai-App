@@ -855,7 +855,7 @@ class _AskFormState extends State<_AskForm> {
         _open = null;
       });
       widget.onPosted();
-      Navigator.push(context, MaterialPageRoute(builder: (_) => PostDetailScreen(postId: '${r['id']}')));
+      Navigator.push(context, WideRoute(builder: (_) => PostDetailScreen(postId: '${r['id']}')));
     } catch (e) {
       if (mounted) setState(() => _error = e is ApiException && e.status == 429 ? t('You can share one link a day. Try again later.') : t(_editing ? 'Could not save your changes. Please try again.' : 'Could not publish your post. Please try again.'));
     } finally {

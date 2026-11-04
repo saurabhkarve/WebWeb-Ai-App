@@ -122,7 +122,7 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
     if (handle.isEmpty) return;
     setState(() => _away = true);
     _syncPause();
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: handle)));
+    await Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: handle)));
     if (!mounted) return;
     _away = false;
     _syncPause();
@@ -309,7 +309,7 @@ class _StoryViewerState extends State<StoryViewer> with SingleTickerProviderStat
                 final v = viewers[k];
                 final name = displayName('${v['userType']}', '${v['name']}', '${v['company'] ?? ''}');
                 return InkWell(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: '${v['handle']}'))),
+                  onTap: () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: '${v['handle']}'))),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: k == 0 ? null : BoxDecoration(border: Border(top: BorderSide(color: p.border))),

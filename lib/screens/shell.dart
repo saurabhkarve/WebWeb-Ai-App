@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -23,7 +24,6 @@ import '../widgets/notify_banner.dart';
 import '../widgets/tour.dart';
 import 'ask.dart';
 import 'connect.dart';
-import 'favourites.dart';
 import 'edit_profile.dart';
 import 'find.dart';
 import 'leads.dart';
@@ -37,9 +37,12 @@ import 'support_sheet.dart';
 import 'talk.dart';
 import 'your_asks.dart' show yourAsksRequest;
 
+/// The WEBWEB logo's own disc gradient (the Find button and its rail item wear it).
+const _logoGradient = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFFE84D), Color(0xFFFFB800)]);
+
 /// Signed-in chrome, same as the web on phones (app-frame.tsx): the slim header (logo, bell, your
 /// avatar with the account menu) and the bar with the five places.
-/// The header always stays in view (the web hides it on scroll only on small screens).
+/// The header always stays in view; it shrinks to a slimmer bar while a page is scrolled down.
 class Shell extends StatefulWidget {
   const Shell({super.key});
   @override
@@ -60,13 +63,27 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   // calls and pages opened lately) is in the account menu. All five use the WebWeb icon set.
   // From 600 px wide (tablets, desktop) the bar becomes a rail down the left, and pages keep a
   // readable width; from 1200 px the rail shows its labels beside the icons.
-  static const _items = [(WI.home, 'Home'), (WI.pin, 'Nearby'), (WI.directory, 'Directory'), (WI.talk, 'Talk'), (WI.bell, 'Notifications')];
-  static const _tourKeys = ['nav-feed', 'nav-find', 'nav-contacts', 'nav-talk', 'nav-notes'];
+  static const _items = [
+    (WI.refer, 'Refer'),
+    (WI.pin, 'Nearby'),
+    (WI.directory, 'Find'),
+    (WI.talk, 'Talk'),
+    (WI.bell, 'Notifications')
+  ];
+  static const _tourKeys = [
+    'nav-feed',
+    'nav-find',
+    'nav-contacts',
+    'nav-talk',
+    'nav-notes'
+  ];
+
   /// how far the Contacts button rises above the bar
   static const _rise = 32.0;
   static const _feed = 0, _dir = 2, _talk = 3, _notesTab = 4, _ask = 5;
   static const _barH = 64.0;
   int _beforeAsk = _feed;
+
   /// the Directory's search page is open: it has its own Publish bar, so the bar and Ask step aside
   bool _dirSearch = false;
 
@@ -78,7 +95,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     _notes.addListener(_unreadChanged);
     _loadUnread();
     _notes.refresh(context.read<AuthProvider>());
-    _poll = Timer.periodic(const Duration(seconds: 30), (_) => _notes.refresh(context.read<AuthProvider>()));
+    _poll = Timer.periodic(const Duration(seconds: 30),
+        (_) => _notes.refresh(context.read<AuthProvider>()));
     _sub = context.read<RealtimeService>().events.listen((e) {
       if (e['type'] == 'msg' || e['type'] == 'read') _loadUnread();
       // a response or referral while the app is open: the bell's count updates at once, not at the next poll
@@ -88,7 +106,10 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     tourRequest.addListener(_replayTour);
     // the first-run tour (cards, then a spotlight on the tabs); the Home tour it replaces is retired with it
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) Tours.maybeShow(context, kPhonebookTourId, phonebookTour(business: _isBusiness()), retire: const [kConnectTourId]);
+      if (mounted)
+        Tours.maybeShow(
+            context, kPhonebookTourId, phonebookTour(business: _isBusiness()),
+            retire: const [kConnectTourId]);
     });
     // the phone's location and contacts count towards the profile's strength: read them now
     DevicePerms.i.refresh();
@@ -98,7 +119,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       final api = context.read<AuthProvider>().api;
       if (await ContactSync.isOn(api).catchError((_) => true)) {
         ContactSync.run(api);
-      } else if (await ContactSync.shouldInvite() && mounted && ModalRoute.of(context)?.isCurrent == true) {
+      } else if (await ContactSync.shouldInvite() &&
+          mounted &&
+          ModalRoute.of(context)?.isCurrent == true) {
         await ContactSync.markInvited();
         if (mounted) showServiceContactsSheet(context, invite: true);
       }
@@ -111,7 +134,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       _loadUnread();
       DevicePerms.i.refresh();
       _notes.refresh(context.read<AuthProvider>());
-      ContactSync.run(context.read<AuthProvider>().api); // once a day at most, and only when it is on
+      ContactSync.run(context
+          .read<AuthProvider>()
+          .api); // once a day at most, and only when it is on
     }
   }
 
@@ -144,20 +169,28 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  bool _isBusiness() => context.read<AuthProvider>().profile?.isEntrepreneur ?? false;
+  bool _isBusiness() =>
+      context.read<AuthProvider>().profile?.isEntrepreneur ?? false;
 
   /// "Take the app tour" from the account menu: the Smart Phonebook tour, from its first card.
   void _replayTour() {
     if (!mounted) return;
-    Tours.start(context, kPhonebookTourId, phonebookTour(business: _isBusiness()));
+    Tours.start(
+        context, kPhonebookTourId, phonebookTour(business: _isBusiness()));
   }
 
   void _go(int k) {
     if (k == _ask && _i != _ask) _beforeAsk = _i;
     if (k != _i) HapticFeedback.selectionClick();
-    if (k == _i && k == _feed) _topTick++; // tapping Home again scrolls the feed to the top
+    if (k == _i && k == _feed)
+      _topTick++; // tapping Home again scrolls the feed to the top
     if (k == _notesTab) _notes.refresh(context.read<AuthProvider>());
-    setState(() => _i = k);
+    // tapping Find while it is open puts the cursor in its search box
+    if (k == _dir && _i == _dir) directoryFocus.value++;
+    setState(() {
+      _i = k;
+      _barHidden = false;
+    });
   }
 
   @override
@@ -171,13 +204,18 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     const sheetW = 600.0;
     final side = wide ? (w - sheetW) / 2 : 0.0;
     final top = wide ? 0.0 : MediaQuery.of(context).padding.top;
-    final header = wide ? 0.0 : 56.0;
+    final header = wide ? 0.0 : 64.0;
     final bottom = MediaQuery.of(context).padding.bottom;
     final bar = _i != _ask;
     final rail = wide;
-    final backdrop = p.dark ? const Color(0xFF0B0B0B) : const HSLColor.fromAHSL(1, 43, .26, .93).toColor();
+    final backdrop = p.dark
+        ? const Color(0xFF0B0B0B)
+        : const HSLColor.fromAHSL(1, 43, .26, .93).toColor();
     // the bar steps aside while the keyboard is up, so what is typed has the room (the Directory's search)
-    final bottomBar = bar && !rail && MediaQuery.viewInsetsOf(context).bottom == 0 && !(_i == _dir && _dirSearch);
+    final bottomBar = bar &&
+        !rail &&
+        MediaQuery.viewInsetsOf(context).bottom == 0 &&
+        !(_i == _dir && _dirSearch);
     // without the bar on Ask, back returns to the tab it was opened from
     return PopScope(
       canPop: _i != _ask,
@@ -185,113 +223,256 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         if (!didPop && _i == _ask) _go(_beforeAsk);
       },
       child: Scaffold(
-      backgroundColor: wide ? backdrop : null,
-      // stretch + expand: the page area is always the full width. With a loose width, a Stack whose only unpositioned child
-      // is the empty banner host (SizedBox.shrink) sized itself 0 wide, and every page in it was laid out 0 wide: a blank screen
-      body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const ActiveCallBanner(),
-        Expanded(
-          child: Stack(fit: StackFit.expand, children: [
-            // pages, below the header; on wide screens the raised sheet in the middle
-            Positioned(
-              left: wide ? side : 0,
-              right: wide ? side : 0,
-              top: 0,
-              bottom: 0,
-              child: wide
-                  ? Container(
-                      clipBehavior: Clip.antiAlias,
-                      decoration: BoxDecoration(
-                        color: p.canvas,
-                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: p.dark ? .6 : .14), blurRadius: 32, spreadRadius: -14, offset: const Offset(0, 12))],
-                      ),
-                      child: Stack(children: [
-                        Positioned.fill(child: _pages(context, top, header, bottomBar, bottom, wide, sheetW)),
-                        // a gold strip with a soft glow along the top of the sheet, on Home only
-                        if (_i == _feed) Positioned(top: 0, left: 0, right: 0, height: 4, child: IgnorePointer(child: Container(decoration: BoxDecoration(gradient: kGoldGradient, boxShadow: [BoxShadow(color: const Color(0xFFFFC700).withValues(alpha: .55), blurRadius: 10, offset: const Offset(0, 2))])))),
-                      ]),
-                    )
-                  : _pages(context, top, header, bottomBar, bottom, wide, sheetW),
-            ),
-            // header (status bar band + 56 px bar), always in view
-            if (!wide)
+        backgroundColor: wide ? backdrop : null,
+        // stretch + expand: the page area is always the full width. With a loose width, a Stack whose only unpositioned child
+        // is the empty banner host (SizedBox.shrink) sized itself 0 wide, and every page in it was laid out 0 wide: a blank screen
+        body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const ActiveCallBanner(),
+          Expanded(
+            child: Stack(fit: StackFit.expand, children: [
+              // pages, below the header; on wide screens the raised sheet in the middle
               Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: _AppHeader(onHome: () => _go(_dir), onSearch: () {
-                  _go(_dir);
-                  directoryFocus.value++;
-                }),
-              ),
-            // "Waiting for network…" / "Connecting…" under the header, WhatsApp-style
-            Positioned(top: top + header + 8, left: 0, right: 0, child: const ConnectionPill()),
-            // a message or a new ask while the app is open: a banner with Reply (and Refer) right on it
-            const NotifyBannerHost(),
-            // the bar along the bottom, Contacts raised in the middle; Ask has its own Publish bar instead
-            if (bottomBar) Positioned(left: 0, right: 0, bottom: 0, height: _barH + bottom + _rise, child: _bar(p, bottom)),
-            // tablets and desktop: the rail down the left, under the header
-            if (rail)
-              Positioned(
-                left: 0,
+                left: wide ? side : 0,
+                right: wide ? side : 0,
                 top: 0,
                 bottom: 0,
-                width: side,
-                child: Align(alignment: Alignment.centerRight, child: SizedBox(width: (labels ? 264.0 : 84.0).clamp(0.0, side), child: _rail(p, labels))),
+                child: wide
+                    ? Container(
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: p.canvas,
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black
+                                    .withValues(alpha: p.dark ? .6 : .14),
+                                blurRadius: 32,
+                                spreadRadius: -14,
+                                offset: const Offset(0, 12))
+                          ],
+                        ),
+                        child: Stack(children: [
+                          Positioned.fill(
+                              child: _pages(context, top, header, bottomBar,
+                                  bottom, wide, sheetW)),
+                        ]),
+                      )
+                    : _pages(
+                        context, top, header, bottomBar, bottom, wide, sheetW),
               ),
-            // from 1280 px the column on the right, as on the website
-            if (labels) Positioned(left: side + sheetW, top: 0, bottom: 0, width: side.clamp(0.0, 320.0), child: _rightRail(p)),
-          ]),
-        ),
-      ]),
+              // header (status bar band + 56 px bar), always in view
+              if (!wide)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: _AppHeader(onHome: () => _go(_dir), compact: _barHidden),
+                ),
+              // "Waiting for network…" / "Connecting…" under the header, WhatsApp-style
+              Positioned(
+                  top: top + header + 8,
+                  left: 0,
+                  right: 0,
+                  child: const ConnectionPill()),
+              // a message or a new ask while the app is open: a banner with Reply (and Refer) right on it
+              const NotifyBannerHost(),
+              // the bar along the bottom, Contacts raised in the middle; Ask has its own Publish bar instead
+              if (bottomBar)
+                Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: _barH + bottom + _rise,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(end: _barHidden ? 1.0 : 0.0),
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, c, _) => _bar(p, bottom, c),
+                    )),
+              // tablets and desktop: the rail down the left, under the header
+              if (rail)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: side,
+                  child: Align(
+                      alignment: Alignment.centerRight,
+                      child: SizedBox(
+                          width: (labels ? 264.0 : 84.0).clamp(0.0, side),
+                          child: _rail(p, labels))),
+                ),
+              // from 1280 px the column on the right, as on the website
+              if (labels)
+                Positioned(
+                    left: side + sheetW,
+                    top: 0,
+                    bottom: 0,
+                    width: side.clamp(0.0, 320.0),
+                    child: _rightRail(p)),
+            ]),
+          ),
+        ]),
       ),
     );
   }
 
+  // the island shrinks to a short pill (icons only) while a page is scrolled down and grows back as soon as it is scrolled up (or a tab changes)
+  bool _barHidden = false;
+  // A real run of scrolling (24 px) one way is needed to change, nothing counts for 400 ms after a change (the shrinking
+  // itself moves things), and the rubber band at either end is ignored: together they stop it bouncing.
+  double _scrollRun = 0;
+  DateTime _scrollQuiet = DateTime.fromMillisecondsSinceEpoch(0);
+
+  void _setBarHidden(bool v) {
+    _scrollRun = 0;
+    _scrollQuiet = DateTime.now().add(const Duration(milliseconds: 400));
+    if (_barHidden != v) setState(() => _barHidden = v);
+  }
+
+  bool _onPageScroll(ScrollNotification n) {
+    if (n.depth != 0 || n.metrics.axis != Axis.vertical || n is! ScrollUpdateNotification) return false;
+    final m = n.metrics;
+    if (DateTime.now().isBefore(_scrollQuiet)) return false;
+    if (m.pixels < 0 || m.pixels > m.maxScrollExtent) return false; // rubber band
+    if (m.pixels <= 40) {
+      if (_barHidden) _setBarHidden(false);
+      return false;
+    }
+    final dy = n.scrollDelta ?? 0;
+    _scrollRun = (dy.sign == _scrollRun.sign || _scrollRun == 0) ? _scrollRun + dy : dy;
+    if (!_barHidden && _scrollRun > 24 && m.pixels > 120) {
+      _setBarHidden(true);
+    } else if (_barHidden && _scrollRun < -24) {
+      _setBarHidden(false);
+    }
+    return false;
+  }
+
+  double _swipeDx = 0;
+
+  /// On phones a swipe left or right changes tab (Refer, Find, Talk). Anything inside that scrolls sideways (an ask's
+  /// cards, the circles, the chips and category rows) takes the swipe first, because the nearest drag wins; only a swipe
+  /// that starts on plain page comes here.
+  Widget _swipeTabs(bool phone, Widget child) {
+    const order = [_feed, _dir, _talk];
+    final at = order.indexOf(_i);
+    if (!phone || at < 0 || _dirSearch) return child;
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: (_) => _swipeDx = 0,
+      onHorizontalDragUpdate: (d) => _swipeDx += d.delta.dx,
+      onHorizontalDragEnd: (d) {
+        // a flick (60 px and quick) or a long slow drag (100 px) counts
+        final v = d.primaryVelocity ?? 0;
+        final far = _swipeDx.abs() >= 100;
+        if (!far && (_swipeDx.abs() < 60 || v.abs() < 250)) return;
+        final to = at + (_swipeDx < 0 ? 1 : -1);
+        if (to >= 0 && to < order.length) _go(order[to]);
+      },
+      child: child,
+    );
+  }
+
   /// The five pages, kept alive in an IndexedStack. On the raised sheet (wide screens) every page is the sheet's 600 px.
-  Widget _pages(BuildContext context, double top, double header, bool bottomBar, double bottom, bool wide, double sheetW) {
+  Widget _pages(BuildContext context, double top, double header, bool bottomBar,
+      double bottom, bool wide, double sheetW) {
     double m(double phone) => wide ? sheetW : phone;
+    final pad = MediaQuery.paddingOf(context);
     return Padding(
-      padding: EdgeInsets.only(top: top + header, bottom: bottomBar ? _barH + bottom + 8 : 0),
-      child: MediaQuery.removePadding(
-        context: context,
-        removeTop: true,
-        removeBottom: bottomBar,
+      padding: EdgeInsets.only(top: top + header),
+      // the page runs to the bottom of the screen, behind the floating island; its lists pad their own ends by
+      // islandSpace() so the last item can be scrolled clear of it
+      child: NotificationListener<ScrollNotification>(
+          onNotification: _onPageScroll,
+          child: _swipeTabs(
+          bottomBar,
+          MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+            padding: pad.copyWith(top: 0, bottom: bottomBar ? 0 : pad.bottom)),
         child: IndexedStack(index: _i, children: [
-          _fit(ConnectScreen(refreshTick: _feedTick, topTick: _topTick, onGoAsk: () => _go(_ask), active: _i == _feed), m(680)),
-          _fit(const FindScreen(), m(900)),
-          _fit(PhonebookHome(active: _i == _dir, onAsk: () => _go(_ask), onSeeAsks: () => _go(_feed), onPosted: () => setState(() => _feedTick++), onSearching: (on) => setState(() => _dirSearch = on)), m(1240)),
-          // Talk loads afresh each time it opens
-          if (_i == _talk) _fit(const TalkScreen(), m(900)) else const SizedBox.shrink(),
-          _fit(_NotesPanel(notes: _notes, page: true, onAsk: () => _go(_ask)), m(760)),
           _fit(
-              AskScreen(active: _i == _ask, onBack: () => _go(_beforeAsk), onPosted: () => setState(() {
-                    _feedTick++;
-                    _i = _feed;
-                  })),
+              ConnectScreen(
+                  refreshTick: _feedTick,
+                  topTick: _topTick,
+                  onGoAsk: () => _go(_ask),
+                  active: _i == _feed),
+              m(680)),
+          _fit(const FindScreen(), m(900)),
+          _fit(
+              PhonebookHome(
+                  active: _i == _dir,
+                  onAsk: () => _go(_ask),
+                  onSeeAsks: () => _go(_feed),
+                  onPosted: () => setState(() => _feedTick++),
+                  onSearching: (on) => setState(() => _dirSearch = on)),
+              m(1240)),
+          // Talk loads afresh each time it opens
+          if (_i == _talk)
+            _fit(const TalkScreen(), m(900))
+          else
+            const SizedBox.shrink(),
+          _fit(_NotesPanel(notes: _notes, page: true, onAsk: () => _go(_ask)),
+              m(760)),
+          _fit(
+              AskScreen(
+                  active: _i == _ask,
+                  onBack: () => _go(_beforeAsk),
+                  onPosted: () => setState(() {
+                        _feedTick++;
+                        _i = _feed;
+                      })),
               m(760)),
         ]),
-      ),
+      ))),
     );
   }
 
   /// Wide screens (1280 px and up), as the website's right column: a search, the ask prompt and the shortcuts.
   Widget _rightRail(Pal p) {
     final me = context.watch<AuthProvider>().profile;
-    BoxDecoration card() => BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(16), boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 18, offset: Offset(0, 6))]);
-    void sub(String title, Widget body) => Navigator.push(context, MaterialPageRoute(builder: (_) => SubPage(title: t(title), body: body)));
+    BoxDecoration card() => BoxDecoration(
+            color: p.card,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x141E1E1E),
+                  blurRadius: 18,
+                  offset: Offset(0, 6))
+            ]);
+    void sub(String title, Widget body) => Navigator.push(context,
+        WideRoute(builder: (_) => SubPage(title: t(title), body: body)));
     final links = <(String, VoidCallback)>[
-      if (me != null) ('Your public page', () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: me.handle)))),
-      ('Your asks', () {
-        yourAsksRequest.value = true;
-        _go(_ask);
-      }),
+      if (me != null)
+        (
+          'Your public page',
+          () => Navigator.push(context,
+              WideRoute(builder: (_) => ProfileScreen(handle: me.handle)))
+        ),
+      (
+        'Your asks',
+        () {
+          yourAsksRequest.value = true;
+          _go(_ask);
+        }
+      ),
       ('Leads for you', () => sub('Leads for you', const LeadsScreen())),
-      ('Today in your area', () => sub('Today in your area', const TodayScreen())),
+      (
+        'Today in your area',
+        () => sub('Today in your area', const TodayScreen())
+      ),
       ('Alerts', () => sub('Alerts', const AlertsScreen())),
       ('Your week', () => sub('Your week', const WeekScreen())),
-      ('Saved asks', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedPostsScreen()))),
-      if (me != null) ('Edit profile', () => Navigator.push(context, MaterialPageRoute(builder: (_) => EditProfileScreen(profile: me)))),
+      (
+        'Saved asks',
+        () => Navigator.push(
+            context, WideRoute(builder: (_) => const SavedPostsScreen()))
+      ),
+      if (me != null)
+        (
+          'Edit profile',
+          () => Navigator.push(context,
+              WideRoute(builder: (_) => EditProfileScreen(profile: me)))
+        ),
     ];
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 14, 0, 16),
@@ -302,10 +483,18 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         Container(
           padding: const EdgeInsets.all(18),
           decoration: card(),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [WIcon(WI.ask, size: 20, color: p.text), const SizedBox(width: 8), Text(t('Need something?'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))]),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              WIcon(WI.ask, size: 20, color: p.text),
+              const SizedBox(width: 8),
+              Text(t('Need something?'),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700))
+            ]),
             const SizedBox(height: 4),
-            Text(t('Post an ask and reach members across Navi Mumbai.'), style: TextStyle(fontSize: 13.5, height: 1.35, color: p.muted)),
+            Text(t('Post an ask and reach members across Navi Mumbai.'),
+                style: TextStyle(fontSize: 13.5, height: 1.35, color: p.muted)),
             const SizedBox(height: 14),
             InkWell(
               onTap: () => _go(_ask),
@@ -313,8 +502,14 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
               child: Container(
                 height: 40,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20)),
-                child: Text(t('Post an ask'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
+                decoration: BoxDecoration(
+                    gradient: kGoldGradient,
+                    borderRadius: BorderRadius.circular(20)),
+                child: Text(t('Post an ask'),
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: kInk)),
               ),
             ),
           ]),
@@ -323,13 +518,26 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: card(),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Padding(padding: const EdgeInsets.fromLTRB(8, 4, 8, 4), child: Text(t('Shortcuts').toUpperCase(), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .6, color: p.muted))),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+                child: Text(t('Shortcuts').toUpperCase(),
+                    style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: .6,
+                        color: p.muted))),
             for (final l in links)
               InkWell(
                 onTap: l.$2,
                 borderRadius: BorderRadius.circular(10),
-                child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10), child: Text(t(l.$1), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+                child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                    child: Text(t(l.$1),
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700))),
               ),
           ]),
         ),
@@ -345,39 +553,87 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         if (w == mq.size.width) return page;
         return Align(
           alignment: Alignment.topCenter,
-          child: SizedBox(width: w, height: c.maxHeight, child: MediaQuery(data: mq.copyWith(size: Size(w, mq.size.height)), child: page)),
+          child: SizedBox(
+              width: w,
+              height: c.maxHeight,
+              child: MediaQuery(
+                  data: mq.copyWith(size: Size(w, mq.size.height)),
+                  child: page)),
         );
       });
 
-  Widget _bar(Pal p, double bottom) => Stack(clipBehavior: Clip.none, children: [
+  Widget _bar(Pal p, double bottom, double c) {
+    // c: 0 = the full island, 1 = the short one (smaller, labels gone)
+    final h = _barH + (48 - _barH) * c;
+    final bb = bottom > 8 ? bottom - 4 : 8.0;
+    final btn = 64 + (48 - 64) * c;
+    final btnTop = (_barH + bottom + _rise) - bb - h + 8 - btn / 2;
+    return Stack(clipBehavior: Clip.none, children: [
         // the empty strip above the bar lets taps through to the page; only the raised button sits in it
         Positioned(
           left: 14,
           right: 14,
           bottom: bottom > 8 ? bottom - 4 : 8,
-          height: _barH,
-          child: Container(
-            // the floating island, as on the website: a rounded pill with a soft shadow, the page showing round it
-            decoration: BoxDecoration(
-              color: p.canvas.withValues(alpha: .94),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: p.border.withValues(alpha: .7)),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: p.dark ? .5 : .16), blurRadius: 26, spreadRadius: -6, offset: const Offset(0, 10))],
-            ),
-            child: Row(children: [
-              for (var k = 0; k < _items.length; k++)
-                Expanded(
-                  child: KeyedSubtree(
-                    key: k == _dir ? null : Tours.key(_tourKeys[k]),
-                    child: k == _dir ? _dirLabel(p) : _barItem(p, k, badge: _badgeOf(k)),
+          height: h,
+          child: Center(
+            // compact: 272 px at most, so the three places sit close together
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 272 - 48 * c),
+              child: SizedBox(
+                height: h,
+                child: Container(
+                  // the floating island, as on the website: a rounded pill with a soft shadow, the page showing round it
+                  decoration: BoxDecoration(
+                    // frosted glass: the page shows through, blurred, so text behind it never fights the labels
+                    color: p.canvas.withValues(alpha: p.dark ? .66 : .74),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                        color: p.dark
+                            ? Colors.white.withValues(alpha: .1)
+                            : Colors.white.withValues(alpha: .85),
+                        width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                          color:
+                              Colors.black.withValues(alpha: p.dark ? .5 : .16),
+                          blurRadius: 26,
+                          spreadRadius: -6,
+                          offset: const Offset(0, 10))
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(30),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                      child: Row(children: [
+                        for (final k in const [_feed, _dir, _talk])
+                          Expanded(
+                            child: KeyedSubtree(
+                              key: k == _dir ? null : Tours.key(_tourKeys[k]),
+                              child: k == _dir
+                                  ? _dirLabel(p, c)
+                                  : _barItem(p, k, c, badge: _badgeOf(k)),
+                            ),
+                          ),
+                      ]),
+                    ),
                   ),
                 ),
-            ]),
+              ),
+            ),
           ),
         ),
         // the bar floats higher on phones with a home indicator (iPhone 15...): the button comes down with it, so its gap to the label stays small
-        Positioned(top: bottom > 8 ? 12 : 0, left: 0, right: 0, child: Center(child: KeyedSubtree(key: Tours.key(_tourKeys[_dir]), child: _dirButton(p, 60)))),
-      ]);
+        Positioned(
+            top: btnTop,
+            left: 0,
+            right: 0,
+            child: Center(
+                child: KeyedSubtree(
+                    key: Tours.key(_tourKeys[_dir]),
+                    child: _dirButton(p, btn)))),
+    ]);
+  }
 
   /// Directory, the heart of the app: always the gold round button, raised in the middle of the bar.
   Widget _dirButton(Pal p, double size) {
@@ -385,44 +641,81 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     return Semantics(
       button: true,
       selected: active,
-      label: t(_items[_dir].$2),
+      label: t(active ? 'Speak' : _items[_dir].$2),
       child: GestureDetector(
-        onTap: () => _go(_dir),
+        // on the Find page the button is Speak: it starts the voice search
+        onTap: () => active ? directorySpeak.value++ : _go(_dir),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           width: size,
           height: size,
           decoration: BoxDecoration(
-            gradient: kGoldGradient,
+            // the logo's own disc gradient, ring of the page colour round it
+            gradient: _logoGradient,
             shape: BoxShape.circle,
             border: Border.all(color: p.canvas, width: 4),
-            boxShadow: [BoxShadow(color: const Color(0xFFD6AA00).withValues(alpha: active ? .55 : .35), blurRadius: active ? 18 : 12, spreadRadius: -4, offset: const Offset(0, 6))],
+            boxShadow: [
+              BoxShadow(
+                  color: const Color(0xFFE0A800)
+                      .withValues(alpha: active ? .6 : .4),
+                  blurRadius: active ? 20 : 14,
+                  spreadRadius: -3,
+                  offset: const Offset(0, 7)),
+              // a soft halo round the raised button while Find is open
+              if (active)
+                BoxShadow(
+                    color: kGold.withValues(alpha: .4),
+                    blurRadius: 24,
+                    spreadRadius: 4),
+            ],
           ),
-          child: Center(child: WIcon(_items[_dir].$1, color: kInk, size: size * .46, strokeWidth: active ? 2.2 : 2)),
+          // Find and Speak change into each other: the ring grows in round the gold and the icon turns into the microphone
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 420),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (w, a) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: .6, end: 1.0).animate(a), child: RotationTransition(turns: Tween(begin: -.08, end: 0.0).animate(a), child: w))),
+            child: active
+                ? _FindRing(key: const ValueKey('speak'), size: size - 8, icon: WIcon(WI.mic, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF8A6500), size: size * .5, strokeWidth: 2.3))
+                : Center(key: const ValueKey('find'), child: WIcon(_items[_dir].$1, color: const Color(0xFF3D3500), size: size * .5, strokeWidth: 2.2)),
+          ),
         ),
       ),
     );
   }
 
   /// the label under the raised button, in the bar
-  Widget _dirLabel(Pal p) {
+  Widget _dirLabel(Pal p, double c) {
     final active = _i == _dir;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => _go(_dir),
+      onTap: () => active ? directorySpeak.value++ : _go(_dir),
       child: ExcludeSemantics(
         child: Align(
           alignment: Alignment.bottomCenter,
-          child: Padding(
+          child: Opacity(
+            opacity: 1 - c,
+            child: Padding(
             padding: const EdgeInsets.only(bottom: 9),
-            child: FittedBox(fit: BoxFit.scaleDown, child: Text(t(_items[_dir].$2), maxLines: 1, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: active ? p.text : p.muted))),
-          ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              transitionBuilder: (w, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, .4), end: Offset.zero).animate(a), child: w)),
+              child: FittedBox(
+                key: ValueKey(active),
+                fit: BoxFit.scaleDown,
+                child: Text(t(active ? 'Speak' : _items[_dir].$2),
+                    maxLines: 1,
+                    style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: active ? p.text : p.muted))),
+          ))),
         ),
       ),
     );
   }
 
-  Widget _barItem(Pal p, int k, {int badge = 0}) {
+  Widget _barItem(Pal p, int k, double c, {int badge = 0}) {
     final active = _i == k;
     final tone = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
     final fg = active ? tone : p.muted;
@@ -435,19 +728,50 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         onTap: () => _go(k),
         child: ExcludeSemantics(
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            // the Material "pill" behind the icon of the open tab
+            // a short gold bar on the island's top edge marks the open tab
             AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 56,
-              height: 30,
-              decoration: BoxDecoration(color: active ? kGold.withValues(alpha: p.dark ? .25 : .22) : Colors.transparent, borderRadius: BorderRadius.circular(15)),
-              child: Stack(alignment: Alignment.center, clipBehavior: Clip.none, children: [
-                WIcon(_items[k].$1, size: 23, color: fg, strokeWidth: active ? 2.2 : 1.9),
-                if (badge > 0) Positioned(right: 8, top: 0, child: _badge(badge)),
-              ]),
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutBack,
+              width: active ? 26 : 0,
+              height: 3,
+              margin: EdgeInsets.only(bottom: 6 - 2 * c),
+              decoration: BoxDecoration(
+                  gradient: kGoldGradient,
+                  borderRadius: BorderRadius.circular(3)),
             ),
-            const SizedBox(height: 4),
-            FittedBox(fit: BoxFit.scaleDown, child: Text(t(_items[k].$2), maxLines: 1, style: TextStyle(fontSize: 11.5, fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: active ? p.text : p.muted))),
+            Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  AnimatedScale(
+                    scale: active ? 1.12 : 1,
+                    duration: const Duration(milliseconds: 220),
+                    child: WIcon(_items[k].$1,
+                        size: 24, color: fg, strokeWidth: active ? 2.2 : 1.8),
+                  ),
+                  if (badge > 0)
+                    Positioned(right: -14, top: -8, child: _badge(badge)),
+                ]),
+            ClipRect(
+              child: Align(
+                heightFactor: 1 - c,
+                child: Opacity(
+                  opacity: 1 - c,
+                  child: Column(children: [
+                    const SizedBox(height: 4),
+                    FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(t(_items[k].$2),
+                            maxLines: 1,
+                            style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight:
+                                    active ? FontWeight.w800 : FontWeight.w500,
+                                color: active ? p.text : p.muted))),
+                  ]),
+                ),
+              ),
+            ),
           ]),
         ),
       ),
@@ -455,18 +779,25 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   }
 
   /// unread chats on Talk, unseen responses on Notifications
-  int _badgeOf(int k) => k == _talk ? unreadChats.value : (k == _notesTab ? _notes.unseen : 0);
+  int _badgeOf(int k) =>
+      k == _talk ? unreadChats.value : (k == _notesTab ? _notes.unseen : 0);
 
   Widget _badge(int n) => Container(
         height: 16,
         constraints: const BoxConstraints(minWidth: 16),
         padding: const EdgeInsets.symmetric(horizontal: 4),
         alignment: Alignment.center,
-        decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(8)),
-        child: Text(n > 99 ? '99+' : '$n', style: const TextStyle(color: kInk, fontSize: 10, fontWeight: FontWeight.w700, height: 1)),
+        decoration: BoxDecoration(
+            gradient: kGoldGradient, borderRadius: BorderRadius.circular(8)),
+        child: Text(n > 99 ? '99+' : '$n',
+            style: const TextStyle(
+                color: kInk,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                height: 1)),
       );
 
-  /// Tablets and desktop, as the website's side dock: the logo on top, the five places (Directory keeps its gold), and
+  /// Tablets and desktop, as the website's side dock: the logo on top, the three places (Directory keeps its gold), and
   /// the account at the foot. [labels]: from 1280 px each label beside its icon.
   Widget _rail(Pal p, bool labels) {
     final tone = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
@@ -476,10 +807,17 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       final home = k == _dir;
       final badge = _badgeOf(k);
       final icon = Stack(clipBehavior: Clip.none, children: [
-        WIcon(_items[k].$1, size: 22, color: home ? kInk : (active ? tone : p.text), strokeWidth: active || home ? 2 : 1.5),
+        WIcon(_items[k].$1,
+            size: 22,
+            color: home ? const Color(0xFF2E2A00) : (active ? tone : p.text),
+            strokeWidth: home ? 2.1 : (active ? 2 : 1.5)),
         if (badge > 0) Positioned(right: -10, top: -6, child: _badge(badge)),
       ]);
-      final style = TextStyle(fontSize: labels ? 15 : 10.5, fontWeight: active || home ? FontWeight.w600 : FontWeight.w400, color: home ? kInk : (active ? tone : p.text), height: 1);
+      final style = TextStyle(
+          fontSize: labels ? 15 : 10.5,
+          fontWeight: active || home ? FontWeight.w600 : FontWeight.w400,
+          color: home ? kInk : (active ? tone : p.text),
+          height: 1);
       return KeyedSubtree(
         key: Tours.key(_tourKeys[k]),
         child: Semantics(
@@ -495,22 +833,48 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                       height: 50,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: home ? null : (active ? p.canvas : Colors.transparent),
-                        gradient: home ? kGoldGradient : null,
+                        color: home
+                            ? null
+                            : (active ? p.canvas : Colors.transparent),
+                        gradient: home ? _logoGradient : null,
                         borderRadius: BorderRadius.circular(26),
-                        border: active ? Border.all(color: home ? kInk.withValues(alpha: .5) : kGold, width: 1.5) : null,
+                        border: active
+                            ? Border.all(
+                                color:
+                                    home ? kInk.withValues(alpha: .5) : kGold,
+                                width: 1.5)
+                            : null,
                       ),
-                      child: Row(children: [icon, const SizedBox(width: 16), Expanded(child: Text(t(_items[k].$2), maxLines: 1, overflow: TextOverflow.ellipsis, style: style))]),
+                      child: Row(children: [
+                        icon,
+                        const SizedBox(width: 16),
+                        Expanded(
+                            child: Text(t(_items[k].$2),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: style))
+                      ]),
                     )
                   : Container(
                       width: 64,
                       padding: const EdgeInsets.symmetric(vertical: 9),
                       decoration: BoxDecoration(
-                        color: home ? null : (active ? kGold.withValues(alpha: p.dark ? .25 : .22) : Colors.transparent),
-                        gradient: home ? kGoldGradient : null,
+                        color: home
+                            ? null
+                            : (active
+                                ? kGold.withValues(alpha: p.dark ? .25 : .22)
+                                : Colors.transparent),
+                        gradient: home ? _logoGradient : null,
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [icon, const SizedBox(height: 5), Text(t(_items[k].$2), maxLines: 1, overflow: TextOverflow.ellipsis, style: style)]),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        icon,
+                        const SizedBox(height: 5),
+                        Text(t(_items[k].$2),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: style)
+                      ]),
                     ),
             ),
           ),
@@ -525,23 +889,57 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
               onTap: () => _openAccountMenu(ctx),
               borderRadius: BorderRadius.circular(labels ? 28 : 16),
               child: Padding(
-                padding: labels ? const EdgeInsets.fromLTRB(10, 8, 12, 8) : const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                padding: labels
+                    ? const EdgeInsets.fromLTRB(10, 8, 12, 8)
+                    : const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
                 child: labels
                     ? Row(children: [
-                        Avatar(name: me.name, photoUrl: me.photoUrl, size: 40, ring: me.hasUpdate, framed: true, type: me.userType, badge: 16),
+                        Avatar(
+                            name: me.name,
+                            photoUrl: me.photoUrl,
+                            size: 40,
+                            ring: me.hasUpdate,
+                            framed: true,
+                            type: me.userType,
+                            badge: 16),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(me.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, height: 1.2)),
-                            Text('@${me.handle}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: p.muted, height: 1.3)),
-                          ]),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(me.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        height: 1.2)),
+                                Text('@${me.handle}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: p.muted,
+                                        height: 1.3)),
+                              ]),
                         ),
                         Text('···', style: TextStyle(color: p.muted)),
                       ])
                     : Column(mainAxisSize: MainAxisSize.min, children: [
-                        Avatar(name: me.name, photoUrl: me.photoUrl, size: 40, ring: me.hasUpdate, framed: true, type: me.userType, badge: 16),
+                        Avatar(
+                            name: me.name,
+                            photoUrl: me.photoUrl,
+                            size: 40,
+                            ring: me.hasUpdate,
+                            framed: true,
+                            type: me.userType,
+                            badge: 16),
                         const SizedBox(height: 4),
-                        Text('@${me.handle}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 9.5, color: p.muted, height: 1)),
+                        Text('@${me.handle}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 9.5, color: p.muted, height: 1)),
                       ]),
               ),
             ),
@@ -549,49 +947,106 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(labels ? 8 : 10, 12, labels ? 16 : 10, 12),
-      child: Column(crossAxisAlignment: labels ? CrossAxisAlignment.stretch : CrossAxisAlignment.center, children: [
-        // the logo, as the web dock's: the whole lockup with its slogan, or just the mark on the narrow dock
-        Padding(
-          padding: EdgeInsets.fromLTRB(labels ? 10 : 0, 0, 0, labels ? 20 : 16),
-          child: labels
-              ? FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: LogoInline(size: 30, markSize: 44, tagline: true, onTap: () => _go(_dir)))
-              : GestureDetector(
-                  onTap: () => _go(_dir),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    // the mark with a soft halo behind it, WEBWEB and the AI pill under it, a fine gold line below: the website's narrow dock
-                    Stack(alignment: Alignment.center, clipBehavior: Clip.none, children: [
-                      Container(width: 30, height: 30, decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: const Color(0xFFFFC700).withValues(alpha: .35), blurRadius: 22, spreadRadius: 6)])),
-                      const LogoMark(size: 46),
+      child: Column(
+          crossAxisAlignment:
+              labels ? CrossAxisAlignment.stretch : CrossAxisAlignment.center,
+          children: [
+            // the logo, as the web dock's: the whole lockup with its slogan, or just the mark on the narrow dock
+            Padding(
+              padding:
+                  EdgeInsets.fromLTRB(labels ? 10 : 0, 0, 0, labels ? 20 : 16),
+              child: labels
+                  ? FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: LogoInline(
+                          size: 30,
+                          markSize: 44,
+                          tagline: true,
+                          onTap: () => _go(_dir)))
+                  : GestureDetector(
+                      onTap: () => _go(_dir),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        // the mark with a soft halo behind it, WEBWEB and the AI pill under it, a fine gold line below: the website's narrow dock
+                        Stack(
+                            alignment: Alignment.center,
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                  width: 30,
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                            color: const Color(0xFFFFC700)
+                                                .withValues(alpha: .35),
+                                            blurRadius: 22,
+                                            spreadRadius: 6)
+                                      ])),
+                              const LogoMark(size: 46),
+                            ]),
+                        const SizedBox(height: 8),
+                        Row(mainAxisSize: MainAxisSize.min, children: [
+                          Text('WEB',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1,
+                                  color: p.text)),
+                          ShaderMask(
+                            blendMode: BlendMode.srcIn,
+                            shaderCallback: (r) => (p.dark
+                                    ? const LinearGradient(colors: [
+                                        Color(0xFFFFD84A),
+                                        Color(0xFFE0AD00)
+                                      ])
+                                    : const LinearGradient(colors: [
+                                        Color(0xFFA89A2C),
+                                        Color(0xFFC9AE24),
+                                        Color(0xFFE8C722)
+                                      ]))
+                                .createShader(r),
+                            child: const Text('WEB',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1,
+                                    color: Colors.white)),
+                          ),
+                        ]),
+                        const SizedBox(height: 4),
+                        const AiPill(font: 8),
+                        const SizedBox(height: 8),
+                        Container(
+                            width: 32,
+                            height: 1,
+                            decoration: BoxDecoration(
+                                gradient: LinearGradient(colors: [
+                              Colors.transparent,
+                              const Color(0xFFFFC700).withValues(alpha: .7),
+                              Colors.transparent
+                            ]))),
+                      ]),
+                    ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                    crossAxisAlignment: labels
+                        ? CrossAxisAlignment.stretch
+                        : CrossAxisAlignment.center,
+                    children: [
+                      // Find first, in gold, then Refer and Talk (on the phone it stays in the middle of the bar)
+                      for (final k in [_dir, _feed, _talk])
+                        Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: item(k)),
                     ]),
-                    const SizedBox(height: 8),
-                    Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text('WEB', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, height: 1, color: p.text)),
-                      ShaderMask(
-                        blendMode: BlendMode.srcIn,
-                        shaderCallback: (r) => (p.dark
-                                ? const LinearGradient(colors: [Color(0xFFFFD84A), Color(0xFFE0AD00)])
-                                : const LinearGradient(colors: [Color(0xFFA89A2C), Color(0xFFC9AE24), Color(0xFFE8C722)]))
-                            .createShader(r),
-                        child: const Text('WEB', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, height: 1, color: Colors.white)),
-                      ),
-                    ]),
-                    const SizedBox(height: 4),
-                    const AiPill(font: 8),
-                    const SizedBox(height: 8),
-                    Container(width: 32, height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.transparent, const Color(0xFFFFC700).withValues(alpha: .7), Colors.transparent]))),
-                  ]),
-                ),
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            child: Column(crossAxisAlignment: labels ? CrossAxisAlignment.stretch : CrossAxisAlignment.center, children: [
-              // Directory last, in gold, as Ask is on the website's dock (on the phone it stays in the middle of the bar)
-              for (final k in [_feed, 1, _talk, _notesTab, _dir]) Padding(padding: const EdgeInsets.only(bottom: 4), child: item(k)),
-            ]),
-          ),
-        ),
-        account,
-      ]),
+              ),
+            ),
+            account,
+          ]),
     );
   }
 }
@@ -599,29 +1054,43 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
 // ======================= header =======================
 
 class _AppHeader extends StatelessWidget {
-  final VoidCallback onHome, onSearch;
-  const _AppHeader({required this.onHome, required this.onSearch});
+  final VoidCallback onHome;
+  // shrunk to a slimmer bar while a page is scrolled down
+  final bool compact;
+  const _AppHeader({required this.onHome, this.compact = false});
 
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final me = context.watch<AuthProvider>().profile;
     final top = MediaQuery.of(context).padding.top;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(end: compact ? 1.0 : 0.0),
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+      builder: (context, c, _) => _bar(context, p, me, top, c),
+    );
+  }
+
+  Widget _bar(BuildContext context, Pal p, dynamic me, double top, double c) {
     return Container(
       padding: EdgeInsets.only(top: top),
+      // the page's own colour with a soft shadow and a thin gold rule at the foot, so the header belongs to the page
+      // instead of sitting on it as a grey bar
       decoration: BoxDecoration(
-        color: p.chip,
+        color: p.canvas,
         boxShadow: [
           BoxShadow(
-            color: p.dark ? const Color(0xFF1E1E1E).withValues(alpha: .6) : const Color(0xFF1E1E1E).withValues(alpha: .2),
-            offset: Offset(0, p.dark ? 8 : 6),
-            blurRadius: p.dark ? 16 : 14,
-            spreadRadius: -8,
+            color: Colors.black.withValues(alpha: p.dark ? .35 : .07),
+            offset: const Offset(0, 4),
+            blurRadius: 14,
+            spreadRadius: -6,
           ),
         ],
       ),
-      child: SizedBox(
-        height: 56,
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+      SizedBox(
+        height: 63 - 17 * c,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(children: [
@@ -630,20 +1099,13 @@ class _AppHeader extends StatelessWidget {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(left: 4, right: 8),
-                child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: LogoInline(size: 28, markSize: 36, tagline: true, onTap: onHome)),
+                child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: LogoInline(
+                        size: 34 - 4 * c, markSize: 44 - 8 * c, tagline: true, fold: c, onTap: onHome)),
               ),
             ),
-            // the Directory's search, one tap from any tab: beside the account
-            Semantics(
-              button: true,
-              label: t('Search'),
-              child: InkResponse(
-                onTap: onSearch,
-                radius: 22,
-                child: SizedBox(width: 40, height: 40, child: Center(child: WIcon(WI.search, size: 24, color: p.text, strokeWidth: 1.9))),
-              ),
-            ),
-            const SizedBox(width: 4),
             Builder(
               builder: (ctx) => GestureDetector(
                 onTap: () => _openAccountMenu(ctx),
@@ -651,13 +1113,25 @@ class _AppHeader extends StatelessWidget {
                   button: true,
                   label: t('Account menu'),
                   child: Avatar(
-                    key: Tours.key('account'),name: me?.name ?? 'Me', photoUrl: me?.photoUrl, size: 32, ring: me?.hasUpdate ?? false, framed: true, type: me?.userType, badge: 14),
+                      key: Tours.key('account'),
+                      name: me?.name ?? 'Me',
+                      photoUrl: me?.photoUrl,
+                      size: 32 - 4 * c,
+                      ring: me?.hasUpdate ?? false,
+                      framed: true,
+                      type: me?.userType,
+                      badge: 14),
                 ),
               ),
             ),
           ]),
         ),
       ),
+      Container(
+        height: 1,
+        decoration: BoxDecoration(gradient: LinearGradient(colors: [kGold.withValues(alpha: 0), kGold.withValues(alpha: .55), kGold.withValues(alpha: 0)])),
+      ),
+      ]),
     );
   }
 }
@@ -667,8 +1141,16 @@ BoxDecoration _panelDecoration(Pal p, {double radius = 14}) => BoxDecoration(
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(color: p.border.withValues(alpha: .6)),
       boxShadow: [
-        BoxShadow(color: const Color(0xFF1E1E1E).withValues(alpha: .06), blurRadius: 2, offset: const Offset(0, 1)),
-        BoxShadow(color: (p.dark ? const Color(0xFF1E1E1E) : const Color(0xFF1E1E1E)).withValues(alpha: p.dark ? .7 : .35), blurRadius: 40, spreadRadius: -12, offset: const Offset(0, 18)),
+        BoxShadow(
+            color: const Color(0xFF1E1E1E).withValues(alpha: .06),
+            blurRadius: 2,
+            offset: const Offset(0, 1)),
+        BoxShadow(
+            color: (p.dark ? const Color(0xFF1E1E1E) : const Color(0xFF1E1E1E))
+                .withValues(alpha: p.dark ? .7 : .35),
+            blurRadius: 40,
+            spreadRadius: -12,
+            offset: const Offset(0, 18)),
       ],
     );
 
@@ -679,9 +1161,11 @@ void _openAccountMenu(BuildContext context) {
     barrierLabel: 'Close',
     barrierColor: const Color(0x8014120C),
     transitionDuration: const Duration(milliseconds: 220),
-    pageBuilder: (ctx, _, __) => const Align(alignment: Alignment.centerRight, child: _AccountMenu()),
+    pageBuilder: (ctx, _, __) =>
+        const Align(alignment: Alignment.centerRight, child: _AccountMenu()),
     transitionBuilder: (_, a, __, child) => SlideTransition(
-      position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
+      position: Tween(begin: const Offset(1, 0), end: Offset.zero)
+          .animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
       child: child,
     ),
   );
@@ -739,14 +1223,34 @@ class _PagesSwitcherState extends State<_PagesSwitcher> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: Row(children: [
-                Avatar(name: '${a['name'] ?? ''}', photoUrl: a['photoURL'] as String?, size: 32, type: a['userType'] as String?),
+                Avatar(
+                    name: '${a['name'] ?? ''}',
+                    photoUrl: a['photoURL'] as String?,
+                    size: 32,
+                    type: a['userType'] as String?),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(('${a['company'] ?? ''}').isNotEmpty ? '${a['company']}' : (('${a['name'] ?? ''}').isNotEmpty ? '${a['name']}' : t('New business page')),
-                        maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                    Text(a['handle'] != null ? '@${a['handle']}' : t('Set up this page'), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
-                  ]),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                            ('${a['company'] ?? ''}').isNotEmpty
+                                ? '${a['company']}'
+                                : (('${a['name'] ?? ''}').isNotEmpty
+                                    ? '${a['name']}'
+                                    : t('New business page')),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w500)),
+                        Text(
+                            a['handle'] != null
+                                ? '@${a['handle']}'
+                                : t('Set up this page'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: p.muted)),
+                      ]),
                 ),
               ]),
             ),
@@ -762,11 +1266,17 @@ class _PagesSwitcherState extends State<_PagesSwitcher> {
                   width: 32,
                   height: 32,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: p.border)),
-                  child: Text('+', style: TextStyle(fontSize: 18, height: 1, color: p.muted)),
+                  decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: p.border)),
+                  child: Text('+',
+                      style:
+                          TextStyle(fontSize: 18, height: 1, color: p.muted)),
                 ),
                 const SizedBox(width: 12),
-                Text(t('Add a business page'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                Text(t('Add a business page'),
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w500)),
               ]),
             ),
           ),
@@ -790,7 +1300,7 @@ class _AccountMenu extends StatelessWidget {
     void push(Widget page) {
       final nav = Navigator.of(context);
       nav.pop();
-      nav.push(MaterialPageRoute(builder: (_) => page));
+      nav.push(WideRoute(builder: (_) => page));
     }
 
     // compact rows (32 icon box, 42 a row) so the whole menu fits on a phone without scrolling
@@ -798,19 +1308,30 @@ class _AccountMenu extends StatelessWidget {
           width: 28,
           height: 28,
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: bg ?? p.chip, borderRadius: BorderRadius.circular(9)),
+          decoration: BoxDecoration(
+              color: bg ?? p.chip, borderRadius: BorderRadius.circular(9)),
           child: WIcon(icon, size: 17, color: fg ?? p.muted, strokeWidth: 1.8),
         );
-    Widget row(WI icon, Widget label, VoidCallback? onTap, {Color? bg, Color? fg, Widget? trailing}) => InkWell(
+    Widget row(WI icon, Widget label, VoidCallback? onTap,
+            {Color? bg, Color? fg, Widget? trailing}) =>
+        InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            child: Row(children: [iconBox(icon, bg: bg, fg: fg), const SizedBox(width: 12), Expanded(child: label), if (trailing != null) trailing]),
+            child: Row(children: [
+              iconBox(icon, bg: bg, fg: fg),
+              const SizedBox(width: 12),
+              Expanded(child: label),
+              if (trailing != null) trailing
+            ]),
           ),
         );
-    Text label(String s, {Color? color}) => Text(s, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: color));
-    Widget item(WI icon, String text, VoidCallback onTap) => row(icon, label(t(text)), onTap);
+    Text label(String s, {Color? color}) => Text(s,
+        style:
+            TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: color));
+    Widget item(WI icon, String text, VoidCallback onTap) =>
+        row(icon, label(t(text)), onTap);
     final divider = Divider(height: 1, color: p.border.withValues(alpha: .6));
 
     // the drawer's ⋯ (Log out) and close sit on the account card: one section, no title bar above it
@@ -820,7 +1341,9 @@ class _AccountMenu extends StatelessWidget {
         icon: WIcon(WI.more, size: 22, color: p.text),
         color: p.canvas,
         position: PopupMenuPosition.under,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: p.border.withValues(alpha: .6))),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: p.border.withValues(alpha: .6))),
         onSelected: (_) {
           Navigator.of(context).pop();
           auth.logout();
@@ -831,12 +1354,19 @@ class _AccountMenu extends StatelessWidget {
             child: Row(children: [
               WIcon(WI.logout, size: 20, color: p.danger, strokeWidth: 1.8),
               const SizedBox(width: 12),
-              Text(t('Log out'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: p.danger)),
+              Text(t('Log out'),
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: p.danger)),
             ]),
           ),
         ],
       ),
-      IconButton(tooltip: t('Close'), onPressed: () => Navigator.of(context).pop(), icon: WIcon(WI.close, size: 22, color: p.text)),
+      IconButton(
+          tooltip: t('Close'),
+          onPressed: () => Navigator.of(context).pop(),
+          icon: WIcon(WI.close, size: 22, color: p.text)),
     ]);
 
     return Material(
@@ -846,48 +1376,90 @@ class _AccountMenu extends StatelessWidget {
       child: SizedBox(
         width: (mq.size.width * .88).clamp(0, 380).toDouble(),
         height: mq.size.height,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           SizedBox(height: mq.padding.top),
           // account card: this page, then the other pages of the sign-in and Add, as one block
           Container(
-            decoration: BoxDecoration(color: p.chip.withValues(alpha: .5), border: Border(top: BorderSide(color: p.border.withValues(alpha: .6)), bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
+            decoration: BoxDecoration(
+                color: p.chip.withValues(alpha: .5),
+                border: Border(
+                    top: BorderSide(color: p.border.withValues(alpha: .6)),
+                    bottom: BorderSide(color: p.border.withValues(alpha: .6)))),
             child: Stack(children: [
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          InkWell(
-            onTap: () => push(const ProfileScreen()),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(20, 12, 96, 12),
-              child: Row(children: [
-                Avatar(name: me.name, photoUrl: me.photoUrl, size: 48, ring: me.hasUpdate, type: me.userType, badge: 18, uid: me.uid),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(me.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
-                    Text('@${me.handle}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: p.muted)),
-                    const SizedBox(height: 4),
-                    Row(children: [
-                      VerifiedBadge(level: me.verification, premium: me.premium, plan: me.plan, size: 14),
-                      const SizedBox(width: 4),
-                      Flexible(child: Text(t(kVerificationLabel[me.verification] ?? ''), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: p.muted))),
+                InkWell(
+                  onTap: () => push(const ProfileScreen()),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 96, 12),
+                    child: Row(children: [
+                      Avatar(
+                          name: me.name,
+                          photoUrl: me.photoUrl,
+                          size: 48,
+                          ring: me.hasUpdate,
+                          type: me.userType,
+                          badge: 18,
+                          uid: me.uid),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(me.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 2),
+                              Text('@${me.handle}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style:
+                                      TextStyle(fontSize: 13, color: p.muted)),
+                              const SizedBox(height: 4),
+                              Row(children: [
+                                VerifiedBadge(
+                                    level: me.verification,
+                                    premium: me.premium,
+                                    plan: me.plan,
+                                    size: 14),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                    child: Text(
+                                        t(kVerificationLabel[me.verification] ??
+                                            ''),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: p.muted))),
+                              ]),
+                            ]),
+                      ),
                     ]),
-                  ]),
+                  ),
                 ),
-              ]),
-            ),
-          ),
-          const _PagesSwitcher(),
+                const _PagesSwitcher(),
               ]),
               Positioned(top: 2, right: 4, child: actions),
             ]),
           ),
           Expanded(
             child: ListView(padding: const EdgeInsets.all(6), children: [
-              item(WI.edit, 'Edit profile', () => push(EditProfileScreen(profile: me))),
-              item(WI.clock, 'Recents', () => push(SubPage(title: t('Recents'), body: const RecentsScreen()))),
+              item(WI.edit, 'Edit profile',
+                  () => push(EditProfileScreen(profile: me))),
               // leads, today, alerts and the week: one page of their own
-              item(WI.sparkle, 'For your business', () => push(SubPage(title: t('For your business'), body: const _BusinessHub()))),
-              item(WI.bookmark, 'Saved asks', () => push(const SavedPostsScreen())),
+              item(
+                  WI.sparkle,
+                  'For your business',
+                  () => push(SubPage(
+                      title: t('For your business'),
+                      body: const _BusinessHub()))),
+              item(WI.bookmark, 'Saved asks',
+                  () => push(const SavedPostsScreen())),
               // help articles, writing to us, the assistant and the tour: one sheet
               item(WI.help, 'Help & Support', () {
                 Navigator.of(context).pop();
@@ -897,98 +1469,151 @@ class _AccountMenu extends StatelessWidget {
               divider,
               const SizedBox(height: 4),
               // two-step verification, blocked people, sign out everywhere, delete account: a tab of Edit profile
-              item(WI.lock, 'Account and privacy', () => push(EditProfileScreen(profile: me, tab: 'account'))),
+              item(WI.lock, 'Account and privacy',
+                  () => push(EditProfileScreen(profile: me, tab: 'account'))),
               if (ContactSync.supported) const _ServiceContactsRow(),
             ]),
           ),
           divider,
           Padding(
             padding: EdgeInsets.fromLTRB(8, 4, 8, 4 + mq.padding.bottom),
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              // language and theme in one row
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
-                child: Row(children: [
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      // the current language; tapping it lists all languages above it
-                      child: PopupMenuButton<String>(
-                        tooltip: t('Language'),
-                        color: p.canvas,
-                        position: PopupMenuPosition.over,
-                        offset: const Offset(0, -8),
-                        constraints: const BoxConstraints(minWidth: 200),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: p.border.withValues(alpha: .6))),
-                        onSelected: (code) {
-                          if (i18n.lang == code) return;
-                          Navigator.of(context).pop();
-                          i18n.set(code);
-                        },
-                        itemBuilder: (_) => [
-                          for (final l in kLangs)
-                            PopupMenuItem(
-                              value: l.code,
-                              child: Row(children: [
-                                Text(l.native, style: TextStyle(fontSize: 15, fontWeight: i18n.lang == l.code ? FontWeight.w700 : FontWeight.w500, color: p.text)),
-                                if (l.native != l.name) ...[
-                                  const SizedBox(width: 8),
-                                  Text(l.name, style: TextStyle(fontSize: 12, color: p.muted)),
-                                ],
-                                const Spacer(),
-                                if (i18n.lang == l.code) const WIcon(WI.check, size: 18, color: kGold, strokeWidth: 2.4),
-                              ]),
-                            ),
-                        ],
-                        child: Container(
-                          height: 40,
-                          padding: const EdgeInsets.only(left: 12, right: 10),
-                          decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20)),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            WIcon(WI.globe, size: 18, color: p.muted, strokeWidth: 1.8),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                kLangs.firstWhere((l) => l.code == i18n.lang, orElse: () => kLangs.first).native,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: p.text),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            WIcon(WI.chevronUp, size: 16, color: p.muted, strokeWidth: 2),
-                          ]),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // theme: follow the device (the default), light or dark
-                  Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      for (final o in [(ThemeMode.system, WI.monitor, 'Device theme'), (ThemeMode.light, WI.sun, 'Light'), (ThemeMode.dark, WI.moon, 'Dark')])
-                        Semantics(
-                          button: true,
-                          selected: themeCtl.mode == o.$1,
-                          label: t(o.$3),
-                          child: GestureDetector(
-                            onTap: () => themeCtl.set(o.$1),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // language and theme in one row
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
+                    child: Row(children: [
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          // the current language; tapping it lists all languages above it
+                          child: PopupMenuButton<String>(
+                            tooltip: t('Language'),
+                            color: p.canvas,
+                            position: PopupMenuPosition.over,
+                            offset: const Offset(0, -8),
+                            constraints: const BoxConstraints(minWidth: 200),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                side: BorderSide(
+                                    color: p.border.withValues(alpha: .6))),
+                            onSelected: (code) {
+                              if (i18n.lang == code) return;
+                              Navigator.of(context).pop();
+                              i18n.set(code);
+                            },
+                            itemBuilder: (_) => [
+                              for (final l in kLangs)
+                                PopupMenuItem(
+                                  value: l.code,
+                                  child: Row(children: [
+                                    Text(l.native,
+                                        style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: i18n.lang == l.code
+                                                ? FontWeight.w700
+                                                : FontWeight.w500,
+                                            color: p.text)),
+                                    if (l.native != l.name) ...[
+                                      const SizedBox(width: 8),
+                                      Text(l.name,
+                                          style: TextStyle(
+                                              fontSize: 12, color: p.muted)),
+                                    ],
+                                    const Spacer(),
+                                    if (i18n.lang == l.code)
+                                      const WIcon(WI.check,
+                                          size: 18,
+                                          color: kGold,
+                                          strokeWidth: 2.4),
+                                  ]),
+                                ),
+                            ],
                             child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(color: themeCtl.mode == o.$1 ? p.card : Colors.transparent, shape: BoxShape.circle),
-                              child: Center(child: WIcon(o.$2, size: 18, color: themeCtl.mode == o.$1 ? p.text : p.muted, strokeWidth: 1.8)),
+                              height: 40,
+                              padding:
+                                  const EdgeInsets.only(left: 12, right: 10),
+                              decoration: BoxDecoration(
+                                  color: p.chip,
+                                  borderRadius: BorderRadius.circular(20)),
+                              child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    WIcon(WI.globe,
+                                        size: 18,
+                                        color: p.muted,
+                                        strokeWidth: 1.8),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        kLangs
+                                            .firstWhere(
+                                                (l) => l.code == i18n.lang,
+                                                orElse: () => kLangs.first)
+                                            .native,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                            color: p.text),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    WIcon(WI.chevronUp,
+                                        size: 16,
+                                        color: p.muted,
+                                        strokeWidth: 2),
+                                  ]),
                             ),
                           ),
                         ),
+                      ),
+                      // theme: follow the device (the default), light or dark
+                      Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                            color: p.chip,
+                            borderRadius: BorderRadius.circular(20)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          for (final o in [
+                            (ThemeMode.system, WI.monitor, 'Device theme'),
+                            (ThemeMode.light, WI.sun, 'Light'),
+                            (ThemeMode.dark, WI.moon, 'Dark')
+                          ])
+                            Semantics(
+                              button: true,
+                              selected: themeCtl.mode == o.$1,
+                              label: t(o.$3),
+                              child: GestureDetector(
+                                onTap: () => themeCtl.set(o.$1),
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                      color: themeCtl.mode == o.$1
+                                          ? p.card
+                                          : Colors.transparent,
+                                      shape: BoxShape.circle),
+                                  child: Center(
+                                      child: WIcon(o.$2,
+                                          size: 18,
+                                          color: themeCtl.mode == o.$1
+                                              ? p.text
+                                              : p.muted,
+                                          strokeWidth: 1.8)),
+                                ),
+                              ),
+                            ),
+                        ]),
+                      ),
                     ]),
                   ),
+                  const SizedBox(height: 8),
+                  const _AppVersion(),
                 ]),
-              ),
-              const SizedBox(height: 8),
-              const _AppVersion(),
-            ]),
           ),
         ]),
       ),
@@ -1004,17 +1629,28 @@ class _BusinessHub extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     Widget tile(WI icon, String title, Widget body) => ListTile(
-          leading: Container(width: 36, height: 36, alignment: Alignment.center, decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(10)), child: WIcon(icon, size: 19, color: p.muted, strokeWidth: 1.8)),
-          title: Text(t(title), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          leading: Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                  color: p.chip, borderRadius: BorderRadius.circular(10)),
+              child: WIcon(icon, size: 19, color: p.muted, strokeWidth: 1.8)),
+          title: Text(t(title),
+              style:
+                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
           trailing: WIcon(WI.chevronRight, size: 18, color: p.muted),
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SubPage(title: t(title), body: body))),
+          onTap: () => Navigator.push(context,
+              WideRoute(builder: (_) => SubPage(title: t(title), body: body))),
         );
-    return ListView(padding: const EdgeInsets.symmetric(vertical: 8), children: [
-      tile(WI.sparkle, 'Leads for you', const LeadsScreen()),
-      tile(WI.sun, 'Today in your area', const TodayScreen()),
-      tile(WI.bell, 'Alerts', const AlertsScreen()),
-      tile(WI.deals, 'Your week', const WeekScreen()),
-    ]);
+    return ListView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        children: [
+          tile(WI.sparkle, 'Leads for you', const LeadsScreen()),
+          tile(WI.sun, 'Today in your area', const TodayScreen()),
+          tile(WI.bell, 'Alerts', const AlertsScreen()),
+          tile(WI.deals, 'Your week', const WeekScreen()),
+        ]);
   }
 }
 
@@ -1031,7 +1667,9 @@ void _openHelp(BuildContext context) {
     builder: (ctx) {
       Widget row(WI icon, String label, VoidCallback onTap) => ListTile(
             leading: WIcon(icon, size: 21, color: p.muted, strokeWidth: 1.8),
-            title: Text(t(label), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+            title: Text(t(label),
+                style:
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
             onTap: () {
               Navigator.pop(ctx);
               onTap();
@@ -1042,14 +1680,18 @@ void _openHelp(BuildContext context) {
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             row(WI.help, 'Help articles', () {
-              final from = defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
-              launchUrl(Uri.parse('$siteUrl/help?lang=$lang&from=$from'), mode: LaunchMode.externalApplication);
+              final from = defaultTargetPlatform == TargetPlatform.iOS
+                  ? 'ios'
+                  : 'android';
+              launchUrl(Uri.parse('$siteUrl/help?lang=$lang&from=$from'),
+                  mode: LaunchMode.externalApplication);
             }),
             row(WI.talk, 'Write to us', () => showSupportSheet(nav.context)),
             // @webwebai: the assistant answers in a chat
             row(WI.sparkle, 'Ask WebWeb AI', () async {
               try {
-                final u = Profile.fromJson(await auth.api.get('/users/handle/webwebai') as Map);
+                final u = Profile.fromJson(
+                    await auth.api.get('/users/handle/webwebai') as Map);
                 final ctx = nav.context;
                 if (ctx.mounted) openChat(ctx, Peer.fromProfile(u));
               } catch (_) {}
@@ -1075,9 +1717,16 @@ class _AppVersion extends StatelessWidget {
       builder: (_, s) {
         final i = s.data;
         return Text(
-          i == null ? ' ' : '${t('WebWeb AI')} · ${t('Version {v}', {'v': i.version})}${i.buildNumber.isEmpty ? '' : ' (${i.buildNumber})'}',
+          i == null
+              ? ' '
+              : '${t('WebWeb AI')} · ${t('Version {v}', {
+                      'v': i.version
+                    })}${i.buildNumber.isEmpty ? '' : ' (${i.buildNumber})'}',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12, color: p.muted, fontFeatures: const [FontFeature.tabularFigures()]),
+          style: TextStyle(
+              fontSize: 12,
+              color: p.muted,
+              fontFeatures: const [FontFeature.tabularFigures()]),
         );
       },
     );
@@ -1104,7 +1753,9 @@ class _ServiceContactsRowState extends State<_ServiceContactsRow> {
 
   Future<void> _toggle() async {
     if (_on == null) return;
-    final changed = _on! ? await turnOffServiceContacts(context) : await showServiceContactsSheet(context) == true;
+    final changed = _on!
+        ? await turnOffServiceContacts(context)
+        : await showServiceContactsSheet(context) == true;
     if (changed && mounted) setState(() => _on = !_on!);
   }
 
@@ -1116,12 +1767,18 @@ class _ServiceContactsRowState extends State<_ServiceContactsRow> {
       _toggleRow(p, on),
       if (on)
         InkWell(
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SharedContactsScreen())),
+          onTap: () => Navigator.of(context)
+              .push(WideRoute(builder: (_) => const SharedContactsScreen())),
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(56, 4, 12, 9),
             child: Row(children: [
-              Expanded(child: Text(t('Contacts you share'), style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: p.link))),
+              Expanded(
+                  child: Text(t('Contacts you share'),
+                      style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: p.link))),
               Icon(Icons.chevron_right, size: 18, color: p.muted),
             ]),
           ),
@@ -1140,14 +1797,22 @@ class _ServiceContactsRowState extends State<_ServiceContactsRow> {
             width: 32,
             height: 32,
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(10)),
-            child: WIcon(WI.contactCard, size: 18, color: p.muted, strokeWidth: 1.8),
+            decoration: BoxDecoration(
+                color: p.chip, borderRadius: BorderRadius.circular(10)),
+            child: WIcon(WI.contactCard,
+                size: 18, color: p.muted, strokeWidth: 1.8),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(t('Service contacts'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
-              Text(t('Share plumbers, electricians, cabs…'), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(t('Service contacts'),
+                  style: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w500)),
+              Text(t('Share plumbers, electricians, cabs…'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: p.muted)),
             ]),
           ),
           AnimatedContainer(
@@ -1156,8 +1821,18 @@ class _ServiceContactsRowState extends State<_ServiceContactsRow> {
             height: 24,
             padding: const EdgeInsets.all(3),
             alignment: on ? Alignment.centerRight : Alignment.centerLeft,
-            decoration: BoxDecoration(color: on ? kGold : p.border, borderRadius: BorderRadius.circular(12)),
-            child: Container(width: 18, height: 18, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Color(0x331E1E1E), blurRadius: 2)])),
+            decoration: BoxDecoration(
+                color: on ? kGold : p.border,
+                borderRadius: BorderRadius.circular(12)),
+            child: Container(
+                width: 18,
+                height: 18,
+                decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(color: Color(0x331E1E1E), blurRadius: 2)
+                    ])),
           ),
         ]),
       ),
@@ -1173,7 +1848,15 @@ class AppNote {
   final bool unseen;
   final DateTime createdAt;
   final Peer sharer;
-  AppNote({required this.id, required this.kind, required this.postId, required this.postTitle, required this.postPath, required this.unseen, required this.createdAt, required this.sharer});
+  AppNote(
+      {required this.id,
+      required this.kind,
+      required this.postId,
+      required this.postTitle,
+      required this.postPath,
+      required this.unseen,
+      required this.createdAt,
+      required this.sharer});
   factory AppNote.fromJson(Map j) => AppNote(
         id: '${j['id']}',
         kind: '${j['kind']}',
@@ -1181,7 +1864,8 @@ class AppNote {
         postTitle: '${j['postTitle'] ?? ''}',
         postPath: '${j['postPath'] ?? ''}',
         unseen: j['unseen'] == true,
-        createdAt: DateTime.fromMillisecondsSinceEpoch((j['createdAt'] as num?)?.toInt() ?? 0),
+        createdAt: DateTime.fromMillisecondsSinceEpoch(
+            (j['createdAt'] as num?)?.toInt() ?? 0),
         sharer: Peer.fromJson((j['sharer'] as Map?) ?? const {}),
       );
 }
@@ -1195,7 +1879,9 @@ class NotificationsModel extends ChangeNotifier {
     try {
       final d = await auth.api.get('/notifications') as Map;
       unseen = (d['unseen'] as num?)?.toInt() ?? 0;
-      items = ((d['items'] as List?) ?? const []).map((e) => AppNote.fromJson(e as Map)).toList();
+      items = ((d['items'] as List?) ?? const [])
+          .map((e) => AppNote.fromJson(e as Map))
+          .toList();
       loaded = true;
       notifyListeners();
     } catch (_) {}
@@ -1205,7 +1891,18 @@ class NotificationsModel extends ChangeNotifier {
   Future<void> markSeen(AuthProvider auth) async {
     if (unseen == 0 && items.every((i) => !i.unseen)) return;
     unseen = 0;
-    items = [for (final i in items) AppNote(id: i.id, kind: i.kind, postId: i.postId, postTitle: i.postTitle, postPath: i.postPath, unseen: false, createdAt: i.createdAt, sharer: i.sharer)];
+    items = [
+      for (final i in items)
+        AppNote(
+            id: i.id,
+            kind: i.kind,
+            postId: i.postId,
+            postTitle: i.postTitle,
+            postPath: i.postPath,
+            unseen: false,
+            createdAt: i.createdAt,
+            sharer: i.sharer)
+    ];
     notifyListeners();
     try {
       await auth.api.post('/notifications/seen', {});
@@ -1219,8 +1916,10 @@ class NotificationsModel extends ChangeNotifier {
 /// turn on phone alerts when they are off, then "who did what on which ask".
 class _NotesPanel extends StatefulWidget {
   final NotificationsModel notes;
+
   /// true: the Notifications tab (fills the page, no pop on tap); false: a floating panel
   final bool page;
+
   /// the empty tab's "Post an ask"
   final VoidCallback? onAsk;
   const _NotesPanel({required this.notes, this.page = false, this.onAsk});
@@ -1232,7 +1931,12 @@ class _NotesPanelState extends State<_NotesPanel> {
   String _filter = 'all';
   bool? _alertsOn;
 
-  static const _verb = {'contact': 'shared a contact on', 'media': 'shared a photo on', 'info': 'shared a note on', 'referral': 'referred a contact on'};
+  static const _verb = {
+    'contact': 'shared a contact on',
+    'media': 'shared a photo on',
+    'info': 'shared a note on',
+    'referral': 'referred a contact on'
+  };
 
   @override
   void initState() {
@@ -1252,123 +1956,241 @@ class _NotesPanelState extends State<_NotesPanel> {
         animation: widget.notes,
         builder: (context, _) {
           final n = widget.notes;
-          final shown = n.items.where((i) => _filter == 'all' || (_filter == 'unread' ? i.unseen : !i.unseen)).toList();
+          final shown = n.items
+              .where((i) =>
+                  _filter == 'all' ||
+                  (_filter == 'unread' ? i.unseen : !i.unseen))
+              .toList();
           return Container(
-            decoration: widget.page ? BoxDecoration(color: p.canvas) : _panelDecoration(p, radius: 16),
+            decoration: widget.page
+                ? BoxDecoration(color: p.canvas)
+                : _panelDecoration(p, radius: 16),
             clipBehavior: Clip.antiAlias,
-            child: Column(mainAxisSize: widget.page ? MainAxisSize.max : MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              if (widget.page) ..._pageHead(p, n, auth) else ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border))),
-                child: Row(children: [
-                  Expanded(child: Text(t('Notifications'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
-                  if (n.unseen > 0)
-                    GestureDetector(
-                      onTap: () => n.markSeen(auth),
-                      child: Text(t('Mark all as read'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.link)),
-                    ),
-                ]),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border))),
-                child: Row(children: [
-                  for (final f in const ['all', 'unread', 'read']) ...[
-                    GestureDetector(
-                      onTap: () => setState(() => _filter = f),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(color: _filter == f ? p.ink : Colors.transparent, borderRadius: BorderRadius.circular(20)),
-                        child: Text(
-                          '${t(f == 'all' ? 'All' : f == 'unread' ? 'Unread' : 'Read')}${f == 'unread' && n.unseen > 0 ? ' ${n.unseen > 9 ? '9+' : n.unseen}' : ''}',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _filter == f ? p.onInk : p.muted),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-                ]),
-              ),
-              ],
-              if (_alertsOn == false)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(color: p.chip.withValues(alpha: .6), border: Border(bottom: BorderSide(color: p.border))),
-                  child: Row(children: [
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(t('Get alerts on this device'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                        Text(t('New messages, calls and responses, even when the app is closed.'), style: TextStyle(fontSize: 12, color: p.muted)),
+            child: Column(
+                mainAxisSize: widget.page ? MainAxisSize.max : MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (widget.page)
+                    ..._pageHead(p, n, auth)
+                  else ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                          border: Border(bottom: BorderSide(color: p.border))),
+                      child: Row(children: [
+                        Expanded(
+                            child: Text(t('Notifications'),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15))),
+                        if (n.unseen > 0)
+                          GestureDetector(
+                            onTap: () => n.markSeen(auth),
+                            child: Text(t('Mark all as read'),
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: p.link)),
+                          ),
                       ]),
                     ),
-                    const SizedBox(width: 12),
-                    GestureDetector(
-                      onTap: () async {
-                        final on = await context.read<NotificationService>().enableAlerts();
-                        if (mounted) setState(() => _alertsOn = on);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20)),
-                        child: Text(t('Turn on'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kInk)),
-                      ),
-                    ),
-                  ]),
-                ),
-              _bound(
-                context,
-                child: !n.loaded
-                    ? const Padding(padding: EdgeInsets.all(24), child: Center(child: LogoLoader(size: 28)))
-                    : n.items.isEmpty
-                        ? (widget.page ? _emptyPage(p) : _empty(p, t('No responses yet. When members share a contact on your Ask, it shows up here.')))
-                        : shown.isEmpty
-                            ? _empty(p, t(_filter == 'unread' ? "You're all caught up." : 'Nothing read yet.'))
-                            : ListView.builder(
-                                shrinkWrap: !widget.page,
-                                padding: EdgeInsets.only(bottom: widget.page ? 100 : 0),
-                                itemCount: shown.length,
-                                itemBuilder: (_, i) {
-                                  final x = shown[i];
-                                  final who = x.sharer.shownName;
-                                  return InkWell(
-                                    onTap: () {
-                                      n.markSeen(auth);
-                                      final nav = Navigator.of(context);
-                                      if (!widget.page) nav.pop();
-                                      nav.push(MaterialPageRoute(builder: (_) => PostDetailScreen(postId: x.postId)));
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                      decoration: BoxDecoration(
-                                        color: x.unseen ? kGold.withValues(alpha: .1) : null,
-                                        border: i == shown.length - 1 ? null : Border(bottom: BorderSide(color: p.border)),
-                                      ),
-                                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                        Avatar(name: who, photoUrl: x.sharer.photoUrl, size: 36, type: x.sharer.userType, badge: 14, uid: x.sharer.uid),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                            Text.rich(
-                                              TextSpan(children: [
-                                                TextSpan(text: who, style: const TextStyle(fontWeight: FontWeight.w700)),
-                                                TextSpan(text: ' ${t(_verb[x.kind] ?? 'responded on')} '),
-                                                TextSpan(text: '“${x.postTitle}”', style: const TextStyle(fontWeight: FontWeight.w600)),
-                                              ]),
-                                              style: const TextStyle(fontSize: 14, height: 1.35),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(timeAgo(x.createdAt), style: TextStyle(fontSize: 12, color: p.muted)),
-                                          ]),
-                                        ),
-                                        if (x.unseen) Container(margin: const EdgeInsets.only(top: 6, left: 6), width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFFE6AC00), shape: BoxShape.circle)),
-                                      ]),
-                                    ),
-                                  );
-                                },
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                          border: Border(bottom: BorderSide(color: p.border))),
+                      child: Row(children: [
+                        for (final f in const ['all', 'unread', 'read']) ...[
+                          GestureDetector(
+                            onTap: () => setState(() => _filter = f),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                  color:
+                                      _filter == f ? p.ink : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(20)),
+                              child: Text(
+                                '${t(f == 'all' ? 'All' : f == 'unread' ? 'Unread' : 'Read')}${f == 'unread' && n.unseen > 0 ? ' ${n.unseen > 9 ? '9+' : n.unseen}' : ''}',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: _filter == f ? p.onInk : p.muted),
                               ),
-              ),
-            ]),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                      ]),
+                    ),
+                  ],
+                  if (_alertsOn == false)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                          color: p.chip.withValues(alpha: .6),
+                          border: Border(bottom: BorderSide(color: p.border))),
+                      child: Row(children: [
+                        Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(t('Get alerts on this device'),
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700)),
+                                Text(t('New messages, calls and responses, even when the app is closed.'),
+                                    style: TextStyle(
+                                        fontSize: 12, color: p.muted)),
+                              ]),
+                        ),
+                        const SizedBox(width: 12),
+                        GestureDetector(
+                          onTap: () async {
+                            final on = await context
+                                .read<NotificationService>()
+                                .enableAlerts();
+                            if (mounted) setState(() => _alertsOn = on);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                                gradient: kGoldGradient,
+                                borderRadius: BorderRadius.circular(20)),
+                            child: Text(t('Turn on'),
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: kInk)),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  _bound(
+                    context,
+                    child: !n.loaded
+                        ? const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Center(child: LogoLoader(size: 28)))
+                        : n.items.isEmpty
+                            ? (widget.page
+                                ? _emptyPage(p)
+                                : _empty(
+                                    p,
+                                    t(
+                                        'No responses yet. When members share a contact on your Ask, it shows up here.')))
+                            : shown.isEmpty
+                                ? _empty(
+                                    p,
+                                    t(_filter == 'unread'
+                                        ? "You're all caught up."
+                                        : 'Nothing read yet.'))
+                                : ListView.builder(
+                                    shrinkWrap: !widget.page,
+                                    padding: EdgeInsets.only(
+                                        bottom: widget.page ? 100 : 0),
+                                    itemCount: shown.length,
+                                    itemBuilder: (_, i) {
+                                      final x = shown[i];
+                                      final who = x.sharer.shownName;
+                                      return InkWell(
+                                        onTap: () {
+                                          n.markSeen(auth);
+                                          final nav = Navigator.of(context);
+                                          if (!widget.page) nav.pop();
+                                          nav.push(WideRoute(
+                                              builder: (_) => PostDetailScreen(
+                                                  postId: x.postId)));
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 16, vertical: 12),
+                                          decoration: BoxDecoration(
+                                            color: x.unseen
+                                                ? kGold.withValues(alpha: .1)
+                                                : null,
+                                            border: i == shown.length - 1
+                                                ? null
+                                                : Border(
+                                                    bottom: BorderSide(
+                                                        color: p.border)),
+                                          ),
+                                          child: Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Avatar(
+                                                    name: who,
+                                                    photoUrl: x.sharer.photoUrl,
+                                                    size: 36,
+                                                    type: x.sharer.userType,
+                                                    badge: 14,
+                                                    uid: x.sharer.uid),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text.rich(
+                                                          TextSpan(children: [
+                                                            TextSpan(
+                                                                text: who,
+                                                                style: const TextStyle(
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w700)),
+                                                            TextSpan(
+                                                                text:
+                                                                    ' ${t(_verb[x.kind] ?? 'responded on')} '),
+                                                            TextSpan(
+                                                                text:
+                                                                    '“${x.postTitle}”',
+                                                                style: const TextStyle(
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w600)),
+                                                          ]),
+                                                          style:
+                                                              const TextStyle(
+                                                                  fontSize: 14,
+                                                                  height: 1.35),
+                                                        ),
+                                                        const SizedBox(
+                                                            height: 2),
+                                                        Text(
+                                                            timeAgo(
+                                                                x.createdAt),
+                                                            style: TextStyle(
+                                                                fontSize: 12,
+                                                                color:
+                                                                    p.muted)),
+                                                      ]),
+                                                ),
+                                                if (x.unseen)
+                                                  Container(
+                                                      margin:
+                                                          const EdgeInsets.only(
+                                                              top: 6, left: 6),
+                                                      width: 8,
+                                                      height: 8,
+                                                      decoration:
+                                                          const BoxDecoration(
+                                                              color: Color(
+                                                                  0xFFE6AC00),
+                                                              shape: BoxShape
+                                                                  .circle)),
+                                              ]),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                  ),
+                ]),
           );
         },
       ),
@@ -1376,8 +2198,12 @@ class _NotesPanelState extends State<_NotesPanel> {
   }
 
   /// the list: filling the rest of the page on the tab, a capped height in the floating panel
-  Widget _bound(BuildContext context, {required Widget child}) =>
-      widget.page ? Expanded(child: child) : ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .62), child: child);
+  Widget _bound(BuildContext context, {required Widget child}) => widget.page
+      ? Expanded(child: child)
+      : ConstrainedBox(
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * .62),
+          child: child);
 
   /// The tab's top, as Talk's: the title and how many are new, Mark all as read, then the filters as gold chips.
   List<Widget> _pageHead(Pal p, NotificationsModel n, AuthProvider auth) {
@@ -1389,15 +2215,28 @@ class _NotesPanelState extends State<_NotesPanel> {
           duration: const Duration(milliseconds: 150),
           height: 36,
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(gradient: on ? kGoldGradient : null, color: on ? null : p.chip, borderRadius: BorderRadius.circular(20)),
+          decoration: BoxDecoration(
+              gradient: on ? kGoldGradient : null,
+              color: on ? null : p.chip,
+              borderRadius: BorderRadius.circular(20)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Text(t(label), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: on ? kInk : p.muted)),
+            Text(t(label),
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: on ? kInk : p.muted)),
             if (f == 'unread' && n.unseen > 0) ...[
               const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
-                decoration: BoxDecoration(color: kInk, borderRadius: BorderRadius.circular(10)),
-                child: Text(n.unseen > 99 ? '99+' : '${n.unseen}', style: const TextStyle(fontSize: 11, height: 16 / 11, fontWeight: FontWeight.w700, color: kGold)),
+                decoration: BoxDecoration(
+                    color: kInk, borderRadius: BorderRadius.circular(10)),
+                child: Text(n.unseen > 99 ? '99+' : '${n.unseen}',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        height: 16 / 11,
+                        fontWeight: FontWeight.w700,
+                        color: kGold)),
               ),
             ],
           ]),
@@ -1410,37 +2249,69 @@ class _NotesPanelState extends State<_NotesPanel> {
         padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(t('Notifications'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1)),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(t('Notifications'),
+                  style: const TextStyle(
+                      fontSize: 24, fontWeight: FontWeight.w700, height: 1)),
               const SizedBox(height: 4),
-              Text(n.unseen > 0 ? '${n.unseen} ${t('unread')}' : t("You're all caught up"), style: TextStyle(fontSize: 14, color: p.muted)),
+              Text(
+                  n.unseen > 0
+                      ? '${n.unseen} ${t('unread')}'
+                      : t("You're all caught up"),
+                  style: TextStyle(fontSize: 14, color: p.muted)),
             ]),
           ),
-          if (n.unseen > 0) TextButton(onPressed: () => n.markSeen(auth), child: Text(t('Mark all as read'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
+          if (n.unseen > 0)
+            TextButton(
+                onPressed: () => n.markSeen(auth),
+                child: Text(t('Mark all as read'),
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w700))),
         ]),
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Row(children: [chip('all', 'All'), const SizedBox(width: 8), chip('unread', 'Unread'), const SizedBox(width: 8), chip('read', 'Read')]),
+        child: Row(children: [
+          chip('all', 'All'),
+          const SizedBox(width: 8),
+          chip('unread', 'Unread'),
+          const SizedBox(width: 8),
+          chip('read', 'Read')
+        ]),
       ),
     ];
   }
 
   /// The empty tab: what will show here, and the way to get some
-  Widget _emptyPage(Pal p) => ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 100), children: [
+  Widget _emptyPage(Pal p) =>
+      ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 100), children: [
         DashedBox(
           radius: 16,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
           child: Column(children: [
-            Container(width: 64, height: 64, alignment: Alignment.center, decoration: BoxDecoration(color: p.tagBg, shape: BoxShape.circle), child: WIcon(WI.bell, size: 28, color: p.tagText)),
+            Container(
+                width: 64,
+                height: 64,
+                alignment: Alignment.center,
+                decoration:
+                    BoxDecoration(color: p.tagBg, shape: BoxShape.circle),
+                child: WIcon(WI.bell, size: 28, color: p.tagText)),
             const SizedBox(height: 14),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 300),
-              child: Text(t('No responses yet. When members share a contact on your Ask, it shows up here.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 14.5, height: 1.4, color: p.muted)),
+              child: Text(
+                  t('No responses yet. When members share a contact on your Ask, it shows up here.'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14.5, height: 1.4, color: p.muted)),
             ),
             if (widget.onAsk != null) ...[
               const SizedBox(height: 18),
-              GoldButton(label: t('Post an ask'), wi: WI.askPlus, height: 44, onPressed: widget.onAsk),
+              GoldButton(
+                  label: t('Post an ask'),
+                  wi: WI.askPlus,
+                  height: 44,
+                  onPressed: widget.onAsk),
             ],
           ]),
         ),
@@ -1448,6 +2319,91 @@ class _NotesPanelState extends State<_NotesPanel> {
 
   Widget _empty(Pal p, String text) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
-        child: Text(text, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.muted)),
+        child: Text(text,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: p.muted)),
+      );
+}
+
+/// The Find button while the Find page is open: the four SkyQ colours round the gold disc, turning while a search runs.
+class _FindRing extends StatefulWidget {
+  final double size;
+  final Widget icon;
+  const _FindRing({super.key, required this.size, required this.icon});
+  @override
+  State<_FindRing> createState() => _FindRingState();
+}
+
+class _FindRingState extends State<_FindRing> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
+
+  @override
+  void initState() {
+    super.initState();
+    directoryBusy.addListener(_sync);
+    directoryLevel.addListener(_sync);
+    _sync();
+  }
+
+  void _sync() {
+    if (!mounted) return;
+    if ((directoryBusy.value || directoryLevel.value >= 0) && !MediaQuery.disableAnimationsOf(context)) {
+      if (!_c.isAnimating) _c.repeat();
+    } else {
+      _c.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    directoryBusy.removeListener(_sync);
+    directoryLevel.removeListener(_sync);
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<double>(
+        valueListenable: directoryLevel,
+        builder: (context, lvl, child) => Transform.scale(
+          scale: lvl < 0 ? 1 : 1 + lvl * 0.07,
+          child: DecoratedBox(
+            // the glow follows the voice
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: lvl < 0
+                  ? null
+                  : [
+                      BoxShadow(color: const Color(0xFF0575E6).withValues(alpha: .55), blurRadius: 6 + lvl * 22, spreadRadius: lvl * 6),
+                      BoxShadow(color: const Color(0xFFFFC700).withValues(alpha: .6), blurRadius: lvl * 16, spreadRadius: lvl * 2),
+                    ],
+            ),
+            child: child,
+          ),
+        ),
+        child: _ringBody(context),
+      );
+
+  Widget _ringBody(BuildContext context) => SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: Stack(alignment: Alignment.center, children: [
+          RotationTransition(
+            turns: _c,
+            child: Container(
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: SweepGradient(
+                  colors: [Color(0xFF0575E6), Color(0xFF34A853), Color(0xFFFFC700), Color(0xFFFF0000), Color(0xFF0575E6)],
+                  stops: [0, .25, .5, .75, 1],
+                ),
+              ),
+            ),
+          ),
+          // a gap of the page colour between the colours and the gold
+          Container(width: widget.size - 4, height: widget.size - 4, decoration: BoxDecoration(shape: BoxShape.circle, color: Pal.of(context).canvas)),
+          Container(width: widget.size - 10, height: widget.size - 10, decoration: BoxDecoration(shape: BoxShape.circle, color: Pal.of(context).card)),
+          widget.icon,
+        ]),
       );
 }

@@ -180,7 +180,7 @@ class _ReviewsCardState extends State<ReviewsCard> {
       padding: const EdgeInsets.only(top: 14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         GestureDetector(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: '${a['handle']}'))),
+          onTap: () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: '${a['handle']}'))),
           child: Row(children: [
             Avatar(name: who, photoUrl: a['photoURL'] as String?, size: 32),
             const SizedBox(width: 10),

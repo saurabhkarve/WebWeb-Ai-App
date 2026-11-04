@@ -624,7 +624,13 @@ class StoryGroup {
   final String? photoUrl;
   final List<StoryItem> items;
   StoryGroup({required this.uid, required this.name, required this.handle, this.userType = 'entrepreneur', this.company = '', this.verification = 0, this.photoUrl, required this.items});
-  String get shownName => userType == 'entrepreneur' && company.isNotEmpty ? company : name;
+  /// House accounts (@webweb...) show without the WEBWEB in front: "Directory", "Quiz", not "WEBWEB Directory".
+  String get shownName {
+    final full = userType == 'entrepreneur' && company.isNotEmpty ? company : name;
+    if (!handle.startsWith('webweb')) return full;
+    final short = full.replaceFirst(RegExp(r'^\s*web\s*web\s*', caseSensitive: false), '').trim();
+    return short.isEmpty ? full : short;
+  }
   factory StoryGroup.fromJson(Map j) => StoryGroup(
         uid: '${j['uid']}', name: '${j['name']}', handle: '${j['handle'] ?? ''}', photoUrl: j['photoURL'] as String?,
         userType: '${j['userType'] ?? 'entrepreneur'}', company: '${j['company'] ?? ''}', verification: (j['verification'] as num?)?.toInt() ?? 0,

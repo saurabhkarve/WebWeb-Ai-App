@@ -248,7 +248,7 @@ class _AskAreaSheetState extends State<_AskAreaSheet> {
             GestureDetector(
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(widget.outer, MaterialPageRoute(builder: (_) => FindScreen(standalone: true, initialLocation: area)));
+                Navigator.push(widget.outer, WideRoute(builder: (_) => FindScreen(standalone: true, initialLocation: area)));
               },
               child: Text(t('More asks in {area}', {'area': t(area)}), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link)),
             ),

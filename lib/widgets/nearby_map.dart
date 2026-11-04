@@ -392,7 +392,7 @@ class _NearbyMapPageState extends State<NearbyMapPage> {
             bottom: lift,
             child: Container(
               decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(20), boxShadow: shadow),
-              child: _row(_sel!, p, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(handle: _sel!.user.handle))),
+              child: _row(_sel!, p, () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: _sel!.user.handle))),
                   big: true),
             ),
           ),
