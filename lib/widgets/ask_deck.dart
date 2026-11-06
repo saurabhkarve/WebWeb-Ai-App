@@ -247,13 +247,16 @@ class _AskDeckState extends State<AskDeck> {
 
   Widget _label(Pal p, String s) => Text(s.toUpperCase(), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: .4, color: p.muted));
 
-  Widget _chip(Pal p, WI icon, String text) => Container(
+  // [on]: the colour of the words on a poster card (a solid colour): a white-tinted chip with light text
+  Widget _chip(Pal p, WI icon, String text, {Color? on}) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        decoration: BoxDecoration(color: p.canvas.withValues(alpha: .7), borderRadius: BorderRadius.circular(20)),
+        decoration: on == null
+            ? BoxDecoration(color: p.canvas.withValues(alpha: .7), borderRadius: BorderRadius.circular(20))
+            : BoxDecoration(color: Colors.white.withValues(alpha: .16), border: Border.all(color: Colors.white.withValues(alpha: .35)), borderRadius: BorderRadius.circular(20)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          WIcon(icon, size: 13, color: p.muted, still: true),
+          WIcon(icon, size: 13, color: on?.withValues(alpha: .9) ?? p.muted, still: true),
           const SizedBox(width: 4),
-          Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text.withValues(alpha: .8)))),
+          Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: on ?? p.text.withValues(alpha: .8)))),
         ]),
       );
 
@@ -305,17 +308,18 @@ class _AskDeckState extends State<AskDeck> {
               }),
             );
         final chips = Wrap(spacing: 6, runSpacing: 6, children: [
-          if ((post.locationPref ?? '').isNotEmpty) _chip(p, WI.pin, t(post.locationPref!)),
-          if (left != null) _chip(p, WI.clock, left),
-          if (left != null && askDeadline(post) != null) _chip(p, WI.calendar, askDeadline(post)!),
-          if ((post.budget ?? '').isNotEmpty) _chip(p, WI.rupee, post.budget!),
-          if (widget.reachLabel != null) _chip(p, WI.locate, widget.reachLabel!),
+          if ((post.locationPref ?? '').isNotEmpty) _chip(p, WI.pin, t(post.locationPref!), on: poster ? onSolid : null),
+          if (left != null) _chip(p, WI.clock, left, on: poster ? onSolid : null),
+          if (left != null && askDeadline(post) != null) _chip(p, WI.calendar, askDeadline(post)!, on: poster ? onSolid : null),
+          if ((post.budget ?? '').isNotEmpty) _chip(p, WI.rupee, post.budget!, on: poster ? onSolid : null),
+          if (widget.reachLabel != null) _chip(p, WI.locate, widget.reachLabel!, on: poster ? onSolid : null),
         ]);
         Widget? cta() {
           if (widget.preview || (visitHref == null && widget.mine)) return null;
           return CardCta(
             label: visitHref != null ? 'Visit website' : 'I can help',
             scale: _scale,
+            poster: poster,
             onTap: () {
               if (_log) CardEvents.log(context.read<AuthProvider>().api, post.id, 'cta', 0, _kinds.length);
               if (visitHref != null) {
@@ -333,6 +337,7 @@ class _AskDeckState extends State<AskDeck> {
             label: 'Talk',
             scale: _scale,
             outlined: true,
+            poster: poster,
             onTap: () {
               if (_log) CardEvents.log(context.read<AuthProvider>().api, post.id, 'cta', 0, _kinds.length);
               openChat(context, Peer(uid: post.authorUid, name: post.authorName, company: post.authorCompany, handle: post.authorHandle));

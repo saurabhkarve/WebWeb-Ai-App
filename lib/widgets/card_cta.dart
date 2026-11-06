@@ -47,7 +47,9 @@ class CardCta extends StatelessWidget {
   final bool fill;
   /// a gold outline, no fill: the second button beside the main one (Talk)
   final bool outlined;
-  const CardCta({super.key, required this.label, required this.onTap, this.scale = 1, this.fill = false, this.outlined = false});
+  /// on a poster card (a solid colour): a white pill, and a white outline for Talk
+  final bool poster;
+  const CardCta({super.key, required this.label, required this.onTap, this.scale = 1, this.fill = false, this.outlined = false, this.poster = false});
 
   @override
   Widget build(BuildContext context) {
@@ -56,12 +58,12 @@ class CardCta extends StatelessWidget {
       constraints: BoxConstraints(minWidth: outlined ? 0 : (96 * scale).clamp(96.0, 120.0)),
       padding: EdgeInsets.symmetric(horizontal: outlined ? 14 : 18),
       alignment: Alignment.center,
-      decoration: outlined ? BoxDecoration(border: Border.all(color: kGold, width: 1.5), borderRadius: BorderRadius.circular(20)) : BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 3, offset: Offset(0, 1))]),
+      decoration: outlined ? BoxDecoration(border: Border.all(color: poster ? Colors.white.withValues(alpha: .75) : kGold, width: 1.5), borderRadius: BorderRadius.circular(20)) : poster ? BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x1A1E1E1E), blurRadius: 3, offset: Offset(0, 1))]) : BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 3, offset: Offset(0, 1))]),
       child: outlined
           ? Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
-              WIcon(WI.talk, size: 18, color: Pal.of(context).text),
+              WIcon(WI.talk, size: 18, color: poster ? Colors.white : Pal.of(context).text),
               const SizedBox(width: 5),
-              Flexible(child: Text(t(label), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: (13 * scale).clamp(12.5, 14.5), fontWeight: FontWeight.w700, color: Pal.of(context).text))),
+              Flexible(child: Text(t(label), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: (13 * scale).clamp(12.5, 14.5), fontWeight: FontWeight.w700, color: poster ? Colors.white : Pal.of(context).text))),
             ])
           : Text(t(label), style: TextStyle(fontSize: (13 * scale).clamp(12.5, 14.5), fontWeight: FontWeight.w700, color: kInk)),
     );
