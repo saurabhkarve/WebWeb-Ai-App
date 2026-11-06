@@ -2254,23 +2254,47 @@ class _AiOrbState extends State<_AiOrb> with SingleTickerProviderStateMixin {
                   ),
                   child: Transform.rotate(
                     angle: .2 * ease,
-                    child: Transform.scale(scale: 1 + .16 * ease, child: const Icon(Icons.auto_awesome_rounded, size: 20, color: Color(0xFFFFD84A))),
+                    child: Transform.scale(scale: 1 + .12 * ease, child: const _AiStar()),
                   ),
                 ),
               ]),
-            ),
-            Positioned(
-              right: 0,
-              bottom: 1,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
-                decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(8), border: Border.all(color: Pal.of(context).card, width: 2)),
-                child: const Text('AI', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: kInk, height: 1, letterSpacing: .4)),
-              ),
             ),
           ]);
         },
       ),
     );
   }
+}
+
+/// One four-point gold star with AI in it.
+class _AiStar extends StatelessWidget {
+  const _AiStar();
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: 28,
+        height: 28,
+        child: Stack(alignment: Alignment.center, children: [
+          CustomPaint(size: const Size(28, 28), painter: _StarPainter()),
+          const Padding(padding: EdgeInsets.only(top: 2), child: Text('AI', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: Color(0xFF1E1E1E), height: 1))),
+        ]),
+      );
+}
+
+class _StarPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final k = size.width / 24;
+    final path = Path()
+      ..moveTo(12 * k, 1.5 * k)
+      ..cubicTo(14 * k, 8 * k, 16 * k, 10 * k, 22.5 * k, 12 * k)
+      ..cubicTo(16 * k, 14 * k, 14 * k, 16 * k, 12 * k, 22.5 * k)
+      ..cubicTo(10 * k, 16 * k, 8 * k, 14 * k, 1.5 * k, 12 * k)
+      ..cubicTo(8 * k, 10 * k, 10 * k, 8 * k, 12 * k, 1.5 * k)
+      ..close();
+    canvas.drawShadow(path, const Color(0xFFFFD84A), 4, true);
+    canvas.drawPath(path, Paint()..shader = const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFFE84D), Color(0xFFFFB800)]).createShader(Offset.zero & size));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
 }
