@@ -1272,32 +1272,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
   /// "AI" with the star, in gold: what the search is
   /// a gold orb with the sparkle, the AI tag on its corner like the app's count badges
-  Widget _aiBadge() => SizedBox(
-        width: 46,
-        height: 44,
-        child: Stack(clipBehavior: Clip.none, alignment: Alignment.centerLeft, children: [
-          Container(
-            width: 40,
-            height: 40,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              gradient: kGoldGradient,
-              shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: const Color(0xFFD6AA00).withValues(alpha: .45), blurRadius: 10, offset: const Offset(0, 4))],
-            ),
-            child: const Icon(Icons.auto_awesome_rounded, size: 21, color: kInk),
-          ),
-          Positioned(
-            right: 0,
-            bottom: 1,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
-              decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(8), border: Border.all(color: Pal.of(context).card, width: 2)),
-              child: const Text('AI', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFFFFD84A), height: 1, letterSpacing: .4)),
-            ),
-          ),
-        ]),
-      );
+  Widget _aiBadge() => const _AiOrb();
 
   /// The search page: the search (the ask's title) with Cancel, then, down to the keyboard, what was found as it is
   /// typed and the new ask to post when no one fits.
@@ -2246,5 +2221,84 @@ class _DirectoryRailSearchState extends State<DirectoryRailSearch> {
         ),
       ),
     ]);
+  }
+}
+
+/// The AI orb of the search: a slow breath of light, a soft ring that spreads and fades, and a sparkle that twinkles.
+class _AiOrb extends StatefulWidget {
+  const _AiOrb();
+  @override
+  State<_AiOrb> createState() => _AiOrbState();
+}
+
+class _AiOrbState extends State<_AiOrb> with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 46,
+      height: 44,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (context, _) {
+          final v = _c.value;
+          final breath = (1 - (2 * v - 1).abs()); // 0 -> 1 -> 0
+          final ease = Curves.easeInOut.transform(breath);
+          return Stack(clipBehavior: Clip.none, alignment: Alignment.centerLeft, children: [
+            // the ring that spreads and fades
+            Positioned(
+              left: 0,
+              child: Opacity(
+                opacity: (0.7 * (1 - (v / .7).clamp(0.0, 1.0))),
+                child: Transform.scale(
+                  scale: 1 + .7 * (v / .7).clamp(0.0, 1.0),
+                  child: Container(width: 40, height: 40, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: kGold.withValues(alpha: .6), width: 2))),
+                ),
+              ),
+            ),
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: kGoldGradient,
+                shape: BoxShape.circle,
+                boxShadow: [BoxShadow(color: const Color(0xFFD6AA00).withValues(alpha: .4 + .35 * ease), blurRadius: 10 + 12 * ease, offset: const Offset(0, 4))],
+              ),
+              child: Transform.rotate(
+                angle: .25 * ease,
+                child: Transform.scale(scale: 1 + .18 * ease, child: const Icon(Icons.auto_awesome_rounded, size: 21, color: kInk)),
+              ),
+            ),
+            Positioned(
+              right: 0,
+              bottom: 1,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
+                decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(8), border: Border.all(color: Pal.of(context).card, width: 2)),
+                child: const Text('AI', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFFFFD84A), height: 1, letterSpacing: .4)),
+              ),
+            ),
+          ]);
+        },
+      ),
+    );
   }
 }
