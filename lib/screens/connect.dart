@@ -1160,7 +1160,7 @@ class _AskComposerState extends State<_AskComposer> {
                 small('🖼️ ${t('Add photos')}', _pickPhotos),
                 small('📍 ${place.isEmpty ? t('Location') : place}', _pickPlace, on: _city != null),
                 small('₹ ${_budget.text.isEmpty ? t('Budget') : _budget.text.replaceFirst(RegExp(r'^₹\s*'), '')}', _pickBudget, on: _budget.text.isNotEmpty),
-                small('🎨 ${t('Card style')}: ${t(kCardStyleLabels[_style] ?? _style)}', () => setState(() => _styleOpen = !_styleOpen), on: _styleOpen),
+                small('🎨 ${t('Card style')}', () => setState(() => _styleOpen = !_styleOpen), on: _styleOpen),
               ])),
                 const SizedBox(width: 10),
                 GestureDetector(
