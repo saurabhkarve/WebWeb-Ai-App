@@ -2828,5 +2828,11 @@
   "Know someone who can help? Refer a contact": "किसी को जानते हैं जो मदद कर सके? संपर्क रेफ़र करें",
   "Add a note (optional), e.g. I have used them: quick and fairly priced": "नोट जोड़ें (वैकल्पिक), जैसे मैंने इनसे काम करवाया है: तेज़ और सही दाम",
   "What do you need, {name}?": "{name}, आपको क्या चाहिए?",
-  "Post ask": "आस्क पोस्ट करें"
+  "Post ask": "आस्क पोस्ट करें",
+  "So asks and contacts near you show first. Only used while the app is open.": "ताकि आपके पास के आस्क और संपर्क पहले दिखें। सिर्फ़ ऐप खुला होने पर इस्तेमाल होता है।",
+  "To take photos for your asks and page, and for video calls.": "अपने आस्क और पेज के लिए फ़ोटो लेने और वीडियो कॉल के लिए।",
+  "So members can hear you on calls and voice asks.": "ताकि सदस्य कॉल और वॉइस आस्क में आपको सुन सकें।",
+  "So you do not miss replies, messages and calls.": "ताकि आप जवाब, संदेश और कॉल न चूकें।",
+  "Do not miss calls": "कॉल न चूकें",
+  "Let WEBWEB run in the background so calls and messages reach you on time.": "WEBWEB को बैकग्राउंड में चलने दें ताकि कॉल और संदेश समय पर पहुँचें।"
 }

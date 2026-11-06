@@ -18,6 +18,7 @@ import 'realtime.dart';
 import 'widgets.dart';
 import 'i18n.dart';
 import 'contact_sync.dart';
+import 'permission_nudge.dart';
 import 'permissions.dart';
 import 'screens/contact_picker.dart';
 import 'screens/service_contacts_sheet.dart';
@@ -390,6 +391,12 @@ class NotificationService with WidgetsBindingObserver {
           return;
         }
         // sent by hand from Admin to members who have not allowed contacts: the sheet explains it and has "Turn on"
+        if (path.startsWith('/allow/')) {
+          final c = nv.context;
+          if (!c.mounted) return;
+          await handlePermissionNudge(c, path.substring(7));
+          return;
+        }
         if (path == '/allow-contacts') {
           if (ContactSync.supported && !await Permissions.granted(Need.contacts) && nv.mounted) {
             await showServiceContactsSheet(nv.context, invite: true);
@@ -483,6 +490,7 @@ const _askReplyAction = AndroidNotificationAction(
 );
 const _referAction = AndroidNotificationAction('refer', 'Refer', showsUserInterface: true);
 /// "Allow contacts" on the note Admin sends to members who have not allowed contacts (a tap on it opens the same screen)
+const _allowAction = AndroidNotificationAction('allow', 'Allow', showsUserInterface: true);
 const _allowContactsAction = AndroidNotificationAction('allow_contacts', 'Allow contacts', showsUserInterface: true);
 
 const _messageDetails = NotificationDetails(
@@ -715,6 +723,11 @@ Future<void> showActivity(Map<String, dynamic> d, {required String title, requir
   final NotificationDetails details;
   if (kind == 'missed_call') {
     details = _messageDetails;
+  } else if (kind == 'permission_nudge') {
+    details = const NotificationDetails(
+      android: AndroidNotificationDetails('activity', 'Activity', channelDescription: 'New activity', importance: Importance.high, priority: Priority.high, groupKey: 'activity', actions: [_allowAction]),
+      iOS: DarwinNotificationDetails(),
+    );
   } else if (kind == 'contacts_nudge') {
     details = const NotificationDetails(
       android: AndroidNotificationDetails('activity', 'Activity', channelDescription: 'New activity', importance: Importance.high, priority: Priority.high, groupKey: 'activity', actions: [_allowContactsAction]),
