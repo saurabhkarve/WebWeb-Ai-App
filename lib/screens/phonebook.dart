@@ -337,8 +337,20 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   int _exI = 0, _exN = 0, _exDir = 1;
   String _typed = '';
 
+  // the greeting and the updates fold away while the box has the cursor; they come back a moment after it leaves, so a tap on a
+  // chip below is not moved out from under the finger by the layout changing on the first touch
+  bool _boxFold = false;
+  Timer? _unfold;
+
   void _onSearchFocus() {
-    if (mounted) setState(() {});
+    _unfold?.cancel();
+    if (_qFocus.hasFocus) {
+      if (mounted) setState(() => _boxFold = true);
+    } else {
+      _unfold = Timer(const Duration(milliseconds: 450), () {
+        if (mounted) setState(() => _boxFold = false);
+      });
+    }
   }
 
   void _typeStep() {
@@ -413,6 +425,10 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     directoryFocus.addListener(_onFocusRequest);
     directorySpeak.addListener(_onSpeak);
     _qFocus.addListener(_onSearchFocus);
+    // the Find page opens with the cursor in the search
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.active) _qFocus.requestFocus();
+    });
     _typeTimer = Timer(const Duration(milliseconds: 800), _typeStep);
     ApproxDistance.init().then((_) => mounted ? setState(() {}) : null);
     _loadMatches();
@@ -441,6 +457,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     _debounce?.cancel();
     _aiTimer?.cancel();
     _typeTimer?.cancel();
+    _unfold?.cancel();
     _q.dispose();
     _qFocus.removeListener(_onSearchFocus);
     _qFocus.dispose();
@@ -741,7 +758,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
     final top = Column(key: _topKey, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       // the updates (people, leads, Today, new businesses) come first, above the search
-      _fold(!_searching, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _fold(!_searching && !_boxFold, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Column(key: Tours.key('updates'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         // a small gold title with a fading rule, so the circles read as their own strip without a box
         Padding(
@@ -778,7 +795,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
           ),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          _fold(!_searching, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _fold(!_searching && !_boxFold, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (me != null && me.name.trim().isNotEmpty)
             Text('${t('Hi {name}', {'name': me.name.trim().split(' ').first})} 👋', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00))),
           const SizedBox(height: 2),
