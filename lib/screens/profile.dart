@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1299,7 +1300,7 @@ Future<void> _showShareSheet(BuildContext context, ShareTarget target, {bool ope
   );
 }
 
-enum _ShareView { menu, chat, qr }
+enum _ShareView { menu, chat, qr, card }
 
 class _ShareSheet extends StatefulWidget {
   final ShareTarget target;
@@ -1315,6 +1316,7 @@ class _ShareSheetState extends State<_ShareSheet> {
   final _q = TextEditingController();
   final _qrKey = GlobalKey();
   bool _qrBusy = false;
+  bool _cardBusy = false;
   String? _sending;
   final Set<String> _sent = {};
 
@@ -1373,6 +1375,29 @@ class _ShareSheetState extends State<_ShareSheet> {
     }
   }
 
+  /// The intro card (the server draws it: /intro-card/<handle>) to the phone's share sheet.
+  Future<void> _shareCard() async {
+    final qr = _t.qr!;
+    final api = context.read<AuthProvider>().api;
+    setState(() => _cardBusy = true);
+    try {
+      final res = await http.get(Uri.parse('$siteUrl/intro-card/${qr.handle}')).timeout(const Duration(seconds: 30));
+      if (res.statusCode != 200) throw 'no card';
+      final name = 'webweb-${qr.handle}-intro-card.png';
+      final r = await SharePlus.instance.share(ShareParams(
+        files: [XFile.fromData(res.bodyBytes, mimeType: 'image/png', name: name)],
+        fileNameOverrides: [name],
+        text: _t.url,
+        subject: _t.subject,
+      ));
+      if (r.status != ShareResultStatus.dismissed) logShare(api, _t.entity, _t.ref, channel: 'card');
+    } catch (_) {
+      if (mounted) toast(context, t('Could not create the card'), error: true);
+    } finally {
+      if (mounted) setState(() => _cardBusy = false);
+    }
+  }
+
   Future<void> _copy() async {
     await Clipboard.setData(ClipboardData(text: _t.url));
     if (!mounted) return;
@@ -1406,6 +1431,7 @@ class _ShareSheetState extends State<_ShareSheet> {
     final heading = switch (_view) {
       _ShareView.chat => t('Send in chat'),
       _ShareView.qr => t('QR code'),
+      _ShareView.card => t('Intro card'),
       _ShareView.menu => _t.title,
     };
     return ConstrainedBox(
@@ -1423,12 +1449,45 @@ class _ShareSheetState extends State<_ShareSheet> {
           if (_view == _ShareView.menu) ...[
             row(WIcon(WI.talk, size: 20, color: p.text), t('Send in chat'), t('Pick a conversation'), _openChats),
             if (_t.qr != null) row(WIcon(WI.qr, size: 20, color: p.text), t('QR code'), t('Show, share or download'), () => setState(() => _view = _ShareView.qr)),
+            if (_t.qr != null) row(WIcon(WI.contactCard, size: 20, color: p.text), t('Intro card'), t('Your photo, what you do and a QR to your page, to share'), () => setState(() => _view = _ShareView.card)),
             row(WIcon(WI.clip, size: 20, color: p.text), t('Copy link'), _t.url.replaceFirst(RegExp(r'^https?://'), ''), _copy),
             row(WIcon(WI.share, size: 20, color: p.text), t('More apps'), t('WhatsApp, email and others'), () async {
               try {
                 await shareAndLog(context.read<AuthProvider>().api, entity: _t.entity, ref: _t.ref, text: _t.text.isEmpty ? _t.url : '${_t.text}\n${_t.url}', subject: _t.subject);
               } catch (_) {}
             }),
+          ] else if (_view == _ShareView.card) ...[
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(children: [
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 280),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: AspectRatio(
+                          aspectRatio: 3 / 4,
+                          child: Image.network(
+                            '$siteUrl/intro-card/${_t.qr!.handle}',
+                            fit: BoxFit.cover,
+                            loadingBuilder: (_, child, prog) => prog == null ? child : Container(color: p.chip, alignment: Alignment.center, child: const Spinner(size: 24)),
+                            errorBuilder: (_, __, ___) => Container(color: p.chip, alignment: Alignment.center, padding: const EdgeInsets.all(16), child: Text(t('Could not create the card'), textAlign: TextAlign.center)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    Expanded(child: GoldButton(label: t('Share image'), wi: WI.share, height: 44, loading: _cardBusy, onPressed: _cardBusy ? null : _shareCard)),
+                    const SizedBox(width: 8),
+                    Expanded(child: GoldButton(label: t('Copy link'), wi: WI.clip, outlined: true, height: 44, onPressed: _copy)),
+                  ]),
+                  const SizedBox(height: 8),
+                  Text(t('Post it on WhatsApp status, Instagram or print it: the QR opens your WEBWEB AI page.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.muted)),
+                ]),
+              ),
+            ),
           ] else if (_view == _ShareView.qr) ...[
             Flexible(
               child: SingleChildScrollView(
