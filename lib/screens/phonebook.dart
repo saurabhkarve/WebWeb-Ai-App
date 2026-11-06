@@ -793,17 +793,8 @@ class _PhonebookHomeState extends State<PhonebookHome> {
       AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
-        padding: EdgeInsets.fromLTRB(16, _searching ? 10 : 18, 16, 14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: p.dark ? Colors.white.withValues(alpha: .1) : p.border),
-          boxShadow: p.dark ? null : const [BoxShadow(color: Color(0x4D1E1E1E), blurRadius: 30, offset: Offset(0, 10), spreadRadius: -18)],
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: p.dark ? [Colors.white.withValues(alpha: .06), Colors.white.withValues(alpha: .02)] : const [Color(0xFFFFFAF0), Color(0xFFFFFDF8), Color(0xFFFFFFFF)],
-          ),
-        ),
+        // no box round the greeting and the search: the colourful search box is the one box
+        padding: EdgeInsets.fromLTRB(0, _searching ? 4 : 8, 0, 14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _fold(!_searching && !_boxFold, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (me != null && me.name.trim().isNotEmpty)
