@@ -2224,41 +2224,48 @@ class _AiOrbState extends State<_AiOrb> with SingleTickerProviderStateMixin {
         animation: _c,
         builder: (context, _) {
           final v = _c.value;
-          final breath = (1 - (2 * v - 1).abs()); // 0 -> 1 -> 0
-          final ease = Curves.easeInOut.transform(breath);
+          final ease = Curves.easeInOut.transform(1 - (2 * v - 1).abs());
           return Stack(clipBehavior: Clip.none, alignment: Alignment.centerLeft, children: [
-            // the ring that spreads and fades
-            Positioned(
-              left: 0,
-              child: Opacity(
-                opacity: (0.7 * (1 - (v / .7).clamp(0.0, 1.0))),
-                child: Transform.scale(
-                  scale: 1 + .7 * (v / .7).clamp(0.0, 1.0),
-                  child: Container(width: 40, height: 40, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: kGold.withValues(alpha: .6), width: 2))),
-                ),
-              ),
-            ),
             Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
-                gradient: kGoldGradient,
                 shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: const Color(0xFFD6AA00).withValues(alpha: .4 + .35 * ease), blurRadius: 10 + 12 * ease, offset: const Offset(0, 4))],
+                boxShadow: [BoxShadow(color: kGold.withValues(alpha: .25 + .25 * ease), blurRadius: 10 + 10 * ease)],
               ),
-              child: Transform.rotate(
-                angle: .25 * ease,
-                child: Transform.scale(scale: 1 + .18 * ease, child: const Icon(Icons.auto_awesome_rounded, size: 21, color: kInk)),
-              ),
+              child: Stack(alignment: Alignment.center, children: [
+                // the ring of the four SkyQ colours, turning slowly
+                Transform.rotate(
+                  angle: v * 6.2831853,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: SweepGradient(colors: [Color(0xFFFFC700), Color(0xFFFF3B30), Color(0xFF0575E6), Color(0xFF34A853), Color(0xFFFFC700)]),
+                    ),
+                  ),
+                ),
+                // the dark glass core
+                Container(
+                  width: 37,
+                  height: 37,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(center: Alignment(-.35, -.45), radius: 1, colors: [Color(0xFF34364F), Color(0xFF15161F)], stops: [0, .62]),
+                  ),
+                  child: Transform.rotate(
+                    angle: .2 * ease,
+                    child: Transform.scale(scale: 1 + .16 * ease, child: const Icon(Icons.auto_awesome_rounded, size: 20, color: Color(0xFFFFD84A))),
+                  ),
+                ),
+              ]),
             ),
             Positioned(
               right: 0,
               bottom: 1,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
-                decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(8), border: Border.all(color: Pal.of(context).card, width: 2)),
-                child: const Text('AI', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFFFFD84A), height: 1, letterSpacing: .4)),
+                decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(8), border: Border.all(color: Pal.of(context).card, width: 2)),
+                child: const Text('AI', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: kInk, height: 1, letterSpacing: .4)),
               ),
             ),
           ]);
