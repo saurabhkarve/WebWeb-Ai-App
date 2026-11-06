@@ -2225,40 +2225,11 @@ class _AiOrbState extends State<_AiOrb> with SingleTickerProviderStateMixin {
         builder: (context, _) {
           final v = _c.value;
           final ease = Curves.easeInOut.transform(1 - (2 * v - 1).abs());
-          return Stack(clipBehavior: Clip.none, alignment: Alignment.centerLeft, children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: kGold.withValues(alpha: .25 + .25 * ease), blurRadius: 10 + 10 * ease)],
-              ),
-              child: Stack(alignment: Alignment.center, children: [
-                // the ring of the four SkyQ colours, turning slowly
-                Transform.rotate(
-                  angle: v * 6.2831853,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: SweepGradient(colors: [Color(0xFFFFC700), Color(0xFFFF3B30), Color(0xFF0575E6), Color(0xFF34A853), Color(0xFFFFC700)]),
-                    ),
-                  ),
-                ),
-                // the dark glass core
-                Container(
-                  width: 37,
-                  height: 37,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(center: Alignment(-.35, -.45), radius: 1, colors: [Color(0xFF34364F), Color(0xFF15161F)], stops: [0, .62]),
-                  ),
-                  child: Transform.rotate(
-                    angle: .2 * ease,
-                    child: Transform.scale(scale: 1 + .12 * ease, child: const _AiStar()),
-                  ),
-                ),
-              ]),
-            ),
+          return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            // one gold star that twinkles softly, with the word AI under it
+            Transform.rotate(angle: .2 * ease, child: Transform.scale(scale: 1 + .12 * ease, child: const _AiStar())),
+            const SizedBox(height: 1),
+            const Text('AI', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFFFFD84A), height: 1, letterSpacing: 1.8)),
           ]);
         },
       ),
@@ -2266,18 +2237,11 @@ class _AiOrbState extends State<_AiOrb> with SingleTickerProviderStateMixin {
   }
 }
 
-/// One four-point gold star with AI in it.
+/// One four-point gold star.
 class _AiStar extends StatelessWidget {
   const _AiStar();
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: 28,
-        height: 28,
-        child: Stack(alignment: Alignment.center, children: [
-          CustomPaint(size: const Size(28, 28), painter: _StarPainter()),
-          const Padding(padding: EdgeInsets.only(top: 2), child: Text('AI', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: Color(0xFF1E1E1E), height: 1))),
-        ]),
-      );
+  Widget build(BuildContext context) => CustomPaint(size: const Size(30, 30), painter: _StarPainter());
 }
 
 class _StarPainter extends CustomPainter {
