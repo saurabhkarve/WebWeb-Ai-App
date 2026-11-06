@@ -762,7 +762,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
       Column(key: Tours.key('updates'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         // a small gold title with a fading rule, so the circles read as their own strip without a box
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 2),
           child: Row(children: [
             Container(
               width: 8,
@@ -777,7 +777,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         ),
         const UpdatesBar(),
       ]),
-      const SizedBox(height: 6),
+      const SizedBox(height: 2),
       ])),
       // the page the app opens on: a greeting, what to ask, the search with where to look inside it, and things to try
       AnimatedContainer(
@@ -907,7 +907,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     final list = RefreshIndicator(
       onRefresh: _refresh,
       child: CustomScrollView(controller: _scroll, slivers: [
-        SliverPadding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 0), sliver: SliverToBoxAdapter(child: top)),
+        SliverPadding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 0), sliver: SliverToBoxAdapter(child: top)),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 0, 28, 120),
           sliver: SliverVariedExtentList.builder(
