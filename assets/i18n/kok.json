@@ -2846,5 +2846,9 @@
   "a good CA near {city}": "{city} लागीं बरो CA",
   "a good CA near me": "म्हज्या लागीं बरो CA",
   "who can repair my AC?": "म्हजो AC कोण दुरुस्त करतलो?",
-  "This is not a keyword search. Say what you need and where, and the AI finds the right people for you.": "हें फकत कीवर्ड सोद न्हय. तुमकां कितें जाय आनी खंय तें सांगात, AI सैमकार लोक सोदतलो."
+  "This is not a keyword search. Say what you need and where, and the AI finds the right people for you.": "हें फकत कीवर्ड सोद न्हय. तुमकां कितें जाय आनी खंय तें सांगात, AI सैमकार लोक सोदतलो.",
+  "Reading your search…": "तुमचो सोद समजून घेतात…",
+  "Checking your contacts…": "तुमचे संपर्क पळयतात…",
+  "Looking nearby…": "लागसार सोदतात…",
+  "Ranking who can help…": "सगळ्यांत सैमकार लोक वेंचतात…"
 }

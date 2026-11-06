@@ -25,6 +25,7 @@ import '../widgets.dart';
 import '../widgets/area_map.dart' show askTimeLeft;
 import '../widgets/city_picker.dart';
 import '../widgets/reviews_card.dart';
+import '../widgets/search_loader.dart';
 import '../widgets/whatsapp_icon.dart';
 import 'connect.dart' show UpdatesBar;
 import '../widgets/tour.dart' show Tours;
@@ -1372,6 +1373,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     // what the member saved a page as, when it is in their contacts
     final saved = {for (final e in all) if (e.member != null) '${e.member!['uid']}': e.name};
     return [
+      if (_results == null && q.length < 4 && mine.isEmpty && _service.isEmpty) SearchLoader(query: q),
       ..._resultsSection(p, aiMatches, saved, mine),
       if (others.isNotEmpty) ...[_label(p, t('On WEBWEB')), for (final u in others) _row(p, _Entry(_memberName(u), null, u))],
       Align(
@@ -1597,14 +1599,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     if (_aiBusy || _aiFor != q) {
       return [
         head,
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(children: [
-            const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kGold)),
-            const SizedBox(width: 12),
-            Expanded(child: Text(_aiFor == q ? t('Looking for who can help…') : t('Press search to ask AI who can help'), style: TextStyle(color: p.muted))),
-          ]),
-        ),
+        SearchLoader(query: q),
         ...own,
         for (final s in svc) s.w,
       ];

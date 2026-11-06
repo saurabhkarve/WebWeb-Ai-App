@@ -2846,5 +2846,9 @@
   "a good CA near {city}": "{city} નજીક સારા CA",
   "a good CA near me": "મારી નજીક સારા CA",
   "who can repair my AC?": "મારું AC કોણ રિપેર કરી શકે?",
-  "This is not a keyword search. Say what you need and where, and the AI finds the right people for you.": "આ માત્ર કીવર્ડ સર્ચ નથી. તમને શું જોઈએ અને ક્યાં તે કહો, AI યોગ્ય લોકોને શોધશે."
+  "This is not a keyword search. Say what you need and where, and the AI finds the right people for you.": "આ માત્ર કીવર્ડ સર્ચ નથી. તમને શું જોઈએ અને ક્યાં તે કહો, AI યોગ્ય લોકોને શોધશે.",
+  "Reading your search…": "તમારી શોધ સમજી રહ્યા છીએ…",
+  "Checking your contacts…": "તમારા સંપર્કો જોઈ રહ્યા છીએ…",
+  "Looking nearby…": "આસપાસ શોધી રહ્યા છીએ…",
+  "Ranking who can help…": "સૌથી યોગ્ય લોકો પસંદ કરી રહ્યા છીએ…"
 }
