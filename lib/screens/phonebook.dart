@@ -346,6 +346,14 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     _unfold?.cancel();
     if (_qFocus.hasFocus) {
       if (mounted) setState(() => _boxFold = true);
+      // the box rises to the upper part of the screen (above the middle) once the greeting has folded and the keyboard is up
+      for (final ms in const [380, 800]) {
+        Future.delayed(Duration(milliseconds: ms), () {
+          if (!mounted || !_qFocus.hasFocus) return;
+          final c = _searchKey.currentContext;
+          if (c != null && c.mounted) Scrollable.ensureVisible(c, alignment: .28, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+        });
+      }
     } else {
       _unfold = Timer(const Duration(milliseconds: 450), () {
         if (mounted) setState(() => _boxFold = false);
