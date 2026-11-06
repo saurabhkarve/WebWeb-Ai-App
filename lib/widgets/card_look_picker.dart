@@ -8,7 +8,9 @@ import '../theme.dart';
 class CardLookPicker extends StatelessWidget {
   final String color, style;
   final ValueChanged<String> onColor, onStyle;
-  const CardLookPicker({super.key, required this.color, required this.style, required this.onColor, required this.onStyle});
+  /// only the row of layouts (no box, no colour circles): the quick ask composer
+  final bool compact;
+  const CardLookPicker({super.key, required this.color, required this.style, required this.onColor, required this.onStyle, this.compact = false});
 
   /// A tiny drawing of a layout, in the chosen colour, so the choice can be seen before it is made.
   Widget _thumb(Pal p, String s) {
@@ -64,15 +66,7 @@ class CardLookPicker extends StatelessWidget {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final p = Pal.of(context);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: p.chip.withValues(alpha: .5), borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(t('Card style'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
-        const SizedBox(height: 6),
+  Widget _styles(Pal p) =>
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(children: [
@@ -97,7 +91,19 @@ class CardLookPicker extends StatelessWidget {
                 ),
               ),
           ]),
-        ),
+        );
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    if (compact) return _styles(p);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: p.chip.withValues(alpha: .5), borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(t('Card style'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
+        const SizedBox(height: 6),
+        _styles(p),
         const SizedBox(height: 8),
         Row(children: [
           Text(t('Card colour'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),

@@ -11,6 +11,7 @@ import '../api.dart';
 import '../ask_types.dart';
 import '../auth_provider.dart';
 import '../card_colors.dart';
+import '../widgets/card_look_picker.dart';
 import '../device_perms.dart';
 import '../i18n.dart';
 import '../widgets/city_picker.dart';
@@ -822,6 +823,7 @@ class _AskComposerState extends State<_AskComposer> {
   bool _showDesc = false;
   /// a random card layout to start; the Card style chip picks another
   String _style = randomCardStyle();
+  String _color = randomCardColor();
   bool _styleOpen = false;
   final _about = TextEditingController();
   final List<TextEditingController> _opts = [TextEditingController(), TextEditingController()];
@@ -912,6 +914,7 @@ class _AskComposerState extends State<_AskComposer> {
         'title': title,
         'description': desc.isEmpty ? title : desc,
         'cardStyle': _style,
+        'cardColor': _color,
         'category': categoryForType(kind, null),
         'askType': kind,
         if (kind == 'poll') 'pollOptions': opts,
@@ -927,6 +930,7 @@ class _AskComposerState extends State<_AskComposer> {
         _showDesc = false;
         _styleOpen = false;
         _style = randomCardStyle();
+        _color = randomCardColor();
         _about.clear();
         for (final o in _opts) {
           o.clear();
@@ -1173,9 +1177,7 @@ class _AskComposerState extends State<_AskComposer> {
               if (_styleOpen)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Wrap(spacing: 8, runSpacing: 8, children: [
-                    for (final st in kCardStyles) small(t(kCardStyleLabels[st] ?? st), () => setState(() => _style = st), on: _style == st),
-                  ]),
+                  child: CardLookPicker(compact: true, color: _color, style: _style, onColor: (c) => setState(() => _color = c), onStyle: (st) => setState(() => _style = st)),
                 ),
               if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: TextStyle(fontSize: 13, color: p.danger))),
             ]),
