@@ -1144,8 +1144,8 @@ class _PhonebookHomeState extends State<PhonebookHome> {
             textInputAction: TextInputAction.search,
             keyboardType: TextInputType.text,
             // tapped: the box grows taller to take a whole sentence
-            minLines: _qFocus.hasFocus || _q.text.isNotEmpty ? 3 : 1,
-            maxLines: _qFocus.hasFocus || _q.text.isNotEmpty ? 4 : 1,
+            minLines: _qFocus.hasFocus || _q.text.isNotEmpty ? 2 : 1,
+            maxLines: _qFocus.hasFocus || _q.text.isNotEmpty ? 2 : 1,
             textCapitalization: TextCapitalization.sentences,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             decoration: InputDecoration(
