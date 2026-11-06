@@ -2838,5 +2838,13 @@
   "Intro card": "ओळख कार्ड",
   "Your photo, what you do and a QR to your page, to share": "तुमचा फोटो, तुम्ही काय करता आणि तुमच्या पेजचा QR, शेअर करण्यासाठी",
   "Could not create the card": "कार्ड तयार करता आले नाही",
-  "Post it on WhatsApp status, Instagram or print it: the QR opens your WEBWEB AI page.": "हे WhatsApp स्टेटस, Instagram वर टाका किंवा प्रिंट करा: QR तुमचे WEBWEB AI पेज उघडतो."
+  "Post it on WhatsApp status, Instagram or print it: the QR opens your WEBWEB AI page.": "हे WhatsApp स्टेटस, Instagram वर टाका किंवा प्रिंट करा: QR तुमचे WEBWEB AI पेज उघडतो.",
+  "plumbers around me": "माझ्या आसपासचे प्लंबर",
+  "plumbers in {city}": "{city} मधील प्लंबर",
+  "electrician near me": "माझ्याजवळ इलेक्ट्रिशियन",
+  "internet service near me": "माझ्याजवळ इंटरनेट सेवा",
+  "a good CA near {city}": "{city} जवळ चांगला CA",
+  "a good CA near me": "माझ्याजवळ चांगला CA",
+  "who can repair my AC?": "माझा AC कोण दुरुस्त करेल?",
+  "This is not a keyword search. Say what you need and where, and the AI finds the right people for you.": "हा फक्त कीवर्ड शोध नाही. तुम्हाला काय हवे आणि कुठे ते सांगा, AI योग्य माणसे शोधेल."
 }

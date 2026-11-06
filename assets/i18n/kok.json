@@ -2838,5 +2838,13 @@
   "Intro card": "वळख कार्ड",
   "Your photo, what you do and a QR to your page, to share": "तुमचो फोटो, तुमी कितें करताय आनी तुमच्या पेजाचो QR, शेअर करपाक",
   "Could not create the card": "कार्ड तयार करूंक जालें ना",
-  "Post it on WhatsApp status, Instagram or print it: the QR opens your WEBWEB AI page.": "तें WhatsApp स्टेटस, Instagram वयल्यान दवरात वा प्रिंट करात: QR तुमचें WEBWEB AI पेज उगडटा."
+  "Post it on WhatsApp status, Instagram or print it: the QR opens your WEBWEB AI page.": "तें WhatsApp स्टेटस, Instagram वयल्यान दवरात वा प्रिंट करात: QR तुमचें WEBWEB AI पेज उगडटा.",
+  "plumbers around me": "म्हज्या भोवतणी प्लंबर",
+  "plumbers in {city}": "{city} त प्लंबर",
+  "electrician near me": "म्हज्या लागींचो इलेक्ट्रिशियन",
+  "internet service near me": "म्हज्या लागीं इंटरनेट सेवा",
+  "a good CA near {city}": "{city} लागीं बरो CA",
+  "a good CA near me": "म्हज्या लागीं बरो CA",
+  "who can repair my AC?": "म्हजो AC कोण दुरुस्त करतलो?",
+  "This is not a keyword search. Say what you need and where, and the AI finds the right people for you.": "हें फकत कीवर्ड सोद न्हय. तुमकां कितें जाय आनी खंय तें सांगात, AI सैमकार लोक सोदतलो."
 }

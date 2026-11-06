@@ -319,6 +319,97 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     if (mounted && city != _hereCity) setState(() => _hereCity = city);
   }
 
+  /// prompts a member could type, with their town when it is known
+  List<String> get _examples {
+    final city = (_place.isNotEmpty ? _place : _hereCity)?.trim();
+    final c = city != null && city.isNotEmpty ? city : null;
+    return [
+      t('plumbers around me'),
+      c != null ? t('plumbers in {city}', {'city': c}) : t('electrician near me'),
+      t('internet service near me'),
+      c != null ? t('a good CA near {city}', {'city': c}) : t('a good CA near me'),
+      t('who can repair my AC?'),
+    ];
+  }
+
+  // the examples typed out one after another in the empty box
+  Timer? _typeTimer;
+  int _exI = 0, _exN = 0, _exDir = 1;
+  String _typed = '';
+
+  void _onSearchFocus() {
+    if (mounted) setState(() {});
+  }
+
+  void _typeStep() {
+    if (!mounted) return;
+    final list = _examples;
+    if (_qFocus.hasFocus || _q.text.isNotEmpty) {
+      _typeTimer = Timer(const Duration(milliseconds: 600), _typeStep);
+      if (_typed.isNotEmpty) setState(() => _typed = '');
+      return;
+    }
+    final w = list[_exI % list.length];
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      setState(() => _typed = w);
+      _exI++;
+      _typeTimer = Timer(const Duration(milliseconds: 2600), _typeStep);
+      return;
+    }
+    _exN += _exDir;
+    var wait = _exDir > 0 ? 55 : 25;
+    if (_exDir > 0 && _exN >= w.length) {
+      _exN = w.length;
+      _exDir = -1;
+      wait = 1700;
+    } else if (_exDir < 0 && _exN <= 0) {
+      _exN = 0;
+      _exDir = 1;
+      _exI++;
+      wait = 350;
+    }
+    setState(() => _typed = w.substring(0, _exN.clamp(0, w.length)));
+    _typeTimer = Timer(Duration(milliseconds: wait), _typeStep);
+  }
+
+  /// the box opened: says this is a request in your own words, with prompts to tap
+  Widget _askHelp(Pal p) {
+    final show = _qFocus.hasFocus && _q.text.isEmpty;
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      alignment: Alignment.topCenter,
+      child: !show
+          ? const SizedBox(width: double.infinity)
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(t('Ask in your own words'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
+                Text(t('This is not a keyword search. Say what you need and where, and the AI finds the right people for you.'), style: TextStyle(fontSize: 12.5, height: 1.3, color: p.muted)),
+                const SizedBox(height: 8),
+                Wrap(spacing: 6, runSpacing: 6, children: [
+                  for (final x in _examples)
+                    ActionChip(
+                      avatar: const Icon(Icons.auto_awesome_rounded, size: 14, color: kGold),
+                      label: Text(x, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: kGold.withValues(alpha: .1),
+                      side: BorderSide(color: kGold.withValues(alpha: .4)),
+                      onPressed: () {
+                        _q.text = x;
+                        _q.selection = TextSelection.collapsed(offset: x.length);
+                        _qFocus.unfocus();
+                        _search(x);
+                        _askAi(x);
+                      },
+                    ),
+                ]),
+              ]),
+            ),
+    );
+  }
+
   /// the island's Speak button: clear what is typed, then the microphone listens
   void _onSpeak() {
     if (!mounted) return;
@@ -359,6 +450,8 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     directoryRequest.addListener(_onRequest);
     directoryFocus.addListener(_onFocusRequest);
     directorySpeak.addListener(_onSpeak);
+    _qFocus.addListener(_onSearchFocus);
+    _typeTimer = Timer(const Duration(milliseconds: 800), _typeStep);
     ApproxDistance.init().then((_) => mounted ? setState(() {}) : null);
     _loadMatches();
     _readPhoneBook(ask: false);
@@ -385,7 +478,9 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     directoryBusy.value = false;
     _debounce?.cancel();
     _aiTimer?.cancel();
+    _typeTimer?.cancel();
     _q.dispose();
+    _qFocus.removeListener(_onSearchFocus);
     _qFocus.dispose();
     _scroll.dispose();
     super.dispose();
@@ -1093,7 +1188,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
               contentPadding: const EdgeInsets.symmetric(vertical: 17, horizontal: 8),
               prefixIcon: Padding(padding: const EdgeInsets.only(left: 12, right: 10), child: _aiBadge()),
               prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-              hintText: t('Ask AI: a name, or what you need'),
+              hintText: _typed.isNotEmpty ? _typed : t('Ask AI: a name, or what you need'),
               hintStyle: TextStyle(fontSize: 15, color: p.muted),
               // text in the box: a clear icon in the place of the microphone (clearing leaves the search)
               suffixIcon: _q.text.isNotEmpty
@@ -1115,6 +1210,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
             ),
           ),
           Divider(height: 1, thickness: 1, color: p.border.withValues(alpha: .6)),
+          _askHelp(p),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 3, 12, 3),
             child: Row(children: [

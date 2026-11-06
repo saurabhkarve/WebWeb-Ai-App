@@ -2838,5 +2838,13 @@
   "Intro card": "પરિચય કાર્ડ",
   "Your photo, what you do and a QR to your page, to share": "તમારો ફોટો, તમે શું કરો છો અને તમારા પેજનો QR, શેર કરવા માટે",
   "Could not create the card": "કાર્ડ બનાવી શકાયું નહીં",
-  "Post it on WhatsApp status, Instagram or print it: the QR opens your WEBWEB AI page.": "તેને WhatsApp સ્ટેટસ, Instagram પર મૂકો અથવા પ્રિન્ટ કરો: QR તમારું WEBWEB AI પેજ ખોલે છે."
+  "Post it on WhatsApp status, Instagram or print it: the QR opens your WEBWEB AI page.": "તેને WhatsApp સ્ટેટસ, Instagram પર મૂકો અથવા પ્રિન્ટ કરો: QR તમારું WEBWEB AI પેજ ખોલે છે.",
+  "plumbers around me": "મારી આસપાસ પ્લમ્બર",
+  "plumbers in {city}": "{city} માં પ્લમ્બર",
+  "electrician near me": "મારી નજીક ઇલેક્ટ્રિશિયન",
+  "internet service near me": "મારી નજીક ઇન્ટરનેટ સર્વિસ",
+  "a good CA near {city}": "{city} નજીક સારા CA",
+  "a good CA near me": "મારી નજીક સારા CA",
+  "who can repair my AC?": "મારું AC કોણ રિપેર કરી શકે?",
+  "This is not a keyword search. Say what you need and where, and the AI finds the right people for you.": "આ માત્ર કીવર્ડ સર્ચ નથી. તમને શું જોઈએ અને ક્યાં તે કહો, AI યોગ્ય લોકોને શોધશે."
 }
