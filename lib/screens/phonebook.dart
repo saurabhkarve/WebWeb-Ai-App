@@ -1237,7 +1237,8 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
   /// "AI" with the star, in gold: what the search is
   /// a gold orb with the sparkle, the AI tag on its corner like the app's count badges
-  Widget _aiBadge() => const _AiOrb();
+  /// the AI pill of the logo
+  Widget _aiBadge() => const Padding(padding: EdgeInsets.only(right: 2), child: AiPill(font: 14));
 
   /// The search page: the search (the ask's title) with Cancel, then, down to the keyboard, what was found as it is
   /// typed and the new ask to post when no one fits.
@@ -2187,78 +2188,4 @@ class _DirectoryRailSearchState extends State<DirectoryRailSearch> {
       ),
     ]);
   }
-}
-
-/// The AI orb of the search: a slow breath of light, a soft ring that spreads and fades, and a sparkle that twinkles.
-class _AiOrb extends StatefulWidget {
-  const _AiOrb();
-  @override
-  State<_AiOrb> createState() => _AiOrbState();
-}
-
-class _AiOrbState extends State<_AiOrb> with SingleTickerProviderStateMixin {
-  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200));
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _c.stop();
-    } else if (!_c.isAnimating) {
-      _c.repeat();
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 46,
-      height: 44,
-      child: AnimatedBuilder(
-        animation: _c,
-        builder: (context, _) {
-          final v = _c.value;
-          final ease = Curves.easeInOut.transform(1 - (2 * v - 1).abs());
-          return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            // one gold star that twinkles softly, with the word AI under it
-            Transform.rotate(angle: .2 * ease, child: Transform.scale(scale: 1 + .12 * ease, child: const _AiStar())),
-            const SizedBox(height: 1),
-            const Text('AI', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFFFFD84A), height: 1, letterSpacing: 1.8)),
-          ]);
-        },
-      ),
-    );
-  }
-}
-
-/// One four-point gold star.
-class _AiStar extends StatelessWidget {
-  const _AiStar();
-  @override
-  Widget build(BuildContext context) => CustomPaint(size: const Size(30, 30), painter: _StarPainter());
-}
-
-class _StarPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final k = size.width / 24;
-    final path = Path()
-      ..moveTo(12 * k, 1.5 * k)
-      ..cubicTo(14 * k, 8 * k, 16 * k, 10 * k, 22.5 * k, 12 * k)
-      ..cubicTo(16 * k, 14 * k, 14 * k, 16 * k, 12 * k, 22.5 * k)
-      ..cubicTo(10 * k, 16 * k, 8 * k, 14 * k, 1.5 * k, 12 * k)
-      ..cubicTo(8 * k, 10 * k, 10 * k, 8 * k, 12 * k, 1.5 * k)
-      ..close();
-    canvas.drawShadow(path, const Color(0xFFFFD84A), 4, true);
-    canvas.drawPath(path, Paint()..shader = const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFFE84D), Color(0xFFFFB800)]).createShader(Offset.zero & size));
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
 }
