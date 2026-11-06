@@ -338,7 +338,9 @@ class Avatar extends StatelessWidget {
   final String? tip;
   /// own picture with a complete profile: a light ring with a little space around the photo
   final bool framed;
-  const Avatar({super.key, required this.name, this.size = 40, this.ring = false, this.framed = false, this.type, this.photoUrl, this.badge = 16, this.uid, this.tip});
+  /// own profile strength in percent: an arc round the photo, orange below 50, gold up to 99, a full green ring at 100
+  final int? progress;
+  const Avatar({super.key, required this.name, this.size = 40, this.ring = false, this.framed = false, this.progress, this.type, this.photoUrl, this.badge = 16, this.uid, this.tip});
 
   @override
   Widget build(BuildContext context) {
@@ -364,7 +366,9 @@ class Avatar extends StatelessWidget {
         child: Container(padding: const EdgeInsets.all(2), decoration: BoxDecoration(shape: BoxShape.circle, color: p.card), child: face),
       );
     }
-    if (framed && !ring) {
+    if (progress != null && !ring) {
+      face = _ProgressRing(percent: progress!, size: size, child: face);
+    } else if (framed && !ring) {
       face = Container(
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: p.text.withValues(alpha: .15), width: 2.5)),
@@ -372,7 +376,7 @@ class Avatar extends StatelessWidget {
       );
     }
     if (type == null) return face;
-    final outer = size + (ring ? 9 : framed ? 11 : 0);
+    final outer = size + (ring ? 9 : (framed || progress != null) ? 11 : 0);
     final b = (badge * .8).roundToDouble();
     final c = outer * .854;
     return SizedBox(
@@ -388,6 +392,39 @@ class Avatar extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// The arc of profile strength round an avatar (web Avatar `progress`): a grey track, the arc in orange (under 50), gold
+/// (50 to 99) or a whole green ring (100).
+class _ProgressRing extends StatelessWidget {
+  final int percent;
+  final double size;
+  final Widget child;
+  const _ProgressRing({required this.percent, required this.size, required this.child});
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final color = percent >= 100 ? const Color(0xFF2F9E6E) : percent < 50 ? const Color(0xFFF97316) : kGold;
+    return CustomPaint(
+      painter: _ProgressArcPainter(percent.clamp(0, 100) / 100, color, p.text.withValues(alpha: .1)),
+      child: Padding(padding: const EdgeInsets.all(5.5), child: child),
+    );
+  }
+}
+
+class _ProgressArcPainter extends CustomPainter {
+  final double v;
+  final Color color, track;
+  _ProgressArcPainter(this.v, this.color, this.track);
+  @override
+  void paint(Canvas canvas, Size size) {
+    const w = 2.5;
+    final r = Rect.fromLTWH(w / 2, w / 2, size.width - w, size.height - w);
+    canvas.drawArc(r, 0, 6.2831853, false, Paint()..style = PaintingStyle.stroke..strokeWidth = w..color = track);
+    if (v > 0) canvas.drawArc(r, -1.5707963, 6.2831853 * v, false, Paint()..style = PaintingStyle.stroke..strokeWidth = w..strokeCap = StrokeCap.round..color = color);
+  }
+  @override
+  bool shouldRepaint(_ProgressArcPainter old) => old.v != v || old.color != color || old.track != track;
 }
 
 /// The avatar's type icon on a circle coloured by presence: green online, gold active in the last 2 hours,

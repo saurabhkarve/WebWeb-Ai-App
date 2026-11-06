@@ -795,12 +795,12 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         padding: EdgeInsets.fromLTRB(16, _searching ? 10 : 18, 16, 14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: p.dark ? kGold.withValues(alpha: .25) : const Color(0x99F0D77A)),
-          boxShadow: p.dark ? null : const [BoxShadow(color: Color(0x40B48200), blurRadius: 30, offset: Offset(0, 10), spreadRadius: -14)],
+          border: Border.all(color: p.dark ? Colors.white.withValues(alpha: .1) : p.border),
+          boxShadow: p.dark ? null : const [BoxShadow(color: Color(0x4D1E1E1E), blurRadius: 30, offset: Offset(0, 10), spreadRadius: -18)],
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: p.dark ? [kGold.withValues(alpha: .22), kGold.withValues(alpha: .04)] : const [Color(0xFFFFF0B0), Color(0xFFFFF8DC), Color(0xFFFFFDF3)],
+            colors: p.dark ? [Colors.white.withValues(alpha: .06), Colors.white.withValues(alpha: .02)] : const [Color(0xFFFFFAF0), Color(0xFFFFFDF8), Color(0xFFFFFFFF)],
           ),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
