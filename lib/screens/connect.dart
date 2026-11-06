@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show File;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -11,7 +12,7 @@ import '../api.dart';
 import '../ask_types.dart';
 import '../auth_provider.dart';
 import '../card_colors.dart';
-import '../widgets/card_look_picker.dart';
+import '../widgets/card_style_sheet.dart';
 import '../device_perms.dart';
 import '../i18n.dart';
 import '../widgets/city_picker.dart';
@@ -824,7 +825,6 @@ class _AskComposerState extends State<_AskComposer> {
   /// a random card layout to start; the Card style chip picks another
   String _style = randomCardStyle();
   String _color = randomCardColor();
-  bool _styleOpen = false;
   final _about = TextEditingController();
   final List<TextEditingController> _opts = [TextEditingController(), TextEditingController()];
   bool _busy = false;
@@ -869,7 +869,9 @@ class _AskComposerState extends State<_AskComposer> {
     final title = _text.text.trim(), desc = _details.text.trim();
     String? fail;
     final opts = _opts.map((o) => o.text.trim()).where((o) => o.isNotEmpty).toList();
-    if (title.length < 5) {
+    if (_type == null) {
+      fail = t('Choose a type');
+    } else if (title.length < 5) {
       fail = t('Add a title');
     } else if (desc.isNotEmpty && desc.length < 20) {
       fail = t('Add a little more detail');
@@ -889,19 +891,7 @@ class _AskComposerState extends State<_AskComposer> {
       _error = null;
     });
     try {
-      // no kind picked: the reading of the words decides
-      var kind = _type;
-      if (kind == null) {
-        try {
-          final r = await api.post('/ai/category', {'title': title, 'description': desc}) as Map;
-          kind = r['type'] as String?;
-        } catch (_) {}
-        if (kind == 'poll' || kind == 'other' || kind == 'visit') kind = null; // these need more than words
-      }
-      if (kind == null) {
-        if (mounted) setState(() => (_busy = false, _error = t('Choose a type')));
-        return;
-      }
+      final kind = _type!;
       final images = <String>[];
       for (final f in _photos) {
         images.add(await api.uploadImage(await f.readAsBytes(), f.name));
@@ -928,7 +918,6 @@ class _AskComposerState extends State<_AskComposer> {
         _text.clear();
         _details.clear();
         _showDesc = false;
-        _styleOpen = false;
         _style = randomCardStyle();
         _color = randomCardColor();
         _about.clear();
@@ -967,6 +956,26 @@ class _AskComposerState extends State<_AskComposer> {
       builder: (_) => _BudgetSheet(value: _budget.text),
     );
     if (got != null && mounted) setState(() => _budget.text = got);
+  }
+
+  Future<void> _pickStyle() async {
+    final home = context.read<AuthProvider>().profile?.location ?? '';
+    final got = await showCardStyleSheet(
+      context,
+      style: _style,
+      color: _color,
+      title: _text.text,
+      description: _details.text,
+      type: _type,
+      budget: _budget.text.trim(),
+      place: _city?.name ?? (home == 'Other' ? '' : home),
+      images: [for (final f in _photos) FileImage(File(f.path))],
+    );
+    if (got == null || !mounted) return;
+    setState(() {
+      _style = got.$1;
+      _color = got.$2;
+    });
   }
 
   Future<void> _pickPlace() async {
@@ -1155,13 +1164,13 @@ class _AskComposerState extends State<_AskComposer> {
                 ),
               // the options (all optional) and the button, in one row
               Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                Expanded(child: Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                Expanded(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(spacing: 8, children: [
                 small('📝 ${t('Description')}', () => setState(() => _showDesc = !_showDesc), on: _showDesc),
                 small('🖼️ ${t('Add photos')}', _pickPhotos),
                 small('📍 ${place.isEmpty ? t('Location') : place}', _pickPlace, on: _city != null),
                 small('₹ ${_budget.text.isEmpty ? t('Budget') : _budget.text.replaceFirst(RegExp(r'^₹\s*'), '')}', _pickBudget, on: _budget.text.isNotEmpty),
-                small('🎨 ${t('Card style')}', () => setState(() => _styleOpen = !_styleOpen), on: _styleOpen),
-              ])),
+                small('🎨 ${t('Card style')}', _pickStyle),
+              ]))),
                 const SizedBox(width: 10),
                 GestureDetector(
             onTap: _busy ? null : _submit,
@@ -1174,11 +1183,6 @@ class _AskComposerState extends State<_AskComposer> {
             ),
           ),
               ]),
-              if (_styleOpen)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: CardLookPicker(compact: true, color: _color, style: _style, onColor: (c) => setState(() => _color = c), onStyle: (st) => setState(() => _style = st)),
-                ),
               if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: TextStyle(fontSize: 13, color: p.danger))),
             ]),
           ),
