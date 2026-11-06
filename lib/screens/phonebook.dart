@@ -372,44 +372,6 @@ class _PhonebookHomeState extends State<PhonebookHome> {
     _typeTimer = Timer(Duration(milliseconds: wait), _typeStep);
   }
 
-  /// the box opened: says this is a request in your own words, with prompts to tap
-  Widget _askHelp(Pal p) {
-    final show = _qFocus.hasFocus && _q.text.isEmpty;
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
-      alignment: Alignment.topCenter,
-      child: !show
-          ? const SizedBox(width: double.infinity)
-          : Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(t('Ask in your own words'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 2),
-                Text(t('This is not a keyword search. Say what you need and where, and the AI finds the right people for you.'), style: TextStyle(fontSize: 12.5, height: 1.3, color: p.muted)),
-                const SizedBox(height: 8),
-                Wrap(spacing: 6, runSpacing: 6, children: [
-                  for (final x in _examples)
-                    ActionChip(
-                      avatar: const Icon(Icons.auto_awesome_rounded, size: 14, color: kGold),
-                      label: Text(x, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
-                      visualDensity: VisualDensity.compact,
-                      backgroundColor: kGold.withValues(alpha: .1),
-                      side: BorderSide(color: kGold.withValues(alpha: .4)),
-                      onPressed: () {
-                        _q.text = x;
-                        _q.selection = TextSelection.collapsed(offset: x.length);
-                        _qFocus.unfocus();
-                        _search(x);
-                        _askAi(x);
-                      },
-                    ),
-                ]),
-              ]),
-            ),
-    );
-  }
-
   /// the island's Speak button: clear what is typed, then the microphone listens
   void _onSpeak() {
     if (!mounted) return;
@@ -1180,6 +1142,10 @@ class _PhonebookHomeState extends State<PhonebookHome> {
             onChanged: _search,
             onSubmitted: (v) => _askAi(v.trim()),
             textInputAction: TextInputAction.search,
+            keyboardType: TextInputType.text,
+            // tapped: the box grows taller to take a whole sentence
+            minLines: _qFocus.hasFocus || _q.text.isNotEmpty ? 3 : 1,
+            maxLines: _qFocus.hasFocus || _q.text.isNotEmpty ? 4 : 1,
             textCapitalization: TextCapitalization.sentences,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             decoration: InputDecoration(
@@ -1210,7 +1176,6 @@ class _PhonebookHomeState extends State<PhonebookHome> {
             ),
           ),
           Divider(height: 1, thickness: 1, color: p.border.withValues(alpha: .6)),
-          _askHelp(p),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 3, 12, 3),
             child: Row(children: [
