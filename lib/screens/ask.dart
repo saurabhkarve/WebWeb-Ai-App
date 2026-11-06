@@ -258,6 +258,7 @@ class _AskScreenState extends State<AskScreen> with MyAskActivityLoader {
       initAskActivity();
       yourAsksRequest.addListener(_onRequest);
       askPrefill.addListener(_onPrefill);
+      askStart.addListener(_onPrefill);
     }
   }
 
@@ -265,13 +266,14 @@ class _AskScreenState extends State<AskScreen> with MyAskActivityLoader {
   void dispose() {
     yourAsksRequest.removeListener(_onRequest);
     askPrefill.removeListener(_onPrefill);
+    askStart.removeListener(_onPrefill);
     disposeAskActivity();
     super.dispose();
   }
 
   /// a search from Contacts to post as an ask: the form, not "Your asks"
   void _onPrefill() {
-    if (askPrefill.value != null && _yours) setState(() => _yours = false);
+    if ((askPrefill.value != null || askStart.value != null) && _yours) setState(() => _yours = false);
   }
 
   void _onRequest() {
@@ -448,7 +450,9 @@ class _AskFormState extends State<_AskForm> {
     _desc.addListener(_changed);
     if (!_editing && !_search) {
       askPrefill.addListener(_prefill);
+      askStart.addListener(_start);
       _prefill();
+      _start();
     }
     _maybeTour();
   }
@@ -463,6 +467,41 @@ class _AskFormState extends State<_AskForm> {
     _title.text = v;
   }
 
+  /// The box at the top of the Asks feed: its line becomes the title, and the kind, place, budget and photos it was
+  /// given come with it.
+  void _start() {
+    final v = askStart.value;
+    if (v == null) return;
+    askStart.value = null;
+    _desc.clear();
+    setState(() {
+      final type = v.type;
+      if (type != null && kAskTypes.any((o) => o.value == type)) {
+        _askType = type;
+        _category = categoryForType(type, _category);
+        if (type == 'poll' && _pollOpts.where((x) => x.trim().isNotEmpty).length < 2) _pollOpts = ['', ''];
+        _typeChosen = true;
+      }
+      _title.text = v.title;
+      final city = v.city;
+      if (city != null) {
+        final c = findPlace(city.name);
+        _geoMoved = true;
+        _location = city.name;
+        if (c?.lat != null) {
+          _geo = (lat: c!.lat!, lng: c.lng!, radiusM: _cityRadius(c));
+        } else if (city.lat != null) {
+          _geo = (lat: city.lat!, lng: city.lng!, radiusM: _geo?.radiusM ?? 100000);
+        }
+      }
+      if ((v.budget ?? '').isNotEmpty) {
+        _budget = v.budget!;
+        _budgetKey++;
+      }
+    });
+    if (v.files.isNotEmpty) _attach(v.files);
+  }
+
   @override
   void didUpdateWidget(covariant _AskForm old) {
     super.didUpdateWidget(old);
@@ -473,7 +512,8 @@ class _AskFormState extends State<_AskForm> {
   void _maybeTour() {
     if (!widget.active || _editing || _search) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && widget.active) Tours.maybeShow(context, 'ask2', kAskTour);
+      // no tour opens by itself (it dimmed the page); "Take the app tour" in the account menu runs them
+      // if (mounted && widget.active) Tours.maybeShow(context, 'ask2', kAskTour);
     });
   }
 
@@ -707,6 +747,13 @@ class _AskFormState extends State<_AskForm> {
     if (room <= 0) return;
     final picked = await ImagePicker().pickMultiImage(maxWidth: 1600, imageQuality: 80, limit: room > 1 ? room : null);
     if (picked.isEmpty || !mounted) return;
+    _attach(picked);
+  }
+
+  /// Photos given to the form (picked here, or handed over from the box on the Asks feed): each starts uploading at once.
+  void _attach(List<XFile> picked) {
+    final room = _maxAskImages - _photos.length;
+    if (room <= 0 || !mounted) return;
     final api = context.read<AuthProvider>().api;
     for (final f in picked.take(room)) {
       final ph = _Photo('${DateTime.now().microsecondsSinceEpoch}${f.name}', f);
@@ -866,6 +913,7 @@ class _AskFormState extends State<_AskForm> {
   @override
   void dispose() {
     askPrefill.removeListener(_prefill);
+    askStart.removeListener(_start);
     _draftTimer?.cancel();
     _aiCatTimer?.cancel();
     for (final c in [if (!_search) _title, _desc, _other]) {

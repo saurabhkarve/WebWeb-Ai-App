@@ -48,7 +48,7 @@ class ContactSync {
     return d['on'] == true;
   }
 
-  /// Turn it on or off. Off removes everything this member sent, and the phone forgets what it sent.
+  /// Turn it on or off. Off only stops further sharing (the server remembers the choice); contacts already shared stay until the member removes them one by one.
   static Future<void> setOn(Api api, bool on) async {
     await api.put('/contact-sync', {'on': on});
     final prefs = await SharedPreferences.getInstance();

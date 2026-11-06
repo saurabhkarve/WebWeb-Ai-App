@@ -32,7 +32,7 @@ import 'find.dart';
 import 'post_detail.dart';
 import 'profile.dart';
 import 'service_page.dart';
-import 'service_contacts_sheet.dart' show showServiceContactsSheet;
+import 'service_contacts_sheet.dart' show autoServiceContacts;
 import 'ask.dart' show SearchAskForm;
 
 /// The AI Phonebook (web /phonebook): which of my contacts already have a WEBWEB page, with what they do, where
@@ -430,17 +430,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
   /// Contacts were just allowed: service contacts (only the contacts saved with a service word, shared with the
   /// member's say-so) look at once if they are on, or are offered once, here, instead of at the third open.
-  Future<void> _serviceContacts() async {
-    final api = context.read<AuthProvider>().api;
-    try {
-      if (await ContactSync.isOn(api)) {
-        ContactSync.run(api, force: true);
-      } else if (!await ContactSync.wasAsked() && mounted) {
-        await ContactSync.markInvited();
-        if (mounted) showServiceContactsSheet(context, invite: true);
-      }
-    } catch (_) {}
-  }
+  Future<void> _serviceContacts() async => autoServiceContacts(context);
 
   Future<void> _loadCats() async {
     try {

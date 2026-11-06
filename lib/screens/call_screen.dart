@@ -56,6 +56,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       case CallState.calling:
         return t('Starting call…');
       case CallState.ringing:
+        if (c.incoming && c.answering) return t('Connecting…');
         return c.incoming ? t('Incoming $kind call') : t('Ringing…');
       case CallState.connecting:
         return t('Connecting…');
@@ -92,7 +93,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       return const Scaffold(backgroundColor: _bg);
     }
     final ended = live == null || c.state == CallState.ended;
-    final ringing = !ended && (c.state == CallState.ringing || c.state == CallState.calling);
+    final ringing = !ended && !c.answering && (c.state == CallState.ringing || c.state == CallState.calling);
     final connected = !ended && c.state == CallState.connected;
     final showVideo = c.video && connected && !ended;
     final hasRemote = cm.remoteR.srcObject != null;
@@ -268,7 +269,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
 
   Widget _controls(CallManager cm, ActiveCall c) {
     final white15 = Colors.white.withValues(alpha: .15);
-    if (c.state == CallState.ringing && c.incoming) {
+    if (c.state == CallState.ringing && c.incoming && !c.answering) {
       return Row(mainAxisSize: MainAxisSize.min, children: [
         _round(WI.phone, t('Decline'), _red, cm.reject, turns: 135 / 360),
         const SizedBox(width: 40),

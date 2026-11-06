@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../ask_types.dart';
@@ -8,6 +9,7 @@ import '../auth_provider.dart';
 import '../i18n.dart';
 import '../realtime.dart';
 import '../theme.dart';
+import '../widgets/city_picker.dart' show PickedCity;
 import '../widgets.dart';
 import 'post_detail.dart';
 
@@ -17,6 +19,18 @@ final ValueNotifier<bool> yourAsksRequest = ValueNotifier(false);
 /// Contacts' Ask AI hands its search over to the Ask form as the title of a new ask ("Post as an ask"); the form
 /// takes it and resets this.
 final ValueNotifier<String?> askPrefill = ValueNotifier(null);
+
+/// What was started in the box at the top of the Asks feed: the line, and (all optional) the kind, photos, place and
+/// budget. The Ask form takes it, fills itself in and resets this.
+class AskStart {
+  final String title;
+  final String? type, budget;
+  final PickedCity? city;
+  final List<XFile> files;
+  const AskStart({required this.title, this.type, this.budget, this.city, this.files = const []});
+}
+
+final ValueNotifier<AskStart?> askStart = ValueNotifier(null);
 
 /// One of my asks with what came in on it (GET /posts/mine/activity).
 class MyAskActivity {

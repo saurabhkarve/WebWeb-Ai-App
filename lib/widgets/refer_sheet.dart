@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../api.dart';
+import '../countries.dart';
 import '../auth_provider.dart';
 import '../i18n.dart';
 import '../models.dart';
@@ -103,9 +104,23 @@ class _ReferSheetState extends State<_ReferSheet> {
     if (got == null || !mounted) return;
     setState(() {
       for (final c in got) {
-        if (!_picked.any((x) => x.phone == c.phone)) _picked.add(c);
+        if (!_picked.any((x) => x.phone == c.phone && x.cc == c.cc)) _picked.add(c);
       }
     });
+  }
+
+  /// a number typed in, with its country code (India first): for someone who is not in the phone book
+  Future<void> _typeNumber() async {
+    final room = _left - _picked.length;
+    if (room <= 0) return toast(context, t('You can refer up to 5 contacts on one ask'));
+    final got = await showModalBottomSheet<PickedContact>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Pal.of(context).canvas,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => _TypeNumberSheet(taken: _picked),
+    );
+    if (got != null && mounted) setState(() => _picked.add(got));
   }
 
   Future<void> _addPhotos() async {
@@ -152,7 +167,7 @@ class _ReferSheetState extends State<_ReferSheet> {
         String? err;
         for (final c in _picked) {
           try {
-            await _api.post('/posts/${widget.post!.id}/refer', {'name': c.name, 'phone': c.phone, if (note.isNotEmpty) 'note': note.length > 200 ? note.substring(0, 200) : note});
+            await _api.post('/posts/${widget.post!.id}/refer', {'name': c.name, 'phone': c.phone, 'countryCode': c.cc, if (note.isNotEmpty) 'note': note.length > 200 ? note.substring(0, 200) : note});
             referred++;
           } catch (e) {
             err = '$e';
@@ -230,7 +245,7 @@ class _ReferSheetState extends State<_ReferSheet> {
               constraints: const BoxConstraints(maxWidth: 170),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                 Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, height: 1.2)),
-                Text(c.phone, maxLines: 1, style: TextStyle(fontSize: 11.5, color: p.muted, height: 1.2)),
+                Text(c.cc == '91' ? c.phone : '+${c.cc} ${c.phone}', maxLines: 1, style: TextStyle(fontSize: 11.5, color: p.muted, height: 1.2)),
               ]),
             ),
             IconButton(visualDensity: VisualDensity.compact, tooltip: t('Remove'), onPressed: _busy ? null : () => setState(() => _picked.remove(c)), icon: WIcon(WI.close, size: 14, color: p.muted)),
@@ -290,15 +305,14 @@ class _ReferSheetState extends State<_ReferSheet> {
           child: TextField(
             controller: _text,
             focusNode: _focus,
-            autofocus: true,
-            minLines: 3,
-            maxLines: 6,
+                        minLines: 2,
+            maxLines: 5,
             maxLength: 300,
             textCapitalization: TextCapitalization.sentences,
             onChanged: (_) => setState(() {}),
             style: const TextStyle(fontSize: 16, height: 1.4),
             decoration: InputDecoration(
-              hintText: t('Who can help, and why they fit. Attach their contact below.'),
+              hintText: t('Add a note (optional), e.g. I have used them: quick and fairly priced'),
               hintStyle: TextStyle(color: p.muted),
               counterText: '',
               filled: false,
@@ -311,10 +325,10 @@ class _ReferSheetState extends State<_ReferSheet> {
           ),
         ),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 14), child: MentionSuggest(controller: _text, focus: _focus)),
-        if (contacts.isNotEmpty || photos.isNotEmpty)
+        if (photos.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-            child: Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [...contacts, ...photos]),
+            child: Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: photos),
           ),
         Container(
           padding: const EdgeInsets.fromLTRB(12, 2, 4, 2),
@@ -323,12 +337,44 @@ class _ReferSheetState extends State<_ReferSheet> {
             if (_text.text.length > 200)
               Text('${_text.text.length}/300', style: TextStyle(fontSize: 11.5, color: _text.text.length > 280 ? p.danger : p.muted, fontFeatures: const [FontFeature.tabularFigures()])),
             const Spacer(),
-            tool(Icons.contact_phone_outlined, 'Contact', canContact ? _attachContact : () => toast(context, t('You can refer up to 5 contacts on one ask'))),
             tool(Icons.add_photo_alternate_outlined, 'Photos', canPhoto ? _addPhotos : null),
           ]),
         ),
       ]),
     );
+
+    // contacts first: that is what a referral is
+    final first = _picked.isEmpty;
+    final addBtn = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _busy ? null : (canContact ? _attachContact : () => toast(context, t('You can refer up to 5 contacts on one ask'))),
+      child: Container(
+        height: first ? 52 : 44,
+        alignment: Alignment.center,
+        decoration: first
+            ? BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(26), boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 3, offset: Offset(0, 1))])
+            : BoxDecoration(borderRadius: BorderRadius.circular(22), border: Border.all(color: kGold, width: 1.5)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.contact_phone_outlined, size: 22, color: first ? kInk : p.tagText),
+          const SizedBox(width: 8),
+          Text(t(first ? 'Add contact' : 'Add another contact'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: first ? kInk : p.tagText)),
+        ]),
+      ),
+    );
+    final contactsSection = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        Expanded(child: Text(t('Who do you want to refer?'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+        Text('${_picked.length}/$_left', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+      ]),
+      const SizedBox(height: 8),
+      if (contacts.isNotEmpty) ...[Wrap(spacing: 8, runSpacing: 8, children: contacts), const SizedBox(height: 8)],
+      addBtn,
+      if (_ask)
+        Align(
+          alignment: Alignment.center,
+          child: TextButton(onPressed: _busy ? null : _typeNumber, child: Text(t('Or type a number'), style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: p.tagText))),
+        ),
+    ]);
 
     return Padding(
       padding: EdgeInsets.only(bottom: kb),
@@ -358,6 +404,8 @@ class _ReferSheetState extends State<_ReferSheet> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              contactsSection,
+              const SizedBox(height: 12),
               composer,
               const SizedBox(height: 10),
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -372,9 +420,173 @@ class _ReferSheetState extends State<_ReferSheet> {
         Container(
           padding: EdgeInsets.fromLTRB(16, 10, 16, kb > 0 ? 10 : mq.padding.bottom + 14),
           decoration: BoxDecoration(color: p.canvas, border: Border(top: BorderSide(color: p.border.withValues(alpha: .7)))),
-          child: GoldButton(label: t('Send'), wi: WI.send, height: 48, loading: _busy, onPressed: _ready && !_busy ? _send : null),
+          child: GoldButton(label: _picked.isEmpty ? t('Send') : '${t('Send')} (${_picked.length})', wi: WI.send, height: 48, loading: _busy, onPressed: _ready && !_busy ? _send : null),
         ),
       ]),
+    );
+  }
+}
+
+/// Name, country code (India first) and number, for a contact that is not in the phone book.
+class _TypeNumberSheet extends StatefulWidget {
+  final List<PickedContact> taken;
+  const _TypeNumberSheet({required this.taken});
+  @override
+  State<_TypeNumberSheet> createState() => _TypeNumberSheetState();
+}
+
+class _TypeNumberSheetState extends State<_TypeNumberSheet> {
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
+  String _country = 'India';
+  String get _cc => kCountries.firstWhere((c) => c.name == _country, orElse: () => kCountries.first).dial;
+  bool _tried = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    super.dispose();
+  }
+
+  String get _national {
+    final d = _phone.text.replaceAll(RegExp(r'\D'), '');
+    if (_cc == '91') return d.length == 12 && d.startsWith('91') ? d.substring(2) : d.length == 11 && d.startsWith('0') ? d.substring(1) : d;
+    return d.replaceFirst(RegExp(r'^0+'), '');
+  }
+
+  String? get _nameErr => _name.text.trim().length < 2 ? t("Enter the contact's name (at least 2 letters)") : null;
+  String? get _phoneErr {
+    final n = _national;
+    final ok = _cc == '91' ? RegExp(r'^[6-9]\d{9}$').hasMatch(n) : RegExp(r'^\d{6,14}$').hasMatch(n);
+    if (!ok) return t(_cc == '91' ? 'Enter a valid 10-digit mobile number' : 'Enter a valid mobile number');
+    if (widget.taken.any((c) => c.phone == n && c.cc == _cc)) return t('This number is already added');
+    return null;
+  }
+
+  void _add() {
+    setState(() => _tried = true);
+    if (_nameErr != null || _phoneErr != null) return;
+    Navigator.pop(context, PickedContact(_name.text.trim().replaceAll(RegExp(r'\s+'), ' '), _national, _cc));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    InputDecoration dec(String hint, String? err) => InputDecoration(hintText: hint, errorText: _tried ? err : null, isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12));
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 14, 16, MediaQuery.of(context).viewInsets.bottom + 14),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        // the title and Add share a row: the sheet is as short as it can be
+        Row(children: [
+          Expanded(child: Text(t('Add contact'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+          SizedBox(width: 96, child: GoldButton(label: t('Add'), height: 40, onPressed: _add)),
+        ]),
+        const SizedBox(height: 10),
+        TextField(controller: _name, autofocus: true, textCapitalization: TextCapitalization.words, maxLength: 60, onChanged: (_) => setState(() {}), decoration: dec(t('Name'), _nameErr).copyWith(counterText: '')),
+        const SizedBox(height: 10),
+        // one field: the country code on the left, the number beside it
+        Container(
+          decoration: BoxDecoration(border: Border.all(color: _tried && _phoneErr != null ? p.danger : p.border), borderRadius: BorderRadius.circular(26)),
+          child: Row(children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () async {
+                final got = await showModalBottomSheet<String>(
+                  context: context,
+                  isScrollControlled: true,
+                  useSafeArea: true,
+                  backgroundColor: p.canvas,
+                  shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                  builder: (_) => _CountrySheet(selected: _country),
+                );
+                if (got != null && mounted) setState(() => _country = got);
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(left: 14, right: 10),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text('${kCountries.firstWhere((c) => c.name == _country).flag} +$_cc', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.text)),
+                  const SizedBox(width: 2),
+                  Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: p.muted),
+                ]),
+              ),
+            ),
+            Container(width: 1, height: 22, color: p.border),
+            Expanded(
+              child: TextField(
+                controller: _phone,
+                keyboardType: TextInputType.phone,
+                maxLength: 16,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(hintText: t(_cc == '91' ? '10-digit mobile number' : 'Mobile number'), counterText: '', border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none, filled: false, isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14)),
+              ),
+            ),
+          ]),
+        ),
+        if (_tried && _phoneErr != null) Padding(padding: const EdgeInsets.only(left: 16, top: 4), child: Text(_phoneErr!, style: TextStyle(fontSize: 12, color: p.danger))),
+      ]),
+    );
+  }
+}
+
+/// The country codes, searchable by country name or code; returns the country's name.
+class _CountrySheet extends StatefulWidget {
+  final String selected;
+  const _CountrySheet({required this.selected});
+  @override
+  State<_CountrySheet> createState() => _CountrySheetState();
+}
+
+class _CountrySheetState extends State<_CountrySheet> {
+  String _q = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final s = _q.trim().toLowerCase().replaceFirst(RegExp(r'^\+'), '');
+    final list = s.isEmpty ? kCountries : kCountries.where((c) => c.name.toLowerCase().contains(s) || c.dial.startsWith(s)).toList();
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * .8,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 4),
+            child: Row(children: [
+              Expanded(child: Text(t('Country code'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+              IconButton(onPressed: () => Navigator.pop(context), icon: WIcon(WI.close, size: 22, color: p.text)),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: TextField(
+              autofocus: true,
+              onChanged: (v) => setState(() => _q = v),
+              decoration: InputDecoration(hintText: t('Search country or code'), prefixIcon: const Icon(Icons.search_rounded), isDense: true, contentPadding: const EdgeInsets.symmetric(vertical: 12), border: OutlineInputBorder(borderRadius: BorderRadius.circular(24))),
+            ),
+          ),
+          Expanded(
+            child: list.isEmpty
+                ? Center(child: Text(t('No country found'), style: TextStyle(color: p.muted)))
+                : ListView.builder(
+                    itemCount: list.length,
+                    itemBuilder: (_, i) {
+                      final c = list[i];
+                      final on = c.name == widget.selected;
+                      return ListTile(
+                        dense: true,
+                        selected: on,
+                        selectedTileColor: kGold.withValues(alpha: .15),
+                        leading: Text(c.flag, style: const TextStyle(fontSize: 22)),
+                        title: Text(c.name, style: TextStyle(fontWeight: on ? FontWeight.w700 : FontWeight.w500)),
+                        trailing: Text('+${c.dial}', style: TextStyle(color: p.muted)),
+                        onTap: () => Navigator.pop(context, c.name),
+                      );
+                    },
+                  ),
+          ),
+        ]),
+      ),
     );
   }
 }

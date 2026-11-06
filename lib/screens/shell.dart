@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -104,27 +103,12 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     });
     _pushSub = NotificationService.activity.stream.listen((_) => _refreshAll());
     tourRequest.addListener(_replayTour);
-    // the first-run tour (cards, then a spotlight on the tabs); the Home tour it replaces is retired with it
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted)
-        Tours.maybeShow(
-            context, kPhonebookTourId, phonebookTour(business: _isBusiness()),
-            retire: const [kConnectTourId]);
-    });
+    // no tour opens by itself: it dimmed the Find page. "Take the app tour" in the account menu still runs it (_replayTour)
     // the phone's location and contacts count towards the profile's strength: read them now
     DevicePerms.i.refresh();
-    // service contacts: look quietly if the member turned it on; else the invitation (first open, then a week apart, 3 times at most)
-    _svcTimer = Timer(const Duration(seconds: 8), () async {
-      if (!mounted) return;
-      final api = context.read<AuthProvider>().api;
-      if (await ContactSync.isOn(api).catchError((_) => true)) {
-        ContactSync.run(api);
-      } else if (await ContactSync.shouldInvite() &&
-          mounted &&
-          ModalRoute.of(context)?.isCurrent == true) {
-        await ContactSync.markInvited();
-        if (mounted) showServiceContactsSheet(context, invite: true);
-      }
+    // service contacts are on by default once contacts are allowed: a notice the first time (with the way to turn it off), then it looks quietly
+    _svcTimer = Timer(const Duration(seconds: 8), () {
+      if (mounted) autoServiceContacts(context);
     });
   }
 
@@ -584,8 +568,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                 child: Container(
                   // the floating island, as on the website: a rounded pill with a soft shadow, the page showing round it
                   decoration: BoxDecoration(
-                    // frosted glass: the page shows through, blurred, so text behind it never fights the labels
-                    color: p.canvas.withValues(alpha: p.dark ? .66 : .74),
+                    // nearly solid, so text scrolling behind it never fights the labels
+                    color: p.canvas.withValues(alpha: p.dark ? .94 : .95),
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(
                         color: p.dark
@@ -601,22 +585,21 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                           offset: const Offset(0, 10))
                     ],
                   ),
+                  // no BackdropFilter: on some iPhones (an iPhone 8 in TestFlight) the blurred backdrop was drawn over the whole
+                  // page as a grey wash, on opening the app and on coming back from a search. A plain fill cannot do that.
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(30),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                      child: Row(children: [
-                        for (final k in const [_feed, _dir, _talk])
-                          Expanded(
-                            child: KeyedSubtree(
-                              key: k == _dir ? null : Tours.key(_tourKeys[k]),
-                              child: k == _dir
-                                  ? _dirLabel(p, c)
-                                  : _barItem(p, k, c, badge: _badgeOf(k)),
-                            ),
+                    child: Row(children: [
+                      for (final k in const [_feed, _dir, _talk])
+                        Expanded(
+                          child: KeyedSubtree(
+                            key: k == _dir ? null : Tours.key(_tourKeys[k]),
+                            child: k == _dir
+                                ? _dirLabel(p, c)
+                                : _barItem(p, k, c, badge: _badgeOf(k)),
                           ),
-                      ]),
-                    ),
+                        ),
+                    ]),
                   ),
                 ),
               ),
@@ -1765,7 +1748,8 @@ class _ServiceContactsRowState extends State<_ServiceContactsRow> {
     final on = _on == true;
     return Column(mainAxisSize: MainAxisSize.min, children: [
       _toggleRow(p, on),
-      if (on)
+      // also while it is off: contacts already shared stay until the member removes them one by one
+      ...[
         InkWell(
           onTap: () => Navigator.of(context)
               .push(WideRoute(builder: (_) => const SharedContactsScreen())),
@@ -1783,6 +1767,7 @@ class _ServiceContactsRowState extends State<_ServiceContactsRow> {
             ]),
           ),
         ),
+      ],
     ]);
   }
 

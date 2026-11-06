@@ -1,3 +1,4 @@
+import '../icons.dart';
 import 'package:flutter/material.dart';
 
 import '../card_colors.dart';
@@ -52,11 +53,17 @@ class CardCta extends StatelessWidget {
   Widget build(BuildContext context) {
     final pill = Container(
       height: (30 * scale).clamp(30.0, 36.0),
-      constraints: BoxConstraints(minWidth: (96 * scale).clamp(96.0, 120.0)),
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+      constraints: BoxConstraints(minWidth: outlined ? 0 : (96 * scale).clamp(96.0, 120.0)),
+      padding: EdgeInsets.symmetric(horizontal: outlined ? 14 : 18),
       alignment: Alignment.center,
       decoration: outlined ? BoxDecoration(border: Border.all(color: kGold, width: 1.5), borderRadius: BorderRadius.circular(20)) : BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20), boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 3, offset: Offset(0, 1))]),
-      child: Text(t(label), style: TextStyle(fontSize: (13 * scale).clamp(12.5, 14.5), fontWeight: FontWeight.w700, color: outlined ? Pal.of(context).text : kInk)),
+      child: outlined
+          ? Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
+              WIcon(WI.talk, size: 18, color: Pal.of(context).text),
+              const SizedBox(width: 5),
+              Flexible(child: Text(t(label), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: (13 * scale).clamp(12.5, 14.5), fontWeight: FontWeight.w700, color: Pal.of(context).text))),
+            ])
+          : Text(t(label), style: TextStyle(fontSize: (13 * scale).clamp(12.5, 14.5), fontWeight: FontWeight.w700, color: kInk)),
     );
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

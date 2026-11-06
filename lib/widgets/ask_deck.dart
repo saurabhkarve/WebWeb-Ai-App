@@ -345,7 +345,7 @@ class _AskDeckState extends State<AskDeck> {
           final tk = c == null ? null : talk();
           return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             chips,
-            if (c != null) ...[const SizedBox(height: 2), tk == null ? c : Row(children: [c, const SizedBox(width: 8), tk])],
+            if (c != null) ...[const SizedBox(height: 2), tk == null ? c : Row(children: [Flexible(child: c), const SizedBox(width: 8), Flexible(child: tk)])],
           ]);
         }
 
@@ -630,7 +630,7 @@ class _AskDeckState extends State<AskDeck> {
                       padding: const EdgeInsets.symmetric(horizontal: 18),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(border: Border.all(color: kGold, width: 1.5), borderRadius: BorderRadius.circular(18)),
-                      child: Text(t('Talk'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Pal.of(context).text)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [WIcon(WI.talk, size: 20, color: Pal.of(context).text), const SizedBox(width: 6), Text(t('Talk'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Pal.of(context).text))]),
                     ),
                   ),
                 ],

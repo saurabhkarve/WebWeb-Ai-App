@@ -1,15 +1,21 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api.dart';
+import '../ask_types.dart';
 import '../auth_provider.dart';
+import '../card_colors.dart';
 import '../device_perms.dart';
 import '../i18n.dart';
+import '../widgets/city_picker.dart';
 import 'your_asks.dart';
+import '../links.dart';
 import '../models.dart';
 import '../safety.dart';
 import '../theme.dart';
@@ -91,7 +97,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
     if (_tourTried || !widget.active) return;
     _tourTried = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) Tours.maybeShow(context, kConnectTourId, kConnectTour);
+      // tours no longer open by themselves; "Take the app tour" in the account menu runs them
+      // if (mounted) Tours.maybeShow(context, kConnectTourId, kConnectTour);
     });
   }
 
@@ -213,6 +220,9 @@ class _ConnectScreenState extends State<ConnectScreen> {
     final houseShown = blocks.take(slotCount).whereType<HouseCard>().length;
     final children = <Widget>[
       const _StrengthNudge(),
+      const SizedBox(height: 12),
+      // a box to start an ask from right here, as at the top of a social feed
+      _AskComposer(onPosted: _load),
       const SizedBox(height: 12),
       Row(children: [Expanded(child: RuleHeading(WI.ask, t('Asks'))), const SizedBox(width: 8), YourAsksPill(onOpen: widget.onGoAsk)]),
       if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
@@ -780,6 +790,512 @@ class _EndOfFeedState extends State<_EndOfFeed> {
           btn('Post an Ask', icon: WI.ask, gold: true, onTap: widget.onAsk),
           btn('Find people', icon: WI.search, onTap: widget.onFind),
           btn('Back to top', glyph: '↑', onTap: widget.onTop),
+        ]),
+      ]),
+    );
+  }
+}
+
+
+/// The box at the top of the Asks feed: the member's picture and a line to start typing. Tapping the line opens the box
+/// out: a bigger writing area and, all optional, photos, a place and a budget. "Post ask" carries all of it to the Ask
+/// form (where it is posted); a kind below the line opens the form on that kind.
+class _AskComposer extends StatefulWidget {
+  /// called after an ask is posted from the box, so the feed can show it
+  final VoidCallback onPosted;
+  const _AskComposer({required this.onPosted});
+  @override
+  State<_AskComposer> createState() => _AskComposerState();
+}
+
+class _AskComposerState extends State<_AskComposer> {
+  static const _maxPhotos = 10;
+  final _text = TextEditingController();
+  final _budget = TextEditingController();
+  final _focus = FocusNode();
+  bool _open = false;
+  PickedCity? _city;
+  final List<XFile> _photos = [];
+  String? _type;
+  final _details = TextEditingController();
+  /// the details field stays hidden until the Description chip is tapped
+  bool _showDesc = false;
+  /// a random card layout to start; the Card style chip picks another
+  String _style = randomCardStyle();
+  bool _styleOpen = false;
+  final _about = TextEditingController();
+  final List<TextEditingController> _opts = [TextEditingController(), TextEditingController()];
+  bool _busy = false;
+  String? _error;
+  String? _postedId;
+
+  @override
+  void dispose() {
+    _text.dispose();
+    _budget.dispose();
+    _details.dispose();
+    _about.dispose();
+    for (final o in _opts) {
+      o.dispose();
+    }
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _expand() {
+    if (_open) return;
+    setState(() => _open = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
+  }
+
+  /// a kind of ask: it opens the box on that kind (tapping it again lets go of it)
+  void _pick(String v) {
+    setState(() {
+      _type = _type == v ? null : v;
+      _error = null;
+      _postedId = null;
+      _open = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
+  }
+
+  static final _blank = RegExp(r'\[[^\]\n]{1,60}\]');
+
+  /// check the ask, then publish it here: the same rules as the full form
+  Future<void> _submit() async {
+    if (!_open) return _expand();
+    final title = _text.text.trim(), desc = _details.text.trim();
+    String? fail;
+    final opts = _opts.map((o) => o.text.trim()).where((o) => o.isNotEmpty).toList();
+    if (title.length < 5) {
+      fail = t('Add a title');
+    } else if (desc.isNotEmpty && desc.length < 20) {
+      fail = t('Add a little more detail');
+    } else if (_blank.hasMatch(title) || _blank.hasMatch(desc)) {
+      fail = t('Replace the [brackets] with your details');
+    } else if (_type == 'poll' && opts.length < 2) {
+      fail = t('Add at least 2 options to vote on');
+    } else if (_type == 'other' && _about.text.trim().length < 2) {
+      fail = t('Say what this ask is about');
+    } else if (_type == 'visit' && firstLink([title, desc]) == null) {
+      fail = t('Add the link to your website in the details');
+    }
+    if (fail != null) return setState(() => _error = fail);
+    final api = context.read<AuthProvider>().api;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      // no kind picked: the reading of the words decides
+      var kind = _type;
+      if (kind == null) {
+        try {
+          final r = await api.post('/ai/category', {'title': title, 'description': desc}) as Map;
+          kind = r['type'] as String?;
+        } catch (_) {}
+        if (kind == 'poll' || kind == 'other' || kind == 'visit') kind = null; // these need more than words
+      }
+      if (kind == null) {
+        if (mounted) setState(() => (_busy = false, _error = t('Choose a type')));
+        return;
+      }
+      final images = <String>[];
+      for (final f in _photos) {
+        images.add(await api.uploadImage(await f.readAsBytes(), f.name));
+      }
+      if (!mounted) return;
+      final home = context.read<AuthProvider>().profile?.location ?? '';
+      final place = _city?.name ?? (home == 'Other' ? '' : home);
+      final budget = _budget.text.trim();
+      final r = await api.post('/posts', {
+        'title': title,
+        'description': desc.isEmpty ? title : desc,
+        'cardStyle': _style,
+        'category': categoryForType(kind, null),
+        'askType': kind,
+        if (kind == 'poll') 'pollOptions': opts,
+        if (kind == 'other') 'categoryLabel': _about.text.trim(),
+        if (place.isNotEmpty) 'locationPref': place,
+        if (budget.isNotEmpty) 'budget': budget,
+        'images': images,
+      }) as Map;
+      if (!mounted) return;
+      setState(() {
+        _text.clear();
+        _details.clear();
+        _showDesc = false;
+        _styleOpen = false;
+        _style = randomCardStyle();
+        _about.clear();
+        for (final o in _opts) {
+          o.clear();
+        }
+        _budget.clear();
+        _photos.clear();
+        _city = null;
+        _type = null;
+        _open = false;
+        _busy = false;
+        _postedId = '${r['id'] ?? ''}';
+      });
+      widget.onPosted();
+    } catch (e) {
+      if (mounted) setState(() => (_busy = false, _error = t('Could not publish your post. Please try again.')));
+    }
+  }
+
+  Future<void> _pickPhotos() async {
+    final room = _maxPhotos - _photos.length;
+    if (room <= 0) return;
+    final picked = await ImagePicker().pickMultiImage(maxWidth: 1600, imageQuality: 80, limit: room > 1 ? room : null);
+    if (picked.isEmpty || !mounted) return;
+    setState(() => _photos.addAll(picked.take(room)));
+  }
+
+  /// Budget is not a free field: amounts in rupees (From and/or To) and what it is per, checked before it is kept.
+  Future<void> _pickBudget() async {
+    final got = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Pal.of(context).canvas,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => _BudgetSheet(value: _budget.text),
+    );
+    if (got != null && mounted) setState(() => _budget.text = got);
+  }
+
+  Future<void> _pickPlace() async {
+    final home = context.read<AuthProvider>().profile?.location ?? '';
+    final c = await showCitySheet(context, value: _city?.name ?? (home == 'Other' ? null : home));
+    if (c != null && mounted) setState(() => _city = c);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final me = context.watch<AuthProvider>().profile;
+    if (me == null) return const SizedBox.shrink();
+    final shown = me.isEntrepreneur && me.company.isNotEmpty ? me.company : me.name;
+    final first = shown.trim().split(RegExp(r'\s+')).first;
+    final hint = t('What do you need, {name}?', {'name': first});
+    final home = me.location == 'Other' ? '' : me.location;
+    final place = _city?.name ?? home;
+
+    Widget small(String label, VoidCallback onTap, {bool on = false}) => GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(18), border: Border.all(color: on ? kGold : p.border)),
+            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.text)),
+          ),
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)),
+      // the card grows and shrinks smoothly as the box opens out and folds back
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (_postedId != null)
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(color: const Color(0xFF2F9E6E).withValues(alpha: .12), borderRadius: BorderRadius.circular(12)),
+            child: Text(t('Your ask is live.'), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Color(0xFF1F7A52))),
+          ),
+        // the kinds of ask, above the line: one tap picks the kind and opens the box
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            for (final o in kAskTypes)
+              if (o.value.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: GestureDetector(
+                    onTap: () => _pick(o.value),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), color: _type == o.value ? kGold.withValues(alpha: .25) : null, border: Border.all(color: _type == o.value ? kGold : p.border)),
+                      child: Text('${o.emoji} ${t(o.short)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.text)),
+                    ),
+                  ),
+                ),
+          ]),
+        ),
+        const SizedBox(height: 10),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(padding: const EdgeInsets.only(top: 2), child: Avatar(name: me.name, size: 40, type: me.userType, photoUrl: me.photoUrl, uid: me.uid)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Stack(children: [
+            TextField(
+              controller: _text,
+              focusNode: _focus,
+              readOnly: !_open,
+              onTap: _expand,
+              onChanged: (_) => setState(() {}),
+              minLines: 1,
+              maxLines: 1,
+              maxLength: 100,
+              buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
+              textInputAction: TextInputAction.newline,
+              style: const TextStyle(fontSize: 15),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: TextStyle(color: p.muted),
+                filled: true,
+                fillColor: p.chip,
+                isDense: true,
+                contentPadding: EdgeInsets.fromLTRB(16, 12, _open ? 60 : 16, 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+              ),
+            ),
+            // the count sits inside the field, at its bottom right
+            if (_open)
+              Positioned(
+                right: 14,
+                top: 0,
+                bottom: 0,
+                child: Center(child: IgnorePointer(child: Text('${_text.text.length}/100', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _text.text.length > 90 ? const Color(0xFFB45309) : p.muted)))),
+              ),
+            ]),
+          ),
+          // closed: the button sits beside the line; open: it moves down beside the options
+          if (!_open) ...[const SizedBox(width: 10), GestureDetector(
+            onTap: _submit,
+            child: Container(
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20)),
+              child: Text(t('Post ask'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
+            ),
+          )],
+        ]),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 240),
+          transitionBuilder: (c, a) => FadeTransition(opacity: a, child: c),
+          child: !_open
+              ? const SizedBox.shrink(key: ValueKey('closed'))
+              : Column(key: const ValueKey('open'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.only(left: 52),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (_showDesc) ...[
+              Stack(children: [
+                TextField(
+                  controller: _details,
+                  onChanged: (_) => setState(() {}),
+                  maxLength: 300,
+                  minLines: 2,
+                  maxLines: 4,
+                  buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
+                  style: const TextStyle(fontSize: 15),
+                  decoration: InputDecoration(
+                    hintText: t('Details: what exactly do you need?'),
+                    hintStyle: TextStyle(color: p.muted),
+                    filled: true,
+                    fillColor: p.chip,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  ),
+                ),
+                Positioned(right: 14, bottom: 6, child: IgnorePointer(child: Text('${_details.text.length}/300', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _details.text.trim().isNotEmpty && _details.text.trim().length < 20 ? const Color(0xFFB45309) : p.muted)))),
+              ]),
+              const SizedBox(height: 10),
+              ],
+              if (_type == 'poll') ...[
+                for (var i = 0; i < _opts.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: TextField(controller: _opts[i], maxLength: 60, buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null, decoration: InputDecoration(hintText: t('Option {n}', {'n': i + 1}), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11), border: OutlineInputBorder(borderRadius: BorderRadius.circular(22)))),
+                  ),
+                if (_opts.length < 4) TextButton(onPressed: () => setState(() => _opts.add(TextEditingController())), child: Text('+ ${t('Add option')}')),
+                const SizedBox(height: 4),
+              ],
+              if (_type == 'other') ...[
+                TextField(controller: _about, maxLength: 40, buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null, decoration: InputDecoration(hintText: t('What is this about? e.g. Event stall, Legal help, Insurance'), isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11), border: OutlineInputBorder(borderRadius: BorderRadius.circular(22)))),
+                const SizedBox(height: 10),
+              ],
+              if (_photos.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Wrap(spacing: 8, runSpacing: 8, children: [
+                    for (var i = 0; i < _photos.length; i++)
+                      Stack(children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: FutureBuilder<Uint8List>(
+                            future: _photos[i].readAsBytes(),
+                            builder: (_, s) => Container(width: 64, height: 64, color: p.chip, child: s.hasData ? Image.memory(s.data!, fit: BoxFit.cover) : null),
+                          ),
+                        ),
+                        Positioned(
+                          right: 2,
+                          top: 2,
+                          child: GestureDetector(
+                            onTap: () => setState(() => _photos.removeAt(i)),
+                            child: Container(width: 20, height: 20, alignment: Alignment.center, decoration: const BoxDecoration(color: Color(0x99000000), shape: BoxShape.circle), child: const Icon(Icons.close, size: 13, color: Colors.white)),
+                          ),
+                        ),
+                      ]),
+                  ]),
+                ),
+              // the options (all optional) and the button, in one row
+              Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                Expanded(child: Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                small('📝 ${t('Description')}', () => setState(() => _showDesc = !_showDesc), on: _showDesc),
+                small('🖼️ ${t('Add photos')}', _pickPhotos),
+                small('📍 ${place.isEmpty ? t('Location') : place}', _pickPlace, on: _city != null),
+                small('₹ ${_budget.text.isEmpty ? t('Budget') : _budget.text.replaceFirst(RegExp(r'^₹\s*'), '')}', _pickBudget, on: _budget.text.isNotEmpty),
+                small('🎨 ${t('Card style')}: ${t(kCardStyleLabels[_style] ?? _style)}', () => setState(() => _styleOpen = !_styleOpen), on: _styleOpen),
+              ])),
+                const SizedBox(width: 10),
+                GestureDetector(
+            onTap: _busy ? null : _submit,
+            child: Container(
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20)),
+              child: Text(t(_busy ? 'Posting...' : 'Post ask'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
+            ),
+          ),
+              ]),
+              if (_styleOpen)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Wrap(spacing: 8, runSpacing: 8, children: [
+                    for (final st in kCardStyles) small(t(kCardStyleLabels[st] ?? st), () => setState(() => _style = st), on: _style == st),
+                  ]),
+                ),
+              if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: TextStyle(fontSize: 13, color: p.danger))),
+            ]),
+          ),
+        
+              ]),
+        ),
+      ]),
+      ),
+    );
+  }
+}
+
+/// From and/or To in rupees (digits only, grouped the Indian way) and an optional unit; returns the budget text the
+/// ask form reads ("₹20,000 - ₹30,000 / month"), or '' to clear.
+class _BudgetSheet extends StatefulWidget {
+  final String value;
+  const _BudgetSheet({required this.value});
+  @override
+  State<_BudgetSheet> createState() => _BudgetSheetState();
+}
+
+class _BudgetSheetState extends State<_BudgetSheet> {
+  static const _units = ['month', 'piece', 'trip', 'day'];
+  static const _max = 999999999;
+  final _from = TextEditingController();
+  final _to = TextEditingController();
+  String _unit = '';
+  bool _tried = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final m = RegExp(r'^(?:Up to\s*)?₹?\s*([\d,]+)?(?:\s*-\s*₹?\s*([\d,]+))?(?:\s*/\s*(\w+))?\s*$').firstMatch(widget.value);
+    if (m != null) {
+      final up = widget.value.startsWith('Up to');
+      final a = m.group(1) ?? '', b = m.group(2) ?? '';
+      _from.text = up ? '' : _group(a);
+      _to.text = up ? _group(a) : _group(b);
+      if (_units.contains(m.group(3))) _unit = m.group(3)!;
+    }
+  }
+
+  @override
+  void dispose() {
+    _from.dispose();
+    _to.dispose();
+    super.dispose();
+  }
+
+  static String _digits(String v) => v.replaceAll(RegExp(r'\D'), '').replaceFirst(RegExp(r'^0+'), '');
+  /// 1234567 -> 12,34,567
+  static String _group(String v) {
+    final d = _digits(v);
+    if (d.length <= 3) return d;
+    final head = d.substring(0, d.length - 3), tail = d.substring(d.length - 3);
+    return '${head.replaceAllMapped(RegExp(r'(\d)(?=(\d{2})+$)'), (m) => '${m[1]},')},$tail';
+  }
+
+  String? get _err {
+    final f = int.tryParse(_digits(_from.text)) ?? 0, to = int.tryParse(_digits(_to.text)) ?? 0;
+    if (f == 0 && to == 0) return t('Enter an amount');
+    if (f > _max || to > _max) return t('That amount is too large');
+    if (f > 0 && to > 0 && to < f) return t('To must be more than From');
+    return null;
+  }
+
+  void _done() {
+    setState(() => _tried = true);
+    if (_err != null) return;
+    final f = _group(_from.text), to = _group(_to.text);
+    final base = f.isEmpty ? 'Up to ₹$to' : to.isEmpty ? '₹$f' : '₹$f - ₹$to';
+    Navigator.pop(context, _unit.isEmpty ? base : '$base / $_unit');
+  }
+
+  Widget _field(String label, TextEditingController c, String hint) => Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Pal.of(context).muted)),
+          const SizedBox(height: 4),
+          TextField(
+            controller: c,
+            keyboardType: TextInputType.number,
+            onChanged: (v) {
+              final g = _group(v);
+              if (g != v) c.value = TextEditingValue(text: g, selection: TextSelection.collapsed(offset: g.length));
+              setState(() {});
+            },
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            decoration: InputDecoration(hintText: hint, prefixText: '₹ ', isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12), border: OutlineInputBorder(borderRadius: BorderRadius.circular(24))),
+          ),
+        ]),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 16),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(t('Budget'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [_field(t('From (optional)'), _from, '20,000'), const SizedBox(width: 12), _field(t('To (optional)'), _to, '30,000')]),
+        const SizedBox(height: 12),
+        Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          Text(t('Per'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
+          for (final u in _units)
+            GestureDetector(
+              onTap: () => setState(() => _unit = _unit == u ? '' : u),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), color: _unit == u ? kGold.withValues(alpha: .2) : null, border: Border.all(color: _unit == u ? kGold : p.border)),
+                child: Text(t(u), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              ),
+            ),
+        ]),
+        if (_tried && _err != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_err!, style: TextStyle(fontSize: 13, color: p.danger))),
+        const SizedBox(height: 14),
+        Row(children: [
+          if (widget.value.isNotEmpty) ...[TextButton(onPressed: () => Navigator.pop(context, ''), child: Text(t('Clear'))), const SizedBox(width: 8)],
+          Expanded(child: GoldButton(label: t('Done'), height: 46, onPressed: _done)),
         ]),
       ]),
     );

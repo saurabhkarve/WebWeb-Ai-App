@@ -23,23 +23,26 @@ class ExistingResponse {
 /// that needs no words (a price and when are optional chips the asker can compare), or "Just a note": a note with an
 /// optional photo (or a photo on its own). Passing on someone's number is Refer's job, so there is no "share my contact" here.
 /// Resolves true when a reply was sent.
-Future<bool> showResponseSheet(BuildContext context, String postId, {ExistingResponse? existing}) async {
-  final r = await showModalBottomSheet<bool>(
+/// [onRefer]: shows "Know someone who can help? Refer a contact" under Send; tapping it closes the sheet and calls it.
+Future<bool> showResponseSheet(BuildContext context, String postId, {ExistingResponse? existing, VoidCallback? onRefer}) async {
+  final r = await showModalBottomSheet<Object>(
     context: context,
     isScrollControlled: true,
     showDragHandle: false,
     backgroundColor: Pal.of(context).canvas,
     barrierColor: kInk.withValues(alpha: .6),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-    builder: (_) => _ResponseSheet(postId: postId, existing: existing),
+    builder: (_) => _ResponseSheet(postId: postId, existing: existing, canRefer: onRefer != null),
   );
+  if (r == 'refer') onRefer?.call();
   return r == true;
 }
 
 class _ResponseSheet extends StatefulWidget {
   final String postId;
   final ExistingResponse? existing;
-  const _ResponseSheet({required this.postId, this.existing});
+  final bool canRefer;
+  const _ResponseSheet({required this.postId, this.existing, this.canRefer = false});
   @override
   State<_ResponseSheet> createState() => _ResponseSheetState();
 }
@@ -340,7 +343,15 @@ class _ResponseSheetState extends State<_ResponseSheet> {
         Container(
           padding: EdgeInsets.fromLTRB(16, 10, 16, MediaQuery.of(context).viewInsets.bottom > 0 ? 10 : bottom + 14),
           decoration: BoxDecoration(color: p.canvas, border: Border(top: BorderSide(color: p.border.withValues(alpha: .7)))),
-          child: GoldButton(label: t(_editing ? 'Save changes' : 'Send'), loading: _busy, onPressed: _ready ? _submit : null),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            GoldButton(label: t(_editing ? 'Save changes' : 'Send'), loading: _busy, onPressed: _ready ? _submit : null),
+            if (widget.canRefer && !_editing)
+              TextButton.icon(
+                onPressed: _busy ? null : () => Navigator.pop(context, 'refer'),
+                icon: WIcon(WI.refer, size: 16, color: p.tagText, strokeWidth: 2),
+                label: Text(t('Know someone who can help? Refer a contact'), style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: p.tagText)),
+              ),
+          ]),
         ),
       ]),
     );

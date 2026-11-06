@@ -33,6 +33,8 @@ class ActiveCall {
   bool reconnecting = false;
   /// handled by the phone's call UI: CallKit (every iPhone call) / the Android lock-screen call screen
   bool native = false;
+  /// Answer was pressed (here or in CallKit): the screen shows "Connecting…", never Answer / Decline again
+  bool answering = false;
   Json? offerSdp;
   ActiveCall({
     required this.id,
@@ -73,7 +75,10 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
     });
     // back online mid-call: the old network path is gone, so restart ICE right away
     rt.onReconnect.listen((_) {
-      if (current?.reconnecting == true) _restartIce();
+      final c = current;
+      if (c == null) return;
+      // a live call that just got a new socket (Wi-Fi to mobile data): move the media to the new path quietly
+      if (c.reconnecting || c.state == CallState.connected) _restartIce(force: true);
     });
     NativeCalls.onHangUp(() {
       if (inCall) hangUp();
@@ -88,7 +93,7 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// How long a dropped call may try to come back before it ends.
-  static const _reconnectFor = Duration(seconds: 25);
+  static const _reconnectFor = Duration(seconds: 45);
   Timer? _dropTimer, _restartTimer;
   bool _restarting = false;
   bool _serviceOn = false, _serviceConnected = false;
@@ -380,6 +385,9 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
     final c = current;
     if (c == null || !c.incoming || c.offerSdp == null) return;
     _stopSounds();
+    // answering already: the call screen must not offer Answer / Decline again (CallKit accept, tap on Answer)
+    c.answering = true;
+    notifyListeners();
     if (!await _mediaAllowed(c.video)) {
       if (current == c) hangUp(note: c.video ? 'Camera or microphone is off' : 'Microphone is off');
       return;
@@ -439,6 +447,9 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
       case CallEventActionCallAccept(:final callKitParams):
         final id = callKitParams.id;
         if (current?.id == id) {
+          current!.answering = true;
+          current!.native = true;
+          notifyListeners();
           openScreen();
           if (current!.state == CallState.ringing) accept();
         } else {
@@ -599,15 +610,20 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
     if (failed) {
       _restartIce();
     } else {
-      _restartTimer = Timer(const Duration(seconds: 4), _restartIce);
+      _restartTimer = Timer(const Duration(milliseconds: 1500), _restartIce);
     }
   }
 
   /// Only the caller offers again (both doing it at once would collide); the callee answers in _onEvent.
-  Future<void> _restartIce() async {
+  Future<void> _restartIce({bool force = false}) async {
     final c = current, pc = _pc;
-    if (c == null || pc == null || c.incoming || !c.reconnecting || _restarting) return;
+    if (c == null || pc == null || (!c.reconnecting && !force) || _restarting) return;
     if (!rt.connected) return; // retried from onReconnect
+    if (c.incoming) {
+      // the callee cannot offer; ask the caller to, so both sides recover as soon as either link changes
+      rt.send({'type': 'call_restart_request', 'callId': c.id});
+      return;
+    }
     _restarting = true;
     try {
       final offer = await pc.createOffer({'iceRestart': true});
@@ -618,7 +634,7 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
       // tried again by the next state change or reconnect
     } finally {
       // let another attempt go out if this one gets no answer (e.g. the other phone was still offline)
-      Timer(const Duration(seconds: 6), () {
+      Timer(const Duration(seconds: 3), () {
         if (_pc == pc) _restarting = false;
         if (current == c && c.reconnecting && _pc == pc) _restartIce();
       });
@@ -663,6 +679,7 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
         if (answered) {
           // answered on the lock screen / CallKit while the app was starting
           c.native = true;
+          c.answering = true;
           notifyListeners();
           openScreen();
           accept();
@@ -717,6 +734,11 @@ class CallManager extends ChangeNotifier with WidgetsBindingObserver {
           await pc.setLocalDescription(answer);
           rt.send({'type': 'call_restart_answer', 'callId': e['callId'], 'sdp': {'sdp': answer.sdp, 'type': answer.type}});
         } catch (_) {}
+        break;
+
+      case 'call_restart_request':
+        if (current?.id != e['callId'] || _pc == null) return;
+        _restartIce(force: true);
         break;
 
       case 'call_restart_answer':

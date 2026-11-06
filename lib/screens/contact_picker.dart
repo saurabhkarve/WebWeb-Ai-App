@@ -8,7 +8,9 @@ import '../widgets.dart';
 
 class PickedContact {
   final String name, phone;
-  const PickedContact(this.name, this.phone);
+  /// the dial code (91 for a number from the phone book)
+  final String cc;
+  const PickedContact(this.name, this.phone, [this.cc = '91']);
   Map<String, String> toJson() => {'name': name, 'phone': phone};
 }
 

@@ -111,6 +111,16 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     if (post.myReaction == null) _actionsKey.currentState?.react('thumbs');
   }
 
+  /// "Know someone who can help?" in the reply sheet: the Refer sheet, as from the Refer button below the card.
+  Future<void> _referFromReply() async {
+    final r = await showReferSheet(context, post);
+    if (r == null || !mounted) return;
+    setState(() {
+      if (r.referred > 0) post.referralsCount += r.referred;
+    });
+    toast(context, t(r.referred > 0 ? 'Referral sent' : 'Response sent'));
+  }
+
   /// Reply stays in the feed: asks open the respond sheet, updates start a chat with the post attached.
   Future<void> _reply() async {
     if (widget.detail && widget.onReply != null) return widget.onReply!();
@@ -118,7 +128,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     // the owner found someone (or no longer needs it): no new replies
     if (post.isRequirement && post.closed) return toast(context, t('This ask is closed'));
     if (post.isRequirement) {
-      if (await showResponseSheet(context, post.id) && mounted) {
+      if (await showResponseSheet(context, post.id, onRefer: _referFromReply) && mounted) {
         setState(() => post = _withShares(post, post.sharesCount + 1));
         toast(context, t('Response sent'));
       }

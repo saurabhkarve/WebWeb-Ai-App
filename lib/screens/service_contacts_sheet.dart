@@ -30,7 +30,7 @@ Future<bool> turnOffServiceContacts(BuildContext context) async {
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(t('Turn off Service contacts?')),
-      content: Text(t('The contacts you sent will be removed, and the app will stop looking.')),
+      content: Text(t('The app will stop sharing contacts. Contacts you already shared stay until you remove them one by one under Contacts you share.')),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('Cancel'))),
         TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('Turn off'))),
@@ -81,20 +81,6 @@ class _SheetState extends State<_Sheet> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final bottom = MediaQuery.of(context).padding.bottom + 16;
-    Widget point(WI icon, String text) => Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(10)),
-              child: WIcon(icon, size: 17, color: p.text, strokeWidth: 1.8),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: Padding(padding: const EdgeInsets.only(top: 6), child: Text(t(text), style: const TextStyle(fontSize: 14, height: 1.35)))),
-          ]),
-        );
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 18, 20, bottom),
       child: SingleChildScrollView(
@@ -112,21 +98,93 @@ class _SheetState extends State<_Sheet> {
             GestureDetector(onTap: () => Navigator.pop(context, false), child: WIcon(WI.close, size: 24, color: p.text)),
           ]),
           const SizedBox(height: 10),
-          Text(t('Help build a trusted list of local service providers: the plumbers, electricians, cabs and carpenters people already call.'),
-              style: TextStyle(fontSize: 14, color: p.muted, height: 1.4)),
-          const SizedBox(height: 8),
-          // honest about how little is taken, and why it matters
-          Text(t('Not all your contacts will be synced: only service providers. If you allow it, it is a great contribution for other users looking for someone they can trust nearby.'),
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, height: 1.4)),
-          const SizedBox(height: 16),
-          point(WI.search, 'The app looks through your phone book on your phone for contacts saved with a service word, like plumber, electrician, cab or carpenter.'),
-          point(WI.send, 'Only those contacts are sent: the name you saved, the mobile number and the word that matched.'),
-          point(WI.lock, 'The rest of your phone book never leaves your phone. Our team reviews every contact before it is used.'),
-          point(WI.refresh, 'It checks for new ones at most once a day while you use the app. Turn it off any time from the account menu; what you sent is removed.'),
+          Text(t('Only service contacts are shared, so members can find trusted help nearby.'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, height: 1.4)),
+          const SizedBox(height: 18),
+          const ShareFlow(steps: [(WI.search, 'Finds service words on your phone'), (WI.send, 'Shares name, number and word'), (WI.check, 'Our team reviews each one')]),
+          const SizedBox(height: 14),
+          Row(children: [
+            WIcon(WI.lock, size: 14, color: p.muted),
+            const SizedBox(width: 6),
+            Expanded(child: Text(t('The rest of your phone book stays on your phone. Checked once a day. Turn off any time.'), style: TextStyle(fontSize: 12.5, color: p.muted, height: 1.35))),
+          ]),
+          const SizedBox(height: 14),
           const SizedBox(height: 8),
           GoldButton(label: t('Turn on'), wi: WI.check, loading: _busy, onPressed: _busy ? null : _turnOn),
           const SizedBox(height: 8),
           TextButton(onPressed: _busy ? null : () => Navigator.pop(context, false), child: Text(t(widget.invite ? 'Not now' : 'Cancel'))),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Service contacts is on by default once contacts are allowed: the member sees what is shared (and can turn it off) the
+/// first time, then it looks quietly. Someone who turned it off is never switched on again (the server remembers).
+/// Safe to call often: it does nothing unless contacts are allowed, and asks nothing once the choice is made.
+Future<void> autoServiceContacts(BuildContext context) async {
+  if (!ContactSync.supported || !await Permissions.granted(Need.contacts)) return;
+  if (!context.mounted) return;
+  final api = context.read<AuthProvider>().api;
+  try {
+    final d = await api.get('/contact-sync') as Map;
+    if (d['on'] == true) {
+      ContactSync.run(api);
+      return;
+    }
+    if (d['optedOut'] == true) return;
+    if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) return;
+    final p = Pal.of(context);
+    // the notice first: what is shared, and the way to turn it off
+    final off = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: p.canvas,
+      barrierColor: kInk.withValues(alpha: .6),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => const _Notice(),
+    );
+    if (!context.mounted) return;
+    if (off == true) {
+      await ContactSync.setOn(api, false);
+      return;
+    }
+    await ContactSync.setOn(api, true);
+    await ContactSync.run(api, force: true);
+  } catch (_) {
+    // quietly try again next time
+  }
+}
+
+class _Notice extends StatelessWidget {
+  const _Notice();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final bottom = MediaQuery.of(context).padding.bottom + 16;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 18, 20, bottom),
+      child: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Container(width: 44, height: 44, alignment: Alignment.center, decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(14)), child: const WIcon(WI.contactCard, size: 22, color: kInk, strokeWidth: 1.8)),
+            const SizedBox(width: 12),
+            Expanded(child: Text(t('Service contacts is on'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+          ]),
+          const SizedBox(height: 10),
+          Text(t('Only service contacts are shared, so members can find trusted help nearby.'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, height: 1.4)),
+          const SizedBox(height: 18),
+          const ShareFlow(steps: [(WI.search, 'Finds service words on your phone'), (WI.send, 'Shares name, number and word'), (WI.check, 'Our team reviews each one')]),
+          const SizedBox(height: 16),
+          Row(children: [
+            WIcon(WI.lock, size: 14, color: p.muted),
+            const SizedBox(width: 6),
+            Expanded(child: Text(t('The rest of your phone book stays on your phone. Checked once a day. Turn off any time.'), style: TextStyle(fontSize: 12.5, color: p.muted, height: 1.35))),
+          ]),
+          const SizedBox(height: 14),
+          GoldButton(label: t('OK'), wi: WI.check, onPressed: () => Navigator.pop(context, false)),
+          const SizedBox(height: 8),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(t('Turn off'))),
         ]),
       ),
     );

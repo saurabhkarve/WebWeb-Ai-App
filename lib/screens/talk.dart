@@ -34,6 +34,7 @@ import '../widgets/whatsapp_icon.dart';
 import 'contact_picker.dart';
 import 'post_detail.dart';
 import 'profile.dart';
+import 'service_contacts_sheet.dart';
 
 /// The Talk tab's badge: conversations with something unread, leaving out blocked people as the Talk list does.
 /// Re-counted whenever the chat list loads, and when a conversation is closed (opening one marks it read).
@@ -241,6 +242,8 @@ class _TalkScreenState extends State<TalkScreen> {
     }
   }
 
+  Future<void> _offerServiceContacts() async => autoServiceContacts(context);
+
   /// Looks through the phone book for numbers that are not on WEBWEB, so they can be invited from here. Asks for
   /// contacts only when [ask]; the numbers are checked once (POST /phonebook/match, not stored), names stay on the phone.
   Future<void> _loadBook({bool ask = false}) async {
@@ -249,6 +252,9 @@ class _TalkScreenState extends State<TalkScreen> {
       if (!ask || !mounted) return;
       final ok = await Permissions.ensure(context, Need.contacts, reason: t('To show which of your contacts are on WEBWEB, and let you invite the rest. Numbers are checked and not kept.'));
       if (!ok || !mounted) return;
+      // contacts were just allowed here: offer Service contacts once now (it is off until the member says yes, and the
+      // permission alone sends nothing), as the Find page does
+      _offerServiceContacts();
     }
     setState(() => _bookBusy = true);
     try {

@@ -40,7 +40,7 @@ extension on Need {
   /// Shown under the reason: what the app does NOT do, so people can decide with confidence.
   String get promise => switch (this) {
         Need.location => 'Used only while you use the app, never in the background. Your exact location is never shown to other members.',
-        Need.contacts => 'Your phone book is shown in the app and read on your phone. Only the contacts you pick are shared (and service contacts, if you turn that on). A phonebook check sends numbers only to find pages and never stores them.',
+        Need.contacts => 'Only service contacts (like plumber or electrician) are shared. The rest of your phone book stays on your phone. Turn it off any time.',
         Need.camera => 'Used only when you take a photo or turn on video in a call.',
         Need.microphone => 'Used only during calls. Calls are never recorded.',
         Need.notifications => 'Only for messages, calls and replies to your asks.',
@@ -210,7 +210,11 @@ class _PermissionDialogState extends State<_PermissionDialog> with WidgetsBindin
           const SizedBox(height: 8),
           Text(how, style: const TextStyle(fontSize: 14, height: 1.45)),
         ],
-        const SizedBox(height: 10),
+        if (need == Need.contacts && _mode == _Mode.ask) ...[
+          const SizedBox(height: 16),
+          const ShareFlow(steps: [(WI.contactCard, 'Your phone book'), (WI.search, 'Service words only'), (WI.check, 'Trusted directory')]),
+        ],
+        const SizedBox(height: 12),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Padding(padding: const EdgeInsets.only(top: 2), child: WIcon(WI.lock, size: 14, color: p.muted)),
           const SizedBox(width: 6),
@@ -229,5 +233,41 @@ class _PermissionDialogState extends State<_PermissionDialog> with WidgetsBindin
         ]),
       ],
     );
+  }
+}
+
+/// A short picture of how something flows, in steps: an icon in a gold disc, a few words under it, an arrow between.
+/// Each step fades in after the one before it.
+class ShareFlow extends StatelessWidget {
+  final List<(WI, String)> steps;
+  const ShareFlow({super.key, required this.steps});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      for (var i = 0; i < steps.length; i++) ...[
+        Expanded(
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: Duration(milliseconds: 350 + i * 180),
+            curve: Curves.easeOutCubic,
+            builder: (_, v, child) => Opacity(opacity: v, child: Transform.translate(offset: Offset(0, (1 - v) * 8), child: child)),
+            child: Column(children: [
+              Container(
+                width: 52,
+                height: 52,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(gradient: i == steps.length - 1 ? kGoldGradient : null, color: i == steps.length - 1 ? null : kGold.withValues(alpha: .18), shape: BoxShape.circle),
+                child: WIcon(steps[i].$1, size: 24, color: i == steps.length - 1 ? kInk : p.text, strokeWidth: 1.8),
+              ),
+              const SizedBox(height: 6),
+              Text(t(steps[i].$2), textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, height: 1.25)),
+            ]),
+          ),
+        ),
+        if (i < steps.length - 1) Padding(padding: const EdgeInsets.only(top: 16), child: Icon(Icons.arrow_forward_rounded, size: 16, color: p.muted)),
+      ],
+    ]);
   }
 }
