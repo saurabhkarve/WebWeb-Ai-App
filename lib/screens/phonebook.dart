@@ -798,7 +798,30 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         curve: Curves.easeOut,
         // no box round the greeting and the search: the colourful search box is the one box
         padding: EdgeInsets.fromLTRB(0, _searching ? 4 : 8, 0, 14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child: Stack(clipBehavior: Clip.none, children: [
+          // the warm yellow behind the greeting and the search, fading out at the top and the bottom into the sections round it
+          Positioned(
+            left: -16,
+            right: -16,
+            top: -28,
+            bottom: -28,
+            child: IgnorePointer(
+              child: ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: (r) => const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black, Colors.black, Colors.transparent], stops: [0, .24, .76, 1]).createShader(r),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: p.dark ? [kGold.withValues(alpha: .2), kGold.withValues(alpha: .04)] : const [Color(0xFFFFF0B0), Color(0xFFFFF8DC), Color(0xFFFFFDF3)],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _fold(!_searching && !_boxFold, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (me != null && me.name.trim().isNotEmpty)
             Text('${t('Hi {name}', {'name': me.name.trim().split(' ').first})} 👋', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00))),
@@ -864,6 +887,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
             ),
           ],
           ])),
+        ])
         ]),
       ),
       _fold(!_searching, _categoryTiles(p)),
