@@ -2851,5 +2851,12 @@
   "Checking your contacts…": "तुमचे संपर्क पाहत आहोत…",
   "Looking nearby…": "आसपास शोधत आहोत…",
   "Ranking who can help…": "सर्वात योग्य माणसे निवडत आहोत…",
-  "Template": "टेम्पलेट"
+  "Template": "टेम्पलेट",
+  "Try a shorter, simpler word, like the trade only.": "लहान, सोपा शब्द वापरून पहा, जसे फक्त व्यवसायाचे नाव.",
+  "Try a town nearby: change the location above.": "जवळचे गाव वापरून पहा: वरचे लोकेशन बदला.",
+  "Members near you may know one. Post an ask and they refer a trusted contact.": "तुमच्या जवळच्या सदस्यांना कोणी माहीत असेल. ask टाका, ते विश्वासू संपर्क सुचवतील.",
+  "Know a good one near you? Sharing a contact from the WEBWEB app helps your neighbours find it.": "जवळ कोणी चांगले माहीत आहे? WEBWEB ॲपवरून संपर्क शेअर केल्यास शेजाऱ्यांना तो सापडेल.",
+  "We could not find “{q}” yet": "“{q}” अजून सापडले नाही",
+  "Ask members near you": "जवळच्या सदस्यांना विचारा",
+  "Share contacts from the app": "ॲपवरून संपर्क शेअर करा"
 }

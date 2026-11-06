@@ -26,6 +26,7 @@ import '../widgets/area_map.dart' show askTimeLeft;
 import '../widgets/city_picker.dart';
 import '../widgets/reviews_card.dart';
 import '../widgets/search_loader.dart';
+import '../widgets/search_not_found.dart';
 import '../widgets/whatsapp_icon.dart';
 import 'connect.dart' show UpdatesBar;
 import '../widgets/tour.dart' show Tours;
@@ -1604,7 +1605,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         for (final s in svc) s.w,
       ];
     }
-    if (matches.isEmpty && svc.isEmpty) return [if (own.isNotEmpty) ...[_label(p, t('In your contacts')), ...own], head, Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(t('No page fits this yet.'), style: TextStyle(color: p.muted)))];
+    if (matches.isEmpty && svc.isEmpty) return [if (own.isNotEmpty) ...[_label(p, t('In your contacts')), ...own], head, SearchNotFound(query: _q.text.trim(), onAsk: () => setState(() => _askOpen = true))];
     // one list: the pages and the service contacts, nearest first (a page with no distance keeps its place at the top)
     final pages = [
       for (final m in matches)
