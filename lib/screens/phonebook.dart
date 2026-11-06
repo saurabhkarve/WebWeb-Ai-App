@@ -787,7 +787,10 @@ class _PhonebookHomeState extends State<PhonebookHome> {
         ),
         const UpdatesBar(),
       ]),
-      const SizedBox(height: 2),
+      // a fine rule between the updates and the search
+      const SizedBox(height: 10),
+      Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.transparent, p.border, Colors.transparent]))),
+      const SizedBox(height: 12),
       ])),
       // the page the app opens on: a greeting, what to ask, the search with where to look inside it, and things to try
       AnimatedContainer(
