@@ -86,6 +86,7 @@ class NotificationService with WidgetsBindingObserver {
     FirebaseMessaging.onMessage.listen((m) {
       if (auth.token == null) return; // signed out on this phone: not for it any more
       activity.add(null);
+      confirmMessageReceived(Map<String, dynamic>.from(m.data));
       _handleData(m.data, title: m.notification?.title, body: m.notification?.body);
     });
     FirebaseMessaging.onMessageOpenedApp.listen((m) => _openFromData(m.data));
@@ -658,6 +659,20 @@ Future<void> _showFailed(Map<String, dynamic> d) => _local.show(
       payload: jsonEncode(d),
     );
 
+/// A message push reached this phone (in front, in the background or with the app closed): tell the API so the
+/// sender's ticks go to two. Also runs in the background isolate; quiet when it cannot.
+Future<void> confirmMessageReceived(Map<String, dynamic> d) async {
+  final chatId = '${d['chatId'] ?? ''}';
+  if (chatId.isEmpty || '${d['kind'] ?? d['type']}' != 'message' && '${d['type']}' != 'msg') return;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    final token = prefs.getString('token');
+    if (token == null) return;
+    await Api(() => token).post('/chats/$chatId/delivered', {});
+  } catch (_) {}
+}
+
 /// Sends a notification's Reply with the saved sign-in (this also runs in the background isolate).
 Future<bool> sendNotificationReply(Map<String, dynamic> d, String text) async {
   final prefs = await SharedPreferences.getInstance();
@@ -834,6 +849,7 @@ Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
     try {
       await showActivity(d, title: '${d['title']}', body: '${d['body'] ?? ''}');
     } catch (_) {}
+    await confirmMessageReceived(Map<String, dynamic>.from(d));
     return;
   }
   await handleCallData(message.data);
