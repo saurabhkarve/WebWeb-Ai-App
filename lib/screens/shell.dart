@@ -478,7 +478,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
           _go(_ask);
         }
       ),
-      // leads, today, alerts and your week: one page
+      // leads and today in your area: one page
       ('For your business', () => sub('For your business', const _BusinessHub())),
       if (me != null)
         (
@@ -1534,8 +1534,6 @@ class _BusinessHub extends StatelessWidget {
         children: [
           tile(WI.sparkle, 'Leads for you', const LeadsScreen()),
           tile(WI.sun, 'Today in your area', const TodayScreen()),
-          tile(WI.bell, 'Alerts', const AlertsScreen()),
-          tile(WI.deals, 'Your week', const WeekScreen()),
         ]);
   }
 }
