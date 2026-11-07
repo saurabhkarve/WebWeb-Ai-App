@@ -48,7 +48,7 @@ class Shell extends StatefulWidget {
   State<Shell> createState() => _ShellState();
 }
 
-class _ShellState extends State<Shell> with WidgetsBindingObserver {
+class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   int _i = 2; // Directory
   int _feedTick = 0; // reload the feed
   int _topTick = 0; // scroll the feed to the top
@@ -141,6 +141,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _slideC.dispose();
+    _slideX.dispose();
     WidgetsBinding.instance.removeObserver(this);
     unreadChats.removeListener(_unreadChanged);
     _notes.removeListener(_unreadChanged);
@@ -163,7 +165,30 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         context, kPhonebookTourId, phonebookTour(business: _isBusiness()));
   }
 
+  // The page slides with the finger while swiping and slides in from the side it came from when the tab changes.
+  final ValueNotifier<double> _slideX = ValueNotifier(0);
+  late final AnimationController _slideC = AnimationController(vsync: this, duration: const Duration(milliseconds: 280));
+  double _slideFrom = 0;
+
+  void _slideIn(double from) {
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      _slideX.value = 0;
+      return;
+    }
+    _slideFrom = from;
+    _slideC.removeListener(_slideTick);
+    _slideC.addListener(_slideTick);
+    _slideC.forward(from: 0);
+  }
+
+  void _slideTick() => _slideX.value = _slideFrom * (1 - Curves.easeOutCubic.transform(_slideC.value));
+
   void _go(int k) {
+    const order = [_feed, _dir, _talk];
+    final a = order.indexOf(_i), b = order.indexOf(k);
+    if (a >= 0 && b >= 0 && a != b && _slideX.value == 0) {
+      _slideIn((b > a ? 1 : -1) * MediaQuery.sizeOf(context).width * .28);
+    }
     if (k == _ask && _i != _ask) _beforeAsk = _i;
     if (k != _i) HapticFeedback.selectionClick();
     if (k == _i && k == _feed)
@@ -338,17 +363,42 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     if (!phone || at < 0 || _dirSearch) return child;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onHorizontalDragStart: (_) => _swipeDx = 0,
-      onHorizontalDragUpdate: (d) => _swipeDx += d.delta.dx,
+      onHorizontalDragStart: (_) {
+        _swipeDx = 0;
+        _slideC.stop();
+      },
+      onHorizontalDragUpdate: (d) {
+        _swipeDx += d.delta.dx;
+        // the page follows the finger; at either end of the three places it only gives a little
+        final to = at + (_swipeDx < 0 ? 1 : -1);
+        final edge = to < 0 || to >= order.length;
+        _slideX.value = _swipeDx * (edge ? .18 : .55);
+      },
       onHorizontalDragEnd: (d) {
         // a flick (60 px and quick) or a long slow drag (100 px) counts
         final v = d.primaryVelocity ?? 0;
         final far = _swipeDx.abs() >= 100;
-        if (!far && (_swipeDx.abs() < 60 || v.abs() < 250)) return;
         final to = at + (_swipeDx < 0 ? 1 : -1);
-        if (to >= 0 && to < order.length) _go(order[to]);
+        if ((!far && (_swipeDx.abs() < 60 || v.abs() < 250)) || to < 0 || to >= order.length) {
+          _slideIn(_slideX.value); // not far enough: it springs back
+          return;
+        }
+        // the page carries on out of sight, the next one slides in from the other side
+        final w = MediaQuery.sizeOf(context).width;
+        final dir = _swipeDx < 0 ? 1.0 : -1.0;
+        _slideX.value = 0;
+        _go(order[to]);
+        _slideIn(dir * w * .28);
       },
-      child: child,
+      onHorizontalDragCancel: () => _slideIn(_slideX.value),
+      child: ValueListenableBuilder<double>(
+        valueListenable: _slideX,
+        builder: (_, x, c) => Opacity(
+          opacity: (1 - x.abs() / (MediaQuery.sizeOf(context).width * 1.2)).clamp(.4, 1.0),
+          child: Transform.translate(offset: Offset(x, 0), child: c),
+        ),
+        child: child,
+      ),
     );
   }
 
