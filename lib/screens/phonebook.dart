@@ -272,8 +272,21 @@ class PhonebookHome extends StatefulWidget {
   State<PhonebookHome> createState() => _PhonebookHomeState();
 }
 
-class _PhonebookHomeState extends State<PhonebookHome> {
+class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserver {
   static const _headH = 30.0, _rowH = 64.0;
+  bool _kbWasUp = false;
+
+  /// The back button closes the keyboard but leaves the cursor in the box, which keeps the page folded and the field
+  /// grabbing the screen: when the keyboard goes away, the box lets go too.
+  @override
+  void didChangeMetrics() {
+    final v = View.maybeOf(context);
+    if (v == null) return;
+    final up = v.viewInsets.bottom > 80;
+    if (_kbWasUp && !up && _qFocus.hasFocus) _qFocus.unfocus();
+    _kbWasUp = up;
+  }
+
   final _q = TextEditingController();
   final _qFocus = FocusNode();
   /// the search field moves between the directory and the search page: one field, so it keeps the keyboard
@@ -431,6 +444,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     directoryRequest.addListener(_onRequest);
     directoryFocus.addListener(_onFocusRequest);
     directorySpeak.addListener(_onSpeak);
@@ -460,6 +474,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     directoryRequest.removeListener(_onRequest);
     directoryFocus.removeListener(_onFocusRequest);
     directorySpeak.removeListener(_onSpeak);
@@ -934,7 +949,7 @@ class _PhonebookHomeState extends State<PhonebookHome> {
 
     final list = RefreshIndicator(
       onRefresh: _refresh,
-      child: CustomScrollView(controller: _scroll, slivers: [
+      child: CustomScrollView(controller: _scroll, keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, slivers: [
         SliverPadding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 0), sliver: SliverToBoxAdapter(child: top)),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 0, 28, 120),
