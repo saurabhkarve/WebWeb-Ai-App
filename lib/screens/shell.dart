@@ -140,6 +140,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
   void dispose() {
     _slideC.dispose();
     _slideX.dispose();
+    _dockC.dispose();
+    _dockT.dispose();
     WidgetsBinding.instance.removeObserver(this);
     unreadChats.removeListener(_unreadChanged);
     _notes.removeListener(_unreadChanged);
@@ -167,6 +169,69 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
     _slideC.forward(from: 0);
   }
 
+  // The island's open place as a position (0 Refer, 1 Find, 2 Talk; -10 when none of them is open). It glides to the new place
+  // on a tap and follows the finger while the page (or the island itself) is swiped.
+  static const _order = [_feed, _dir, _talk];
+  double _dockIdx(int k) => _order.contains(k) ? _order.indexOf(k).toDouble() : -10.0;
+  late final ValueNotifier<double> _dockT = ValueNotifier(_dockIdx(_i));
+  late final AnimationController _dockC = AnimationController(vsync: this, duration: const Duration(milliseconds: 280))..addStatusListener((st) {
+      if (st == AnimationStatus.completed || st == AnimationStatus.dismissed) _dockLive = false;
+    });
+  bool _dockLive = false;
+  double _dockFrom = 0, _dockTo = 0;
+
+  void _dockGo(double to) {
+    final from = _dockT.value;
+    if (from < 0 || to < 0 || (MediaQuery.maybeDisableAnimationsOf(context) ?? false)) {
+      _dockT.value = to;
+      _dockLive = false;
+      return;
+    }
+    _dockFrom = from;
+    _dockTo = to;
+    _dockLive = true;
+    _dockC.removeListener(_dockTick);
+    _dockC.addListener(_dockTick);
+    _dockC.forward(from: 0);
+  }
+
+  void _dockTick() => _dockT.value = _dockFrom + (_dockTo - _dockFrom) * Curves.easeOutCubic.transform(_dockC.value);
+
+  /// A swipe in progress, on the page or on the island: [frac] is how far it has gone towards the next place (+1) or the
+  /// previous one (-1). The island's pill and the page both follow it.
+  void _scrubStart() {
+    _swipeDx = 0;
+    _slideC.stop();
+    _dockC.stop();
+    _dockLive = true;
+  }
+
+  void _scrub(double frac) {
+    final at = _dockIdx(_i);
+    if (at < 0) return;
+    final to = (at + frac).clamp(0.0, 2.0);
+    _dockT.value = to;
+    final edge = at + frac < 0 || at + frac > 2;
+    _slideX.value = -frac * MediaQuery.sizeOf(context).width * (edge ? .06 : .3);
+  }
+
+  void _scrubEnd(double frac, double velocity) {
+    final at = _dockIdx(_i);
+    if (at < 0) return;
+    final dir = frac > 0 ? 1 : -1;
+    final to = at + dir;
+    // a flick (a third of a place and quick) or a long slow drag (half a place) counts
+    final far = frac.abs() >= .5;
+    final flick = frac.abs() >= .2 && velocity.abs() >= 250 && (velocity < 0) == (dir > 0);
+    if ((!far && !flick) || to < 0 || to > 2) {
+      _slideIn(_slideX.value);
+      _dockGo(at);
+      return;
+    }
+    _slideX.value = 0;
+    _go(_order[to.toInt()]);
+  }
+
   void _slideTick() => _slideX.value = _slideFrom * (1 - Curves.easeOutCubic.transform(_slideC.value));
 
   void _go(int k) {
@@ -175,6 +240,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
     if (a >= 0 && b >= 0 && a != b && _slideX.value == 0) {
       _slideIn((b > a ? 1 : -1) * MediaQuery.sizeOf(context).width * .28);
     }
+    _dockGo(_dockIdx(k));
     if (k != _i) HapticFeedback.selectionClick();
     if (k == _i && k == _feed) {
       _topTick++; // tapping Home again scrolls the feed to the top
@@ -345,42 +411,21 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
   /// cards, the circles, the chips and category rows) takes the swipe first, because the nearest drag wins; only a swipe
   /// that starts on plain page comes here.
   Widget _swipeTabs(bool phone, Widget child) {
-    const order = [_feed, _dir, _talk];
-    final at = order.indexOf(_i);
+    final at = _order.indexOf(_i);
     // The wrapper is always there, only its gestures come and go: a tree that changed shape when the keyboard opened (the bar
     // steps aside) or when the Directory began searching rebuilt every page from scratch, and the search lost its cursor,
     // its text and its keyboard on the spot.
     final on = phone && at >= 0 && !_dirSearch;
+    final w = MediaQuery.sizeOf(context).width;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onHorizontalDragStart: !on ? null : (_) {
-        _swipeDx = 0;
-        _slideC.stop();
-      },
+      onHorizontalDragStart: !on ? null : (_) => _scrubStart(),
       onHorizontalDragUpdate: !on ? null : (d) {
         _swipeDx += d.delta.dx;
-        // the page follows the finger; at either end of the three places it only gives a little
-        final to = at + (_swipeDx < 0 ? 1 : -1);
-        final edge = to < 0 || to >= order.length;
-        _slideX.value = _swipeDx * (edge ? .18 : .55);
+        _scrub((-_swipeDx / (w * .5)).clamp(-1.0, 1.0));
       },
-      onHorizontalDragEnd: !on ? null : (d) {
-        // a flick (60 px and quick) or a long slow drag (100 px) counts
-        final v = d.primaryVelocity ?? 0;
-        final far = _swipeDx.abs() >= 100;
-        final to = at + (_swipeDx < 0 ? 1 : -1);
-        if ((!far && (_swipeDx.abs() < 60 || v.abs() < 250)) || to < 0 || to >= order.length) {
-          _slideIn(_slideX.value); // not far enough: it springs back
-          return;
-        }
-        // the page carries on out of sight, the next one slides in from the other side
-        final w = MediaQuery.sizeOf(context).width;
-        final dir = _swipeDx < 0 ? 1.0 : -1.0;
-        _slideX.value = 0;
-        _go(order[to]);
-        _slideIn(dir * w * .28);
-      },
-      onHorizontalDragCancel: !on ? null : () => _slideIn(_slideX.value),
+      onHorizontalDragEnd: !on ? null : (d) => _scrubEnd((-_swipeDx / (w * .5)).clamp(-1.0, 1.0), d.primaryVelocity ?? 0),
+      onHorizontalDragCancel: !on ? null : () => _scrubEnd(0, 0),
       child: ValueListenableBuilder<double>(
         valueListenable: _slideX,
         builder: (_, x, c) => Opacity(
@@ -577,13 +622,31 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
                 border: Border.all(color: p.dark ? Colors.white.withValues(alpha: .1) : Colors.black.withValues(alpha: .06)),
                 boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: p.dark ? .5 : .16), blurRadius: 26, spreadRadius: -6, offset: const Offset(0, 10))],
               ),
-              child: Row(children: [
-                for (final k in const [_feed, _dir, _talk])
-                  Expanded(
-                    flex: _i == k ? 5 : 3,
-                    child: KeyedSubtree(key: Tours.key(_tourKeys[k]), child: _dockItem(p, k, badge: _badgeOf(k))),
-                  ),
-              ]),
+              // swiping along the island changes the page too, the open pill following the finger
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onHorizontalDragStart: (_) => _scrubStart(),
+                onHorizontalDragUpdate: (d) {
+                  _swipeDx += d.delta.dx;
+                  _scrub((-_swipeDx / 100).clamp(-1.0, 1.0));
+                },
+                onHorizontalDragEnd: (d) => _scrubEnd((-_swipeDx / 100).clamp(-1.0, 1.0), d.primaryVelocity ?? 0),
+                onHorizontalDragCancel: () => _scrubEnd(0, 0),
+                child: ValueListenableBuilder<double>(
+                  valueListenable: _dockT,
+                  builder: (_, live, __) {
+                    final t = _dockLive ? live : _dockIdx(_i);
+                    return Row(children: [
+                      for (final k in _order)
+                        Expanded(
+                          // the open place is 5 parts wide, the others 3, and the width glides between them
+                          flex: (3000 + 2000 * (1 - (t - _order.indexOf(k)).abs()).clamp(0.0, 1.0)).round(),
+                          child: KeyedSubtree(key: Tours.key(_tourKeys[k]), child: _dockItem(p, k, (t - _order.indexOf(k)).abs() < .5, badge: _badgeOf(k))),
+                        ),
+                    ]);
+                  },
+                ),
+              ),
             ),
           ),
         ),
@@ -591,8 +654,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
     );
   }
 
-  Widget _dockItem(Pal p, int k, {int badge = 0}) {
-    final active = _i == k;
+  Widget _dockItem(Pal p, int k, bool active, {int badge = 0}) {
     final dir = k == _dir;
     // none of the three places is open (a post, a profile, Notifications...): Find glows softly, as the way back
     final soft = dir && !active && ![_feed, _dir, _talk].contains(_i);
@@ -607,7 +669,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         // on the Find page a tap puts the cursor back in the search
-        onTap: () => active && dir ? directoryFocus.value++ : _go(k),
+        onTap: () => _i == k && dir ? directoryFocus.value++ : _go(k),
         child: ExcludeSemantics(
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 260),
