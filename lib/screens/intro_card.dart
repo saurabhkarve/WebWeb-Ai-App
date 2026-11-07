@@ -47,7 +47,10 @@ class _IntroCardScreenState extends State<IntroCardScreen> {
   bool _busyUpdate = false, _busyImage = false;
 
   String get _handle => context.read<AuthProvider>().profile?.handle ?? '';
-  String get _url => '$siteUrl/intro-card/$_handle?t=$_tpl';
+  // r: this visit, so a changed photo or detail is drawn afresh and never an older copy kept on the way
+  final _visit = DateTime.now().millisecondsSinceEpoch;
+  String _cardUrl(String tpl) => '$siteUrl/intro-card/$_handle?t=$tpl&r=$_visit';
+  String get _url => _cardUrl(_tpl);
 
   Future<Uint8List> _png() async {
     final res = await http.get(Uri.parse(_url)).timeout(const Duration(seconds: 30));
@@ -92,24 +95,46 @@ class _IntroCardScreenState extends State<IntroCardScreen> {
     }
   }
 
+  Widget _round(Pal p, {required WI wi, required String label, required bool busy, required bool gold, required VoidCallback? onTap}) => Semantics(
+        button: true,
+        label: label,
+        child: Tooltip(
+          message: label,
+          child: Material(
+            color: Colors.transparent,
+            child: Ink(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(gradient: gold ? kGoldGradient : null, color: gold ? null : p.chip, border: gold ? null : Border.all(color: p.border), shape: BoxShape.circle),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onTap,
+                child: Center(child: busy ? const Spinner(size: 18) : WIcon(wi, size: 22, color: gold ? kInk : p.text, strokeWidth: 1.9, still: true)),
+              ),
+            ),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
+    final idle = !_busyUpdate && !_busyImage;
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 110),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text(t('Pick a style, then share your card as an update or as an image.'), style: TextStyle(fontSize: 13.5, color: p.muted)),
         const SizedBox(height: 14),
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 300),
+        // the card, with its two ways to share beside it at the top right
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: AspectRatio(
                 aspectRatio: 3 / 4,
                 child: Image.network(
                   _url,
-                  key: ValueKey(_tpl),
+                  key: ValueKey(_url),
                   fit: BoxFit.cover,
                   loadingBuilder: (_, child, prog) => prog == null ? child : Container(color: p.chip, alignment: Alignment.center, child: const Spinner(size: 24)),
                   errorBuilder: (_, __, ___) => Container(color: p.chip, alignment: Alignment.center, padding: const EdgeInsets.all(16), child: Text(t('Could not create the card'), textAlign: TextAlign.center)),
@@ -117,61 +142,65 @@ class _IntroCardScreenState extends State<IntroCardScreen> {
               ),
             ),
           ),
-        ),
+          const SizedBox(width: 10),
+          Column(children: [
+            _round(p, wi: WI.updates, label: t('Share as update'), busy: _busyUpdate, gold: true, onTap: idle ? _shareUpdate : null),
+            const SizedBox(height: 10),
+            _round(p, wi: WI.share, label: t('Share image'), busy: _busyImage, gold: false, onTap: idle ? _shareImage : null),
+          ]),
+        ]),
         const SizedBox(height: 16),
         Text('${t('Style')} · ${kIntroCardTemplates.length}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
         const SizedBox(height: 8),
-        // every template, drawn with your own details: tap one to choose it
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: kIntroCardTemplates.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 3 / 4.6),
-          itemBuilder: (_, k) {
-            final tp = kIntroCardTemplates[k];
-            final on = tp.$1 == _tpl;
-            return Semantics(
-              button: true,
-              selected: on,
-              label: '${t('Template')}: ${tp.$2}',
-              child: GestureDetector(
-                onTap: () => setState(() => _tpl = tp.$1),
-                child: Column(children: [
-                  Expanded(
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.all(2.5),
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: on ? kGold : p.border, width: on ? 2.5 : 1)),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: SizedBox.expand(
-                          child: Image.network(
-                            '$siteUrl/intro-card/$_handle?t=${tp.$1}',
-                            fit: BoxFit.cover,
-                            cacheWidth: 300,
-                            loadingBuilder: (_, child, prog) => prog == null
-                                ? child
-                                : DecoratedBox(
-                                    decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(tp.$3), Color(tp.$3), Color(tp.$4), Color(tp.$4)], stops: const [0, .5, .5, 1]))),
-                            errorBuilder: (_, __, ___) => DecoratedBox(
-                                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(tp.$3), Color(tp.$3), Color(tp.$4), Color(tp.$4)], stops: const [0, .5, .5, 1]))),
+        // every template, drawn with your own details, in one row that slides sideways: tap one to choose it
+        SizedBox(
+          height: 150,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: kIntroCardTemplates.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (_, k) {
+              final tp = kIntroCardTemplates[k];
+              final on = tp.$1 == _tpl;
+              final swatch = DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(tp.$3), Color(tp.$3), Color(tp.$4), Color(tp.$4)], stops: const [0, .5, .5, 1])));
+              return Semantics(
+                button: true,
+                selected: on,
+                label: '${t('Template')}: ${tp.$2}',
+                child: GestureDetector(
+                  onTap: () => setState(() => _tpl = tp.$1),
+                  child: SizedBox(
+                    width: 86,
+                    child: Column(children: [
+                      Expanded(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.all(2.5),
+                          decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: on ? kGold : p.border, width: on ? 2.5 : 1)),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: SizedBox.expand(
+                              child: Image.network(
+                                _cardUrl(tp.$1),
+                                fit: BoxFit.cover,
+                                cacheWidth: 300,
+                                loadingBuilder: (_, child, prog) => prog == null ? child : swatch,
+                                errorBuilder: (_, __, ___) => swatch,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      Text(tp.$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: on ? FontWeight.w800 : FontWeight.w600)),
+                    ]),
                   ),
-                  const SizedBox(height: 4),
-                  Text(tp.$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: on ? FontWeight.w800 : FontWeight.w600)),
-                ]),
-              ),
-            );
-          },
+                ),
+              );
+            },
+          ),
         ),
-        const SizedBox(height: 16),
-        GoldButton(label: t('Share as update'), wi: WI.updates, height: 48, loading: _busyUpdate, onPressed: _busyUpdate || _busyImage ? null : _shareUpdate),
-        const SizedBox(height: 8),
-        GoldButton(label: t('Share image'), wi: WI.share, outlined: true, height: 48, loading: _busyImage, onPressed: _busyUpdate || _busyImage ? null : _shareImage),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
         Text(t('The QR on the card opens your WEBWEB AI page. An update stays for 24 hours.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.muted)),
       ]),
     );
