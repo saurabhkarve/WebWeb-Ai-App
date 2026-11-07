@@ -191,8 +191,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
     }
     if (k == _ask && _i != _ask) _beforeAsk = _i;
     if (k != _i) HapticFeedback.selectionClick();
-    if (k == _i && k == _feed)
+    if (k == _i && k == _feed) {
       _topTick++; // tapping Home again scrolls the feed to the top
+    }
     if (k == _notesTab) _notes.refresh(context.read<AuthProvider>());
     // tapping Find while it is open puts the cursor in its search box
     if (k == _dir && _i == _dir) directoryFocus.value++;
@@ -2233,88 +2234,5 @@ class _NotesPanelState extends State<_NotesPanel> {
         child: Text(text,
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 14, color: p.muted)),
-      );
-}
-
-/// The Find button while the Find page is open: the four SkyQ colours round the gold disc, turning while a search runs.
-class _FindRing extends StatefulWidget {
-  final double size;
-  final Widget icon;
-  const _FindRing({super.key, required this.size, required this.icon});
-  @override
-  State<_FindRing> createState() => _FindRingState();
-}
-
-class _FindRingState extends State<_FindRing> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
-
-  @override
-  void initState() {
-    super.initState();
-    directoryBusy.addListener(_sync);
-    directoryLevel.addListener(_sync);
-    _sync();
-  }
-
-  void _sync() {
-    if (!mounted) return;
-    if ((directoryBusy.value || directoryLevel.value >= 0) && !MediaQuery.disableAnimationsOf(context)) {
-      if (!_c.isAnimating) _c.repeat();
-    } else {
-      _c.stop();
-    }
-  }
-
-  @override
-  void dispose() {
-    directoryBusy.removeListener(_sync);
-    directoryLevel.removeListener(_sync);
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => ValueListenableBuilder<double>(
-        valueListenable: directoryLevel,
-        builder: (context, lvl, child) => Transform.scale(
-          scale: lvl < 0 ? 1 : 1 + lvl * 0.07,
-          child: DecoratedBox(
-            // the glow follows the voice
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: lvl < 0
-                  ? null
-                  : [
-                      BoxShadow(color: const Color(0xFF0575E6).withValues(alpha: .55), blurRadius: 6 + lvl * 22, spreadRadius: lvl * 6),
-                      BoxShadow(color: const Color(0xFFFFC700).withValues(alpha: .6), blurRadius: lvl * 16, spreadRadius: lvl * 2),
-                    ],
-            ),
-            child: child,
-          ),
-        ),
-        child: _ringBody(context),
-      );
-
-  Widget _ringBody(BuildContext context) => SizedBox(
-        width: widget.size,
-        height: widget.size,
-        child: Stack(alignment: Alignment.center, children: [
-          RotationTransition(
-            turns: _c,
-            child: Container(
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: SweepGradient(
-                  colors: [Color(0xFF0575E6), Color(0xFF34A853), Color(0xFFFFC700), Color(0xFFFF0000), Color(0xFF0575E6)],
-                  stops: [0, .25, .5, .75, 1],
-                ),
-              ),
-            ),
-          ),
-          // a gap of the page colour between the colours and the gold
-          Container(width: widget.size - 4, height: widget.size - 4, decoration: BoxDecoration(shape: BoxShape.circle, color: Pal.of(context).canvas)),
-          Container(width: widget.size - 10, height: widget.size - 10, decoration: BoxDecoration(shape: BoxShape.circle, color: Pal.of(context).card)),
-          widget.icon,
-        ]),
       );
 }

@@ -1436,7 +1436,8 @@ class _ChatThreadState extends State<ChatThread> {
                 if (v == 'delete') {
                   _deleteChat();
                 } else if (v == 'safety') {
-                  if (await showSafetySheet(context, uid: _peer.uid, name: _peer.name) && mounted) Navigator.pop(context);
+                  final left = await showSafetySheet(context, uid: _peer.uid, name: _peer.name);
+                  if (left && mounted) Navigator.pop(this.context);
                 }
               },
               itemBuilder: (_) => [
