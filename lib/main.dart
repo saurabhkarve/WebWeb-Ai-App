@@ -80,8 +80,8 @@ class _KeyboardDismissOnScroll extends StatelessWidget {
     return NotificationListener<ScrollNotification>(
       onNotification: (n) {
         final drag = n is ScrollUpdateNotification ? n.dragDetails : (n is OverscrollNotification ? n.dragDetails : null);
-        if (drag == null || drag.delta.dy < 3 || n.metrics.axis != Axis.vertical) return false;
-        if (MediaQuery.viewInsetsOf(context).bottom <= 0) return false;
+        // any drag of the page, up or down, with the keyboard up or already closed (back button), lets the field go
+        if (drag == null || drag.delta.dy.abs() < 3 || n.metrics.axis != Axis.vertical) return false;
         final focus = FocusManager.instance.primaryFocus;
         final field = focus?.context;
         if (focus == null || field == null) return false;

@@ -850,9 +850,6 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
         ),
         const UpdatesBar(),
       ]),
-      // a fine rule between the updates and the search
-      const SizedBox(height: 10),
-      Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.transparent, p.border, Colors.transparent]))),
       const SizedBox(height: 12),
       ])),
       // the page the app opens on: a greeting, what to ask, the search with where to look inside it, and things to try
@@ -1247,6 +1244,8 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
             key: _searchKey,
             controller: _q,
             focusNode: _qFocus,
+            // a tap anywhere else lets the cursor go, so the rest of the page (and the island) is usable at once
+            onTapOutside: (_) => _qFocus.unfocus(),
             onChanged: _search,
             onSubmitted: (v) => _askAi(v.trim()),
             textInputAction: TextInputAction.search,
