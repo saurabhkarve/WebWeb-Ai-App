@@ -94,7 +94,7 @@ String _dayLabel(DateTime d) {
   final now = DateTime.now();
   if (_sameDay(d, now)) return t('Today');
   if (_sameDay(d, now.subtract(const Duration(days: 1)))) return t('Yesterday');
-  return '${d.day} ${_months[d.month - 1]} ${d.year}';
+  return '${d.day} ${_months[d.month - 1]} ${(d.year % 100).toString().padLeft(2, '0')}';
 }
 
 String _duration(int s) => s >= 3600 ? '${s ~/ 3600}h ${(s % 3600) ~/ 60}m' : s >= 60 ? '${s ~/ 60}m ${s % 60}s' : '${s}s';
@@ -971,6 +971,34 @@ class _ChatThreadState extends State<ChatThread> {
   late final _input = TextEditingController(text: widget.draft);
   final _inputFocus = FocusNode();
   final _scroll = ScrollController();
+  // the day shown on the floating chip while scrolling (WhatsApp style)
+  final _itemKeys = <int, GlobalKey>{};
+  final _listBox = GlobalKey();
+  String? _floatDay;
+  bool _floatShow = false;
+  Timer? _floatHide;
+
+  void _onScrollDay() {
+    final box = _listBox.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return;
+    final top = box.localToGlobal(Offset.zero).dy;
+    final items = _timeline;
+    String? day;
+    final keys = _itemKeys.keys.toList()..sort();
+    for (final i in keys) {
+      final ro = _itemKeys[i]!.currentContext?.findRenderObject() as RenderBox?;
+      if (ro == null || !ro.attached || i >= items.length) continue;
+      if (ro.localToGlobal(Offset.zero).dy + ro.size.height > top + 8) {
+        day = _dayLabel(items[i].at);
+        break;
+      }
+    }
+    _floatHide?.cancel();
+    _floatHide = Timer(const Duration(milliseconds: 1400), () {
+      if (mounted) setState(() => _floatShow = false);
+    });
+    if (day != _floatDay || !_floatShow) setState(() { _floatDay = day; _floatShow = day != null; });
+  }
   List<Msg> _msgs = [];
   List<CallLog> _calls = [];
   bool _loaded = false;
@@ -1285,6 +1313,7 @@ class _ChatThreadState extends State<ChatThread> {
     _poll?.cancel();
     _input.dispose();
     _inputFocus.dispose();
+    _floatHide?.cancel();
     _scroll.dispose();
     super.dispose();
   }
@@ -1435,19 +1464,49 @@ class _ChatThreadState extends State<ChatThread> {
                 ? const Center(child: LogoLoader())
                 : items.isEmpty
                     ? _firstMessage(p)
-                    : ListView.builder(
-                        controller: _scroll,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: items.length,
-                        itemBuilder: (_, i) {
-                          final it = items[i];
-                          final showDay = i == 0 || !_sameDay(items[i - 1].at, it.at);
-                          return Column(children: [
-                            if (showDay) _dayPill(_dayLabel(it.at), p),
-                            it.call != null ? _callRow(it.call!, p) : Padding(padding: const EdgeInsets.only(bottom: 8), child: _message(it.msg!, p)),
-                          ]);
-                        },
-                      ),
+                    : Stack(key: _listBox, children: [
+                        NotificationListener<ScrollUpdateNotification>(
+                          onNotification: (n) {
+                            if (n.metrics.axis == Axis.vertical) _onScrollDay();
+                            return false;
+                          },
+                          child: ListView.builder(
+                            controller: _scroll,
+                            padding: const EdgeInsets.all(16),
+                            itemCount: items.length,
+                            itemBuilder: (_, i) {
+                              final it = items[i];
+                              final showDay = i == 0 || !_sameDay(items[i - 1].at, it.at);
+                              return KeyedSubtree(
+                                key: _itemKeys.putIfAbsent(i, GlobalKey.new),
+                                child: Column(children: [
+                                  if (showDay) _dayPill(_dayLabel(it.at), p),
+                                  it.call != null ? _callRow(it.call!, p) : Padding(padding: const EdgeInsets.only(bottom: 8), child: _message(it.msg!, p)),
+                                ]),
+                              );
+                            },
+                          ),
+                        ),
+                        if (_floatDay != null)
+                          Positioned(
+                            top: 8,
+                            left: 0,
+                            right: 0,
+                            child: IgnorePointer(
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 200),
+                                opacity: _floatShow ? 1 : 0,
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                    decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20), border: Border.all(color: p.border), boxShadow: const [BoxShadow(color: Color(0x1A000000), blurRadius: 6, offset: Offset(0, 1))]),
+                                    child: Text(_floatDay!, style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ]),
           ),
         ),
         if (_pending != null) _pendingBox(p),
