@@ -541,7 +541,7 @@ class _AskTypesDemoState extends State<_AskTypesDemo> {
 /// The pictures of the Smart Phonebook tour: small loops that show the idea (search, facts, connect, a business page).
 class PbTourVisual extends StatefulWidget {
   final String kind;
-  const PbTourVisual(this.kind);
+  const PbTourVisual(this.kind, {super.key});
   @override
   State<PbTourVisual> createState() => PbTourVisualState();
 }
