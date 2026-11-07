@@ -8,7 +8,6 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import '../crash_reporter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../approx_distance.dart';
 import '../ask_types.dart';
@@ -28,10 +27,10 @@ import '../widgets/city_picker.dart';
 import '../widgets/reviews_card.dart';
 import '../widgets/search_loader.dart';
 import '../widgets/search_not_found.dart';
-import '../widgets/whatsapp_icon.dart';
 import 'connect.dart' show UpdatesBar;
 import '../widgets/tour.dart' show Tours;
 import 'find.dart';
+import 'local_contact.dart';
 import 'post_detail.dart';
 import 'profile.dart';
 import 'service_page.dart';
@@ -1805,6 +1804,8 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
                 ),
             ]),
           ),
+          // every contact opens a page: the arrow says there is more
+          Padding(padding: const EdgeInsets.only(left: 4), child: Icon(Icons.chevron_right_rounded, size: 24, color: p.muted)),
         ]),
       ),
     );
@@ -1823,7 +1824,6 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
   /// A contact without a page: everything saved on it (each number with call and WhatsApp, emails, company,
   /// address), and an invitation to make a page.
   Future<void> _contactSheet(_Entry e) async {
-    final p = Pal.of(context);
     final c = e.contact;
     final phones = c == null ? [if (e.phone != null) e.phone!] : c.phones.map((ph) => ph.number).toSet().toList();
     final emails = (c?.emails ?? const <Email>[]).map((m) => m.address.trim()).where((m) => m.isNotEmpty).toSet().toList();
@@ -1832,68 +1832,9 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
         .where((a) => a.isNotEmpty)
         .toSet()
         .toList();
-    final ten = phones.map(ContactSync.mobile10).whereType<String>().firstOrNull;
-    final invite = '${t('I have a free business page on WEBWEB, the AI Phonebook. Make yours so customers can find and review you:')} https://webweb.ai';
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: p.canvas,
-      isScrollControlled: true,
-      builder: (ctx) {
-        void go(String url) {
-          Navigator.pop(ctx);
-          _open(url);
-        }
-
-        Widget icon(IconData i, Color color, String tip, VoidCallback onTap) => IconButton(tooltip: tip, onPressed: onTap, icon: Icon(i, color: color));
-        Widget iconW(Widget w, String tip, VoidCallback onTap) => IconButton(tooltip: tip, onPressed: onTap, icon: w);
-        return SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * .8),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
-              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                ListTile(
-                  leading: _photo(e, null, 48),
-                  title: Text(e.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                  subtitle: e.org.isEmpty ? null : Text(e.org, style: TextStyle(color: p.muted)),
-                ),
-                const Divider(height: 8),
-                for (final ph in phones)
-                  ListTile(
-                    leading: Icon(Icons.phone_rounded, color: p.muted),
-                    title: Text(ph),
-                    onTap: () => go('tel:${ph.replaceAll(RegExp(r'[^\d+]'), '')}'),
-                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                      icon(Icons.call_rounded, const Color(0xFF1E9E5A), t('Call'), () => go('tel:${ph.replaceAll(RegExp(r'[^\d+]'), '')}')),
-                      if (ContactSync.mobile10(ph) != null) iconW(const WhatsAppIcon(size: 24), 'WhatsApp', () => go('https://wa.me/91${ContactSync.mobile10(ph)}')),
-                    ]),
-                  ),
-                for (final m in emails)
-                  ListTile(leading: Icon(Icons.mail_outline_rounded, color: p.muted), title: Text(m), onTap: () => go('mailto:$m')),
-                for (final a in places)
-                  ListTile(
-                    leading: Icon(Icons.place_outlined, color: p.muted),
-                    title: Text(a),
-                    onTap: () => go('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(a)}'),
-                  ),
-                if (ten != null) ...[
-                  const Divider(height: 8),
-                  ListTile(
-                    leading: const Icon(Icons.person_add_alt_1_rounded, color: kStar),
-                    title: Text(t('Invite to the phonebook')),
-                    onTap: () => go('https://wa.me/91$ten?text=${Uri.encodeComponent(invite)}'),
-                  ),
-                ],
-              ]),
-            ),
-          ),
-        );
-      },
-    );
+    if (!mounted) return;
+    await Navigator.push(context, WideRoute(builder: (_) => LocalContactScreen(name: e.name, org: e.org, photo: e.contact?.photo?.thumbnail, phones: phones, emails: emails, places: places)));
   }
-
-  /// the phone's dialer or WhatsApp, straight away (these are the member's own contacts, not links from others)
-  static void _open(String url) => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication).catchError((_) => false);
 
   // ---------- asks ----------
 
