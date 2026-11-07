@@ -455,8 +455,15 @@ class UpdatesBarState extends State<UpdatesBar> {
   Future<int>? _loadingMore;
   final _scroll = ScrollController();
 
+  // What was last shown, kept while the app runs: the Find page rebuilds itself when a search starts or is cleared, and the
+  // circles come back at once from this instead of flashing empty while they load again.
+  static ({List<StoryGroup> groups, LeadSummary? leads, List<Post>? leadList, List<FeedAd> ads, TodayFeed? today, List<Profile>? biz, WeekStats? week, Set<String> dailySeen, Set<String> seen, bool hasMore})? _kept;
+
+  void _keep() => _kept = (groups: _groups, leads: _leads, leadList: _leadList, ads: _ads, today: _today, biz: _biz, week: _week, dailySeen: _dailySeen, seen: _seen, hasMore: _hasMore);
+
   @override
   void dispose() {
+    _keep();
     _scroll.dispose();
     super.dispose();
   }
@@ -464,6 +471,19 @@ class UpdatesBarState extends State<UpdatesBar> {
   @override
   void initState() {
     super.initState();
+    final k = _kept;
+    if (k != null) {
+      _groups = k.groups;
+      _leads = k.leads;
+      _leadList = k.leadList;
+      _ads = k.ads;
+      _today = k.today;
+      _biz = k.biz;
+      _week = k.week;
+      _dailySeen = k.dailySeen;
+      _seen = k.seen;
+      _hasMore = k.hasMore;
+    }
     SharedPreferences.getInstance().then((sp) {
       try {
         final ids = (jsonDecode(sp.getString(_seenKey) ?? '[]') as List).map((e) => '$e').toSet();
