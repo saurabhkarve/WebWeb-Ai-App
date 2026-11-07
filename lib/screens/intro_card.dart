@@ -103,13 +103,13 @@ class _IntroCardScreenState extends State<IntroCardScreen> {
           child: Material(
             color: Colors.transparent,
             child: Ink(
-              width: 46,
-              height: 46,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(gradient: gold ? kGoldGradient : null, color: gold ? null : p.chip, border: gold ? null : Border.all(color: p.border), shape: BoxShape.circle),
               child: InkWell(
                 customBorder: const CircleBorder(),
                 onTap: onTap,
-                child: Center(child: busy ? const Spinner(size: 18) : WIcon(wi, size: 22, color: gold ? kInk : p.text, strokeWidth: 1.9, still: true)),
+                child: Center(child: busy ? const Spinner(size: 18) : WIcon(wi, size: 20, color: gold ? kInk : p.text, strokeWidth: 1.9, still: true)),
               ),
             ),
           ),
@@ -120,14 +120,28 @@ class _IntroCardScreenState extends State<IntroCardScreen> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final idle = !_busyUpdate && !_busyImage;
+    // the two ways to share sit in the page's header, top right
+    return SubPage(
+      title: t('30-second intro card'),
+      actions: [
+        _round(p, wi: WI.updates, label: t('Share as update'), busy: _busyUpdate, gold: true, onTap: idle ? _shareUpdate : null),
+        const SizedBox(width: 8),
+        _round(p, wi: WI.share, label: t('Share image'), busy: _busyImage, gold: false, onTap: idle ? _shareImage : null),
+      ],
+      body: _content(p),
+    );
+  }
+
+  Widget _content(Pal p) {
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 110),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text(t('Pick a style, then share your card as an update or as an image.'), style: TextStyle(fontSize: 13.5, color: p.muted)),
         const SizedBox(height: 14),
-        // the card, with its two ways to share beside it at the top right
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
+        // the card, centred
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 300),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: AspectRatio(
@@ -142,13 +156,7 @@ class _IntroCardScreenState extends State<IntroCardScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          Column(children: [
-            _round(p, wi: WI.updates, label: t('Share as update'), busy: _busyUpdate, gold: true, onTap: idle ? _shareUpdate : null),
-            const SizedBox(height: 10),
-            _round(p, wi: WI.share, label: t('Share image'), busy: _busyImage, gold: false, onTap: idle ? _shareImage : null),
-          ]),
-        ]),
+        ),
         const SizedBox(height: 16),
         Text('${t('Style')} · ${kIntroCardTemplates.length}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
         const SizedBox(height: 8),

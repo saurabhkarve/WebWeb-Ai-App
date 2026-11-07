@@ -506,7 +506,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
         ('Leads for you', () => sub('Leads for you', const LeadsScreen())),
         ('Today in your area', () => sub('Today in your area', const TodayScreen())),
       ],
-      if (me != null) ('30-second intro card', () => sub('30-second intro card', const IntroCardScreen())),
+      if (me != null) ('30-second intro card', () => Navigator.push(context, WideRoute(builder: (_) => const IntroCardScreen()))),
       if (me != null)
         (
           'Edit profile',
@@ -1384,7 +1384,7 @@ class _AccountMenu extends StatelessWidget {
               item(WI.edit, 'Edit profile',
                   () => push(EditProfileScreen(profile: me))),
               item(WI.contactCard, '30-second intro card',
-                  () => push(SubPage(title: t('30-second intro card'), body: const IntroCardScreen()))),
+                  () => push(const IntroCardScreen())),
               // for businesses only: a consumer is not shown them
               if (me.isEntrepreneur) ...[
                 item(WI.sparkle, 'Leads for you',

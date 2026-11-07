@@ -1019,7 +1019,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
         Row(children: [
           Expanded(child: _shortcut(p, Icons.campaign_outlined, 'Post an ask', widget.onAsk ?? () {})),
           const SizedBox(width: 12),
-          Expanded(child: _shortcut(p, Icons.badge_outlined, '30-second intro card', () => Navigator.push(context, WideRoute(builder: (_) => SubPage(title: t('30-second intro card'), body: const IntroCardScreen()))))),
+          Expanded(child: _shortcut(p, Icons.badge_outlined, '30-second intro card', () => Navigator.push(context, WideRoute(builder: (_) => const IntroCardScreen())))),
         ]),
       ])),
       const SizedBox(height: 14),
