@@ -24,6 +24,7 @@ import '../widgets/tour.dart';
 import 'connect.dart';
 import 'edit_profile.dart';
 import 'find.dart';
+import 'intro_card.dart';
 import 'leads.dart';
 import 'p2.dart';
 import 'phonebook.dart';
@@ -457,6 +458,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
         ('Leads for you', () => sub('Leads for you', const LeadsScreen())),
         ('Today in your area', () => sub('Today in your area', const TodayScreen())),
       ],
+      if (me != null) ('30-second intro card', () => sub('30-second intro card', const IntroCardScreen())),
       if (me != null)
         (
           'Edit profile',
@@ -1316,6 +1318,8 @@ class _AccountMenu extends StatelessWidget {
             child: ListView(padding: const EdgeInsets.all(6), children: [
               item(WI.edit, 'Edit profile',
                   () => push(EditProfileScreen(profile: me))),
+              item(WI.contactCard, '30-second intro card',
+                  () => push(SubPage(title: t('30-second intro card'), body: const IntroCardScreen()))),
               // for businesses only: a consumer is not shown them
               if (me.isEntrepreneur) ...[
                 item(WI.sparkle, 'Leads for you',

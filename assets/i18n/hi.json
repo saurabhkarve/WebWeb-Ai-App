@@ -2858,5 +2858,12 @@
   "Know a good one near you? Sharing a contact from the WEBWEB app helps your neighbours find it.": "आपके पास कोई अच्छा है? WEBWEB ऐप से संपर्क शेयर करने पर आपके पड़ोसी उसे ढूँढ पाएँगे।",
   "We could not find “{q}” yet": "“{q}” अभी नहीं मिला",
   "Ask members near you": "पास के सदस्यों से पूछिए",
-  "Share contacts from the app": "ऐप से संपर्क शेयर करें"
+  "Share contacts from the app": "ऐप से संपर्क शेयर करें",
+  "30-second intro card": "30 सेकंड का परिचय कार्ड",
+  "Share as update": "अपडेट के रूप में शेयर करें",
+  "Posted as an update": "अपडेट के रूप में पोस्ट हो गया",
+  "Could not post the update": "अपडेट पोस्ट नहीं हो सका",
+  "Pick a style, then share your card as an update or as an image.": "एक स्टाइल चुनें, फिर अपना कार्ड अपडेट या इमेज के रूप में शेयर करें।",
+  "Style": "स्टाइल",
+  "The QR on the card opens your WEBWEB AI page. An update stays for 24 hours.": "कार्ड पर QR आपका WEBWEB AI पेज खोलता है। अपडेट 24 घंटे रहता है।"
 }
