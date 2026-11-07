@@ -10,7 +10,10 @@ import '../theme.dart';
 class SearchLoader extends StatefulWidget {
   /// a new search starts the steps over
   final String query;
-  const SearchLoader({super.key, required this.query});
+
+  /// results are already showing: one slim line, no placeholder rows, so nothing is pushed down or hidden by the keyboard
+  final bool compact;
+  const SearchLoader({super.key, required this.query, this.compact = false});
   @override
   State<SearchLoader> createState() => _SearchLoaderState();
 }
@@ -70,21 +73,21 @@ class _SearchLoaderState extends State<SearchLoader> with SingleTickerProviderSt
     final p = Pal.of(context);
     final steps = _steps;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      padding: EdgeInsets.symmetric(vertical: widget.compact ? 6 : 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           AnimatedBuilder(
             animation: _c,
             builder: (_, __) => Container(
-              width: 38,
-              height: 38,
+              width: widget.compact ? 26 : 34,
+              height: widget.compact ? 26 : 34,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 gradient: kGoldGradient,
                 shape: BoxShape.circle,
                 boxShadow: [BoxShadow(color: kGold.withValues(alpha: .25 + .3 * _c.value), blurRadius: 8 + 12 * _c.value)],
               ),
-              child: Transform.scale(scale: .9 + .25 * _c.value, child: const Icon(Icons.auto_awesome_rounded, size: 19, color: kInk)),
+              child: Transform.scale(scale: .9 + .25 * _c.value, child: Icon(Icons.auto_awesome_rounded, size: widget.compact ? 14 : 17, color: kInk)),
             ),
           ),
           const SizedBox(width: 12),
@@ -113,8 +116,9 @@ class _SearchLoaderState extends State<SearchLoader> with SingleTickerProviderSt
             ]),
           ),
         ]),
-        const SizedBox(height: 16),
-        for (var k = 0; k < 3; k++)
+        if (!widget.compact) const SizedBox(height: 12),
+        if (!widget.compact)
+        for (var k = 0; k < 2; k++)
           Opacity(
             opacity: 1 - k * .22,
             child: AnimatedBuilder(

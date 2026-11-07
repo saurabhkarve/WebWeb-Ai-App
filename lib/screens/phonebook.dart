@@ -1686,7 +1686,8 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
     if (_aiBusy || _aiFor != q) {
       return [
         head,
-        SearchLoader(query: q),
+        // something is already listed: only a slim line says more is coming, so the results stay in view above the keyboard
+        SearchLoader(query: q, compact: own.isNotEmpty || svc.isNotEmpty),
         ...own,
         for (final s in svc) s.w,
       ];
