@@ -1006,9 +1006,9 @@ class _AskComposerState extends State<_AskComposer> {
           ),
         );
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)),
+    // no box round it: the kinds and the field sit on the page itself
+    return Material(
+      type: MaterialType.transparency,
       // the card grows and shrinks smoothly as the box opens out and folds back
       child: AnimatedSize(
         duration: const Duration(milliseconds: 280),
@@ -1023,8 +1023,16 @@ class _AskComposerState extends State<_AskComposer> {
             child: Text(t('Your ask is live.'), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Color(0xFF1F7A52))),
           ),
         // the kinds of ask, above the line: one tap picks the kind and opens the box
-        SingleChildScrollView(
+        // the chips run out to both screen edges and start back in line with the page (its padding is 16)
+        LayoutBuilder(builder: (_, box) => Transform.translate(
+          offset: const Offset(-16, 0),
+          child: OverflowBox(
+            alignment: Alignment.centerLeft,
+            minWidth: box.maxWidth + 32,
+            maxWidth: box.maxWidth + 32,
+            child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(children: [
             for (final o in kAskTypes)
               if (o.value.isNotEmpty)
@@ -1041,6 +1049,8 @@ class _AskComposerState extends State<_AskComposer> {
                 ),
           ]),
         ),
+          ),
+        )),
         const SizedBox(height: 10),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Padding(padding: const EdgeInsets.only(top: 2), child: Avatar(name: me.name, size: 40, type: me.userType, photoUrl: me.photoUrl, uid: me.uid)),
