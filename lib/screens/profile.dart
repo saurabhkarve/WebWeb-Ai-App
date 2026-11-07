@@ -1648,50 +1648,6 @@ class _ShareSheetState extends State<_ShareSheet> {
   }
 }
 
-/// Saved asks (bookmarks), opened from the account menu.
-class SavedPostsScreen extends StatefulWidget {
-  const SavedPostsScreen({super.key});
-  @override
-  State<SavedPostsScreen> createState() => SavedPostsScreenState();
-}
-
-class SavedPostsScreenState extends State<SavedPostsScreen> {
-  List<Post>? _posts;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final d = await context.read<AuthProvider>().api.get('/posts/bookmarks');
-      if (mounted) setState(() => _posts = (d as List).map((e) => Post.fromJson(e as Map)).toList());
-    } catch (_) {
-      if (mounted) setState(() => _posts = []);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => SubPage(
-        title: t('Saved asks'),
-        body: _posts == null
-            ? const Center(child: LogoLoader())
-            : LogoRefresh(
-                onRefresh: _load,
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).padding.bottom + 24),
-                  children: [
-                    if (_posts!.isEmpty) EmptyState(title: t('Nothing saved yet'), hint: t('Tap Save on an ask to keep it here.')),
-                    for (final x in _posts!) PostCard(key: ValueKey(x.id), post: x),
-                  ],
-                ),
-              ),
-      );
-}
-
 
 
 /// "20 min", "3 hr", "2 days"

@@ -213,17 +213,6 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
     }
   }
 
-  Future<void> _toggleSave() async {
-    final on = !it.bookmarked;
-    setState(() => it.bookmarked = on);
-    try {
-      on ? await _api.post('/products/${it.id}/bookmark', {}) : await _api.delete('/products/${it.id}/bookmark');
-      if (mounted) toast(context, t(on ? 'Saved' : 'Removed from saved'));
-    } catch (_) {
-      if (mounted) setState(() => it.bookmarked = !on);
-    }
-  }
-
   /// Refer people from the phone book who may want this item (max 5, like asks).
   Future<void> _refer() async {
     final picked = await pickFromPhoneBook(context, askerName: widget.ownerName);
@@ -368,24 +357,6 @@ class _ItemCardState extends State<_ItemCard> with SingleTickerProviderStateMixi
                   const SizedBox(width: 4),
                   Text(t(it.kind == 'service' ? 'Service' : 'Product'), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, height: 1, color: p.text)),
                 ])),
-              ),
-            ),
-            Positioned(
-              right: 8,
-              top: 8,
-              child: GestureDetector(
-                onTap: _toggleSave,
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: p.canvas.withValues(alpha: .9),
-                    boxShadow: const [BoxShadow(color: Color(0x141E1E1E), blurRadius: 2, offset: Offset(0, 1))],
-                  ),
-                  child: WIcon(WI.bookmark, size: 18, fill: it.bookmarked, color: it.bookmarked ? p.link : p.muted),
-                ),
               ),
             ),
             if ((it.price ?? '').isNotEmpty)

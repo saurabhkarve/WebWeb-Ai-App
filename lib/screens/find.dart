@@ -300,7 +300,6 @@ class _FindScreenState extends State<FindScreen> {
                     );
                     if (r != null && context.mounted) {
                       toast(context, savedMessage(r.openNow));
-                      openAlerts(context);
                     }
                   },
                   child: Padding(

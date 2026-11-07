@@ -14,13 +14,9 @@ import 'p2.dart';
 /// P1 (docs/P1-MICRO-PLAN.md), as on the web: "Leads for you" (/leads) and "Your week" (/week); both have a circle
 /// at the front of Updates (p2.dart).
 
-const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 
 Future<void> openLeads(BuildContext context) =>
     Navigator.push(context, WideRoute(builder: (_) => SubPage(title: t('Leads for you'), body: const LeadsScreen())));
-Future<void> openWeek(BuildContext context) =>
-    Navigator.push(context, WideRoute(builder: (_) => SubPage(title: t('Your week'), body: const WeekScreen())));
 
 Future<void> _editProfile(BuildContext context) async {
   final auth = context.read<AuthProvider>();
@@ -102,17 +98,10 @@ class _LeadsScreenState extends State<LeadsScreen> {
               )
             else
               const Spacer(),
-            // the way to alerts stays here on busy days, when the card below is hidden
-            if (_alerts != null && (_alerts! > 0 || fresh > 0))
+            // the way to set an alert stays here on busy days, when the card below is hidden
+            if (_alerts != null && _alerts! == 0 && fresh > 0)
               GestureDetector(
-                onTap: () async {
-                  if (_alerts! > 0) {
-                    await openAlerts(context);
-                    _load();
-                  } else {
-                    _setAlert();
-                  }
-                },
+                onTap: _setAlert,
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   WIcon(WI.bell, size: 14, color: p.link),
                   const SizedBox(width: 4),
@@ -203,133 +192,3 @@ class _LeadsScreenState extends State<LeadsScreen> {
   }
 }
 
-/// "Your week" (the Monday scorecard): the last 7 days, rank in trade and area, and what to do next.
-class WeekScreen extends StatefulWidget {
-  const WeekScreen({super.key});
-  @override
-  State<WeekScreen> createState() => _WeekScreenState();
-}
-
-class _WeekScreenState extends State<WeekScreen> {
-  WeekStats? _w;
-  bool _failed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    context.read<AuthProvider>().api.get('/me/week').then((d) {
-      if (mounted) setState(() => _w = WeekStats.fromJson(d as Map));
-    }).catchError((_) {
-      if (mounted) setState(() => _failed = true);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Pal.of(context);
-    final w = _w;
-    if (_failed) return Center(child: Text(t('Could not load. Please try again.'), style: TextStyle(color: p.muted)));
-    if (w == null) return const PageLoader();
-    final trade = (w.category ?? '').isEmpty ? '' : t(labelOf(kProfileCategories, w.category));
-    final to = DateTime.now();
-    final from = to.subtract(const Duration(days: 6));
-    String day(DateTime d) => '${d.day} ${_months[d.month - 1]}';
-    final tiles = [
-      (w.leads, w.leads == 1 ? 'lead' : 'leads', false),
-      (w.replied, w.replied == 1 ? 'reply sent' : 'replies sent', false),
-      (w.won, 'won', w.won > 0),
-      (w.askViews, 'views on your asks', false),
-    ];
-    Widget tile((int, String, bool) x) => Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            gradient: x.$3 ? kGoldGradient : null,
-            color: x.$3 ? null : p.card,
-            border: Border.all(color: x.$3 ? kGold : p.border),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${x.$1}', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: x.$3 ? kInk : p.text)),
-            Text(t(x.$2), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: x.$3 ? kInk.withValues(alpha: .75) : p.muted)),
-          ]),
-        );
-    Widget row(String text, String action, VoidCallback onTap, {String? sub, bool bold = false}) => InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(text, style: TextStyle(fontSize: 14, fontWeight: bold ? FontWeight.w700 : FontWeight.w400, color: bold ? p.text : p.muted)),
-                  if (sub != null) Text(sub, style: TextStyle(fontSize: 12, color: p.muted)),
-                ]),
-              ),
-              const SizedBox(width: 12),
-              Text('$action →', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.link)),
-            ]),
-          ),
-        );
-
-    return ListView(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, islandSpace(context)),
-      children: [
-        Text('${day(from)} – ${day(to)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
-        const SizedBox(height: 12),
-        Row(children: [Expanded(child: tile(tiles[0])), const SizedBox(width: 8), Expanded(child: tile(tiles[1]))]),
-        const SizedBox(height: 8),
-        Row(children: [Expanded(child: tile(tiles[2])), const SizedBox(width: 8), Expanded(child: tile(tiles[3]))]),
-        if (w.rank != null && trade.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: p.chip.withValues(alpha: .4), border: Border.all(color: p.border), borderRadius: BorderRadius.circular(18)),
-            child: Row(children: [
-              const Text('🏅', style: TextStyle(fontSize: 24)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text.rich(TextSpan(children: [
-                    TextSpan(text: '#${w.rank} ', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    TextSpan(
-                      text: w.rankArea != null
-                          ? t('of {n} {trade} businesses in {area}', {'n': w.rankOf ?? 0, 'trade': trade, 'area': t(w.rankArea!)})
-                          : t('of {n} {trade} businesses', {'n': w.rankOf ?? 0, 'trade': trade}),
-                    ),
-                  ]), style: const TextStyle(fontSize: 14)),
-                  Text(t('By jobs won and replies over the last 30 days'), style: TextStyle(fontSize: 12, color: p.muted)),
-                ]),
-              ),
-            ]),
-          ),
-        ],
-        if (w.wonTotal > 0) ...[
-          const SizedBox(height: 16),
-          Text('🏆 ${t(w.wonTotal == 1 ? '{n} deal won on WEBWEB so far' : '{n} deals won on WEBWEB so far', {'n': w.wonTotal})}', style: const TextStyle(fontSize: 14)),
-        ],
-        if (w.responsesReceived > 0) ...[
-          const SizedBox(height: 8),
-          Text(t(w.responsesReceived == 1 ? '{n} response on your asks this week' : '{n} responses on your asks this week', {'n': w.responsesReceived}), style: const TextStyle(fontSize: 14)),
-        ],
-        const SizedBox(height: 16),
-        Container(
-          decoration: BoxDecoration(border: Border.all(color: p.border), borderRadius: BorderRadius.circular(18)),
-          clipBehavior: Clip.antiAlias,
-          child: Material(
-            color: Colors.transparent,
-            child: Column(children: [
-              row(
-                t(w.openLeads == 1 ? '{n} open lead' : '{n} open leads', {'n': w.openLeads}),
-                t('See leads'),
-                () => openLeads(context),
-                bold: true,
-                sub: w.newAsksInTrade > 0 && trade.isNotEmpty ? t('{n} new asks in {trade} this week', {'n': w.newAsksInTrade, 'trade': trade}) : null,
-              ),
-              Divider(height: 1, color: p.border),
-              row(t('Add your services to get better matches'), t('Edit profile'), () => _editProfile(context)),
-            ]),
-          ),
-        ),
-      ],
-    );
-  }
-}

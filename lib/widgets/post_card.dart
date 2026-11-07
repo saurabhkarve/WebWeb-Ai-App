@@ -215,13 +215,6 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       backgroundColor: p.canvas,
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ListTile(
-            leading: WIcon(WI.bookmark, size: 20, color: p.text, fill: post.bookmarked),
-            title: Text(t(post.bookmarked ? 'Remove from saved' : (isAsk ? 'Save ask' : 'Save'))),
-            onTap: () => Navigator.pop(ctx, 'save'),
-          ),
-          // saving is for you; what follows changes the ask
-          Divider(height: 1, color: p.border),
           if (isAsk) ListTile(leading: WIcon(WI.edit, size: 20, color: p.text), title: Text(t('Edit ask')), onTap: () => Navigator.pop(ctx, 'edit')),
           ListTile(
             leading: WIcon(WI.trash, size: 20, color: p.danger),
@@ -232,7 +225,6 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       ),
     );
     if (!mounted || choice == null) return;
-    if (choice == 'save') return _actionsKey.currentState?.toggleBookmark();
     if (choice == 'edit') {
       final saved = await Navigator.push<bool>(context, WideRoute(builder: (_) => SubPage(title: t('Edit ask'), body: AskScreen(onPosted: () {}, edit: post))));
       if (saved == true) widget.onChanged?.call();
@@ -341,8 +333,6 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
                     uid: post.authorUid,
                     name: post.shownName,
                     postId: post.id,
-                    saved: post.bookmarked,
-                    onToggleSave: () => _actionsKey.currentState?.toggleBookmark(),
                     onAlert: post.isRequirement ? _alertSimilar : null,
                   ) &&
                   mounted) {
@@ -787,17 +777,6 @@ class PostActionsState extends State<PostActions> {
     }
   }
 
-  /// Save / remove from saved (from the ⋯ menu and the Share menu).
-  Future<void> toggleBookmark() async {
-    final on = !post.bookmarked;
-    setState(() => post.bookmarked = on);
-    try {
-      on ? await _api.post('/posts/${post.id}/bookmark') : await _api.delete('/posts/${post.id}/bookmark');
-      if (mounted) toast(context, t(on ? 'Saved' : 'Removed from saved'));
-    } catch (_) {
-      if (mounted) setState(() => post.bookmarked = !on);
-    }
-  }
 
   /// Refer: the note box with "Attach a contact" (refer_sheet.dart), open and ready to type, on asks and updates
   /// alike (on an update they go to the poster in a chat). Your own update opens its page instead.
@@ -833,12 +812,6 @@ class PostActionsState extends State<PostActions> {
           ListTile(leading: SvgPicture.string(whatsAppSvg, width: 20, height: 20), title: const Text('WhatsApp'), onTap: () => Navigator.pop(ctx, 'whatsapp')),
           ListTile(leading: WIcon(WI.share, size: 20, color: p.text), title: Text(t('More ways to share')), onTap: () => Navigator.pop(ctx, 'native')),
           ListTile(leading: WIcon(WI.link, size: 20, color: p.text), title: Text(t('Copy link')), onTap: () => Navigator.pop(ctx, 'copy')),
-          // Save is here as well as in the ⋯ menu
-          ListTile(
-            leading: WIcon(WI.bookmark, size: 20, color: p.text, fill: post.bookmarked),
-            title: Text(t(post.bookmarked ? 'Remove from saved' : (post.isRequirement ? 'Save ask' : 'Save'))),
-            onTap: () => Navigator.pop(ctx, 'save'),
-          ),
         ]),
       ),
     );
@@ -853,8 +826,6 @@ class PostActionsState extends State<PostActions> {
         try {
           await shareAndLog(_api, entity: 'post', ref: post.id, text: post.webUrl, subject: _subject);
         } catch (_) {}
-      case 'save':
-        await toggleBookmark();
       case 'copy':
         await Clipboard.setData(ClipboardData(text: post.webUrl));
         logShare(_api, 'post', post.id, channel: 'copy');

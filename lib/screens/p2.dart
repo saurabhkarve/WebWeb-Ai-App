@@ -72,7 +72,6 @@ String _money(num? n) {
 
 Future<void> openToday(BuildContext context, {String? poll}) =>
     Navigator.push(context, WideRoute(builder: (_) => SubPage(title: t('Today in your area'), body: TodayScreen(poll: poll))));
-Future<void> openAlerts(BuildContext context) => Navigator.push(context, WideRoute(builder: (_) => SubPage(title: t('Alerts'), body: const AlertsScreen())));
 
 // ===================== Today =====================
 
@@ -796,156 +795,6 @@ class _AlertSheetState extends State<_AlertSheet> {
   }
 }
 
-/// Alerts: "tell me when someone asks for…". Each says what, where and how it tells the member, and how many asks
-/// it found; matches also join Leads for you. Add, edit, pause and delete here.
-class AlertsScreen extends StatefulWidget {
-  const AlertsScreen({super.key});
-  @override
-  State<AlertsScreen> createState() => _AlertsScreenState();
-}
-
-class _AlertsScreenState extends State<AlertsScreen> {
-  List<Alert>? _list;
-  int _limit = 5;
-  String? _saved;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final r = await context.read<AuthProvider>().api.get('/alerts') as Map;
-      if (mounted) {
-        setState(() {
-          _list = ((r['alerts'] as List?) ?? const []).map((e) => Alert.fromJson(e as Map)).toList();
-          _limit = (r['limit'] as num?)?.toInt() ?? 5;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _list = []);
-    }
-  }
-
-  Future<void> _sheet([Alert? editing]) async {
-    final r = await showAlertSheet(context, editing: editing);
-    if (r == null || !mounted) return;
-    setState(() => _saved = editing != null ? null : savedMessage(r.openNow));
-    _load();
-  }
-
-  Future<void> _menu(Alert a) async {
-    final p = Pal.of(context);
-    final pick = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: p.canvas,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          for (final m in ['Edit', a.paused ? 'Resume' : 'Pause', 'Delete'])
-            ListTile(title: Text(t(m), style: TextStyle(fontWeight: FontWeight.w600, color: m == 'Delete' ? p.danger : p.text)), onTap: () => Navigator.pop(ctx, m)),
-        ]),
-      ),
-    );
-    if (!mounted || pick == null) return;
-    final api = context.read<AuthProvider>().api;
-    try {
-      if (pick == 'Edit') return await _sheet(a);
-      if (pick == 'Delete') await api.delete('/alerts/${a.id}');
-      if (pick == 'Pause' || pick == 'Resume') await api.patch('/alerts/${a.id}', {'paused': !a.paused});
-    } catch (e) {
-      if (mounted) toast(context, '$e', error: true);
-    }
-    _load();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Pal.of(context);
-    final list = _list;
-    if (list == null) return const PageLoader();
-    const how = {'instant': 'Instantly', 'daily': 'Once a day', 'leads': 'Only in Leads'};
-    final green = p.dark ? kGreenDark : kGreen;
-    return LogoRefresh(
-      onRefresh: _load,
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, islandSpace(context)),
-        children: [
-          Row(children: [
-            Expanded(child: Text(t('Get told when someone asks for what you do. Matches also show in Leads for you.'), style: TextStyle(fontSize: 14, color: p.muted))),
-            const SizedBox(width: 12),
-            GoldButton(label: t('Add'), wi: WI.plus, height: 36, onPressed: list.length >= _limit ? null : _sheet),
-          ]),
-          if (_saved != null)
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: green.withValues(alpha: .1), borderRadius: BorderRadius.circular(12)),
-              child: Text(_saved!, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: green)),
-            ),
-          if (list.isEmpty) ...[
-            EmptyState(title: t('No alerts yet'), hint: t('Set one for your trade and area, and be the first to reply when a fitting ask comes in.')),
-            Center(child: GoldButton(label: t('Set an alert'), wi: WI.bell, height: 40, onPressed: _sheet)),
-          ],
-          for (final a in list)
-            Opacity(
-              opacity: a.paused ? .6 : 1,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border))),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(color: kGold.withValues(alpha: .2), shape: BoxShape.circle),
-                    child: WIcon(WI.bell, size: 20, color: p.tagText),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(a.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                      Text(
-                        [
-                          if (a.category != null) t(kCategoryShort[a.category] ?? 'Ask'),
-                          a.place != null ? t('within {km} km of {place}', {'km': a.radiusKm, 'place': a.place!}) : t('Anywhere'),
-                          if (a.budgetMin != null) t('over ₹{n}', {'n': _money(a.budgetMin).substring(1)}),
-                        ].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: p.muted),
-                      ),
-                      const SizedBox(height: 2),
-                      Text.rich(
-                        TextSpan(children: [
-                          TextSpan(
-                            text: a.recentMatches == 0 ? t('No matches yet') : t(a.recentMatches == 1 ? '1 match this month' : '{n} matches this month', {'n': a.recentMatches}),
-                            style: TextStyle(fontWeight: FontWeight.w600, color: p.tagText),
-                          ),
-                          if (a.lastMatchedAt != null) TextSpan(text: ' · ${t('last {when}', {'when': timeAgo(a.lastMatchedAt!)})}', style: TextStyle(color: p.muted)),
-                          TextSpan(text: ' · ${a.paused ? t('Paused') : t(how[a.delivery] ?? '')}', style: TextStyle(color: p.muted)),
-                        ]),
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ]),
-                  ),
-                  IconButton(tooltip: t('More options'), onPressed: () => _menu(a), icon: WIcon(WI.more, size: 20, color: p.muted)),
-                ]),
-              ),
-            ),
-          if (list.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Text(t('{n} of {max} alerts used', {'n': list.length, 'max': _limit}), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.muted)),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 /// What to say once an alert is saved.
 String savedMessage(int openNow) => openNow > 0
     ? t(openNow == 1 ? "Saved. 1 open ask already fits: it's in your Leads." : "Saved. {n} open asks already fit: they're in your Leads.", {'n': openNow})
@@ -1206,8 +1055,8 @@ List<DailyGroup> buildDailyGroups({required List<Post>? leads, required TodayFee
       label: t('Your week'),
       title: t('Your week'),
       tone: _tone['rates'],
-      allLabel: t('Your week'),
-      allPage: () => SubPage(title: t('Your week'), body: const WeekScreen()),
+      allLabel: t('Today'),
+      allPage: () => SubPage(title: t('Today in your area'), body: const TodayScreen()),
       cards: [DailyCard(id: key, fresh: !seen.contains(key), bg: _bg['rates']!, ms: 9000, build: (go) => _WeekCard(w: week, go: go))],
     ));
   }
@@ -1863,8 +1712,6 @@ class _WeekCard extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(child: tile(w.askViews, t('views on your asks'))),
         ]),
-        const SizedBox(height: 16),
-        _Cta(emoji: '📊', label: t('Your week'), onTap: () => go(SubPage(title: t('Your week'), body: const WeekScreen()))),
       ]),
     );
   }

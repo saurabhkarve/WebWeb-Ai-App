@@ -376,19 +376,15 @@ class NotificationService with WidgetsBindingObserver {
       final path = '${d['path'] ?? ''}';
       final isChat = d['type'] == 'msg' || d['chatId'] != null || path.startsWith('/chat/') || d['kind'] == 'missed_call';
       if (!isChat) {
-        // "Your week" (the Monday scorecard)
-        if (path == '/week') {
-          nv.push(WideRoute(builder: (_) => SubPage(title: t('Your week'), body: const WeekScreen())));
+        // the Monday scorecard and the alert summary now open Leads
+        if (path == '/week' || path == '/alerts') {
+          nv.push(WideRoute(builder: (_) => SubPage(title: t('Leads for you'), body: const LeadsScreen())));
           return;
         }
         // P2: Today (a morning notice, a question's result), alerts (the 8 pm summary goes to Leads), an update's reach
         if (path.startsWith('/today')) {
           final poll = Uri.tryParse(path)?.queryParameters['poll'];
           nv.push(WideRoute(builder: (_) => SubPage(title: t('Today in your area'), body: TodayScreen(poll: poll))));
-          return;
-        }
-        if (path == '/alerts') {
-          nv.push(WideRoute(builder: (_) => SubPage(title: t('Alerts'), body: const AlertsScreen())));
           return;
         }
         // sent by hand from Admin to members who have not allowed contacts: the sheet explains it and has "Turn on"
