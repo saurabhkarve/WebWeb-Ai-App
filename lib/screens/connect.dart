@@ -1045,7 +1045,18 @@ class _AskComposerState extends State<_AskComposer> {
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Padding(padding: const EdgeInsets.only(top: 2), child: Avatar(name: me.name, size: 40, type: me.userType, photoUrl: me.photoUrl, uid: me.uid)),
           const SizedBox(width: 12),
+          // the field and the button are one control: a bordered box, the button inside it at the right
           Expanded(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 240),
+              padding: EdgeInsets.fromLTRB(0, 0, _open ? 0 : 4, 0),
+              decoration: BoxDecoration(
+                color: p.card,
+                borderRadius: BorderRadius.circular(_open ? 18 : 24),
+                border: Border.all(color: _focus.hasFocus ? kGold : p.text.withValues(alpha: .22), width: _focus.hasFocus ? 1.6 : 1),
+              ),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                Expanded(
             child: Stack(children: [
             TextField(
               controller: _text,
@@ -1062,11 +1073,12 @@ class _AskComposerState extends State<_AskComposer> {
               decoration: InputDecoration(
                 hintText: hint,
                 hintStyle: TextStyle(color: p.muted),
-                filled: true,
-                fillColor: p.chip,
+                filled: false,
                 isDense: true,
                 contentPadding: EdgeInsets.fromLTRB(16, 12, _open ? 60 : 16, 12),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
               ),
             ),
             // the count sits inside the field, at its bottom right
@@ -1080,16 +1092,19 @@ class _AskComposerState extends State<_AskComposer> {
             ]),
           ),
           // closed: the button sits beside the line; open: it moves down beside the options
-          if (!_open) ...[const SizedBox(width: 10), GestureDetector(
+          if (!_open) ...[const SizedBox(width: 6), GestureDetector(
             onTap: _submit,
             child: Container(
-              height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               alignment: Alignment.center,
-              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(18)),
               child: Text(t('Post ask'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
             ),
           )],
+              ]),
+            ),
+          ),
         ]),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 240),
