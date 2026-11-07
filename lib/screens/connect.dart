@@ -1039,7 +1039,12 @@ class _AskComposerState extends State<_AskComposer> {
             constraints: const BoxConstraints(maxWidth: 150),
             padding: const EdgeInsets.symmetric(horizontal: 10),
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: on ? kGold.withValues(alpha: .25) : p.canvas, borderRadius: BorderRadius.circular(16), border: Border.all(color: on ? kGold : p.border)),
+            decoration: BoxDecoration(
+              color: on ? kGold.withValues(alpha: .25) : p.canvas,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: on ? kGold : (p.dark ? Colors.white24 : const Color(0xFFE3D49A))),
+              boxShadow: p.dark ? null : [BoxShadow(color: const Color(0xFF785A00).withValues(alpha: .12), blurRadius: 3, offset: const Offset(0, 1))],
+            ),
             child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: p.text)),
           ),
         );
@@ -1111,7 +1116,14 @@ class _AskComposerState extends State<_AskComposer> {
                     onTap: () => _pick(o.value),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), color: _type == o.value ? kGold.withValues(alpha: .25) : null, border: Border.all(color: _type == o.value ? kGold : p.border)),
+                      // solid chips with a warm edge, so they read on the yellow glow behind the box; the picked kind is gold
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        color: _type == o.value ? null : p.canvas,
+                        gradient: _type == o.value ? kGoldGradient : null,
+                        border: Border.all(color: _type == o.value ? const Color(0xFFE0A800) : (p.dark ? Colors.white24 : const Color(0xFFE3D49A))),
+                        boxShadow: p.dark ? null : [BoxShadow(color: const Color(0xFF785A00).withValues(alpha: .12), blurRadius: 3, offset: const Offset(0, 1))],
+                      ),
                       child: Text('${o.emoji} ${t(o.short)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.text)),
                     ),
                   ),
