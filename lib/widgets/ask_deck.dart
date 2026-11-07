@@ -350,7 +350,7 @@ class _AskDeckState extends State<AskDeck> {
           final tk = c == null ? null : talk();
           return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             chips,
-            if (c != null) ...[const SizedBox(height: 2), tk == null ? c : Row(children: [Flexible(child: c), const SizedBox(width: 8), Flexible(child: tk)])],
+            if (c != null) ...[const SizedBox(height: 2), tk == null ? c : Row(children: [c, const SizedBox(width: 8), Flexible(child: tk)])],
           ]);
         }
 
