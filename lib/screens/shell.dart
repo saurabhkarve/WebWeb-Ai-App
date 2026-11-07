@@ -271,7 +271,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
     const sheetW = 600.0;
     final side = wide ? (w - sheetW) / 2 : 0.0;
     final top = wide ? 0.0 : MediaQuery.of(context).padding.top;
-    final header = wide ? 0.0 : 64.0;
+    // exactly the header's own height (51 + the 1 px rule): any more leaves a bare strip between it and the page
+    final header = wide ? 0.0 : 52.0;
     final bottom = MediaQuery.of(context).padding.bottom;
     final rail = wide;
     final backdrop = p.dark
