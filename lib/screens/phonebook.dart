@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import '../crash_reporter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../approx_distance.dart';
@@ -393,6 +394,11 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
         });
       }
     } else {
+      // the cursor left within 3 s of landing with nothing typed: not what a person does. Reported with the call stack of whatever
+      // took it, so the cause shows in the crash list (Admin) instead of being guessed.
+      if (_q.text.isEmpty && DateTime.now().difference(_focusedAt) < const Duration(seconds: 3)) {
+        CrashReporter.report('Find lost focus unexpectedly', StackTrace.current, context: {'ms': '${DateTime.now().difference(_focusedAt).inMilliseconds}', 'kb': '$_kbWasUp'});
+      }
       _unfold = Timer(const Duration(milliseconds: 450), () {
         if (mounted) setState(() => _boxFold = false);
       });
