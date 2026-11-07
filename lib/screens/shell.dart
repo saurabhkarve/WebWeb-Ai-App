@@ -234,7 +234,13 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
 
   void _slideTick() => _slideX.value = _slideFrom * (1 - Curves.easeOutCubic.transform(_slideC.value));
 
+  // The pages already opened: the others are not built until their first visit (a faster start, less memory), and once
+  // opened they stay alive in the stack as before.
+  late final Set<int> _opened = {_i};
+  Widget _lazy(int k, Widget Function() page) => _opened.contains(k) ? page() : const SizedBox.shrink();
+
   void _go(int k) {
+    _opened.add(k);
     const order = [_feed, _dir, _talk];
     final a = order.indexOf(_i), b = order.indexOf(k);
     if (a >= 0 && b >= 0 && a != b && _slideX.value == 0) {
@@ -454,28 +460,28 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
         data: MediaQuery.of(context).copyWith(
             padding: pad.copyWith(top: 0, bottom: bottomBar ? 0 : pad.bottom)),
         child: IndexedStack(index: _i, children: [
-          _fit(
+          _lazy(_feed, () => _fit(
               ConnectScreen(
                   refreshTick: _feedTick,
                   topTick: _topTick,
                   active: _i == _feed),
-              m(680)),
-          _fit(const FindScreen(), m(900)),
-          _fit(
+              m(680))),
+          _lazy(1, () => _fit(const FindScreen(), m(900))),
+          _lazy(_dir, () => _fit(
               PhonebookHome(
                   active: _i == _dir,
                   onAsk: () => _go(_feed),
                   onSeeAsks: () => _go(_feed),
                   onPosted: () => setState(() => _feedTick++),
                   onSearching: (on) => setState(() => _dirSearch = on)),
-              m(1240)),
+              m(1240))),
           // Talk loads afresh each time it opens
           if (_i == _talk)
             _fit(const TalkScreen(), m(900))
           else
             const SizedBox.shrink(),
-          _fit(_NotesPanel(notes: _notes, page: true, onAsk: () => _go(_feed)),
-              m(760)),
+          _lazy(_notesTab, () => _fit(_NotesPanel(notes: _notes, page: true, onAsk: () => _go(_feed)),
+              m(760))),
         ]),
       ))),
     );

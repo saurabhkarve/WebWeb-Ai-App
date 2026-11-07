@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart' show TextInputFormatter;
@@ -638,7 +640,7 @@ class _SpinnerState extends State<Spinner> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) => RotationTransition(
         turns: _c,
-        child: CustomPaint(size: Size.square(widget.size), painter: _ArcPainter(widget.color ?? Pal.of(context).text)),
+        child: RepaintBoundary(child: CustomPaint(size: Size.square(widget.size), painter: _ArcPainter(widget.color ?? Pal.of(context).text))),
       );
 }
 
@@ -849,8 +851,27 @@ class NetImg extends StatelessWidget {
     if (Uri.tryParse(u)?.path.toLowerCase().endsWith('.svg') ?? false) {
       return SvgPicture.network(u, fit: fit, width: width, height: height, alignment: alignment, placeholderBuilder: (_) => fallback, errorBuilder: (_, __, ___) => fallback);
     }
-    return Image.network(u, fit: fit, width: width, height: height, alignment: alignment, errorBuilder: (_, __, ___) => fallback,
-        frameBuilder: (_, child, frame, sync) => sync || frame != null ? child : fallback);
+    // the web preview keeps the plain loader (the browser has its own cache, and its cross-origin rules differ)
+    if (kIsWeb) {
+      return Image.network(u, fit: fit, width: width, height: height, alignment: alignment, errorBuilder: (_, __, ___) => fallback,
+          frameBuilder: (_, child, frame, sync) => sync || frame != null ? child : fallback);
+    }
+    // kept on the phone's storage between launches, and decoded at the size it is shown (not at full resolution)
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final w = width;
+    final decodeW = w != null && w.isFinite ? (w * dpr).round() : null;
+    return CachedNetworkImage(
+      imageUrl: u,
+      fit: fit,
+      width: width,
+      height: height,
+      alignment: alignment,
+      memCacheWidth: decodeW,
+      fadeInDuration: Duration.zero,
+      fadeOutDuration: Duration.zero,
+      placeholder: (_, __) => fallback,
+      errorWidget: (_, __, ___) => fallback,
+    );
   }
 }
 

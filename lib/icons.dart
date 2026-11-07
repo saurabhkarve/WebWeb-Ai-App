@@ -204,7 +204,8 @@ class _WIconState extends State<WIcon> with TickerProviderStateMixin {
     final base = SvgPicture.string(_wrap(body.replaceFirst(spark, ''), c, sw), width: widget.size, height: widget.size);
     final star = SvgPicture.string(_wrap(spark, c, sw).replaceFirst('stroke="${_hex(c)}"', 'stroke="${_hex(c)}" fill="${_hex(c)}"'), width: widget.size, height: widget.size);
     final origin = Alignment(cx / 12 - 1, cy / 12 - 1);
-    return SizedBox(
+    // the turning star repaints its own small layer, not the page it sits on
+    return RepaintBoundary(child: SizedBox(
       width: widget.size,
       height: widget.size,
       child: Stack(children: [
@@ -221,7 +222,7 @@ class _WIconState extends State<WIcon> with TickerProviderStateMixin {
           child: star,
         ),
       ]),
-    );
+    ));
   }
 }
 

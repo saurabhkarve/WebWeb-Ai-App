@@ -1988,7 +1988,8 @@ class _GlowBorderState extends State<_GlowBorder> with SingleTickerProviderState
   @override
   Widget build(BuildContext context) {
     const w = 2.0;
-    return AnimatedBuilder(
+    // its own layer: the turning colours repaint this box only, not the whole page round it, every frame
+    return RepaintBoundary(child: AnimatedBuilder(
       animation: _c,
       builder: (_, child) => Container(
         padding: const EdgeInsets.all(w),
@@ -2008,7 +2009,7 @@ class _GlowBorderState extends State<_GlowBorder> with SingleTickerProviderState
         child: child,
       ),
       child: ClipRRect(borderRadius: BorderRadius.circular(widget.radius - w), child: widget.child),
-    );
+    ));
   }
 }
 
