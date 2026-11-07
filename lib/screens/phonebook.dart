@@ -449,6 +449,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
     directoryFocus.addListener(_onFocusRequest);
     directorySpeak.addListener(_onSpeak);
     _qFocus.addListener(_onSearchFocus);
+    _loadKept();
     // the Find page opens with the cursor in the search
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && widget.active) _qFocus.requestFocus();
@@ -575,12 +576,14 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
       try {
         final d = await api.get('/users/search', {'q': v.trim(), if (_place.isNotEmpty) 'place': _place});
         if (mounted) setState(() => _results = (d as List).cast<Map>());
+        _keep((d as List).cast<Map>());
       } catch (_) {
         if (mounted) setState(() => _results = const []);
       }
       try {
         final d = await api.get('/service-contacts/search', {'q': v.trim(), if (_place.isNotEmpty) 'place': _place, if (_placeAt != null) ...{'lat': '${_placeAt!.lat}', 'lng': '${_placeAt!.lng}'}});
         if (mounted && _q.text.trim() == v.trim()) setState(() => _service = ((d as Map)['contacts'] as List? ?? const []).cast<Map>());
+        _keep(((d as Map)['contacts'] as List? ?? const []).cast<Map>(), service: true);
       } catch (_) {
         if (mounted) setState(() => _service = const []);
       }
@@ -637,6 +640,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
       if (!mounted) return;
       final r = await context.read<AuthProvider>().api.post('/phonebook/ai-find', {'q': q, if (_place.isNotEmpty) 'place': _place, if (here != null) 'lat': here.lat, if (here != null) 'lng': here.lng}) as Map;
       if (mounted && _aiFor == q) setState(() => _ai = r);
+      _keep(((r['matches'] as List?) ?? const []).cast<Map>());
     } catch (_) {
       if (mounted && _aiFor == q) setState(() => _ai = const {'matches': []});
     } finally {
@@ -694,6 +698,46 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
   Future<void> _openCheck() async {
     await Navigator.push(context, WideRoute(builder: (_) => SubPage(title: t('Phonebook'), body: const PhonebookScreen())));
     _loadMatches();
+  }
+
+  // ---- pages and service contacts the searches found, kept on the phone ----
+  // A later search shows the ones that match its words at once (and with no network), as ordinary rows: they open exactly
+  // like the same result from the server. Nothing is listed unless the typed words match it.
+  List<Map> _kept = [];
+  List<Map> _keptSvc = [];
+
+  Future<void> _loadKept() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      List<Map> read(String k) => ((jsonDecode(sp.getString(k) ?? '[]') as List).whereType<Map>()).toList();
+      final a = read('webweb_found_pages'), b = read('webweb_found_service');
+      if (mounted) setState(() => (_kept = a, _keptSvc = b));
+    } catch (_) {}
+  }
+
+  Future<void> _keep(List<Map> found, {bool service = false}) async {
+    if (found.isEmpty) return;
+    String id(Map m) => service ? '${m['phone']}' : '${m['uid']}';
+    final list = service ? _keptSvc : _kept;
+    final seen = <String>{};
+    final next = [
+      for (final m in [...found, ...list])
+        if (id(m) != 'null' && seen.add(id(m))) Map<String, dynamic>.from(m),
+    ].take(300).toList();
+    if (service) {
+      _keptSvc = next;
+    } else {
+      _kept = next;
+    }
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setString(service ? 'webweb_found_service' : 'webweb_found_pages', jsonEncode(next));
+    } catch (_) {}
+  }
+
+  static bool _keyword(Map m, String q) {
+    final hay = '${m['name']} ${m['company']} ${m['handle']} ${m['category']} ${m['location']} ${m['place']} ${(m['services'] as List? ?? const []).join(' ')} ${(m['tags'] as List? ?? const []).join(' ')}'.toLowerCase();
+    return q.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).every(hay.contains);
   }
 
   static String _memberName(Map m) => displayName('${m['userType'] ?? ''}', '${m['name'] ?? ''}', '${m['company'] ?? ''}');
@@ -1405,7 +1449,10 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
       final u = (_results ?? const <Map>[]).where((u) => norm(_memberName(u)) == norm(mine[i].name) || norm('${u['name'] ?? ''}') == norm(mine[i].name)).firstOrNull;
       if (u != null) mine[i] = _Entry(mine[i].name, mine[i].phone, u, mine[i].contact);
     }
-    final others = (_results ?? const <Map>[]).where((u) => !shown(u)).take(20).toList();
+    // pages kept from earlier searches that match these words: shown with the rest, as the same rows
+    final live = {for (final u in _results ?? const <Map>[]) '${u['uid']}'};
+    final fromKept = _kept.where((u) => !live.contains('${u['uid']}') && _keyword(u, q)).take(10);
+    final others = [...(_results ?? const <Map>[]), ...fromKept].where((u) => !shown(u)).take(20).toList();
     // what the member saved a page as, when it is in their contacts
     final saved = {for (final e in all) if (e.member != null) '${e.member!['uid']}': e.name};
     return [
@@ -1429,7 +1476,10 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
   List<_Hit> _serviceItems(Pal p, List<_Entry> mine) {
     String d10(String? x) => ContactSync.mobile10(x ?? '') ?? '';
     final have = {for (final e in mine) d10(e.phone), for (final e in mine) ...(e.contact?.phones ?? const <Phone>[]).map((ph) => d10(ph.number))};
-    final list = _service.where((c) => !have.contains('${c['phone']}')).toList();
+    final q = _q.text.trim().toLowerCase();
+    final liveSvc = {for (final c in _service) '${c['phone']}'};
+    final keptSvc = _keptSvc.where((c) => !liveSvc.contains('${c['phone']}') && _keyword(c, q)).take(10);
+    final list = [..._service, ...keptSvc].where((c) => !have.contains('${c['phone']}')).toList();
     if (list.isEmpty) return const [];
     // who shares it, by the name saved in MY phone book (never the name the sharer is known by elsewhere)
     final saved = <String, String>{};
