@@ -21,7 +21,6 @@ import '../widgets/active_call_banner.dart';
 import '../widgets/connection_pill.dart';
 import '../widgets/notify_banner.dart';
 import '../widgets/tour.dart';
-import 'ask.dart';
 import 'connect.dart';
 import 'edit_profile.dart';
 import 'find.dart';
@@ -34,7 +33,6 @@ import 'service_contacts_sheet.dart';
 import 'shared_contacts.dart';
 import 'support_sheet.dart';
 import 'talk.dart';
-import 'your_asks.dart' show yourAsksRequest;
 
 /// The WEBWEB logo's own disc gradient (the Find button and its rail item wear it).
 const _logoGradient = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFFE84D), Color(0xFFFFB800)]);
@@ -79,9 +77,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
 
   /// how far the Contacts button rises above the bar
   static const _rise = 0.0;
-  static const _feed = 0, _dir = 2, _talk = 3, _notesTab = 4, _ask = 5;
+  static const _feed = 0, _dir = 2, _talk = 3, _notesTab = 4;
   static const _barH = 64.0;
-  int _beforeAsk = _feed;
 
   /// the Directory's search page is open: it has its own Publish bar, so the bar and Ask step aside
   bool _dirSearch = false;
@@ -177,7 +174,6 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
     if (a >= 0 && b >= 0 && a != b && _slideX.value == 0) {
       _slideIn((b > a ? 1 : -1) * MediaQuery.sizeOf(context).width * .28);
     }
-    if (k == _ask && _i != _ask) _beforeAsk = _i;
     if (k != _i) HapticFeedback.selectionClick();
     if (k == _i && k == _feed) {
       _topTick++; // tapping Home again scrolls the feed to the top
@@ -204,21 +200,17 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
     final top = wide ? 0.0 : MediaQuery.of(context).padding.top;
     final header = wide ? 0.0 : 64.0;
     final bottom = MediaQuery.of(context).padding.bottom;
-    final bar = _i != _ask;
     final rail = wide;
     final backdrop = p.dark
         ? const Color(0xFF0B0B0B)
         : const HSLColor.fromAHSL(1, 43, .26, .93).toColor();
     // the bar steps aside while the keyboard is up, so what is typed has the room (the Directory's search)
-    final bottomBar = bar &&
-        !rail &&
+    final bottomBar = !rail &&
         MediaQuery.viewInsetsOf(context).bottom == 0 &&
         !(_i == _dir && _dirSearch);
-    // without the bar on Ask, back returns to the tab it was opened from
     return PopScope(
-      canPop: _i != _ask,
+      canPop: true,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _i == _ask) _go(_beforeAsk);
       },
       child: Scaffold(
         backgroundColor: wide ? backdrop : null,
@@ -417,14 +409,13 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
               ConnectScreen(
                   refreshTick: _feedTick,
                   topTick: _topTick,
-                  onGoAsk: () => _go(_ask),
                   active: _i == _feed),
               m(680)),
           _fit(const FindScreen(), m(900)),
           _fit(
               PhonebookHome(
                   active: _i == _dir,
-                  onAsk: () => _go(_ask),
+                  onAsk: () => _go(_feed),
                   onSeeAsks: () => _go(_feed),
                   onPosted: () => setState(() => _feedTick++),
                   onSearching: (on) => setState(() => _dirSearch = on)),
@@ -434,16 +425,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
             _fit(const TalkScreen(), m(900))
           else
             const SizedBox.shrink(),
-          _fit(_NotesPanel(notes: _notes, page: true, onAsk: () => _go(_ask)),
-              m(760)),
-          _fit(
-              AskScreen(
-                  active: _i == _ask,
-                  onBack: () => _go(_beforeAsk),
-                  onPosted: () => setState(() {
-                        _feedTick++;
-                        _i = _feed;
-                      })),
+          _fit(_NotesPanel(notes: _notes, page: true, onAsk: () => _go(_feed)),
               m(760)),
         ]),
       ))),
@@ -471,13 +453,6 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
           () => Navigator.push(context,
               WideRoute(builder: (_) => ProfileScreen(handle: me.handle)))
         ),
-      (
-        'Your asks',
-        () {
-          yourAsksRequest.value = true;
-          _go(_ask);
-        }
-      ),
       if (me != null && me.isEntrepreneur) ...[
         ('Leads for you', () => sub('Leads for you', const LeadsScreen())),
         ('Today in your area', () => sub('Today in your area', const TodayScreen())),
@@ -512,7 +487,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
                 style: TextStyle(fontSize: 13.5, height: 1.35, color: p.muted)),
             const SizedBox(height: 14),
             InkWell(
-              onTap: () => _go(_ask),
+              onTap: () => _go(_feed),
               borderRadius: BorderRadius.circular(20),
               child: Container(
                 height: 40,

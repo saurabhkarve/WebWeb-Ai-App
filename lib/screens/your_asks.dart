@@ -200,10 +200,12 @@ class _Chip extends StatelessWidget {
   }
 }
 
-/// Home: a small button at the end of the Asks heading to "Your asks", with how much is new. Nothing when I have asked nothing.
+/// Home: a small button at the end of the Asks heading. "Your asks" shows only the asks I posted; then it reads "All asks" and
+/// switches back. Nothing when I have asked nothing.
 class YourAsksPill extends StatefulWidget {
-  final VoidCallback onOpen;
-  const YourAsksPill({super.key, required this.onOpen});
+  final bool active;
+  final VoidCallback onTap;
+  const YourAsksPill({super.key, required this.active, required this.onTap});
   @override
   State<YourAsksPill> createState() => _YourAsksPillState();
 }
@@ -228,21 +230,18 @@ class _YourAsksPillState extends State<YourAsksPill> with MyAskActivityLoader {
     final p = Pal.of(context);
     final fresh = items.fold<int>(0, (n, a) => n + a.fresh);
     return GestureDetector(
-      onTap: () {
-        yourAsksRequest.value = true;
-        widget.onOpen();
-      },
+      onTap: widget.onTap,
       child: Container(
         height: 32,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: fresh > 0 ? kGold.withValues(alpha: .10) : p.canvas,
+          color: widget.active ? kGold.withValues(alpha: .25) : (fresh > 0 ? kGold.withValues(alpha: .10) : p.canvas),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: fresh > 0 ? kGold.withValues(alpha: .6) : p.border),
+          border: Border.all(color: widget.active ? kGold : (fresh > 0 ? kGold.withValues(alpha: .6) : p.border)),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(t('Your asks'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.text)),
-          if (fresh > 0) ...[
+          Text(t(widget.active ? 'All asks' : 'Your asks'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.text)),
+          if (fresh > 0 && !widget.active) ...[
             const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -250,8 +249,6 @@ class _YourAsksPillState extends State<YourAsksPill> with MyAskActivityLoader {
               child: Text(t('{n} new', {'n': '$fresh'}), style: const TextStyle(fontSize: 11, height: 1.45, fontWeight: FontWeight.w700, color: Color(0xFF1E1E1E))),
             ),
           ],
-          const SizedBox(width: 6),
-          WIcon(WI.arrow, size: 12, color: p.muted, still: true),
         ]),
       ),
     );

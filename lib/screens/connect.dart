@@ -41,10 +41,9 @@ import 'p2.dart';
 class ConnectScreen extends StatefulWidget {
   final int refreshTick;
   final int topTick;
-  final VoidCallback onGoAsk;
   /// the tab is on screen (the feed is built behind the Phonebook tab too; its tour waits until it is shown)
   final bool active;
-  const ConnectScreen({super.key, required this.refreshTick, this.topTick = 0, required this.onGoAsk, this.active = true});
+  const ConnectScreen({super.key, required this.refreshTick, this.topTick = 0, this.active = true});
   @override
   State<ConnectScreen> createState() => _ConnectScreenState();
 }
@@ -177,6 +176,27 @@ class _ConnectScreenState extends State<ConnectScreen> {
   }
 
   /// Quietly look for newer posts; never shuffle the list under the reader.
+  /// "Your asks": only the asks I posted, in place of the feed (the button then reads "All asks")
+  bool _mine = false;
+  List<Post>? _myAsks;
+
+  Future<void> _loadMine() async {
+    final uid = context.read<AuthProvider>().userId;
+    if (uid == null) return;
+    try {
+      final l = (await _api.get('/posts', {'authorId': uid, 'limit': 50, 'kind': 'requirement'}) as List).map((e) => Post.fromJson(e as Map)).toList();
+      if (mounted) setState(() => _myAsks = l);
+    } catch (_) {
+      if (mounted) setState(() => _myAsks ??= const []);
+    }
+  }
+
+  void _toggleMine() {
+    setState(() => _mine = !_mine);
+    if (_mine) _loadMine();
+    _toTop();
+  }
+
   Future<void> _checkFresh() async {
     final cur = _posts;
     if (cur == null || !mounted) return;
@@ -224,9 +244,25 @@ class _ConnectScreenState extends State<ConnectScreen> {
       const _StrengthNudge(),
       const SizedBox(height: 12),
       // a box to start an ask from right here, as at the top of a social feed
-      _AskComposer(onPosted: _load),
+      _AskComposer(onPosted: () {
+        _load();
+        if (_mine) _loadMine();
+      }),
       const SizedBox(height: 12),
-      Row(children: [Expanded(child: RuleHeading(WI.ask, t('Asks'))), const SizedBox(width: 8), YourAsksPill(onOpen: widget.onGoAsk)]),
+      Row(children: [Expanded(child: RuleHeading(WI.ask, t('Asks'))), const SizedBox(width: 8), YourAsksPill(active: _mine, onTap: _toggleMine)]),
+      if (_mine) ...[
+        if (_myAsks == null) const PageLoader(),
+        if (_myAsks != null && _myAsks!.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Column(children: [
+              Text(t('You have not posted an ask yet'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text(t('Post what you need and the replies will show up here.'), textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: p.muted)),
+            ]),
+          ),
+        for (final a in _myAsks ?? const <Post>[]) PostCard(key: ValueKey('mine-${a.id}'), post: a, onBlocked: _loadMine),
+      ] else ...[
       if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: TextStyle(fontSize: 14, color: p.danger))),
       if (posts == null && _error == null) const PageLoader(),
       if (posts != null && posts.isEmpty) _empty(p),
@@ -253,7 +289,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
       if (posts != null && posts.isNotEmpty)
         (_loadingMore || _hasMore)
             ? const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Center(child: LogoLoader(size: 40)))
-            : _EndOfFeed(count: posts.length, onAsk: widget.onGoAsk, onFind: () => Navigator.push(context, WideRoute(builder: (_) => const FindScreen(standalone: true))), onTop: _toTop),
+            : _EndOfFeed(count: posts.length, onAsk: _toTop, onFind: () => Navigator.push(context, WideRoute(builder: (_) => const FindScreen(standalone: true))), onTop: _toTop),
+      ],
     ];
     return Stack(children: [
       LogoRefresh(
