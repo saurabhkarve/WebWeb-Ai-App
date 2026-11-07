@@ -1098,17 +1098,8 @@ class SubPage extends StatelessWidget {
       body: Column(children: [
         Container(
           padding: EdgeInsets.only(top: top),
-          decoration: BoxDecoration(
-            color: p.chip,
-            boxShadow: [
-              BoxShadow(
-                color: p.dark ? const Color(0xFF1E1E1E).withValues(alpha: .6) : const Color(0xFF1E1E1E).withValues(alpha: .2),
-                offset: Offset(0, p.dark ? 8 : 6),
-                blurRadius: p.dark ? 16 : 14,
-                spreadRadius: -8,
-              ),
-            ],
-          ),
+          // no shadow under the bar: nothing grey falls on the page
+          decoration: BoxDecoration(color: p.chip),
           child: SizedBox(
             height: 56,
             child: Row(children: [

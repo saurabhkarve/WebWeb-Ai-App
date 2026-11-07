@@ -1015,15 +1015,7 @@ class _AppHeader extends StatelessWidget {
       // instead of sitting on it as a grey bar
       decoration: BoxDecoration(
         color: p.canvas,
-        boxShadow: [
-          BoxShadow(
-            // the same shadow as the web header once the page is scrolled (none at the top), fading in and out
-            color: const Color(0xFF1E1E1E).withValues(alpha: (p.dark ? .85 : .2) * c),
-            offset: Offset(0, p.dark ? 12 : 10),
-            blurRadius: p.dark ? 24 : 22,
-            spreadRadius: p.dark ? -6 : -8,
-          ),
-        ],
+        // no shadow under the header: nothing grey falls on the page
       ),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
       SizedBox(
