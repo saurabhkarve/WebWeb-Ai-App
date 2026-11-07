@@ -1094,34 +1094,48 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
         width: w,
         child: Padding(
           padding: const EdgeInsets.only(right: 8),
-          child: Material(
-            color: kGold.withValues(alpha: p.dark ? .1 : .08),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: kGold.withValues(alpha: .25))),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: p.dark ? const [Color(0xFF2E2C25), Color(0xFF1C1B18)] : const [Color(0xFFFFFFFF), Color(0xFFFBF3D8)]),
+              border: Border.all(color: p.dark ? kGold.withValues(alpha: .2) : const Color(0xCCE6D39A)),
+              boxShadow: [BoxShadow(color: p.dark ? const Color(0xD9000000) : const Color(0x73785A00), blurRadius: 16, spreadRadius: -10, offset: const Offset(0, 8))],
+            ),
+            child: Material(
+            type: MaterialType.transparency,
             child: InkWell(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
               onTap: () => _pick(tag),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  // the icon on a medallion with a gold ring
                   Container(
-                    width: 48,
-                    height: 48,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
+                    width: 52,
+                    height: 52,
+                    padding: const EdgeInsets.all(1.5),
+                    decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      color: p.card,
-                      border: Border.all(color: kGold.withValues(alpha: .4)),
-                      boxShadow: const [BoxShadow(color: Color(0x59785A00), blurRadius: 6, spreadRadius: -2, offset: Offset(0, 2))],
+                      gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFFE98A), Color(0xFFF5C518), Color(0xFFB98A00)]),
+                      boxShadow: [BoxShadow(color: Color(0x8C966E00), blurRadius: 8, spreadRadius: -3, offset: Offset(0, 4))],
                     ),
-                    child: Text('${c['emoji'] ?? '✨'}', style: const TextStyle(fontSize: 24, height: 1)),
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: p.dark ? const [Color(0xFF3A372D), Color(0xFF22211C)] : const [Color(0xFFFFFFFF), Color(0xFFFFF6DC)]),
+                      ),
+                      child: Text('${c['emoji'] ?? '✨'}', style: const TextStyle(fontSize: 24, height: 1)),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   SizedBox(
                     height: 28,
-                    child: Text(t(tag), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, height: 1.15)),
+                    child: Text(t(tag), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, height: 1.15)),
                   ),
                 ]),
               ),
+            ),
             ),
           ),
         ),
@@ -1198,7 +1212,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
       const SizedBox(height: 4),
       if (!_allCats)
         SizedBox(
-          height: 112,
+          height: 120,
           // a whole number of tiles plus a half, so the last one is cut off and hints the row scrolls
           child: LayoutBuilder(builder: (_, box) {
             final shown = box.maxWidth < 400 ? 4.5 : (box.maxWidth < 560 ? 5.5 : 6.5);
