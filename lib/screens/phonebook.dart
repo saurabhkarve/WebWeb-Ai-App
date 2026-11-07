@@ -827,7 +827,8 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
 
     final top = Column(key: _topKey, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       // the updates (people, leads, Today, new businesses) come first, above the search
-      _fold(!_searching && !_boxFold, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      // (they stay when the box only has the cursor; they fold once something is typed)
+      _fold(!_searching, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Column(key: Tours.key('updates'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         // a small gold title with a fading rule, so the circles read as their own strip without a box
         // small screens go without the title
