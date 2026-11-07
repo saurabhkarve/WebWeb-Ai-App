@@ -102,8 +102,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
       if (e['type'] == 'notify') _refreshAll();
     });
     _pushSub = NotificationService.activity.stream.listen((_) => _refreshAll());
-    tourRequest.addListener(_replayTour);
-    // no tour opens by itself: it dimmed the Find page. "Take the app tour" in the account menu still runs it (_replayTour)
+    // no tour runs any more: nothing dims the page
     // the phone's location and contacts count towards the profile's strength: read them now
     DevicePerms.i.refresh();
     // service contacts are on by default once contacts are allowed: a notice the first time (with the way to turn it off), then it looks quietly
@@ -150,19 +149,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
     _pushSub?.cancel();
     _poll?.cancel();
     _svcTimer?.cancel();
-    tourRequest.removeListener(_replayTour);
     _notes.dispose();
     super.dispose();
-  }
-
-  bool _isBusiness() =>
-      context.read<AuthProvider>().profile?.isEntrepreneur ?? false;
-
-  /// "Take the app tour" from the account menu: the Smart Phonebook tour, from its first card.
-  void _replayTour() {
-    if (!mounted) return;
-    Tours.start(
-        context, kPhonebookTourId, phonebookTour(business: _isBusiness()));
   }
 
   // The page slides with the finger while swiping and slides in from the side it came from when the tab changes.
@@ -1606,7 +1594,6 @@ void _openHelp(BuildContext context) {
                 if (ctx.mounted) openChat(ctx, Peer.fromProfile(u));
               } catch (_) {}
             }),
-            row(WI.info, 'Take the app tour', () => tourRequest.value++),
           ]),
         ),
       );
