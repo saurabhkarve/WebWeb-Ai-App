@@ -347,21 +347,24 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
   Widget _swipeTabs(bool phone, Widget child) {
     const order = [_feed, _dir, _talk];
     final at = order.indexOf(_i);
-    if (!phone || at < 0 || _dirSearch) return child;
+    // The wrapper is always there, only its gestures come and go: a tree that changed shape when the keyboard opened (the bar
+    // steps aside) or when the Directory began searching rebuilt every page from scratch, and the search lost its cursor,
+    // its text and its keyboard on the spot.
+    final on = phone && at >= 0 && !_dirSearch;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onHorizontalDragStart: (_) {
+      onHorizontalDragStart: !on ? null : (_) {
         _swipeDx = 0;
         _slideC.stop();
       },
-      onHorizontalDragUpdate: (d) {
+      onHorizontalDragUpdate: !on ? null : (d) {
         _swipeDx += d.delta.dx;
         // the page follows the finger; at either end of the three places it only gives a little
         final to = at + (_swipeDx < 0 ? 1 : -1);
         final edge = to < 0 || to >= order.length;
         _slideX.value = _swipeDx * (edge ? .18 : .55);
       },
-      onHorizontalDragEnd: (d) {
+      onHorizontalDragEnd: !on ? null : (d) {
         // a flick (60 px and quick) or a long slow drag (100 px) counts
         final v = d.primaryVelocity ?? 0;
         final far = _swipeDx.abs() >= 100;
@@ -377,7 +380,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
         _go(order[to]);
         _slideIn(dir * w * .28);
       },
-      onHorizontalDragCancel: () => _slideIn(_slideX.value),
+      onHorizontalDragCancel: !on ? null : () => _slideIn(_slideX.value),
       child: ValueListenableBuilder<double>(
         valueListenable: _slideX,
         builder: (_, x, c) => Opacity(
