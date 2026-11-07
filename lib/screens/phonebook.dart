@@ -277,14 +277,36 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
   bool _kbWasUp = false;
 
   /// The back button closes the keyboard but leaves the cursor in the box, which keeps the page folded and the field
-  /// grabbing the screen: when the keyboard goes away, the box lets go too.
+  /// grabbing the screen: once the keyboard has stayed away for a moment, the box lets go too. Never right after the
+  /// field got the cursor (the keyboard is still sliding up and the insets are not settled).
+  Timer? _kbGone;
   @override
   void didChangeMetrics() {
     final v = View.maybeOf(context);
     if (v == null) return;
     final up = v.viewInsets.bottom > 80;
-    if (_kbWasUp && !up && _qFocus.hasFocus) _qFocus.unfocus();
-    _kbWasUp = up;
+    if (up) {
+      _kbGone?.cancel();
+      _kbWasUp = true;
+    } else if (_kbWasUp) {
+      _kbGone?.cancel();
+      _kbGone = Timer(const Duration(milliseconds: 450), () {
+        final still = (View.maybeOf(context)?.viewInsets.bottom ?? 0) <= 80;
+        if (mounted && still) {
+          _kbWasUp = false;
+          _releaseSearch();
+        }
+      });
+    }
+  }
+
+  /// The one way the search lets go of the cursor: ignored while the field has only just got it, so a tap into the box is
+  /// never undone by the layout moving or the keyboard opening under it.
+  DateTime _focusedAt = DateTime.fromMillisecondsSinceEpoch(0);
+  void _releaseSearch() {
+    if (!_qFocus.hasFocus) return;
+    if (DateTime.now().difference(_focusedAt) < const Duration(milliseconds: 700)) return;
+    _qFocus.unfocus();
   }
 
   final _q = TextEditingController();
@@ -360,6 +382,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
   void _onSearchFocus() {
     _unfold?.cancel();
     if (_qFocus.hasFocus) {
+      _focusedAt = DateTime.now();
       if (mounted) setState(() => _boxFold = true);
       // the box rises to the upper part of the screen (above the middle) once the greeting has folded and the keyboard is up
       for (final ms in const [380, 800]) {
@@ -481,6 +504,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
     _typeTimer?.cancel();
     _unfold?.cancel();
     _q.dispose();
+    _kbGone?.cancel();
     _qFocus.removeListener(_onSearchFocus);
     _qFocus.dispose();
     _scroll.dispose();
@@ -990,7 +1014,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
 
     final list = RefreshIndicator(
       onRefresh: _refresh,
-      child: CustomScrollView(controller: _scroll, keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, slivers: [
+      child: CustomScrollView(controller: _scroll, slivers: [
         SliverPadding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 0), sliver: SliverToBoxAdapter(child: top)),
         SliverPadding(
           padding: EdgeInsets.fromLTRB(16, 0, 28, islandSpace(context) + 20),
@@ -1258,7 +1282,9 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
     final p = Pal.of(context);
     return _GlowBorder(
       radius: 26,
-      child: ColoredBox(
+      // the whole box (field, place, Speak) counts as inside: a tap on the place or Speak does not drop the cursor first
+      child: TextFieldTapRegion(
+       child: ColoredBox(
         color: p.card,
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           TextField(
@@ -1266,7 +1292,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
             controller: _q,
             focusNode: _qFocus,
             // a tap anywhere else lets the cursor go, so the rest of the page (and the island) is usable at once
-            onTapOutside: (_) => _qFocus.unfocus(),
+            onTapOutside: (_) => _releaseSearch(),
             onChanged: _search,
             onSubmitted: (v) => _askAi(v.trim()),
             textInputAction: TextInputAction.search,
@@ -1344,6 +1370,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
             ]),
           ),
         ]),
+       ),
       ),
     );
   }
@@ -1384,7 +1411,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
         ),
         Expanded(
           child: _hasFound() && !_askOpen
-              ? ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, children: _found(p, tuck: true))
+              ? ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: _found(p, tuck: true))
               : SearchAskForm(
             title: _q,
             focus: _qFocus,

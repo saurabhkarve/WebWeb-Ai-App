@@ -71,17 +71,46 @@ class App extends StatelessWidget {
 
 /// Dragging any list downwards while the keyboard is up puts the keyboard away (WhatsApp-style), on every
 /// screen. Scrolling inside the text field that has the keyboard does not count.
-class _KeyboardDismissOnScroll extends StatelessWidget {
+class _KeyboardDismissOnScroll extends StatefulWidget {
   final Widget child;
   const _KeyboardDismissOnScroll({required this.child});
+  @override
+  State<_KeyboardDismissOnScroll> createState() => _KeyboardDismissOnScrollState();
+}
+
+class _KeyboardDismissOnScrollState extends State<_KeyboardDismissOnScroll> {
+  FocusNode? _last;
+  DateTime _gainedAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  @override
+  void initState() {
+    super.initState();
+    FocusManager.instance.addListener(_onFocus);
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeListener(_onFocus);
+    super.dispose();
+  }
+
+  // when a field got the cursor: a drag in the first moments is the finger settling after the tap, not a wish to leave
+  void _onFocus() {
+    final f = FocusManager.instance.primaryFocus;
+    if (f != _last) {
+      _last = f;
+      _gainedAt = DateTime.now();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return NotificationListener<ScrollNotification>(
       onNotification: (n) {
         final drag = n is ScrollUpdateNotification ? n.dragDetails : (n is OverscrollNotification ? n.dragDetails : null);
-        // any drag of the page, up or down, with the keyboard up or already closed (back button), lets the field go
-        if (drag == null || drag.delta.dy.abs() < 3 || n.metrics.axis != Axis.vertical) return false;
+        // a deliberate vertical drag of the page, up or down, lets the field go (keyboard up, or already closed with back)
+        if (drag == null || drag.delta.dy.abs() < 6 || n.metrics.axis != Axis.vertical) return false;
+        if (DateTime.now().difference(_gainedAt) < const Duration(milliseconds: 700)) return false;
         final focus = FocusManager.instance.primaryFocus;
         final field = focus?.context;
         if (focus == null || field == null) return false;
@@ -93,7 +122,7 @@ class _KeyboardDismissOnScroll extends StatelessWidget {
         if (!inside) focus.unfocus();
         return false;
       },
-      child: child,
+      child: widget.child,
     );
   }
 }
