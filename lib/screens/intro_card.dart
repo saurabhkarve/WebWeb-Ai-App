@@ -116,15 +116,41 @@ class _IntroCardScreenState extends State<IntroCardScreen> {
         ),
       );
 
+  /// "Share as update": the gold pill with its words, small enough for the header
+  Widget _updatePill(VoidCallback? onTap) => Opacity(
+        opacity: onTap == null && !_busyUpdate ? .5 : 1,
+        child: Material(
+          color: Colors.transparent,
+          child: Ink(
+            height: 40,
+            decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20)),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  if (_busyUpdate) const Spinner(size: 16, color: kInk) else const WIcon(WI.updates, size: 18, color: kInk, strokeWidth: 1.9, still: true),
+                  const SizedBox(width: 6),
+                  Text(t('Share as update'), maxLines: 1, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: kInk, height: 1.1)),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final idle = !_busyUpdate && !_busyImage;
     // the two ways to share sit in the page's header, top right
     return SubPage(
-      title: t('30-second intro card'),
+      // the title shrinks a little rather than being cut when the labelled button takes room
+      titleWidget: Padding(padding: const EdgeInsets.only(right: 10), child: Align(alignment: Alignment.centerLeft, child: FittedBox(fit: BoxFit.scaleDown, child: Text(t('30-second intro card'), maxLines: 1, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700))))),
       actions: [
-        _round(p, wi: WI.updates, label: t('Share as update'), busy: _busyUpdate, gold: true, onTap: idle ? _shareUpdate : null),
+        // new to most members, so it says what it does
+        _updatePill(idle ? _shareUpdate : null),
         const SizedBox(width: 8),
         _round(p, wi: WI.share, label: t('Share image'), busy: _busyImage, gold: false, onTap: idle ? _shareImage : null),
       ],
