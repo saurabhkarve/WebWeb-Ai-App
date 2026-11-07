@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 
 
 import 'package:flutter/material.dart';
+import 'phonebook.dart' show PhonebookCache;
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
@@ -69,6 +70,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// the area whose map is open (a chip in the areas line)
   int? _areaOpen;
   String _catFilter = 'all';
+  /// "In your phone": this member is one of the contacts the last check matched on this phone
+  String? _phoneNote;
 
   Api get _api => context.read<AuthProvider>().api;
   bool get _own => widget.handle == null || widget.handle == context.read<AuthProvider>().profile?.handle;
@@ -84,6 +87,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final u = Profile.fromJson(await _api.get('/users/handle/$_handle') as Map);
       if (!mounted) return;
+      if (!_own) {
+        PhonebookCache.load().then((c) {
+          final inPhone = (c ?? const <Map>[]).any((m) => '${m['uid']}' == u.uid);
+          if (inPhone && mounted) setState(() => _phoneNote = t('In your phone'));
+        });
+      }
       setState(() {
         _u = u;
         _error = null;
@@ -508,6 +517,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTap: pl?.lat == null || pl?.lng == null ? null : () => showAreaViewer(ctx, lat: pl!.lat!, lng: pl.lng!, radiusM: 0, label: u.location),
             );
           }),
+        if (_phoneNote != null) tag(icon: WI.phone, text: _phoneNote!),
         if (u.category.isNotEmpty) tag(text: t(labelOf(kProfileCategories, u.category))),
         // a GSTIN is public record: tap to check it on the GST portal
         if ((gst ?? '').isNotEmpty)

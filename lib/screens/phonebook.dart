@@ -868,6 +868,8 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
       // the updates (people, leads, Today, new businesses) come first, above the search
       // (they stay when the box only has the cursor; they fold once something is typed)
       _fold(!_searching, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      // a little room between the header and the circles
+      const SizedBox(height: 10),
       Column(key: Tours.key('updates'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         // a small gold title with a fading rule, so the circles read as their own strip without a box
         // small screens go without the title
@@ -1690,7 +1692,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
   List<Widget> _resultsSection(Pal p, List<Map> matches, Map<String, String> saved, List<_Entry> mine) {
     final svc = _serviceItems(p, mine);
     // the contacts saved on this phone look the same as the rest, at the top of the one list
-    final own = [for (final e in mine.take(30)) _row(p, e)];
+    final own = [for (final e in mine.take(30)) _row(p, e, note: e.contact != null ? _phoneNote(e) : null)];
     if (_q.text.trim().length < 4) {
       if (own.isEmpty && svc.isEmpty) return const [];
       return [_label(p, t(own.isNotEmpty ? 'In your contacts' : 'Service contacts')), ...own, for (final s in _sorted(svc)) s.w];
@@ -1795,7 +1797,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
           0,
           (m['rating'] as num?)?.toDouble() ?? 0,
           (m['reviews'] as num?)?.toInt() ?? 0,
-          _row(p, _Entry(saved['${m['uid']}'] ?? _memberName(m), null, m), why: '${m['why'] ?? ''}'),
+          _row(p, _Entry(saved['${m['uid']}'] ?? _memberName(m), null, m), why: '${m['why'] ?? ''}', note: saved['${m['uid']}'] != null ? t('In your phone') : null),
         ),
     ];
     final mixed = <_Hit>[];
@@ -1806,7 +1808,23 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
     return [head, if (mixed.length >= 2) _sortBar(p), ...own, for (final h in _sorted(mixed, merged: true)) h.w];
   }
 
-  Widget _row(Pal p, _Entry e, {String? why}) {
+  /// For a contact saved on this phone, in the search results: "Shared by 2 users and you" when others share it too, else
+  /// "In your phone". [ids] on a service contact are the other sharers (never you), so they are who "users" counts.
+  String _phoneNote(_Entry e) {
+    String d10(String? x) => ContactSync.mobile10(x ?? '') ?? '';
+    final nums = {d10(e.phone), ...(e.contact?.phones ?? const <Phone>[]).map((ph) => d10(ph.number))}..remove('');
+    for (final c in [..._service, ..._keptSvc]) {
+      final mine = {d10('${c['phone']}'), ...((c['otherPhones'] as List?) ?? const []).map((x) => d10('$x'))};
+      if (mine.intersection(nums).isEmpty) continue;
+      final s = c['sharedBy'];
+      final n = s is Map ? ((s['ids'] as List?)?.length ?? 0) : 0;
+      if (n > 0) return n == 1 ? t('Shared by 1 user and you') : t('Shared by {n} users and you', {'n': n});
+      break;
+    }
+    return t('In your phone');
+  }
+
+  Widget _row(Pal p, _Entry e, {String? why, String? note}) {
     final m = e.member;
     final who = m == null ? '' : _memberName(m);
     final d = (m?['distanceM'] as num?)?.toDouble();
@@ -1848,6 +1866,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
                 if (reviews > 0) ...[const SizedBox(width: 6), Text('★ ${rating.toStringAsFixed(1)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.tagText))],
               ]),
               if (sub.isNotEmpty) Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+              if (note != null) Text(note, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.link, fontSize: 12, fontWeight: FontWeight.w600)),
               if (why != null && why.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
@@ -1888,7 +1907,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
         .toSet()
         .toList();
     if (!mounted) return;
-    await Navigator.push(context, WideRoute(builder: (_) => LocalContactScreen(name: e.name, org: e.org, photo: e.contact?.photo?.thumbnail, phones: phones, emails: emails, places: places)));
+    await Navigator.push(context, WideRoute(builder: (_) => LocalContactScreen(note: _phoneNote(e), name: e.name, org: e.org, photo: e.contact?.photo?.thumbnail, phones: phones, emails: emails, places: places)));
   }
 
   // ---------- asks ----------

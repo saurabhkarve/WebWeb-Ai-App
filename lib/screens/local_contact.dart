@@ -15,11 +15,13 @@ import 'profile.dart' show ProfileActionBtn;
 class LocalContactScreen extends StatelessWidget {
   final String name;
   final String org;
+  /// "In your phone", or "Shared by 2 users and you"
+  final String? note;
   final Uint8List? photo;
   final List<String> phones;
   final List<String> emails;
   final List<String> places;
-  const LocalContactScreen({super.key, required this.name, required this.org, required this.photo, required this.phones, required this.emails, required this.places});
+  const LocalContactScreen({super.key, this.note, required this.name, required this.org, required this.photo, required this.phones, required this.emails, required this.places});
 
   static void _open(String url) => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication).catchError((_) => false);
   static String _tel(String n) => 'tel:${n.replaceAll(RegExp(r'[^\d+]'), '')}';
@@ -49,7 +51,7 @@ class LocalContactScreen extends StatelessWidget {
         const SizedBox(height: 12),
         Text(name, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
         if (org.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 2), child: Text(org, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.muted))),
-        Padding(padding: const EdgeInsets.only(top: 4), child: Text(t('Saved on this phone'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.muted))),
+        Padding(padding: const EdgeInsets.only(top: 4), child: Text(note ?? t('Saved on this phone'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: note == null ? p.muted : p.link, fontWeight: note == null ? FontWeight.w400 : FontWeight.w600))),
         const SizedBox(height: 16),
         if (phones.isNotEmpty)
           Row(children: [
