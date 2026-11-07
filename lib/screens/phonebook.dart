@@ -825,6 +825,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
     final me = context.watch<AuthProvider>().profile;
     final all = _entries;
 
+    final small = MediaQuery.sizeOf(context).width < 640;
     final top = Column(key: _topKey, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       // the updates (people, leads, Today, new businesses) come first, above the search
       // (they stay when the box only has the cursor; they fold once something is typed)
@@ -886,12 +887,12 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _fold(!_searching && !_boxFold, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (me != null && me.name.trim().isNotEmpty)
-            Text('${t('Hi {name}', {'name': me.name.trim().split(' ').first})} 👋', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00))),
+            Text('${t('Hi {name}', {'name': me.name.trim().split(' ').first})} 👋', style: TextStyle(fontSize: small ? 13 : 14, fontWeight: FontWeight.w700, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00))),
           const SizedBox(height: 2),
-          Text(t('What are you looking for?'), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, height: 1.1)),
-          const SizedBox(height: 6),
-          Text(t('Search your phonebook, trusted service contacts and businesses near you.'), style: TextStyle(fontSize: 14, height: 1.35, color: p.text.withValues(alpha: .65))),
-          const SizedBox(height: 16),
+          Text(t('What are you looking for?'), style: TextStyle(fontSize: small ? 22 : 28, fontWeight: FontWeight.w800, height: 1.1)),
+          const SizedBox(height: 4),
+          Text(t('Search your phonebook, trusted service contacts and businesses near you.'), style: TextStyle(fontSize: small ? 12.5 : 14, height: 1.35, color: p.text.withValues(alpha: .65))),
+          SizedBox(height: small ? 12 : 16),
           ])),
           _searchField(),
           _fold(!_searching, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
