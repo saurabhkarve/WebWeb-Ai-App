@@ -557,11 +557,30 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
   /// member's say-so) look at once if they are on, or are offered once, here, instead of at the third open.
   Future<void> _serviceContacts() async => autoServiceContacts(context);
 
-  Future<void> _loadCats() async {
+  /// The category tiles: the copy kept from the last time at once (so they are there even offline or while the server is
+  /// busy), then the live list; a failed request is tried again a few times instead of leaving the section out.
+  Future<void> _loadCats([int attempt = 0]) async {
+    const key = 'pb_cats';
+    if (attempt == 0 && _cats.isEmpty) {
+      try {
+        final raw = (await SharedPreferences.getInstance()).getString(key);
+        if (raw != null && mounted && _cats.isEmpty) setState(() => _cats = (jsonDecode(raw) as List).cast<Map>());
+      } catch (_) {}
+    }
+    if (!mounted) return;
     try {
       final d = await context.read<AuthProvider>().api.get('/service-contacts/categories') as Map;
-      if (mounted) setState(() => _cats = (d['categories'] as List).cast<Map>());
-    } catch (_) {}
+      final list = (d['categories'] as List).cast<Map>();
+      if (list.isEmpty) return;
+      if (mounted) setState(() => _cats = list);
+      (await SharedPreferences.getInstance()).setString(key, jsonEncode(list));
+    } catch (e) {
+      if (attempt == 0) CrashReporter.report('Categories did not load: $e', null);
+      if (attempt < 4 && mounted) {
+        await Future<void>.delayed(Duration(seconds: 3 * (attempt + 1)));
+        if (mounted) _loadCats(attempt + 1);
+      }
+    }
   }
 
   Future<void> _loadAsks() async {
@@ -575,7 +594,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
     }
   }
 
-  Future<void> _refresh() => Future.wait([_loadMatches(), _readPhoneBook(ask: false), _loadAsks()]);
+  Future<void> _refresh() => Future.wait([_loadMatches(), _readPhoneBook(ask: false), _loadAsks(), if (_cats.isEmpty) _loadCats(1)]);
 
   void _search(String v) {
     // the directory turns into the search page when the typing starts (not when the box is only tapped), and back when
