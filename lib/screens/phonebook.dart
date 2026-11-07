@@ -450,10 +450,6 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
     directorySpeak.addListener(_onSpeak);
     _qFocus.addListener(_onSearchFocus);
     _loadKept();
-    // the Find page opens with the cursor in the search
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && widget.active) _qFocus.requestFocus();
-    });
     _typeTimer = Timer(const Duration(milliseconds: 800), _typeStep);
     ApproxDistance.init().then((_) => mounted ? setState(() {}) : null);
     _loadMatches();
@@ -1077,7 +1073,6 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
     _q.text = word;
     _q.selection = TextSelection.collapsed(offset: _q.text.length);
     _search(word);
-    _qFocus.requestFocus();
   }
 
   static const _tradeEmoji = {'Plumber': '🔧', 'Electrician': '⚡', 'Printer': '🖨️', 'Carpenter': '🪚', 'Tutor': '📚', 'Caterer': '🍽️', 'Transport': '🚚', 'Chartered accountant': '🧾', 'Mobile repair': '📱', 'Tailor': '🧵'};

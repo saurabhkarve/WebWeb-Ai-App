@@ -100,6 +100,12 @@ ThemeData buildTheme(Brightness b) {
     canvasColor: p.card,
     textTheme: text,
     primaryTextTheme: text,
+    // no grey press, hover or focus overlay on anything: taps show no splash and no tint
+    splashFactory: NoSplash.splashFactory,
+    splashColor: Colors.transparent,
+    highlightColor: Colors.transparent,
+    hoverColor: Colors.transparent,
+    focusColor: Colors.transparent,
     iconTheme: IconThemeData(color: p.text),
     colorScheme: ColorScheme.fromSeed(seedColor: kGold, brightness: b, primary: kGold, onPrimary: kInk, surface: p.canvas, onSurface: p.text, error: p.danger),
     dividerColor: p.border,
