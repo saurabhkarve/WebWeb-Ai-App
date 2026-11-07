@@ -478,8 +478,10 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
           _go(_ask);
         }
       ),
-      // leads and today in your area: one page
-      ('For your business', () => sub('For your business', const _BusinessHub())),
+      if (me != null && me.isEntrepreneur) ...[
+        ('Leads for you', () => sub('Leads for you', const LeadsScreen())),
+        ('Today in your area', () => sub('Today in your area', const TodayScreen())),
+      ],
       if (me != null)
         (
           'Edit profile',
@@ -1339,13 +1341,13 @@ class _AccountMenu extends StatelessWidget {
             child: ListView(padding: const EdgeInsets.all(6), children: [
               item(WI.edit, 'Edit profile',
                   () => push(EditProfileScreen(profile: me))),
-              // leads, today, alerts and the week: one page of their own
-              item(
-                  WI.sparkle,
-                  'For your business',
-                  () => push(SubPage(
-                      title: t('For your business'),
-                      body: const _BusinessHub()))),
+              // for businesses only: a consumer is not shown them
+              if (me.isEntrepreneur) ...[
+                item(WI.sparkle, 'Leads for you',
+                    () => push(SubPage(title: t('Leads for you'), body: const LeadsScreen()))),
+                item(WI.sun, 'Today in your area',
+                    () => push(SubPage(title: t('Today in your area'), body: const TodayScreen()))),
+              ],
               // help articles, writing to us, the assistant and the tour: one sheet
               item(WI.help, 'Help & Support', () {
                 Navigator.of(context).pop();
@@ -1504,37 +1506,6 @@ class _AccountMenu extends StatelessWidget {
         ]),
       ),
     );
-  }
-}
-
-/// The account menu's "For your business": leads, today in your area, alerts and your week, one tap each.
-class _BusinessHub extends StatelessWidget {
-  const _BusinessHub();
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Pal.of(context);
-    Widget tile(WI icon, String title, Widget body) => ListTile(
-          leading: Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                  color: p.chip, borderRadius: BorderRadius.circular(10)),
-              child: WIcon(icon, size: 19, color: p.muted, strokeWidth: 1.8)),
-          title: Text(t(title),
-              style:
-                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          trailing: WIcon(WI.chevronRight, size: 18, color: p.muted),
-          onTap: () => Navigator.push(context,
-              WideRoute(builder: (_) => SubPage(title: t(title), body: body))),
-        );
-    return ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        children: [
-          tile(WI.sparkle, 'Leads for you', const LeadsScreen()),
-          tile(WI.sun, 'Today in your area', const TodayScreen()),
-        ]);
   }
 }
 
