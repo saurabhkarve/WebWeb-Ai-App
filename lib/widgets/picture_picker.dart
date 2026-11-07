@@ -171,7 +171,8 @@ class _PicturePickerState extends State<_PicturePicker> {
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .85),
       child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).padding.bottom),
+        // room under the last button, so it can be scrolled clear of the bottom bar and the phone's gesture area
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 96 + MediaQuery.of(context).padding.bottom),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
             Expanded(child: Text(t(_cover ? 'Cover' : 'Profile photo'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
