@@ -1231,6 +1231,18 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
     ]);
   }
 
+  /// the keyboard's search key: searches now, or puts the cursor in the box when it is empty
+  void _findNow() {
+    final q = _q.text.trim();
+    if (q.isEmpty) {
+      _qFocus.requestFocus();
+    } else {
+      _qFocus.unfocus();
+      _search(q);
+      if (q.length >= 4) _askAi(q);
+    }
+  }
+
   /// The search with where to look inside the box, under the text: the current location unless another town is picked
   /// (every city of India, or any town typed).
   Widget _searchBox() {
@@ -1272,11 +1284,12 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
                         _q.clear();
                         _search('');
                       })
-                  : MicButton(island: true, onWords: (words, _) {
-                      _q.text = words;
-                      _q.selection = TextSelection.collapsed(offset: _q.text.length);
-                      _search(words);
-                    }),
+                  // empty: Find as an icon (the same as the keyboard's search key); Speak sits under the box
+                  : IconButton(
+                      tooltip: t('Find'),
+                      icon: Icon(Icons.search, size: 24, color: p.muted),
+                      onPressed: _findNow,
+                    ),
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
@@ -1284,7 +1297,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
           ),
           Divider(height: 1, thickness: 1, color: p.border.withValues(alpha: .6)),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 3, 12, 3),
+            padding: const EdgeInsets.fromLTRB(12, 4, 8, 4),
             child: Row(children: [
               Expanded(
                 child: Align(
@@ -1308,32 +1321,16 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
               ),
             ),
               ),
-              // the same as the keyboard's search key: searches now, or puts the cursor in the box when it is empty
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(30),
-                  onTap: () {
-                    final q = _q.text.trim();
-                    if (q.isEmpty) {
-                      _qFocus.requestFocus();
-                    } else {
-                      _qFocus.unfocus();
-                      _search(q);
-                      if (q.length >= 4) _askAi(q);
-                    }
-                  },
-                  child: Ink(
-                    height: 38,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(30), gradient: kGoldGradient),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.search, size: 18, color: Color(0xFF1E1E1E)),
-                      const SizedBox(width: 6),
-                      Text(t('Find'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF1E1E1E))),
-                    ]),
-                  ),
-                ),
+              // Speak: listens, then searches what was said (the island's Speak starts this one)
+              MicButton(
+                pill: true,
+                island: true,
+                onWords: (words, done) {
+                  _q.text = words;
+                  _q.selection = TextSelection.collapsed(offset: _q.text.length);
+                  _search(words);
+                  if (done && words.trim().length >= 4) _askAi(words.trim());
+                },
               ),
             ]),
           ),
@@ -2113,7 +2110,9 @@ class MicButton extends StatefulWidget {
   final void Function(String words, bool done) onWords;
   /// the island's Speak button starts this one (the box of the Find page)
   final bool island;
-  const MicButton({super.key, required this.onWords, this.island = false});
+  /// the blue "Speak" button under the box (icon and word), as on the web
+  final bool pill;
+  const MicButton({super.key, required this.onWords, this.island = false, this.pill = false});
   @override
   State<MicButton> createState() => _MicButtonState();
 }
@@ -2182,11 +2181,47 @@ class _MicButtonState extends State<MicButton> {
   }
 
   @override
-  Widget build(BuildContext context) => IconButton(
+  Widget build(BuildContext context) {
+    if (widget.pill) {
+      return Semantics(
+        button: true,
+        label: t('Speak your search'),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(30),
+            gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF4A63E7), Color(0xFF2B3A9E)]),
+            boxShadow: [
+              BoxShadow(color: const Color(0xFF2B3A9E).withValues(alpha: .45), blurRadius: 14, offset: const Offset(0, 6), spreadRadius: -6),
+              if (_listening) BoxShadow(color: const Color(0xFF4A63E7).withValues(alpha: .35), blurRadius: 0, spreadRadius: 4),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(30),
+              onTap: _toggle,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  height: 36,
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const WIcon(WI.mic, size: 16, color: Colors.white),
+                    const SizedBox(width: 6),
+                    Text(t(_listening ? 'Listening…' : 'Speak'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return IconButton(
         tooltip: t(_listening ? 'Listening… tap to stop' : 'Speak your ask'),
         icon: WIcon(WI.mic, size: 22, color: _listening ? kGold : Pal.of(context).muted),
         onPressed: _toggle,
       );
+  }
 }
 
 /// The Directory's search in the right column of wide screens (web right-rail.tsx): the AI badge, the four SkyQ colours
