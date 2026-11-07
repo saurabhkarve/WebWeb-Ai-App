@@ -249,7 +249,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                   top: 0,
                   left: 0,
                   right: 0,
-                  child: _AppHeader(onHome: () => _go(_dir), compact: _barHidden),
+                  child: _AppHeader(onHome: () => _go(_dir), compact: false),
                 ),
               // "Waiting for network…" / "Connecting…" under the header, WhatsApp-style
               Positioned(
@@ -542,7 +542,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       });
 
   /// The island: a floating dock of three places. The open place is a gold pill with its icon and name; the others are
-  /// icons. Its size never changes with scrolling. On Find the pill is Speak (the voice search).
+  /// icons. Its size never changes with scrolling.
   Widget _bar(Pal p, double bottom) {
     final bb = bottom > 8 ? bottom - 4 : 8.0;
     return Positioned.fill(
@@ -578,20 +578,18 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   Widget _dockItem(Pal p, int k, {int badge = 0}) {
     final active = _i == k;
     final dir = k == _dir;
-    final label = t(active && dir ? 'Speak' : _items[k].$2);
+    final label = t(_items[k].$2);
     final ink = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF3D3500);
     final iconColor = active ? ink : p.muted;
-    final icon = active && dir
-        ? _FindRing(key: const ValueKey('speak'), size: 30, icon: WIcon(WI.mic, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF8A6500), size: 18, strokeWidth: 2.3))
-        : WIcon(_items[k].$1, size: 24, color: iconColor, strokeWidth: active ? 2.2 : 1.8);
+    final icon = WIcon(_items[k].$1, size: 24, color: iconColor, strokeWidth: active ? 2.2 : 1.8);
     return Semantics(
       button: true,
       selected: active,
       label: label,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        // on the Find page the pill is Speak: it starts the voice search
-        onTap: () => active && dir ? directorySpeak.value++ : _go(k),
+        // on the Find page a tap puts the cursor back in the search
+        onTap: () => active && dir ? directoryFocus.value++ : _go(k),
         child: ExcludeSemantics(
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 260),
@@ -930,16 +928,16 @@ class _AppHeader extends StatelessWidget {
         color: p.canvas,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: p.dark ? .35 : .07),
-            offset: const Offset(0, 4),
-            blurRadius: 14,
+            color: Colors.black.withValues(alpha: p.dark ? .25 : .05),
+            offset: const Offset(0, 3),
+            blurRadius: 10,
             spreadRadius: -6,
           ),
         ],
       ),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
       SizedBox(
-        height: 63 - 17 * c,
+        height: 51,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(children: [
@@ -952,7 +950,7 @@ class _AppHeader extends StatelessWidget {
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
                     child: LogoInline(
-                        size: 34 - 4 * c, markSize: 44 - 8 * c, tagline: true, fold: c, onTap: onHome)),
+                        size: 30, markSize: 40, tagline: true, onTap: onHome)),
               ),
             ),
             Builder(
@@ -965,7 +963,7 @@ class _AppHeader extends StatelessWidget {
                       key: Tours.key('account'),
                       name: me?.name ?? 'Me',
                       photoUrl: me?.photoUrl,
-                      size: 32 - 4 * c,
+                      size: 32,
                       ring: me?.hasUpdate ?? false,
                       framed: true,
                       progress: context.watch<AuthProvider>().completion?.percent,
