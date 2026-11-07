@@ -32,7 +32,6 @@ import 'house_text_card.dart';
 import 'reply_thread.dart';
 import 'p1.dart';
 import 'refer_sheet.dart';
-import 'response_sheet.dart';
 import 'tour.dart';
 import '../share_log.dart';
 import '../views.dart';
@@ -111,7 +110,7 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     if (post.myReaction == null) _actionsKey.currentState?.react('thumbs');
   }
 
-  /// "Know someone who can help?" in the reply sheet: the Refer sheet, as from the Refer button below the card.
+  /// The Refer drawer, as from the Refer button below the card; "I can help" on an ask opens it too.
   Future<void> _referFromReply() async {
     final r = await showReferSheet(context, post);
     if (r == null || !mounted) return;
@@ -127,13 +126,8 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
     if (_isOwner) return post.isRequirement ? toast(context, t('Responses to your ask are on its page')) : _openDetail();
     // the owner found someone (or no longer needs it): no new replies
     if (post.isRequirement && post.closed) return toast(context, t('This ask is closed'));
-    if (post.isRequirement) {
-      if (await showResponseSheet(context, post.id, onRefer: _referFromReply) && mounted) {
-        setState(() => post = _withShares(post, post.sharesCount + 1));
-        toast(context, t('Response sent'));
-      }
-      return;
-    }
+    // "I can help" on an ask opens the Refer drawer (the note box with Attach a contact): the old response window is gone
+    if (post.isRequirement) return _referFromReply();
     await openChat(
       context,
       Peer(uid: post.authorUid, name: post.authorName, company: post.authorCompany, handle: post.authorHandle, userType: post.authorType, photoUrl: post.authorPhotoUrl),
@@ -148,56 +142,6 @@ class _PostCardState extends State<PostCard> with SingleTickerProviderStateMixin
       },
     );
   }
-
-  static Post _withShares(Post p, int n) => Post(
-        id: p.id,
-        kind: p.kind,
-        authorUid: p.authorUid,
-        authorName: p.authorName,
-        authorCompany: p.authorCompany,
-        authorHandle: p.authorHandle,
-        authorPhotoUrl: p.authorPhotoUrl,
-        title: p.title,
-        description: p.description,
-        category: p.category,
-        locationPref: p.locationPref,
-        budget: p.budget,
-        urgency: p.urgency,
-        matchReason: p.matchReason,
-        slug: p.slug,
-        categoryLabel: p.categoryLabel,
-        authorType: p.authorType,
-        authorVerification: p.authorVerification,
-        distanceM: p.distanceM,
-        radiusM: p.radiusM,
-        lat: p.lat,
-        lng: p.lng,
-        editedAt: p.editedAt,
-        repostedByName: p.repostedByName,
-        repostedByHandle: p.repostedByHandle,
-        repostedBy: p.repostedBy,
-        repostedAt: p.repostedAt,
-        images: p.images,
-        sharesCount: n,
-        authorHasUpdate: p.authorHasUpdate,
-        createdAt: p.createdAt,
-        recentResponses: p.recentResponses,
-        latestReplies: p.latestReplies,
-        referrers: p.referrers,
-        reactionsCount: p.reactionsCount,
-        repostsCount: p.repostsCount,
-        referralsCount: p.referralsCount,
-        reacted: p.reacted,
-        reposted: p.reposted,
-        bookmarked: p.bookmarked,
-        myReaction: p.myReaction,
-        outcome: p.outcome,
-        wonBy: p.wonBy,
-        leadReason: p.leadReason,
-        leadNew: p.leadNew,
-        fact: p.fact,
-        houseCard: p.houseCard,
-      );
 
   /// "Alert me for similar asks": the alert sheet, with this ask's category and place.
   Future<void> _alertSimilar() async {
