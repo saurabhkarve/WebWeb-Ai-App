@@ -1143,7 +1143,7 @@ class _AskComposerState extends State<_AskComposer> {
               padding: EdgeInsets.fromLTRB(0, 0, _open ? 0 : 4, 0),
               decoration: BoxDecoration(
                 color: p.card,
-                borderRadius: BorderRadius.circular(_open ? 18 : 24),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: _focus.hasFocus ? kGold : p.text.withValues(alpha: .22), width: _focus.hasFocus ? 1.6 : 1),
               ),
               child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
@@ -1189,7 +1189,7 @@ class _AskComposerState extends State<_AskComposer> {
               height: 36,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               alignment: Alignment.center,
-              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(18)),
+              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(12)),
               child: Text(t('Post ask'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
             ),
           )],
@@ -1297,7 +1297,7 @@ class _AskComposerState extends State<_AskComposer> {
                 child: Container(
                   height: 44,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(22)),
+                  decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(16)),
                   child: Text(t(_busy ? 'Posting...' : 'Post ask'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
                 ),
               ),
