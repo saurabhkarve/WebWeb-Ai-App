@@ -119,45 +119,54 @@ class _IntroCardScreenState extends State<IntroCardScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        Text(t('Style'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
-        const SizedBox(height: 6),
-        // a swatch each, the chosen one ringed
-        SizedBox(
-          height: 56,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: kIntroCardTemplates.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (_, k) {
-              final tp = kIntroCardTemplates[k];
-              final on = tp.$1 == _tpl;
-              return Semantics(
-                button: true,
-                selected: on,
-                label: '${t('Template')}: ${tp.$2}',
-                child: GestureDetector(
-                  onTap: () => setState(() => _tpl = tp.$1),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    width: 50,
-                    height: 50,
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: on ? kGold : Colors.transparent, width: 2.5)),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: p.border),
-                        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(tp.$3), Color(tp.$3), Color(tp.$4), Color(tp.$4)], stops: const [0, .5, .5, 1]),
+        Text('${t('Style')} · ${kIntroCardTemplates.length}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.muted)),
+        const SizedBox(height: 8),
+        // every template, drawn with your own details: tap one to choose it
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: kIntroCardTemplates.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 3 / 4.6),
+          itemBuilder: (_, k) {
+            final tp = kIntroCardTemplates[k];
+            final on = tp.$1 == _tpl;
+            return Semantics(
+              button: true,
+              selected: on,
+              label: '${t('Template')}: ${tp.$2}',
+              child: GestureDetector(
+                onTap: () => setState(() => _tpl = tp.$1),
+                child: Column(children: [
+                  Expanded(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.all(2.5),
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: on ? kGold : p.border, width: on ? 2.5 : 1)),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: SizedBox.expand(
+                          child: Image.network(
+                            '$siteUrl/intro-card/$_handle?t=${tp.$1}',
+                            fit: BoxFit.cover,
+                            cacheWidth: 300,
+                            loadingBuilder: (_, child, prog) => prog == null
+                                ? child
+                                : DecoratedBox(
+                                    decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(tp.$3), Color(tp.$3), Color(tp.$4), Color(tp.$4)], stops: const [0, .5, .5, 1]))),
+                            errorBuilder: (_, __, ___) => DecoratedBox(
+                                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(tp.$3), Color(tp.$3), Color(tp.$4), Color(tp.$4)], stops: const [0, .5, .5, 1]))),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-            },
-          ),
+                  const SizedBox(height: 4),
+                  Text(tp.$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: on ? FontWeight.w800 : FontWeight.w600)),
+                ]),
+              ),
+            );
+          },
         ),
-        const SizedBox(height: 4),
-        Text(kIntroCardTemplates.firstWhere((e) => e.$1 == _tpl).$2, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
         const SizedBox(height: 16),
         GoldButton(label: t('Share as update'), wi: WI.updates, height: 48, loading: _busyUpdate, onPressed: _busyUpdate || _busyImage ? null : _shareUpdate),
         const SizedBox(height: 8),
