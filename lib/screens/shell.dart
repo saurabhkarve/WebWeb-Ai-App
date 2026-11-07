@@ -628,9 +628,11 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
   Widget _dockItem(Pal p, int k, {int badge = 0}) {
     final active = _i == k;
     final dir = k == _dir;
+    // none of the three places is open (a post, a profile, Notifications...): Find glows softly, as the way back
+    final soft = dir && !active && ![_feed, _dir, _talk].contains(_i);
     final label = t(_items[k].$2);
     final ink = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF3D3500);
-    final iconColor = active ? ink : p.muted;
+    final iconColor = active ? ink : (soft ? (p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00)) : p.muted);
     final icon = WIcon(_items[k].$1, size: 24, color: iconColor, strokeWidth: active ? 2.2 : 1.8);
     return Semantics(
       button: true,
@@ -646,10 +648,13 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
             curve: Curves.easeOutCubic,
             margin: const EdgeInsets.symmetric(horizontal: 2),
             decoration: BoxDecoration(
+              color: soft ? const Color(0xFFFFC700).withValues(alpha: p.dark ? .1 : .15) : null,
               gradient: active ? (p.dark ? const LinearGradient(colors: [Color(0xFF34322B), Color(0xFF1E1E1E)], begin: Alignment.topCenter, end: Alignment.bottomCenter) : _logoGradient) : null,
               borderRadius: BorderRadius.circular(26),
-              border: active && p.dark ? Border.all(color: const Color(0xFFFFC700).withValues(alpha: .6)) : null,
-              boxShadow: active && !p.dark ? [BoxShadow(color: const Color(0xFFE0A800).withValues(alpha: .35), blurRadius: 12, spreadRadius: -3, offset: const Offset(0, 4))] : null,
+              border: active && p.dark ? Border.all(color: const Color(0xFFFFC700).withValues(alpha: .6)) : (soft ? Border.all(color: const Color(0xFFFFC700).withValues(alpha: .35)) : null),
+              boxShadow: active && !p.dark
+                  ? [BoxShadow(color: const Color(0xFFE0A800).withValues(alpha: .35), blurRadius: 12, spreadRadius: -3, offset: const Offset(0, 4))]
+                  : (soft ? [BoxShadow(color: const Color(0xFFFFC700).withValues(alpha: .3), blurRadius: 16, spreadRadius: -2)] : null),
             ),
             child: Center(
               child: Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
