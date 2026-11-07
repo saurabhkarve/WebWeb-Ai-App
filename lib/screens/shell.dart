@@ -988,10 +988,11 @@ class _AppHeader extends StatelessWidget {
         color: p.canvas,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: (p.dark ? .5 : .14) * c),
-            offset: Offset(0, 3 + 4 * c),
-            blurRadius: 10 + 4 * c,
-            spreadRadius: -6,
+            // the same shadow as the web header once the page is scrolled (none at the top), fading in and out
+            color: const Color(0xFF1E1E1E).withValues(alpha: (p.dark ? .85 : .2) * c),
+            offset: Offset(0, p.dark ? 12 : 10),
+            blurRadius: p.dark ? 24 : 22,
+            spreadRadius: p.dark ? -6 : -8,
           ),
         ],
       ),
