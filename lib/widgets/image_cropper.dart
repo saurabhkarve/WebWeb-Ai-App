@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -33,12 +34,32 @@ Future<Uint8List?> pickAndCrop(BuildContext context, CropSpec spec) async {
   final f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 2400, maxHeight: 2400, imageQuality: 92);
   if (f == null) return null;
   final ui.Image image;
-  try {
-    final codec = await ui.instantiateImageCodec(await f.readAsBytes());
-    image = (await codec.getNextFrame()).image;
-  } catch (_) {
+  Object? why;
+  ui.Image? decoded;
+  // the picked file's bytes, then the same file read as a stream, then the simpler decoder: any one that works is enough
+  for (final read in <Future<Uint8List> Function()>[f.readAsBytes, () async => Uint8List.fromList([for (final c in await f.openRead().toList()) ...c])]) {
+    if (decoded != null) break;
+    try {
+      final bytes = await read();
+      if (bytes.isEmpty) continue;
+      try {
+        final codec = await ui.instantiateImageCodec(bytes);
+        decoded = (await codec.getNextFrame()).image;
+      } catch (e) {
+        why = e;
+        final c = Completer<ui.Image>();
+        ui.decodeImageFromList(bytes, (im) => c.complete(im));
+        decoded = await c.future.timeout(const Duration(seconds: 10));
+      }
+    } catch (e) {
+      why = e;
+    }
+  }
+  if (decoded == null) {
+    debugPrint('crop: could not read ${f.path} (${f.mimeType}): $why');
     throw ApiException(t('This photo format is not supported. Please choose a JPG, PNG or WebP picture.'));
   }
+  image = decoded;
   try {
     return await nav.push<Uint8List>(MaterialPageRoute(fullscreenDialog: true, builder: (_) => _CropScreen(image: image, spec: spec)));
   } finally {
