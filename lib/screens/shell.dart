@@ -78,7 +78,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   ];
 
   /// how far the Contacts button rises above the bar
-  static const _rise = 32.0;
+  static const _rise = 0.0;
   static const _feed = 0, _dir = 2, _talk = 3, _notesTab = 4, _ask = 5;
   static const _barH = 64.0;
   int _beforeAsk = _feed;
@@ -266,12 +266,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                     right: 0,
                     bottom: 0,
                     height: _barH + bottom + _rise,
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(end: _barHidden ? 1.0 : 0.0),
-                      duration: const Duration(milliseconds: 280),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, c, _) => _bar(p, bottom, c),
-                    )),
+                    child: Stack(children: [_bar(p, bottom)])),
               // tablets and desktop: the rail down the left, under the header
               if (rail)
                 Positioned(
@@ -546,216 +541,85 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         );
       });
 
-  Widget _bar(Pal p, double bottom, double c) {
-    // c: 0 = the full island, 1 = the short one (smaller, labels gone)
-    final h = _barH + (48 - _barH) * c;
+  /// The island: a floating dock of three places. The open place is a gold pill with its icon and name; the others are
+  /// icons. Its size never changes with scrolling. On Find the pill is Speak (the voice search).
+  Widget _bar(Pal p, double bottom) {
     final bb = bottom > 8 ? bottom - 4 : 8.0;
-    final btn = 64 + (48 - 64) * c;
-    final btnTop = (_barH + bottom + _rise) - bb - h + 8 - btn / 2;
-    return Stack(clipBehavior: Clip.none, children: [
-        // the empty strip above the bar lets taps through to the page; only the raised button sits in it
-        Positioned(
-          left: 14,
-          right: 14,
-          bottom: bottom > 8 ? bottom - 4 : 8,
-          height: h,
-          child: Center(
-            // compact: 272 px at most, so the three places sit close together
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 272 - 48 * c),
-              child: SizedBox(
-                height: h,
-                child: Container(
-                  // the floating island, as on the website: a rounded pill with a soft shadow, the page showing round it
-                  decoration: BoxDecoration(
-                    // nearly solid, so text scrolling behind it never fights the labels
-                    color: p.canvas.withValues(alpha: p.dark ? .94 : .95),
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                        color: p.dark
-                            ? Colors.white.withValues(alpha: .1)
-                            : Colors.white.withValues(alpha: .85),
-                        width: 1.2),
-                    boxShadow: [
-                      BoxShadow(
-                          color:
-                              Colors.black.withValues(alpha: p.dark ? .5 : .16),
-                          blurRadius: 26,
-                          spreadRadius: -6,
-                          offset: const Offset(0, 10))
-                    ],
-                  ),
-                  // no BackdropFilter: on some iPhones (an iPhone 8 in TestFlight) the blurred backdrop was drawn over the whole
-                  // page as a grey wash, on opening the app and on coming back from a search. A plain fill cannot do that.
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(30),
-                    child: Row(children: [
-                      for (final k in const [_feed, _dir, _talk])
-                        Expanded(
-                          child: KeyedSubtree(
-                            key: k == _dir ? null : Tours.key(_tourKeys[k]),
-                            child: k == _dir
-                                ? _dirLabel(p, c)
-                                : _barItem(p, k, c, badge: _badgeOf(k)),
-                          ),
-                        ),
-                    ]),
-                  ),
-                ),
+    return Positioned.fill(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, bb),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 340),
+            child: Container(
+              height: _barH,
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: p.canvas.withValues(alpha: p.dark ? .96 : .97),
+                borderRadius: BorderRadius.circular(32),
+                border: Border.all(color: p.dark ? Colors.white.withValues(alpha: .1) : Colors.black.withValues(alpha: .06)),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: p.dark ? .5 : .16), blurRadius: 26, spreadRadius: -6, offset: const Offset(0, 10))],
               ),
+              child: Row(children: [
+                for (final k in const [_feed, _dir, _talk])
+                  Expanded(
+                    flex: _i == k ? 5 : 3,
+                    child: KeyedSubtree(key: Tours.key(_tourKeys[k]), child: _dockItem(p, k, badge: _badgeOf(k))),
+                  ),
+              ]),
             ),
           ),
         ),
-        // the bar floats higher on phones with a home indicator (iPhone 15...): the button comes down with it, so its gap to the label stays small
-        Positioned(
-            top: btnTop,
-            left: 0,
-            right: 0,
-            child: Center(
-                child: KeyedSubtree(
-                    key: Tours.key(_tourKeys[_dir]),
-                    child: _dirButton(p, btn)))),
-    ]);
-  }
-
-  /// Directory, the heart of the app: always the gold round button, raised in the middle of the bar.
-  Widget _dirButton(Pal p, double size) {
-    final active = _i == _dir;
-    return Semantics(
-      button: true,
-      selected: active,
-      label: t(active ? 'Speak' : _items[_dir].$2),
-      child: GestureDetector(
-        // on the Find page the button is Speak: it starts the voice search
-        onTap: () => active ? directorySpeak.value++ : _go(_dir),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            // the logo's own disc gradient, ring of the page colour round it
-            gradient: _logoGradient,
-            shape: BoxShape.circle,
-            border: Border.all(color: p.canvas, width: 4),
-            boxShadow: [
-              BoxShadow(
-                  color: const Color(0xFFE0A800)
-                      .withValues(alpha: active ? .6 : .4),
-                  blurRadius: active ? 20 : 14,
-                  spreadRadius: -3,
-                  offset: const Offset(0, 7)),
-              // a soft halo round the raised button while Find is open
-              if (active)
-                BoxShadow(
-                    color: kGold.withValues(alpha: .4),
-                    blurRadius: 24,
-                    spreadRadius: 4),
-            ],
-          ),
-          // Find and Speak change into each other: the ring grows in round the gold and the icon turns into the microphone
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 420),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeIn,
-            transitionBuilder: (w, a) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: .6, end: 1.0).animate(a), child: RotationTransition(turns: Tween(begin: -.08, end: 0.0).animate(a), child: w))),
-            child: active
-                ? _FindRing(key: const ValueKey('speak'), size: size - 8, icon: WIcon(WI.mic, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF8A6500), size: size * .5, strokeWidth: 2.3))
-                : Center(key: const ValueKey('find'), child: WIcon(_items[_dir].$1, color: const Color(0xFF3D3500), size: size * .5, strokeWidth: 2.2)),
-          ),
-        ),
       ),
     );
   }
 
-  /// the label under the raised button, in the bar
-  Widget _dirLabel(Pal p, double c) {
-    final active = _i == _dir;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => active ? directorySpeak.value++ : _go(_dir),
-      child: ExcludeSemantics(
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: Opacity(
-            opacity: 1 - c,
-            child: Padding(
-            padding: const EdgeInsets.only(bottom: 9),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
-              transitionBuilder: (w, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, .4), end: Offset.zero).animate(a), child: w)),
-              child: FittedBox(
-                key: ValueKey(active),
-                fit: BoxFit.scaleDown,
-                child: Text(t(active ? 'Speak' : _items[_dir].$2),
-                    maxLines: 1,
-                    style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: active ? p.text : p.muted))),
-          ))),
-        ),
-      ),
-    );
-  }
-
-  Widget _barItem(Pal p, int k, double c, {int badge = 0}) {
+  Widget _dockItem(Pal p, int k, {int badge = 0}) {
     final active = _i == k;
-    final tone = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00);
-    final fg = active ? tone : p.muted;
+    final dir = k == _dir;
+    final label = t(active && dir ? 'Speak' : _items[k].$2);
+    final ink = p.dark ? const Color(0xFFFFD84A) : const Color(0xFF3D3500);
+    final iconColor = active ? ink : p.muted;
+    final icon = active && dir
+        ? _FindRing(key: const ValueKey('speak'), size: 30, icon: WIcon(WI.mic, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF8A6500), size: 18, strokeWidth: 2.3))
+        : WIcon(_items[k].$1, size: 24, color: iconColor, strokeWidth: active ? 2.2 : 1.8);
     return Semantics(
       button: true,
       selected: active,
-      label: t(_items[k].$2),
+      label: label,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => _go(k),
+        // on the Find page the pill is Speak: it starts the voice search
+        onTap: () => active && dir ? directorySpeak.value++ : _go(k),
         child: ExcludeSemantics(
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            // a short gold bar on the island's top edge marks the open tab
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutBack,
-              width: active ? 26 : 0,
-              height: 3,
-              margin: EdgeInsets.only(bottom: 6 - 2 * c),
-              decoration: BoxDecoration(
-                  gradient: kGoldGradient,
-                  borderRadius: BorderRadius.circular(3)),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            decoration: BoxDecoration(
+              gradient: active ? (p.dark ? const LinearGradient(colors: [Color(0xFF34322B), Color(0xFF1E1E1E)], begin: Alignment.topCenter, end: Alignment.bottomCenter) : _logoGradient) : null,
+              borderRadius: BorderRadius.circular(26),
+              border: active && p.dark ? Border.all(color: const Color(0xFFFFC700).withValues(alpha: .6)) : null,
+              boxShadow: active && !p.dark ? [BoxShadow(color: const Color(0xFFE0A800).withValues(alpha: .35), blurRadius: 12, spreadRadius: -3, offset: const Offset(0, 4))] : null,
             ),
-            Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  AnimatedScale(
-                    scale: active ? 1.12 : 1,
-                    duration: const Duration(milliseconds: 220),
-                    child: WIcon(_items[k].$1,
-                        size: 24, color: fg, strokeWidth: active ? 2.2 : 1.8),
-                  ),
-                  if (badge > 0)
-                    Positioned(right: -14, top: -8, child: _badge(badge)),
-                ]),
-            ClipRect(
-              child: Align(
-                heightFactor: 1 - c,
-                child: Opacity(
-                  opacity: 1 - c,
-                  child: Column(children: [
-                    const SizedBox(height: 4),
-                    FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(t(_items[k].$2),
-                            maxLines: 1,
-                            style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight:
-                                    active ? FontWeight.w800 : FontWeight.w500,
-                                color: active ? p.text : p.muted))),
+            child: Center(
+              child: Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    icon,
+                    if (active) ...[
+                      const SizedBox(width: 7),
+                      Text(label, maxLines: 1, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: ink)),
+                      const SizedBox(width: 4),
+                    ],
                   ]),
                 ),
-              ),
+                if (badge > 0 && !active) Positioned(right: -12, top: -10, child: _badge(badge)),
+              ]),
             ),
-          ]),
+          ),
         ),
       ),
     );
