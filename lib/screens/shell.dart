@@ -480,11 +480,6 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
       ),
       // leads, today, alerts and your week: one page
       ('For your business', () => sub('For your business', const _BusinessHub())),
-      (
-        'Saved asks',
-        () => Navigator.push(
-            context, WideRoute(builder: (_) => const SavedPostsScreen()))
-      ),
       if (me != null)
         (
           'Edit profile',
@@ -1351,8 +1346,6 @@ class _AccountMenu extends StatelessWidget {
                   () => push(SubPage(
                       title: t('For your business'),
                       body: const _BusinessHub()))),
-              item(WI.bookmark, 'Saved asks',
-                  () => push(const SavedPostsScreen())),
               // help articles, writing to us, the assistant and the tour: one sheet
               item(WI.help, 'Help & Support', () {
                 Navigator.of(context).pop();
