@@ -1035,11 +1035,12 @@ class _AskComposerState extends State<_AskComposer> {
     Widget small(String label, VoidCallback onTap, {bool on = false}) => GestureDetector(
           onTap: onTap,
           child: Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            height: 32,
+            constraints: const BoxConstraints(maxWidth: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: p.canvas, borderRadius: BorderRadius.circular(18), border: Border.all(color: on ? kGold : p.border)),
-            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.text)),
+            decoration: BoxDecoration(color: on ? kGold.withValues(alpha: .25) : p.canvas, borderRadius: BorderRadius.circular(16), border: Border.all(color: on ? kGold : p.border)),
+            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: p.text)),
           ),
         );
 
@@ -1071,7 +1072,14 @@ class _AskComposerState extends State<_AskComposer> {
       Material(
       type: MaterialType.transparency,
       // the card grows and shrinks smoothly as the box opens out and folds back
-      child: AnimatedSize(
+      // a tap outside the box folds it back when nothing is written (as on the web)
+      child: TapRegion(
+        onTapOutside: (_) {
+          if (_open && !_busy && _text.text.trim().isEmpty && _details.text.trim().isEmpty && _photos.isEmpty && _budget.text.trim().isEmpty) {
+            setState(() => _open = false);
+          }
+        },
+        child: AnimatedSize(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOutCubic,
         alignment: Alignment.topCenter,
@@ -1248,27 +1256,39 @@ class _AskComposerState extends State<_AskComposer> {
                       ]),
                   ]),
                 ),
-              // the options (all optional) and the button, in one row
-              Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                Expanded(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(spacing: 8, children: [
-                small('📝 ${t('Description')}', () => setState(() => _showDesc = !_showDesc), on: _showDesc),
-                small('🖼️ ${t('Add photos')}', _pickPhotos),
-                small('📍 ${place.isEmpty ? t('Location') : place}', _pickPlace, on: _city != null),
-                small('₹ ${_budget.text.isEmpty ? t('Budget') : _budget.text.replaceFirst(RegExp(r'^₹\s*'), '')}', _pickBudget, on: _budget.text.isNotEmpty),
-                small('🎨 ${t('Card style')}', _pickStyle),
-              ]))),
-                const SizedBox(width: 10),
-                GestureDetector(
-            onTap: _busy ? null : _submit,
-            child: Container(
-              height: 36,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(20)),
-              child: Text(t(_busy ? 'Posting...' : 'Post ask'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
-            ),
-          ),
-              ]),
+              // the options (all optional) scroll out to both screen edges; the button lies below them, the full width of the box
+              LayoutBuilder(builder: (_, box) => SizedBox(
+                height: 34,
+                child: Transform.translate(
+                  offset: const Offset(-68, 0),
+                  child: OverflowBox(
+                    alignment: Alignment.centerLeft,
+                    minWidth: box.maxWidth + 68 + 16,
+                    maxWidth: box.maxWidth + 68 + 16,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.only(left: 68, right: 16),
+                      child: Row(spacing: 6, children: [
+                        small('📝 ${t('Description')}', () => setState(() => _showDesc = !_showDesc), on: _showDesc),
+                        small('🖼️ ${t('Add photos')}', _pickPhotos),
+                        small('📍 ${place.isEmpty ? t('Location') : place}', _pickPlace, on: _city != null),
+                        small('₹ ${_budget.text.isEmpty ? t('Budget') : _budget.text.replaceFirst(RegExp(r'^₹\s*'), '')}', _pickBudget, on: _budget.text.isNotEmpty),
+                        small('🎨 ${t('Card style')}', _pickStyle),
+                      ]),
+                    ),
+                  ),
+                ),
+              )),
+              const SizedBox(height: 10),
+              GestureDetector(
+                onTap: _busy ? null : _submit,
+                child: Container(
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(22)),
+                  child: Text(t(_busy ? 'Posting...' : 'Post ask'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kInk)),
+                ),
+              ),
               if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: TextStyle(fontSize: 13, color: p.danger))),
             ]),
           ),
@@ -1276,6 +1296,7 @@ class _AskComposerState extends State<_AskComposer> {
               ]),
         ),
       ]),
+      ),
       ),
       ),
     ]);
