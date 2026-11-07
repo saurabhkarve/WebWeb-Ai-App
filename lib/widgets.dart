@@ -1123,8 +1123,10 @@ class FitRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-        builder: (_, box) => SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
+        // never scrolls: when the tiles are wider than the row together they are scaled down to fit it
+        builder: (_, box) => FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
           // the tiles' shadow shows below the row
           clipBehavior: Clip.none,
           child: _FitRowBody(width: box.maxWidth, spacing: spacing, children: children),

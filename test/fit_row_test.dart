@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:webweb_app/widgets.dart';
 
-/// Five controls of the given widths in a row [width] wide; returns each control's laid-out width and whether the
-/// row can scroll.
+/// Controls of the given widths in a row [width] wide; returns each control's width as drawn and whether the
+/// row can scroll (it never does).
 Future<(List<double>, bool)> layout(WidgetTester tester, double width, List<double> sizes) async {
   await tester.pumpWidget(MaterialApp(
     home: Center(
@@ -13,9 +13,8 @@ Future<(List<double>, bool)> layout(WidgetTester tester, double width, List<doub
       ),
     ),
   ));
-  final widths = [for (var i = 0; i < sizes.length; i++) tester.getSize(find.byKey(ValueKey(i)).first).width];
-  final pos = tester.state<ScrollableState>(find.byType(Scrollable)).position;
-  return (widths, pos.maxScrollExtent > 0);
+  final widths = [for (var i = 0; i < sizes.length; i++) tester.getRect(find.byKey(ValueKey(i)).first).width];
+  return (widths, find.byType(Scrollable).evaluate().isNotEmpty);
 }
 
 void main() {
@@ -35,8 +34,9 @@ void main() {
     expect(w.reduce((a, b) => a + b) + 24, closeTo(400, .01));
   });
 
-  testWidgets('scrolls only when even its own widths are too wide', (tester) async {
-    final (_, scrolls) = await layout(tester, 300, [80, 80, 80, 80, 80]);
-    expect(scrolls, isTrue);
+  testWidgets('never scrolls: too wide even at its own widths, it is scaled down to fit', (tester) async {
+    final (w, scrolls) = await layout(tester, 300, [80, 80, 80, 80, 80]);
+    expect(scrolls, isFalse);
+    expect(w.reduce((a, b) => a + b) + 24 * (300 / 424), lessThanOrEqualTo(300.01));
   });
 }
