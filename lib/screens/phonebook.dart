@@ -31,6 +31,7 @@ import 'connect.dart' show UpdatesBar;
 import '../widgets/tour.dart' show Tours;
 import 'find.dart';
 import 'local_contact.dart';
+import 'intro_card.dart' show IntroCardScreen;
 import 'post_detail.dart';
 import 'profile.dart';
 import 'service_page.dart';
@@ -330,7 +331,6 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
   /// the last searches, on this phone only
   List<String> _recent = const [];
   bool _allCats = false;
-  Map? _mine;
   Timer? _debounce, _aiTimer;
   String? _scrubbing;
   /// Ask AI: the answer (engine, title, matches with why) and the search it is for
@@ -489,12 +489,6 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
     SharedPreferences.getInstance().then((sp) {
       if (mounted) setState(() => _recent = (sp.getStringList('webweb_recent_finds') ?? const []).take(6).toList());
     });
-    final me = context.read<AuthProvider>().profile;
-    if (me != null) {
-      context.read<AuthProvider>().api.get('/users/${me.uid}/reviews', {'limit': '1'}).then((d) {
-        if (mounted) setState(() => _mine = d as Map);
-      }).catchError((_) {});
-    }
   }
 
   @override
@@ -1004,18 +998,32 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
           Expanded(child: _shortcut(p, Icons.near_me_outlined, 'Search nearby', () => Navigator.push(context, WideRoute(builder: (_) => SubPage(title: t('Nearby'), body: const FindScreen()))))),
         ]),
       ])),
-      ...[
-        // my card, as at the top of a phone's contacts
-        if (me != null) ...[const SizedBox(height: 14), _myCard(p, me.handle, displayName(me.userType, me.name, me.company), me.photoUrl)],
-        if (showAsks) ...[
-          const SizedBox(height: 18),
-          _asksTitle(p),
-          const SizedBox(height: 8),
-          _askStrip(p),
-        ],
-        const SizedBox(height: 14),
-        ..._prompts(p),
-      ],
+      // things to try: whole sentences Ask AI understands, one tap searches them
+      _fold(!_searching, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const SizedBox(height: 18),
+        Text(t('Try asking AI'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        _bleed(
+          84,
+          ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: _tryAsking.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (_, i) => _tryCard(p, _tryAsking[i].$1, _tryAsking[i].$2),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text(t('Do more'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: _shortcut(p, Icons.campaign_outlined, 'Post an ask', widget.onAsk ?? () {})),
+          const SizedBox(width: 12),
+          Expanded(child: _shortcut(p, Icons.badge_outlined, '30-second intro card', () => Navigator.push(context, WideRoute(builder: (_) => SubPage(title: t('30-second intro card'), body: const IntroCardScreen()))))),
+        ]),
+      ])),
+      const SizedBox(height: 14),
+      ..._prompts(p),
     ]);
 
     // A to Z: a letter over each group, every line the same height so the index can jump straight to a letter
@@ -1125,6 +1133,34 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
 
   static const _tradeEmoji = {'Plumber': '🔧', 'Electrician': '⚡', 'Printer': '🖨️', 'Carpenter': '🪚', 'Tutor': '📚', 'Caterer': '🍽️', 'Transport': '🚚', 'Chartered accountant': '🧾', 'Mobile repair': '📱', 'Tailor': '🧵'};
   static const _trades = ['Plumber', 'Electrician', 'Printer', 'Carpenter', 'Tutor', 'Caterer', 'Transport', 'Chartered accountant', 'Mobile repair', 'Tailor'];
+
+  static const _tryAsking = [
+    ('🔧', 'Plumber to fix a leaking tap today'),
+    ('🧾', 'CA for GST filing'),
+    ('🎉', 'Caterer for a wedding of 100 guests'),
+    ('📚', 'Maths tutor for class 10'),
+    ('🚚', 'Transport for shifting a 2 BHK flat'),
+  ];
+
+  /// An example sentence on a soft card: a tap searches it as it is.
+  Widget _tryCard(Pal p, String emoji, String text) => InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => _pick(t(text)),
+        child: Container(
+          width: 190,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: p.dark ? const [Color(0xFF2E2C25), Color(0xFF1C1B18)] : const [Color(0xFFFFFFFF), Color(0xFFFBF3D8)]),
+            border: Border.all(color: p.dark ? kGold.withValues(alpha: .2) : const Color(0xCCE6D39A)),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(emoji, style: const TextStyle(fontSize: 20)),
+            const Spacer(),
+            Text(t(text), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, height: 1.2)),
+          ]),
+        ),
+      );
 
   /// A category's icon and name; a tap searches it.
   Widget _catTile(Map c, {double w = 78}) {
@@ -1864,20 +1900,6 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
         if (widget.onSeeAsks != null) TextButton(onPressed: widget.onSeeAsks, child: Text(t('See all'))),
       ]);
 
-  /// the open asks around me, one swipe each way, after a card to post my own
-  Widget _askStrip(Pal p) => SizedBox(
-        height: 150,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          clipBehavior: Clip.none,
-          children: [
-            _postAskCard(p),
-            for (final a in _asks ?? const <Post>[]) Padding(padding: const EdgeInsets.only(left: 10), child: _askCard(p, a)),
-            if (_asks == null) const SizedBox(width: 120, child: Center(child: CircularProgressIndicator(strokeWidth: 2))),
-          ],
-        ),
-      );
-
   Widget _postAskCard(Pal p, {bool vertical = false}) => InkWell(
         onTap: widget.onAsk,
         borderRadius: BorderRadius.circular(18),
@@ -1931,36 +1953,6 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
     );
   }
 
-  Widget _myCard(Pal p, String handle, String name, String? photo) {
-    final count = (_mine?['count'] as num?)?.toInt() ?? 0;
-    final avg = (_mine?['avg'] as num?)?.toDouble() ?? 0;
-    final ask = '${t('Thank you for your business! Could you review {name} on WEBWEB? It takes a minute:', {'name': name})} https://webweb.ai/@$handle#reviews';
-    return InkWell(
-      onTap: () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: handle))),
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(18), border: Border.all(color: p.border)),
-        child: Row(children: [
-          Avatar(name: name, photoUrl: photo, size: 52),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              Text(t('My page'), style: TextStyle(fontSize: 12, color: p.muted)),
-              if (count > 0)
-                Row(children: [Stars(value: avg, size: 11), const SizedBox(width: 4), Text('${avg.toStringAsFixed(1)} · $count', style: TextStyle(fontSize: 11, color: p.muted))]),
-            ]),
-          ),
-          TextButton.icon(
-            onPressed: () => openExternal(context, 'https://wa.me/?text=${Uri.encodeComponent(ask)}'),
-            icon: const Icon(Icons.star_outline_rounded, size: 18, color: kStar),
-            label: Text(t('Ask for a review'), style: const TextStyle(fontSize: 12)),
-          ),
-        ]),
-      ),
-    );
-  }
 }
 
 
