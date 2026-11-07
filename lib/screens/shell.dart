@@ -274,7 +274,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
                   top: 0,
                   left: 0,
                   right: 0,
-                  child: _AppHeader(onHome: () => _go(_dir), compact: false),
+                  child: _AppHeader(onHome: () => _go(_dir), compact: _scrolled),
                 ),
               // "Waiting for network…" / "Connecting…" under the header, WhatsApp-style
               Positioned(
@@ -333,8 +333,13 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
     if (_barHidden != v) setState(() => _barHidden = v);
   }
 
+  // the header has no shadow at the top of a page and gets one once the page is scrolled (as on the web)
+  bool _scrolled = false;
+
   bool _onPageScroll(ScrollNotification n) {
     if (n.depth != 0 || n.metrics.axis != Axis.vertical || n is! ScrollUpdateNotification) return false;
+    final sc = n.metrics.pixels > 4;
+    if (sc != _scrolled) setState(() => _scrolled = sc);
     final m = n.metrics;
     if (DateTime.now().isBefore(_scrollQuiet)) return false;
     if (m.pixels < 0 || m.pixels > m.maxScrollExtent) return false; // rubber band
@@ -957,7 +962,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
 
 class _AppHeader extends StatelessWidget {
   final VoidCallback onHome;
-  // shrunk to a slimmer bar while a page is scrolled down
+  // the page is scrolled: the header gets its shadow (it never changes size)
   final bool compact;
   const _AppHeader({required this.onHome, this.compact = false});
 
@@ -983,9 +988,9 @@ class _AppHeader extends StatelessWidget {
         color: p.canvas,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: p.dark ? .25 : .05),
-            offset: const Offset(0, 3),
-            blurRadius: 10,
+            color: Colors.black.withValues(alpha: (p.dark ? .5 : .14) * c),
+            offset: Offset(0, 3 + 4 * c),
+            blurRadius: 10 + 4 * c,
             spreadRadius: -6,
           ),
         ],
