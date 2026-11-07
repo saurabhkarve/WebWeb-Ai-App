@@ -1098,7 +1098,10 @@ class _AskComposerState extends State<_AskComposer> {
           ),
         // the kinds of ask, above the line: one tap picks the kind and opens the box
         // the chips run out to both screen edges and start back in line with the page (its padding is 16)
-        LayoutBuilder(builder: (_, box) => Transform.translate(
+        LayoutBuilder(builder: (_, box) => SizedBox(
+          // a fixed height: the overflow box below would otherwise take the column's unbounded height and the page would not lay out
+          height: 40,
+          child: Transform.translate(
           offset: const Offset(-16, 0),
           child: OverflowBox(
             alignment: Alignment.centerLeft,
@@ -1131,7 +1134,7 @@ class _AskComposerState extends State<_AskComposer> {
           ]),
         ),
           ),
-        )),
+        ))),
         const SizedBox(height: 10),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Padding(padding: const EdgeInsets.only(top: 2), child: Avatar(name: me.name, size: 40, type: me.userType, photoUrl: me.photoUrl, uid: me.uid)),
