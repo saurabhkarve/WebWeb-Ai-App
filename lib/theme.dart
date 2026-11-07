@@ -106,8 +106,21 @@ ThemeData buildTheme(Brightness b) {
     highlightColor: Colors.transparent,
     hoverColor: Colors.transparent,
     focusColor: Colors.transparent,
+    // the state layers of Material 3 widgets (pressed, hovered, focused) are grey tints too: off everywhere
+    textButtonTheme: const TextButtonThemeData(style: _noOverlay),
+    elevatedButtonTheme: const ElevatedButtonThemeData(style: _noOverlay),
+    filledButtonTheme: const FilledButtonThemeData(style: _noOverlay),
+    outlinedButtonTheme: const OutlinedButtonThemeData(style: _noOverlay),
+    iconButtonTheme: const IconButtonThemeData(style: _noOverlay),
+    segmentedButtonTheme: const SegmentedButtonThemeData(style: _noOverlay),
+    menuButtonTheme: const MenuButtonThemeData(style: _noOverlay),
+    switchTheme: const SwitchThemeData(overlayColor: WidgetStatePropertyAll(Colors.transparent)),
+    checkboxTheme: const CheckboxThemeData(overlayColor: WidgetStatePropertyAll(Colors.transparent)),
+    radioTheme: const RadioThemeData(overlayColor: WidgetStatePropertyAll(Colors.transparent)),
+    sliderTheme: const SliderThemeData(overlayColor: Colors.transparent),
+    listTileTheme: const ListTileThemeData(selectedTileColor: Colors.transparent),
     iconTheme: IconThemeData(color: p.text),
-    colorScheme: ColorScheme.fromSeed(seedColor: kGold, brightness: b, primary: kGold, onPrimary: kInk, surface: p.canvas, onSurface: p.text, error: p.danger),
+    colorScheme: ColorScheme.fromSeed(seedColor: kGold, brightness: b, primary: kGold, onPrimary: kInk, surface: p.canvas, onSurface: p.text, error: p.danger).copyWith(surfaceTint: Colors.transparent),
     dividerColor: p.border,
     dividerTheme: DividerThemeData(color: p.border, thickness: 1, space: 1),
     appBarTheme: AppBarTheme(
@@ -155,3 +168,6 @@ class ThemeController extends ChangeNotifier {
     (await SharedPreferences.getInstance()).setString('theme', m.name);
   }
 }
+
+/// Buttons without the pressed / hovered / focused tint.
+const _noOverlay = ButtonStyle(overlayColor: WidgetStatePropertyAll(Colors.transparent), splashFactory: NoSplash.splashFactory);
