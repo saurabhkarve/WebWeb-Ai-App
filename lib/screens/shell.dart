@@ -478,13 +478,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
           _go(_ask);
         }
       ),
-      ('Leads for you', () => sub('Leads for you', const LeadsScreen())),
-      (
-        'Today in your area',
-        () => sub('Today in your area', const TodayScreen())
-      ),
-      ('Alerts', () => sub('Alerts', const AlertsScreen())),
-      ('Your week', () => sub('Your week', const WeekScreen())),
+      // leads, today, alerts and your week: one page
+      ('For your business', () => sub('For your business', const _BusinessHub())),
       (
         'Saved asks',
         () => Navigator.push(
