@@ -1922,7 +1922,7 @@ class _NotesPanelState extends State<_NotesPanel> {
                                 : ListView.builder(
                                     shrinkWrap: !widget.page,
                                     padding: EdgeInsets.only(
-                                        bottom: widget.page ? 100 : 0),
+                                        bottom: widget.page ? islandSpace(context) : 0),
                                     itemCount: shown.length,
                                     itemBuilder: (_, i) {
                                       final x = shown[i];
@@ -2116,7 +2116,7 @@ class _NotesPanelState extends State<_NotesPanel> {
 
   /// The empty tab: what will show here, and the way to get some
   Widget _emptyPage(Pal p) =>
-      ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 100), children: [
+      ListView(padding: EdgeInsets.fromLTRB(16, 8, 16, islandSpace(context)), children: [
         DashedBox(
           radius: 16,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),

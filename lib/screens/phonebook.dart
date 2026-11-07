@@ -997,7 +997,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
       child: CustomScrollView(controller: _scroll, keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, slivers: [
         SliverPadding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 0), sliver: SliverToBoxAdapter(child: top)),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 28, 120),
+          padding: EdgeInsets.fromLTRB(16, 0, 28, islandSpace(context) + 20),
           sliver: SliverVariedExtentList.builder(
             itemCount: items.length,
             itemExtentBuilder: (i, _) => i >= items.length ? null : (items[i] is String ? _headH : _rowH),
