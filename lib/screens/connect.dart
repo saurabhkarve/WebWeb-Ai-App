@@ -1044,7 +1044,31 @@ class _AskComposerState extends State<_AskComposer> {
         );
 
     // no box round it: the kinds and the field sit on the page itself
-    return Material(
+    final glow = Positioned(
+      left: -16,
+      right: -16,
+      top: -28,
+      bottom: -28,
+      child: IgnorePointer(
+        // the warm yellow behind the box, fading out at the top and the bottom, as behind the search on Find
+        child: ShaderMask(
+          blendMode: BlendMode.dstIn,
+          shaderCallback: (r) => const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black, Colors.black, Colors.transparent], stops: [0, .24, .76, 1]).createShader(r),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: p.dark ? [kGold.withValues(alpha: .2), kGold.withValues(alpha: .04)] : const [Color(0xFFFFF0B0), Color(0xFFFFF8DC), Color(0xFFFFFDF3)],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    return Stack(clipBehavior: Clip.none, children: [
+      glow,
+      Material(
       type: MaterialType.transparency,
       // the card grows and shrinks smoothly as the box opens out and folds back
       child: AnimatedSize(
@@ -1253,7 +1277,8 @@ class _AskComposerState extends State<_AskComposer> {
         ),
       ]),
       ),
-    );
+      ),
+    ]);
   }
 }
 
