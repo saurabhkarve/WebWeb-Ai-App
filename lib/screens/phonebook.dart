@@ -786,6 +786,8 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
       _fold(!_searching && !_boxFold, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Column(key: Tours.key('updates'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         // a small gold title with a fading rule, so the circles read as their own strip without a box
+        // small screens go without the title
+        if (MediaQuery.sizeOf(context).width >= 640)
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 0, 4, 2),
           child: Row(children: [
