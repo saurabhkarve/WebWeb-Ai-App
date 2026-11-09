@@ -100,7 +100,7 @@ class _SheetState extends State<_Sheet> {
           const SizedBox(height: 10),
           Text(t('Only service contacts are shared, so members can find trusted help nearby.'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, height: 1.4)),
           const SizedBox(height: 18),
-          const ShareFlow(steps: [(WI.search, 'Finds service words on your phone'), (WI.send, 'Shares name, number and word'), (WI.check, 'Our team reviews each one')]),
+          const ShareFlow(steps: [(WI.search, 'Finds service words on your phone'), (WI.send, 'Shares name, number, word and picture'), (WI.check, 'Our team reviews each one')]),
           const SizedBox(height: 14),
           Row(children: [
             WIcon(WI.lock, size: 14, color: p.muted),
@@ -174,7 +174,7 @@ class _Notice extends StatelessWidget {
           const SizedBox(height: 10),
           Text(t('Only service contacts are shared, so members can find trusted help nearby.'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, height: 1.4)),
           const SizedBox(height: 18),
-          const ShareFlow(steps: [(WI.search, 'Finds service words on your phone'), (WI.send, 'Shares name, number and word'), (WI.check, 'Our team reviews each one')]),
+          const ShareFlow(steps: [(WI.search, 'Finds service words on your phone'), (WI.send, 'Shares name, number, word and picture'), (WI.check, 'Our team reviews each one')]),
           const SizedBox(height: 16),
           Row(children: [
             WIcon(WI.lock, size: 14, color: p.muted),

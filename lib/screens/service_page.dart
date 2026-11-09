@@ -197,92 +197,98 @@ class _ServicePageScreenState extends State<ServicePageScreen> {
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // the picture is the name, with who shares it and what Google says where a member's page has its numbers
-          Transform.translate(
-            offset: const Offset(0, -44),
-            child: Padding(
-              padding: const EdgeInsets.only(left: 12),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: p.canvas, shape: BoxShape.circle), child: Avatar(name: '${c['name']}', size: 96)),
-                const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text.rich(
-                    TextSpan(children: [
-                      TextSpan(text: '$sharers', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: gold)),
-                      TextSpan(text: ' ${t('members share this')}'),
-                      if (rating != null) ...[
-                        const TextSpan(text: ' · '),
-                        TextSpan(text: '★ ${rating.toStringAsFixed(1)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: gold)),
-                        const TextSpan(text: ' Google'),
-                      ],
-                    ]),
-                    textAlign: TextAlign.end,
-                    style: TextStyle(fontSize: 12, color: p.muted, height: 1.2),
+          // the picture is the name, with who shares it and what Google says where a member's page has its numbers.
+          // The 104 pt row hangs 44 pt up over the cover and only the 60 pt under it takes room, so no empty gap is
+          // left further down (a Transform keeps its old space).
+          SizedBox(
+            height: 60,
+            child: OverflowBox(
+              alignment: Alignment.bottomLeft,
+              minHeight: 0,
+              maxHeight: 104,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: p.canvas, shape: BoxShape.circle), child: Avatar(name: '${c['name']}', photoUrl: c['photoURL'] as String?, size: 96)),
+                    const Spacer(),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text.rich(
+                        TextSpan(children: [
+                          TextSpan(text: '$sharers', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: gold)),
+                          TextSpan(text: ' ${sharers == 1 ? t('member shares this') : t('members share this')}'),
+                          if (rating != null) ...[
+                            const TextSpan(text: ' · '),
+                            TextSpan(text: '★ ${rating.toStringAsFixed(1)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: gold)),
+                            const TextSpan(text: ' Google'),
+                          ],
+                        ]),
+                        textAlign: TextAlign.end,
+                        style: TextStyle(fontSize: 12, color: p.muted, height: 1.2),
+                      ),
+                    ),
+                  ]),
+                ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text.rich(
+              TextSpan(children: [
+                TextSpan(text: name),
+                // nobody has checked this contact: members saved it and WEBWEB approved it, nothing more
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20)),
+                      child: Text(t('Not verified'), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.muted, height: 1.3)),
+                    ),
                   ),
                 ),
               ]),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.375),
             ),
-          ),
-          Transform.translate(
-            offset: const Offset(0, -38),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text.rich(
-                TextSpan(children: [
-                  TextSpan(text: name),
-                  // nobody has checked this contact: members saved it and WEBWEB approved it, nothing more
-                  WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20)),
-                        child: Text(t('Not verified'), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.muted, height: 1.3)),
-                      ),
-                    ),
-                  ),
-                ]),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.375),
-              ),
-              Text.rich(
-                TextSpan(children: [
-                  TextSpan(text: '@$phone', style: TextStyle(fontWeight: FontWeight.w700, color: p.link)),
-                  if (tags.isNotEmpty) TextSpan(text: ' · ${tags.first}'),
-                ]),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 14, color: p.muted, height: 1.375),
-              ),
-              if (address.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(address, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, height: 1.43))),
-              const SizedBox(height: 6),
-              Wrap(spacing: 6, runSpacing: 6, children: [
-                if (where.isNotEmpty) tag(where, icon: Icons.place_outlined, onTap: maps.isNotEmpty ? () => _open(maps) : null),
-                for (final x in tags) tag(x),
-                if (rating != null) tag('★ ${rating.toStringAsFixed(1)}${c['ratings'] is num ? ' (${c['ratings']})' : ''} Google', goldChip: true, onTap: () => _open(google)),
-                if (widget.shared != null) tag(widget.shared!),
+            Text.rich(
+              TextSpan(children: [
+                TextSpan(text: '@$phone', style: TextStyle(fontWeight: FontWeight.w700, color: p.link)),
+                if (tags.isNotEmpty) TextSpan(text: ' · ${tags.first}'),
               ]),
-              const SizedBox(height: 8),
-              Row(children: [
-                Expanded(child: ProfileActionBtn(label: t('Call'), wi: WI.phone, gold: true, onTap: () => _open('tel:+91$phone'))),
-                const SizedBox(width: 8),
-                Expanded(child: ProfileActionBtn(label: 'WhatsApp', leading: const Padding(padding: EdgeInsets.only(right: 6), child: WhatsAppIcon(size: 17)), onTap: () => _open('https://wa.me/91$phone'))),
-                const SizedBox(width: 8),
-                SizedBox(width: 44, child: ProfileActionBtn(wi: WI.share, label: '', semantic: t('Share profile'), onTap: () => SharePlus.instance.share(ShareParams(text: shareText)))),
-              ]),
-              const SizedBox(height: 8),
-              // this number is not a member: invite them to claim their page
-              ProfileActionBtn(
-                label: t('Invite to WEBWEB'),
-                leading: const Padding(padding: EdgeInsets.only(right: 6), child: WhatsAppIcon(size: 17)),
-                onTap: () {
-                  final me = context.read<AuthProvider>().profile;
-                  final msg = '${t('Join me on WEBWEB AI, where businesses share contacts and get things done.')}\n$siteUrl${me == null ? '' : '/@${me.handle}'}';
-                  _open('https://wa.me/91$phone?text=${Uri.encodeComponent(msg)}');
-                },
-              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 14, color: p.muted, height: 1.375),
+            ),
+            // a street address only: the place alone is already the chip below
+            if ('${c['address'] ?? ''}'.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(address, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, height: 1.43))),
+            const SizedBox(height: 6),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              if (where.isNotEmpty) tag(where, icon: Icons.place_outlined, onTap: maps.isNotEmpty ? () => _open(maps) : null),
+              for (final x in tags) tag(x),
+              if (rating != null) tag('★ ${rating.toStringAsFixed(1)}${c['ratings'] is num ? ' (${c['ratings']})' : ''} Google', goldChip: true, onTap: () => _open(google)),
+              if (widget.shared != null) tag(widget.shared!),
             ]),
-          ),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: ProfileActionBtn(label: t('Call'), wi: WI.phone, gold: true, onTap: () => _open('tel:+91$phone'))),
+              const SizedBox(width: 8),
+              Expanded(child: ProfileActionBtn(label: 'WhatsApp', leading: const Padding(padding: EdgeInsets.only(right: 6), child: WhatsAppIcon(size: 17)), onTap: () => _open('https://wa.me/91$phone'))),
+              const SizedBox(width: 8),
+              SizedBox(width: 44, child: ProfileActionBtn(wi: WI.share, label: '', semantic: t('Share profile'), onTap: () => SharePlus.instance.share(ShareParams(text: shareText)))),
+            ]),
+            const SizedBox(height: 8),
+            // this number is not a member: invite them to claim their page
+            ProfileActionBtn(
+              label: t('Invite to WEBWEB'),
+              leading: const Padding(padding: EdgeInsets.only(right: 6), child: WhatsAppIcon(size: 17)),
+              onTap: () {
+                final me = context.read<AuthProvider>().profile;
+                final msg = '${t('Join me on WEBWEB AI, where businesses share contacts and get things done.')}\n$siteUrl${me == null ? '' : '/@${me.handle}'}';
+                _open('https://wa.me/91$phone?text=${Uri.encodeComponent(msg)}');
+              },
+            ),
+          ]),
           if (site.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),

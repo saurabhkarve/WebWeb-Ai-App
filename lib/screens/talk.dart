@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_contacts/flutter_contacts.dart' show FlutterContacts, ContactProperty;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -974,6 +976,9 @@ class _ChatThreadState extends State<ChatThread> {
   // the day shown on the floating chip while scrolling (WhatsApp style)
   final _itemKeys = <int, GlobalKey>{};
   final _listBox = GlobalKey();
+  /// the reply box floats over the messages; they scroll on underneath it, with room at the end to clear it
+  final _dockKey = GlobalKey();
+  double _dockH = 76;
   String? _floatDay;
   bool _floatShow = false;
   Timer? _floatHide;
@@ -1023,6 +1028,7 @@ class _ChatThreadState extends State<ChatThread> {
     super.initState();
     NotificationService.activeChat = widget.chatId;
     clearChatNotification(widget.chatId); // its notification and the lines it kept
+    _measureDock();
     _apiKept;
     _meKept;
     _load();
@@ -1170,11 +1176,33 @@ class _ChatThreadState extends State<ChatThread> {
 
   void _markRead() => _rt.send({'type': 'read', 'chatId': widget.chatId});
 
-  void _toBottom({bool jump = false}) => WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!_scroll.hasClients) return;
-        final end = _scroll.position.maxScrollExtent;
-        jump ? _scroll.jumpTo(end) : _scroll.animateTo(end, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
-      });
+  /// Opening a chat shows its latest message, and the list keeps to the end while it fills in (rows measured as they
+  /// are built, pictures loading, the reply box changing height) until the member scrolls up to read. New messages
+  /// then bring it down only if it was already at the end, or when the member sends one ([force]).
+  bool _stick = true;
+
+  void _toBottom({bool jump = false, bool force = false}) {
+    if (force) _stick = true;
+    if (!_stick) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scroll.hasClients) return;
+      final end = _scroll.position.maxScrollExtent;
+      jump ? _scroll.jumpTo(end) : _scroll.animateTo(end, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+    });
+  }
+
+  /// the list's length changed (lazy rows measured, a picture loaded, the reply box grew): stay at the end
+  bool _onMetrics(ScrollMetricsNotification n) {
+    if (_stick && n.metrics.axis == Axis.vertical && n.metrics.maxScrollExtent - n.metrics.pixels > 1) _toBottom(jump: true);
+    return false;
+  }
+
+  /// the member scrolled: keep to the end only while they are at (or near) it
+  void _onUserScroll(ScrollNotification n) {
+    if (n.metrics.axis != Axis.vertical) return;
+    final byHand = (n is ScrollUpdateNotification && n.dragDetails != null) || n is UserScrollNotification;
+    if (byHand) _stick = n.metrics.maxScrollExtent - n.metrics.pixels < 80;
+  }
 
   void _onEvent(Json e) {
     switch (e['type']) {
@@ -1245,7 +1273,7 @@ class _ChatThreadState extends State<ChatThread> {
       _replyTo = null;
       if (fromComposer) _pending = null;
     });
-    _toBottom();
+    _toBottom(force: true);
     // through the outbox: sent now when online, otherwise kept (clock) and sent by itself once the network
     // is back, even if the app is closed in between
     await Outbox.add(OutboxItem(
@@ -1397,183 +1425,239 @@ class _ChatThreadState extends State<ChatThread> {
             const SizedBox(width: 8),
             Expanded(
               child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _peer.handle.isEmpty ? null : () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: _peer.handle))),
-                child: Row(children: [
-                  Avatar(name: _peer.name, photoUrl: _peer.photoUrl, size: 36, type: _peer.userType, badge: 16, uid: _peer.uid),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        Flexible(child: Text(_peer.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25))),
-                        if (_peer.verification > 0 || _peer.premium || _peer.plan != null) ...[
-                          const SizedBox(width: 4),
-                          VerifiedBadge(level: _peer.verification, premium: _peer.premium, plan: _peer.plan, size: 14),
-                        ],
-                      ]),
-                      Builder(builder: (context) {
-                        // offline: say so where "online" would be (WhatsApp shows "Waiting for network")
-                        final status = connectionStatus(context.watch<RealtimeService>());
-                        final live = status == null && (_typing || on);
-                        return Text(
-                          status ?? (_typing ? t('typing…') : (on ? t('online') : _peer.company)),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12, height: 1.25, color: live ? kGreen : p.muted, fontWeight: live ? FontWeight.w600 : FontWeight.w500),
-                        );
-                      }),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _peer.handle.isEmpty ? null : () => Navigator.push(context, WideRoute(builder: (_) => ProfileScreen(handle: _peer.handle))),
+                    child: Row(children: [
+                      Avatar(name: _peer.name, photoUrl: _peer.photoUrl, size: 36, type: _peer.userType, badge: 16, uid: _peer.uid),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Row(children: [
+                            Flexible(child: Text(_peer.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.25))),
+                            if (_peer.verification > 0 || _peer.premium || _peer.plan != null) ...[
+                              const SizedBox(width: 4),
+                              VerifiedBadge(level: _peer.verification, premium: _peer.premium, plan: _peer.plan, size: 14),
+                            ],
+                          ]),
+                          Builder(builder: (context) {
+                            // offline: say so where "online" would be (WhatsApp shows "Waiting for network")
+                            final status = connectionStatus(context.watch<RealtimeService>());
+                            final live = status == null && (_typing || on);
+                            return Text(
+                              status ?? (_typing ? t('typing…') : (on ? t('online') : _peer.company)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 12, height: 1.25, color: live ? kGreen : p.muted, fontWeight: live ? FontWeight.w600 : FontWeight.w500),
+                            );
+                          }),
+                        ]),
+                      ),
                     ]),
                   ),
-                ]),
-              ),
-            ),
-            _headerBtn(p, WI.video, t('Video call'), () => placeCall(context, _peer, true)),
-            _headerBtn(p, WI.phone, t('Call'), () => placeCall(context, _peer, false)),
-            PopupMenuButton<String>(
-              tooltip: t('More'),
-              icon: WIcon(WI.more, size: 24, color: p.text),
-              onSelected: (v) async {
-                if (v == 'delete') {
-                  _deleteChat();
-                } else if (v == 'safety') {
-                  final left = await showSafetySheet(context, uid: _peer.uid, name: _peer.name);
-                  if (left && mounted) Navigator.pop(this.context);
-                }
-              },
-              itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: 'safety',
-                  child: Row(children: [Icon(Icons.flag_outlined, size: 18, color: p.text), const SizedBox(width: 10), const Text('Report or block', style: TextStyle(fontWeight: FontWeight.w600))]),
                 ),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: Row(children: [WIcon(WI.trash, size: 18, color: p.danger), const SizedBox(width: 10), Text(t('Delete chat'), style: TextStyle(color: p.danger, fontWeight: FontWeight.w600))]),
-                ),
-              ],
-            ),
-          ]),
-        ),
-        const ActiveCallBanner(),
-        Expanded(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: () {
-              FocusScope.of(context).unfocus();
-              if (_selected != null) setState(() => _selected = null);
-            },
-            child: !_loaded
-                ? const Center(child: LogoLoader())
-                : items.isEmpty
-                    ? _firstMessage(p)
-                    : Stack(key: _listBox, children: [
-                        NotificationListener<ScrollUpdateNotification>(
-                          onNotification: (n) {
-                            if (n.metrics.axis == Axis.vertical) _onScrollDay();
-                            return false;
-                          },
-                          child: ListView.builder(
-                            controller: _scroll,
-                            padding: const EdgeInsets.all(16),
-                            itemCount: items.length,
-                            itemBuilder: (_, i) {
-                              final it = items[i];
-                              final showDay = i == 0 || !_sameDay(items[i - 1].at, it.at);
-                              return KeyedSubtree(
-                                key: _itemKeys.putIfAbsent(i, GlobalKey.new),
-                                child: Column(children: [
-                                  if (showDay) _dayPill(_dayLabel(it.at), p),
-                                  it.call != null ? _callRow(it.call!, p) : Padding(padding: const EdgeInsets.only(bottom: 8), child: _message(it.msg!, p)),
-                                ]),
-                              );
-                            },
-                          ),
-                        ),
-                        if (_floatDay != null)
-                          Positioned(
-                            top: 8,
-                            left: 0,
-                            right: 0,
-                            child: IgnorePointer(
-                              child: AnimatedOpacity(
-                                duration: const Duration(milliseconds: 200),
-                                opacity: _floatShow ? 1 : 0,
-                                child: Center(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                    decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20), border: Border.all(color: p.border), boxShadow: const [BoxShadow(color: Color(0x1A000000), blurRadius: 6, offset: Offset(0, 1))]),
-                                    child: Text(_floatDay!, style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w700)),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                      ]),
-          ),
-        ),
-        if (_pending != null) _pendingBox(p),
-        if (_replyTo != null) _replyBox(p),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(6, 4, 4, 4),
-              decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(30), border: Border.all(color: p.border)),
-              child: Row(children: [
-                Semantics(
-                  button: true,
-                  label: t('Attach'),
-                  child: GestureDetector(
-                    onTap: _openAttach,
-                    child: Container(width: 32, height: 32, decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle), child: Center(child: WIcon(WI.plus, size: 20, color: p.text, strokeWidth: 2.2))),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _input,
-                    focusNode: _inputFocus,
-                    // an item or post tagged on the way in: the box is ready for the message about it
-                    autofocus: widget.pending != null,
-                    minLines: 1,
-                    maxLines: 5,
-                    textCapitalization: TextCapitalization.sentences,
-                    onChanged: (v) {
-                      _setTyping(v.isNotEmpty);
-                      setState(() {});
-                    },
-                    style: const TextStyle(fontSize: 16),
-                    decoration: InputDecoration(
-                      hintText: _pending != null ? t('Write your message…') : t('Message...'),
-                      hintStyle: TextStyle(color: p.muted),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      filled: false,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                _headerBtn(p, WI.video, t('Video call'), () => placeCall(context, _peer, true)),
+                _headerBtn(p, WI.phone, t('Call'), () => placeCall(context, _peer, false)),
+                PopupMenuButton<String>(
+                  tooltip: t('More'),
+                  icon: WIcon(WI.more, size: 24, color: p.text),
+                  onSelected: (v) async {
+                    if (v == 'delete') {
+                      _deleteChat();
+                    } else if (v == 'safety') {
+                      final left = await showSafetySheet(context, uid: _peer.uid, name: _peer.name);
+                      if (left && mounted) Navigator.pop(this.context);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'safety',
+                      child: Row(children: [Icon(Icons.flag_outlined, size: 18, color: p.text), const SizedBox(width: 10), const Text('Report or block', style: TextStyle(fontWeight: FontWeight.w600))]),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Semantics(
-                  button: true,
-                  label: t('Send'),
-                  child: GestureDetector(
-                    onTap: canSend ? () => _send() : null,
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 150),
-                      opacity: canSend ? 1 : .4,
-                      child: Container(width: 40, height: 40, decoration: const BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle), child: const Center(child: WIcon(WI.send, size: 20, color: kInk, strokeWidth: 2.2))),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(children: [WIcon(WI.trash, size: 18, color: p.danger), const SizedBox(width: 10), Text(t('Delete chat'), style: TextStyle(color: p.danger, fontWeight: FontWeight.w600))]),
                     ),
-                  ),
+                  ],
                 ),
               ]),
             ),
-          ),
+            const ActiveCallBanner(),
+            Expanded(
+              child: Stack(children: [
+                // the wallpaper stays put while the messages scroll over it
+                Positioned.fill(child: _ChatWall(dark: p.dark)),
+                Positioned.fill(
+                  child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {
+                  FocusScope.of(context).unfocus();
+                  if (_selected != null) setState(() => _selected = null);
+                },
+                child: !_loaded
+                    ? const Center(child: LogoLoader())
+                    : items.isEmpty
+                        ? Padding(padding: EdgeInsets.only(bottom: _dockH), child: _firstMessage(p))
+                        : Stack(key: _listBox, children: [
+                            NotificationListener<ScrollMetricsNotification>(
+                              onNotification: _onMetrics,
+                              child: NotificationListener<ScrollNotification>(
+                              onNotification: (n) {
+                                _onUserScroll(n);
+                                if (n is ScrollUpdateNotification && n.metrics.axis == Axis.vertical) _onScrollDay();
+                                return false;
+                              },
+                              child: ListView.builder(
+                                controller: _scroll,
+                                padding: EdgeInsets.fromLTRB(16, 16, 16, _dockH + 12),
+                                itemCount: items.length,
+                                itemBuilder: (_, i) {
+                                  final it = items[i];
+                                  final showDay = i == 0 || !_sameDay(items[i - 1].at, it.at);
+                                  return KeyedSubtree(
+                                    key: _itemKeys.putIfAbsent(i, GlobalKey.new),
+                                    child: Column(children: [
+                                      if (showDay) _dayPill(_dayLabel(it.at), p),
+                                      it.call != null ? _callRow(it.call!, p) : Padding(padding: const EdgeInsets.only(bottom: 8), child: _message(it.msg!, p)),
+                                    ]),
+                                  );
+                                },
+                              ),
+                              ),
+                            ),
+                            if (_floatDay != null)
+                              Positioned(
+                                top: 8,
+                                left: 0,
+                                right: 0,
+                                child: IgnorePointer(
+                                  child: AnimatedOpacity(
+                                    duration: const Duration(milliseconds: 200),
+                                    opacity: _floatShow ? 1 : 0,
+                                    child: Center(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                        decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20), border: Border.all(color: p.border), boxShadow: const [BoxShadow(color: Color(0x1A000000), blurRadius: 6, offset: Offset(0, 1))]),
+                                        child: Text(_floatDay!, style: TextStyle(color: p.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ]),
+              ),
+            ),
+            // a soft fade under the reply box, so the messages passing behind it stay readable
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: _dockH + 24,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [p.canvas.withValues(alpha: 0), p.canvas.withValues(alpha: .4), p.canvas.withValues(alpha: .85)],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: NotificationListener<SizeChangedLayoutNotification>(
+                onNotification: (_) {
+                  _measureDock();
+                  return true;
+                },
+                child: SizeChangedLayoutNotifier(
+                  child: Column(key: _dockKey, mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      if (_pending != null) _pendingBox(p),
+                      if (_replyTo != null) _replyBox(p),
+                      SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Container(
+                            padding: const EdgeInsets.fromLTRB(6, 4, 4, 4),
+                            decoration: BoxDecoration(
+                              color: p.card.withValues(alpha: .96),
+                              borderRadius: BorderRadius.circular(30),
+                              border: Border.all(color: p.border),
+                              boxShadow: const [BoxShadow(color: Color(0x2E1E1E1E), blurRadius: 24, offset: Offset(0, 8), spreadRadius: -12)],
+                            ),
+                            child: Row(children: [
+                              Semantics(
+                                button: true,
+                                label: t('Attach'),
+                                child: GestureDetector(
+                                  onTap: _openAttach,
+                                  child: Container(width: 32, height: 32, decoration: BoxDecoration(color: p.chip, shape: BoxShape.circle), child: Center(child: WIcon(WI.plus, size: 20, color: p.text, strokeWidth: 2.2))),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: _input,
+                                  focusNode: _inputFocus,
+                                  // an item or post tagged on the way in: the box is ready for the message about it
+                                  autofocus: widget.pending != null,
+                                  minLines: 1,
+                                  maxLines: 5,
+                                  textCapitalization: TextCapitalization.sentences,
+                                  onChanged: (v) {
+                                    _setTyping(v.isNotEmpty);
+                                    setState(() {});
+                                  },
+                                  style: const TextStyle(fontSize: 16),
+                                  decoration: InputDecoration(
+                                    hintText: _pending != null ? t('Write your message…') : t('Message...'),
+                                    hintStyle: TextStyle(color: p.muted),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    filled: false,
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Semantics(
+                                button: true,
+                                label: t('Send'),
+                                child: GestureDetector(
+                                  onTap: canSend ? () => _send() : null,
+                                  child: AnimatedOpacity(
+                                    duration: const Duration(milliseconds: 150),
+                                    opacity: canSend ? 1 : .4,
+                                    child: Container(width: 40, height: 40, decoration: const BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle), child: const Center(child: WIcon(WI.send, size: 20, color: kInk, strokeWidth: 2.2))),
+                                  ),
+                                ),
+                              ),
+                            ]),
+                          ),
+                        ),
+                      ),
+                  ]),
+                ),
+              ),
+            ),
+          ]),
         ),
       ]),
     );
+  }
+
+  /// how tall the floating reply box is now (it grows with a reply, an attachment or a longer message)
+  void _measureDock() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final h = (_dockKey.currentContext?.findRenderObject() as RenderBox?)?.size.height;
+      if (h != null && mounted && (h - _dockH).abs() > .5) setState(() => _dockH = h);
+    });
   }
 
   Widget _headerBtn(Pal p, WI icon, String label, VoidCallback onTap) => Semantics(
@@ -2433,3 +2517,92 @@ class _Person {
   final String? phone;
   const _Person(this.name, {this.member, this.phone});
 }
+
+/// The chat room's wallpaper (as on the web): a faint gold doodle of sparkles, a phone, a chat bubble and a person,
+/// over a soft warm glow at the top. Drawn once per theme and tiled; it does not move while the messages scroll.
+const _wallSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 140 140" fill="none" stroke="COLOR" stroke-opacity="OP" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M24 14l2.4 6.6L33 23l-6.6 2.4L24 32l-2.4-6.6L15 23l6.6-2.4z"/>'
+    '<path d="M92 18h4l2 5-2.5 1.5a11 11 0 0 0 5 5L102 27l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 90 20a2 2 0 0 1 2-2z"/>'
+    '<path d="M18 84h22v14H27l-6 5V98h-3z"/>'
+    '<circle cx="62" cy="58" r="1.6" fill="COLOR" fill-opacity="OP" stroke="none"/>'
+    '<path d="M96 92l1.5 4 4 1.5-4 1.5-1.5 4-1.5-4-4-1.5 4-1.5z"/>'
+    '<circle cx="120" cy="64" r="5"/><path d="M60 118a8 8 0 0 1 16 0"/><circle cx="68" cy="108" r="3.5"/>'
+    '<circle cx="128" cy="126" r="1.6" fill="COLOR" fill-opacity="OP" stroke="none"/></svg>';
+
+class _ChatWall extends StatefulWidget {
+  final bool dark;
+  const _ChatWall({required this.dark});
+  @override
+  State<_ChatWall> createState() => _ChatWallState();
+}
+
+class _ChatWallState extends State<_ChatWall> {
+  static final Map<bool, PictureInfo> _drawn = {};
+  PictureInfo? _tile;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(_ChatWall old) {
+    super.didUpdateWidget(old);
+    if (old.dark != widget.dark) _load();
+  }
+
+  Future<void> _load() async {
+    final dark = widget.dark;
+    var tile = _drawn[dark];
+    if (tile == null) {
+      try {
+        final svg = _wallSvg.replaceAll('COLOR', dark ? '#ffc700' : '#b58900').replaceAll('OP', dark ? '0.08' : '0.16');
+        tile = _drawn[dark] = await vg.loadPicture(SvgStringLoader(svg), null);
+      } catch (_) {
+        return; // no doodle is fine: the plain background stays
+      }
+    }
+    if (mounted) setState(() => _tile = tile);
+  }
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(child: CustomPaint(painter: _WallPainter(_tile?.picture, widget.dark), size: Size.infinite));
+}
+
+class _WallPainter extends CustomPainter {
+  final ui.Picture? tile;
+  final bool dark;
+  _WallPainter(this.tile, this.dark);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = Offset.zero & size;
+    canvas.drawRect(
+      r,
+      Paint()
+        ..shader = RadialGradient(
+          center: Alignment.topCenter,
+          radius: 1.1,
+          colors: [kGold.withValues(alpha: dark ? .05 : .07), kGold.withValues(alpha: 0)],
+        ).createShader(r),
+    );
+    final t = tile;
+    if (t == null) return;
+    canvas.save();
+    canvas.clipRect(r);
+    for (double y = 0; y < size.height; y += 140) {
+      for (double x = 0; x < size.width; x += 140) {
+        canvas.save();
+        canvas.translate(x, y);
+        canvas.drawPicture(t);
+        canvas.restore();
+      }
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_WallPainter old) => old.tile != tile || old.dark != dark;
+}
+

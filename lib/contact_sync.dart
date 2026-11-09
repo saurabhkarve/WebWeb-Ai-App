@@ -11,13 +11,16 @@ import 'permissions.dart';
 
 /// Service contacts: with the member's say-so (off until they turn it on), the app looks through the phone book
 /// on the phone for contacts saved with a service word ("Ramesh Plumber", "Sai Cabs") and sends only those:
-/// saved name, number and the word that matched. The rest of the phone book never leaves the phone.
+/// saved name, number and the word that matched, and the picture saved with it (the phone's small thumbnail).
+/// The rest of the phone book never leaves the phone.
 /// The words come from the server (Admin > Service contacts > Keywords). It runs quietly while the app is open,
 /// at most once a day, and sends only contacts it has not sent before.
 class ContactSync {
   static const _kSent = 'svc_contacts_sent';
   static const _kLast = 'svc_contacts_last';
   static const _kAsked = 'svc_contacts_asked';
+  /// number -> fingerprint of the picture last sent for it ('' = sent as none), so a picture goes again only when it changes
+  static const _kPhotos = 'svc_contacts_photos';
   static bool _running = false;
 
   static bool get supported => !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
@@ -130,6 +133,8 @@ class ContactSync {
       final sent = (prefs.getStringList(_kSent) ?? const []).toSet();
       final out = <Map<String, String>>[];
       final seen = <String>{};
+      // every matched contact (sent now or before), for its picture: contact id -> its numbers
+      final matched = <String, List<String>>{};
       for (final c in contacts) {
         final name = (c.displayName ?? '').trim();
         if (name.isEmpty || c.phones.isEmpty) continue;
@@ -143,6 +148,7 @@ class ContactSync {
         if (word == null) continue;
         for (final p in c.phones) {
           final m = mobile10(p.number);
+          if (m != null && c.id != null) matched.putIfAbsent(c.id!, () => []).add(m);
           if (m == null || sent.contains(m) || !seen.add(m)) continue;
           out.add({'name': _cut(name), if (org.isNotEmpty) 'org': _cut(org), 'phone': m, 'keyword': word});
         }
@@ -153,6 +159,7 @@ class ContactSync {
         sent.addAll(batch.map((b) => b['phone']!));
         await prefs.setStringList(_kSent, sent.toList());
       }
+      await _sendPhotos(api, prefs, matched, sent);
       await prefs.setInt(_kLast, DateTime.now().millisecondsSinceEpoch);
       return out.length;
     } catch (_) {
@@ -160,6 +167,44 @@ class ContactSync {
     } finally {
       _running = false;
     }
+  }
+}
+
+/// The pictures saved with the matched contacts, read one contact at a time (only those, never the whole phone
+/// book's pictures) and sent five at a time when new, changed or deleted. At most 100 a day.
+Future<void> _sendPhotos(Api api, SharedPreferences prefs, Map<String, List<String>> matched, Set<String> sent) async {
+  final known = <String, String>{};
+  try {
+    known.addAll((jsonDecode(prefs.getString(ContactSync._kPhotos) ?? '{}') as Map).map((k, v) => MapEntry('$k', '$v')));
+  } catch (_) {}
+  final queue = <Map<String, Object?>>[];
+  final marks = <String, String>{};
+  for (final e in matched.entries) {
+    if (queue.length >= 100) break;
+    final phones = e.value.where(sent.contains).toSet(); // only numbers the server has
+    if (phones.isEmpty) continue;
+    Uint8List? thumb;
+    try {
+      thumb = (await FlutterContacts.get(e.key, properties: {ContactProperty.photoThumbnail}))?.photo?.thumbnail;
+    } catch (_) {
+      continue;
+    }
+    if (thumb != null && (thumb.length < 100 || thumb.length > 150000)) thumb = null;
+    final mark = thumb == null ? '' : sha256.convert(thumb).toString().substring(0, 16);
+    for (final p in phones) {
+      final was = known[p];
+      if (was == mark || (was == null && mark.isEmpty)) continue; // unchanged, or never had one
+      queue.add({'phone': p, 'image': thumb == null ? null : base64Encode(thumb)});
+      marks[p] = mark;
+    }
+  }
+  for (var i = 0; i < queue.length; i += 5) {
+    final batch = queue.sublist(i, i + 5 > queue.length ? queue.length : i + 5);
+    await api.post('/contact-sync/photos', {'photos': batch});
+    for (final b in batch) {
+      known['${b['phone']}'] = marks['${b['phone']}']!;
+    }
+    await prefs.setString(ContactSync._kPhotos, jsonEncode(known));
   }
 }
 

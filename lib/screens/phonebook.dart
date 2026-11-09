@@ -868,27 +868,10 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
       // the updates (people, leads, Today, new businesses) come first, above the search
       // (they stay when the box only has the cursor; they fold once something is typed)
       _fold(!_searching, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      // a little room between the header and the circles
-      const SizedBox(height: 10),
-      Column(key: Tours.key('updates'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        // a small gold title with a fading rule, so the circles read as their own strip without a box
-        // small screens go without the title
-        if (MediaQuery.sizeOf(context).width >= 640)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 2),
-          child: Row(children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: kGold, boxShadow: [BoxShadow(color: kGold.withValues(alpha: .25), spreadRadius: 3)]),
-            ),
-            const SizedBox(width: 8),
-            Text(t('Updates').toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1.6, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00))),
-            const SizedBox(width: 10),
-            Expanded(child: Container(height: 1, decoration: BoxDecoration(gradient: LinearGradient(colors: [kGold.withValues(alpha: .6), kGold.withValues(alpha: 0)])))),
-          ]),
-        ),
-        const UpdatesBar(),
+      // a little room between the header and the circles (more on wide screens, where the circles meet the sheet's top edge)
+      SizedBox(height: small ? 10 : 20),
+      Column(key: Tours.key('updates'), crossAxisAlignment: CrossAxisAlignment.stretch, children: const [
+        UpdatesBar(),
       ]),
       const SizedBox(height: 12),
       ])),
@@ -924,7 +907,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _fold(!_searching && !_boxFold, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (me != null && me.name.trim().isNotEmpty)
-            Text('${t('Hi {name}', {'name': me.name.trim().split(' ').first})} 👋', style: TextStyle(fontSize: small ? 13 : 14, fontWeight: FontWeight.w700, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00))),
+            Text('${me.firstName.isEmpty ? t('Hi') : t('Hi {name}', {'name': me.firstName})} 👋', style: TextStyle(fontSize: small ? 13 : 14, fontWeight: FontWeight.w700, color: p.dark ? const Color(0xFFFFD84A) : const Color(0xFF7A5A00))),
           const SizedBox(height: 2),
           Text(t('What are you looking for?'), style: TextStyle(fontSize: small ? 22 : 28, fontWeight: FontWeight.w800, height: 1.1)),
           const SizedBox(height: 4),
@@ -993,7 +976,8 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
       _fold(!_searching, _categoryTiles(p)),
       // two more ways in under the categories: see which of your contacts have a page, and look round the area
       _fold(!_searching, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const SizedBox(height: 14),
+        // the category row already ends with room for its shadows
+        SizedBox(height: _allCats ? 14 : 4),
         Row(children: [
           Expanded(child: _shortcut(p, Icons.contacts_outlined, 'Check my contacts', _openCheck)),
           const SizedBox(width: 12),
@@ -1290,10 +1274,10 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
           child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4), child: Text(t(_allCats ? 'Hide' : 'See all'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.link))),
         ),
       ]),
-      const SizedBox(height: 4),
       if (!_allCats)
         SizedBox(
-          height: 120,
+          // 120 for the cards, plus room above and below inside the row so their shadows are not cut off
+          height: 138,
           // a whole number of tiles plus a half, so the last one is cut off and hints the row scrolls
           child: LayoutBuilder(builder: (_, box) {
             final shown = box.maxWidth < 400 ? 4.5 : (box.maxWidth < 560 ? 5.5 : 6.5);
@@ -1307,7 +1291,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
                 child: SizedBox(
                   width: box.maxWidth + 32,
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
                     scrollDirection: Axis.horizontal,
                     itemCount: _cats.length,
                     itemBuilder: (_, i) => _catTile(_cats[i], w: box.maxWidth / shown),
@@ -1359,9 +1343,11 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
             onSubmitted: (v) => _askAi(v.trim()),
             textInputAction: TextInputAction.search,
             keyboardType: TextInputType.text,
-            // tapped: the box grows taller to take a whole sentence
-            minLines: _qFocus.hasFocus || _q.text.isNotEmpty ? 2 : 1,
+            // one line level with the AI badge; a whole sentence grows the box to two lines as it wraps
+            minLines: 1,
             maxLines: _qFocus.hasFocus || _q.text.isNotEmpty ? 2 : 1,
+            // in the middle of the taller box, level with the AI badge (a short search no longer sits at the top)
+            textAlignVertical: TextAlignVertical.center,
             textCapitalization: TextCapitalization.sentences,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             decoration: InputDecoration(
@@ -1371,6 +1357,8 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
               prefixIcon: Padding(padding: const EdgeInsets.only(left: 12, right: 10), child: _aiBadge()),
               prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
               hintText: _typed.isNotEmpty ? _typed : t('Ask AI: a name, or what you need'),
+              // one line: a hidden two-line hint would still hold the box two lines tall
+              hintMaxLines: 1,
               hintStyle: TextStyle(fontSize: 15, color: p.muted),
               // text in the box: a clear icon in the place of the microphone (clearing leaves the search)
               suffixIcon: _q.text.isNotEmpty
@@ -1612,7 +1600,8 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
               constraints: const BoxConstraints(minHeight: _rowH),
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(children: [
-                Avatar(name: '${c['name']}', size: 44),
+                // the picture a member saved with it in their phone book, else initials
+                Avatar(name: '${c['name']}', photoUrl: c['photoURL'] as String?, size: 44),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1627,7 +1616,7 @@ class _PhonebookHomeState extends State<PhonebookHome> with WidgetsBindingObserv
                           ApproxDistance.label(ApproxDistance.km(_base, '${c['place'] ?? ''}')),
                         // from Google (Places)
                         if (c['rating'] is num) '★ ${(c['rating'] as num).toStringAsFixed(1)}${c['ratings'] is num ? ' (${c['ratings']})' : ''} Google',
-                      ].join(' · '),
+                      ].where((s) => '$s'.isNotEmpty).join(' · '), // no stray "·" when the distance is not known
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12, color: p.muted),

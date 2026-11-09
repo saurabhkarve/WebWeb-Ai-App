@@ -48,7 +48,7 @@
 		</dict>
 	</dict>
 	<key>NSContactsUsageDescription</key>
-	<string>Shows your phone book in the app and lets you pick people to refer. Only contacts saved with a service word (like plumber or electrician) are shared with WEBWEB: the name, number and word. The rest stays on your phone. You can turn sharing off any time in the app.</string>
+	<string>Shows your phone book in the app and lets you pick people to refer. Only contacts saved with a service word (like plumber or electrician) are shared with WEBWEB: the name, number, word and the contact's picture if it has one. The rest stays on your phone. You can turn sharing off any time in the app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>WEBWEB is a local network: your location connects you with asks and members near you, sets the area of your asks and page, and lets you share a pin in a chat. It is used only while you use the app, never in the background.</string>
 	<!-- Required by App Store Connect because the location plugin can ask for "Always" access; WEBWEB never does

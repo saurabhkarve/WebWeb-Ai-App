@@ -1065,20 +1065,60 @@ class WideColumn extends StatelessWidget {
     final mq = MediaQuery.of(context);
     if (mq.size.width < 768) return child;
     const w = 600.0;
-    return ColoredBox(
-      color: Pal.of(context).canvas,
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: SizedBox(width: w, child: MediaQuery(data: mq.copyWith(size: Size(w, mq.size.height)), child: child)),
+    final p = Pal.of(context);
+    // only the sheet itself is drawn: the rail on the left and the column on the right (the shell's, underneath) stay
+    // in view and can be used, as on the website
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Container(
+        width: w,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: p.canvas,
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: p.dark ? .6 : .14), blurRadius: 32, spreadRadius: -14, offset: const Offset(0, 12))],
+        ),
+        child: MediaQuery(data: mq.copyWith(size: Size(w, mq.size.height)), child: child),
       ),
     );
   }
 }
 
-/// A pushed page: the page itself on a phone, a centred 600 px column on a wide screen (see [WideColumn]). Pages that
+/// A pushed page: the page itself on a phone. From 768 px it opens inside the app's centre sheet (see [WideColumn])
+/// with the rail and the right column still showing round it: the route is see-through outside the sheet and has no
+/// barrier, so a tap on the rail reaches the shell (which closes the pushed pages and opens that place). Pages that
 /// should fill the screen (fullscreenDialog: maps, the story player, the cropper) keep using MaterialPageRoute.
 class WideRoute<T> extends MaterialPageRoute<T> {
   WideRoute({required WidgetBuilder builder, super.settings, super.maintainState}) : super(builder: (c) => WideColumn(child: builder(c)));
+
+  bool _inSheet = false;
+
+  @override
+  void install() {
+    final nav = navigator;
+    if (nav != null) _inSheet = MediaQuery.sizeOf(nav.context).width >= 768;
+    super.install();
+  }
+
+  @override
+  bool get opaque => !_inSheet;
+
+  @override
+  Widget buildModalBarrier() => _inSheet ? const SizedBox.shrink() : super.buildModalBarrier();
+
+  /// the page underneath (the shell with its rail) stays exactly where it is while this one opens over the sheet
+  @override
+  bool canTransitionFrom(TransitionRoute<dynamic> previousRoute) => !_inSheet && super.canTransitionFrom(previousRoute);
+
+  @override
+  Widget buildTransitions(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation, Widget child) {
+    if (!_inSheet) return super.buildTransitions(context, animation, secondaryAnimation, child);
+    // inside the sheet: a short fade and rise, nothing drawn over the rail
+    final a = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+    return FadeTransition(
+      opacity: a,
+      child: SlideTransition(position: Tween(begin: const Offset(0, .02), end: Offset.zero).animate(a), child: child),
+    );
+  }
 }
 
 class SubPage extends StatelessWidget {

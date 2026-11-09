@@ -170,6 +170,12 @@ class Profile {
   });
 
   bool get isEntrepreneur => userType == 'entrepreneur';
+  /// The first name to greet them by, or '' when they have not given one yet (sign-up does not ask, so the
+  /// server keeps "New member" until they do).
+  String get firstName {
+    final n = name.trim();
+    return n.isEmpty || n == 'New member' ? '' : n.split(RegExp(r'\s+')).first;
+  }
   bool get isJobSeeker => userType == 'job_seeker';
 
   factory Profile.fromJson(Map j) {

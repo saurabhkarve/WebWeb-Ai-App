@@ -240,6 +240,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
   Widget _lazy(int k, Widget Function() page) => _opened.contains(k) ? page() : const SizedBox.shrink();
 
   void _go(int k) {
+    // wide screens: pages opened over the sheet (a chat, a profile) close when a place on the rail is picked
+    if (MediaQuery.sizeOf(context).width >= 768) Navigator.of(context).popUntil((r) => r.isFirst);
     _opened.add(k);
     const order = [_feed, _dir, _talk];
     final a = order.indexOf(_i), b = order.indexOf(k);

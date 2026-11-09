@@ -1046,9 +1046,8 @@ class _AskComposerState extends State<_AskComposer> {
     final p = Pal.of(context);
     final me = context.watch<AuthProvider>().profile;
     if (me == null) return const SizedBox.shrink();
-    final shown = me.isEntrepreneur && me.company.isNotEmpty ? me.company : me.name;
-    final first = shown.trim().split(RegExp(r'\s+')).first;
-    final hint = t('What do you need, {name}?', {'name': first});
+    final first = me.isEntrepreneur && me.company.isNotEmpty ? me.company.trim().split(RegExp(r'\s+')).first : me.firstName;
+    final hint = first.isEmpty ? t('What do you need?') : t('What do you need, {name}?', {'name': first});
     final home = me.location == 'Other' ? '' : me.location;
     final place = _city?.name ?? home;
 
