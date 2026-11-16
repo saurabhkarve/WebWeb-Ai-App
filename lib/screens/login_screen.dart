@@ -405,6 +405,18 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           ),
         ),
       ),
+      const SizedBox(height: 18),
+      // look around first: search businesses and open their pages without an account
+      OutlinedButton(
+        onPressed: auth.loading ? null : auth.browseAsGuest,
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+          shape: const StadiumBorder(),
+          side: BorderSide(color: p.border),
+          foregroundColor: p.text,
+        ),
+        child: Text(t('Browse without signing in'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+      ),
     ]);
   }
 

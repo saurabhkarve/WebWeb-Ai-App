@@ -40,6 +40,7 @@ import '../widgets/picture_picker.dart';
 import '../widgets/resume.dart';
 import '../widgets/upi.dart';
 import '../widgets/area_map.dart' show AreaMap, showAreaViewer;
+import 'guest_home.dart' show needsSignIn;
 
 /// One profile for everyone (web profile-view.tsx): your own page ([handle] == null) and any member's.
 /// Cover band with the back arrow, picture, one quiet stats line, name, tags, then the actions and
@@ -154,7 +155,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  Future<void> _message() async => openChat(context, Peer.fromProfile(_u!));
+  Future<void> _message() async {
+    if (needsSignIn(context)) return;
+    await openChat(context, Peer.fromProfile(_u!));
+  }
   final _reviewsKey = GlobalKey();
 
   Future<void> _edit() async {
@@ -207,6 +211,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _openUpdates(List<StoryItem> items) async {
+    if (needsSignIn(context)) return;
     final u = _u!;
     final changed = await Navigator.push<bool>(
       context,
@@ -386,6 +391,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               roundBtn(
                 label: 'Report or block',
                 onTap: () async {
+                  if (needsSignIn(context)) return;
                   if (await showSafetySheet(context, uid: u.uid, name: displayName(u.userType, u.name, u.company)) && mounted) Navigator.maybePop(context);
                 },
                 child: const Padding(padding: EdgeInsets.all(2), child: Icon(Icons.more_vert, size: 22, color: kInk)),
@@ -592,7 +598,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         button: true,
         label: label,
         child: GestureDetector(
-          onTap: () => openExternal(context, l.url),
+          onTap: () => needsSignIn(context) ? null : openExternal(context, l.url),
           child: Container(
             height: 44,
             alignment: Alignment.center,
@@ -613,13 +619,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           return Row(children: [
             Expanded(child: ProfileActionBtn(label: t('Talk'), wi: WI.talk, gold: true, onTap: _message)),
             const SizedBox(width: 8),
-            Expanded(child: ProfileActionBtn(label: t('Call'), wi: WI.phone, onTap: () => placeCall(context, Peer.fromProfile(u), false))),
+            Expanded(child: ProfileActionBtn(label: t('Call'), wi: WI.phone, onTap: () => needsSignIn(context) ? null : placeCall(context, Peer.fromProfile(u), false))),
             const SizedBox(width: 8),
-            SizedBox(width: 44, child: ProfileActionBtn(wi: WI.share, label: '', semantic: t('Share profile'), onTap: () => showShareProfileSheet(context, u, isSelf: false))),
+            SizedBox(width: 44, child: ProfileActionBtn(wi: WI.share, label: '', semantic: t('Share profile'), onTap: () => needsSignIn(context) ? null : showShareProfileSheet(context, u, isSelf: false))),
             const SizedBox(width: 8),
-            SizedBox(width: 44, child: ProfileActionBtn(wi: WI.video, label: '', semantic: t('Video'), onTap: () => placeCall(context, Peer.fromProfile(u), true))),
+            SizedBox(width: 44, child: ProfileActionBtn(wi: WI.video, label: '', semantic: t('Video'), onTap: () => needsSignIn(context) ? null : placeCall(context, Peer.fromProfile(u), true))),
             const SizedBox(width: 8),
-            SizedBox(width: 44, child: ProfileActionBtn(wi: WI.heart, gold: fav, label: '', semantic: t('Favourite'), onTap: () => Favourites.toggle(u))),
+            SizedBox(width: 44, child: ProfileActionBtn(wi: WI.heart, gold: fav, label: '', semantic: t('Favourite'), onTap: () => needsSignIn(context) ? null : Favourites.toggle(u))),
           ]);
         },
       );
@@ -693,7 +699,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               at: x.createdAt,
               imageUrl: x.images.isEmpty ? null : x.images.first,
               text: x.description,
-              onTap: () => Navigator.push(context, WideRoute(builder: (_) => PostDetailScreen(postId: x.id))),
+              onTap: () => needsSignIn(context) ? null : Navigator.push(context, WideRoute(builder: (_) => PostDetailScreen(postId: x.id))),
             ),
         ]..sort((a, b) => b.at.compareTo(a.at));
         return GridView.count(
@@ -953,6 +959,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             wi: WI.talk,
             onPressed: () {
               Navigator.pop(ctx);
+              if (needsSignIn(context)) return;
               openChat(context, Peer.fromProfile(u), attachment: {
                 'type': 'item',
                 'name': x.name.length > 80 ? x.name.substring(0, 80) : x.name,
@@ -991,7 +998,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Wrap(spacing: 6, runSpacing: 6, children: [
           for (final s in u.skills)
             GestureDetector(
-              onTap: () => Navigator.push(context, WideRoute(builder: (_) => FindScreen(standalone: true, initialQuery: s, initialScope: 'people'))),
+              onTap: () => needsSignIn(context) ? null : Navigator.push(context, WideRoute(builder: (_) => FindScreen(standalone: true, initialQuery: s, initialScope: 'people'))),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(20), border: Border.all(color: p.border.withValues(alpha: .7))),
@@ -1271,7 +1278,8 @@ Future<void> showShareItemSheet(BuildContext context, Product item, Profile owne
     showShareItemSheetFor(context, item, handle: owner.handle, business: displayName(owner.userType, owner.name, owner.company));
 
 /// The same, from places that only know the owner's handle and display name (the Connect feed's catalog strip).
-Future<void> showShareItemSheetFor(BuildContext context, Product item, {required String handle, required String business}) {
+Future<void> showShareItemSheetFor(BuildContext context, Product item, {required String handle, required String business}) async {
+  if (needsSignIn(context)) return;
   final url = '$siteUrl${item.pathFor(handle)}';
   final name = item.name.length > 80 ? item.name.substring(0, 80) : item.name;
   return _showShareSheet(

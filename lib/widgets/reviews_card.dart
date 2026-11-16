@@ -6,6 +6,7 @@ import '../i18n.dart';
 import '../screens/profile.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../screens/guest_home.dart' show needsSignIn;
 
 const kStar = Color(0xFFF5B301);
 
@@ -54,6 +55,7 @@ class _ReviewsCardState extends State<ReviewsCard> {
   }
 
   Future<void> _write() async {
+    if (needsSignIn(context)) return;
     final mine = _d?['mine'] as Map?;
     final saved = await showModalBottomSheet<bool>(
       context: context,

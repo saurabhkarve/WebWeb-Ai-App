@@ -12,6 +12,7 @@ import '../i18n.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../screens/guest_home.dart' show needsSignIn;
 
 /// UPI on a member's page and in chat (web components/upi.tsx): chips that open a QR popup, the list
 /// in Edit profile, the "UPI payment" form in the chat attach sheet and the payment card in a chat.
@@ -129,7 +130,8 @@ const upiMarkSvg = '<svg viewBox="0 0 16 18" xmlns="http://www.w3.org/2000/svg">
 List<Widget> upiChips(BuildContext context, Profile u, String payee) => [
       for (final x in u.upi)
         GestureDetector(
-          onTap: () => showUpiDialog(context, vpa: x.vpa, name: x.verifiedName ?? payee, verifiedName: x.verifiedName, editableAmount: true),
+          // a visitor without an account sees the ID masked (the server sends it so): sign in first
+          onTap: () => needsSignIn(context) ? null : showUpiDialog(context, vpa: x.vpa, name: x.verifiedName ?? payee, verifiedName: x.verifiedName, editableAmount: true),
           child: Builder(builder: (context) {
             final p = Pal.of(context);
             final fg = upiGreen(p);

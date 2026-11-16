@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import '../auth_provider.dart';
@@ -12,15 +13,21 @@ import '../widgets.dart';
 /// Service contacts, explained before anything is read: what is looked for, what is sent and what is not, and
 /// how to stop. Turning it on asks for contacts (if not given yet), saves the choice and looks once right away.
 /// Pops with true when it was turned on. [invite]: the one-time invitation ("Not now" instead of "Cancel").
-Future<bool?> showServiceContactsSheet(BuildContext context, {bool invite = false}) {
+/// When the phone has not been asked for contacts yet, the sheet is the explanation before the phone's prompt, so it
+/// has one way on, "Continue", to that prompt (App Store guideline 5.1.1(iv)); the choice is made there.
+Future<bool?> showServiceContactsSheet(BuildContext context, {bool invite = false}) async {
   final p = Pal.of(context);
+  final asking = ContactSync.supported && (await Permission.contacts.status).isDenied;
+  if (!context.mounted) return null;
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
+    isDismissible: !asking,
+    enableDrag: !asking,
     backgroundColor: p.canvas,
     barrierColor: kInk.withValues(alpha: .6),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (_) => _Sheet(invite: invite),
+    builder: (_) => PopScope(canPop: !asking, child: _Sheet(invite: invite, asking: asking)),
   );
 }
 
@@ -50,7 +57,9 @@ Future<bool> turnOffServiceContacts(BuildContext context) async {
 
 class _Sheet extends StatefulWidget {
   final bool invite;
-  const _Sheet({required this.invite});
+  /// the phone's contacts prompt comes next: "Continue" and no way to close
+  final bool asking;
+  const _Sheet({required this.invite, required this.asking});
   @override
   State<_Sheet> createState() => _SheetState();
 }
@@ -62,9 +71,12 @@ class _SheetState extends State<_Sheet> {
     final api = context.read<AuthProvider>().api;
     setState(() => _busy = true);
     try {
-      final allowed = await Permissions.ensure(context, Need.contacts, reason: t('To find service providers saved in your phone book.'));
+      final allowed = await Permissions.ensure(context, Need.contacts, reason: t('To find service providers saved in your phone book.'), explained: true);
       await DevicePerms.i.refresh();
-      if (!allowed || !mounted) return;
+      if (!allowed || !mounted) {
+        if (mounted && widget.asking) Navigator.pop(context, false); // they chose at the phone's prompt
+        return;
+      }
       await ContactSync.setOn(api, true);
       final n = await ContactSync.run(api, force: true);
       if (!mounted) return;
@@ -95,7 +107,7 @@ class _SheetState extends State<_Sheet> {
             ),
             const SizedBox(width: 12),
             Expanded(child: Text(t('Share service contacts'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
-            GestureDetector(onTap: () => Navigator.pop(context, false), child: WIcon(WI.close, size: 24, color: p.text)),
+            if (!widget.asking) GestureDetector(onTap: () => Navigator.pop(context, false), child: WIcon(WI.close, size: 24, color: p.text)),
           ]),
           const SizedBox(height: 10),
           Text(t('Only service contacts are shared, so members can find trusted help nearby.'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, height: 1.4)),
@@ -109,9 +121,11 @@ class _SheetState extends State<_Sheet> {
           ]),
           const SizedBox(height: 14),
           const SizedBox(height: 8),
-          GoldButton(label: t('Turn on'), wi: WI.check, loading: _busy, onPressed: _busy ? null : _turnOn),
-          const SizedBox(height: 8),
-          TextButton(onPressed: _busy ? null : () => Navigator.pop(context, false), child: Text(t(widget.invite ? 'Not now' : 'Cancel'))),
+          GoldButton(label: t(widget.asking ? 'Continue' : 'Turn on'), wi: widget.asking ? null : WI.check, loading: _busy, onPressed: _busy ? null : _turnOn),
+          if (!widget.asking) ...[
+            const SizedBox(height: 8),
+            TextButton(onPressed: _busy ? null : () => Navigator.pop(context, false), child: Text(t(widget.invite ? 'Not now' : 'Cancel'))),
+          ],
         ]),
       ),
     );

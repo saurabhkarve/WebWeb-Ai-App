@@ -37,6 +37,15 @@ extension on Need {
         Need.notifications => 'Allow notifications',
       };
 
+  /// The heading of the explanation shown before the phone's own prompt: what it is, not a request to allow it.
+  String get heading => switch (this) {
+        Need.location => 'Your location',
+        Need.contacts => 'Your contacts',
+        Need.camera => 'Your camera',
+        Need.microphone => 'Your microphone',
+        Need.notifications => 'Notifications',
+      };
+
   /// Shown under the reason: what the app does NOT do, so people can decide with confidence.
   String get promise => switch (this) {
         Need.location => 'Used only while you use the app, never in the background. Your exact location is never shown to other members.',
@@ -49,7 +58,10 @@ extension on Need {
 
 /// One place for every permission, the same way each time (WhatsApp-style):
 /// 1. Checks the permission right before it is needed, every time (it may have been turned off in Settings).
-/// 2. Not given yet: a pop-up says why it is needed, then "Allow" shows the phone's own prompt.
+/// 2. Not given yet: a pop-up says why it is needed, and its only button, "Continue", always goes on to the phone's own
+///    prompt, where the person decides (App Store guideline 5.1.1(iv): no "Allow" wording, no way to put the prompt
+///    off). With [explained] (the screen already said why, e.g. the Service contacts sheet) the phone's prompt shows
+///    straight away.
 /// 3. Turned off for good (or "Don't ask again"): the pop-up explains how, "Open Settings" goes there, and
 ///    when the person comes back the permission is checked again; the pop-up closes on its own once it is on.
 /// 4. Returns true only when the permission is really granted, so the caller can go ahead.
@@ -64,7 +76,7 @@ class Permissions {
   }
 
   /// [reason]: one translated sentence on what it is for right now, e.g. "To share your location in this chat."
-  static Future<bool> ensure(BuildContext context, Need need, {required String reason}) async {
+  static Future<bool> ensure(BuildContext context, Need need, {required String reason, bool explained = false}) async {
     if (!_phone) return true;
     if (need == Need.location && !await Geolocator.isLocationServiceEnabled()) {
       if (!context.mounted) return false;
@@ -76,13 +88,21 @@ class Permissions {
     if (!context.mounted) return false;
     // iOS reports "permanently denied" once the person said no; Android after "Don't allow" twice
     final blocked = s.isPermanentlyDenied || s.isRestricted;
+    if (explained && !blocked) {
+      final r = await need.permission.request();
+      if (r.isGranted || r.isLimited) return true;
+      if (!context.mounted) return false;
+      // said no: only Settings can turn it on now; say how, with a way to close
+      return _dialog(context, need, reason: reason, mode: _Mode.settings);
+    }
     return _dialog(context, need, reason: reason, mode: blocked ? _Mode.settings : _Mode.ask);
   }
 
   static Future<bool> _dialog(BuildContext context, Need need, {required String reason, required _Mode mode}) async {
     final r = await showDialog<bool>(
       context: context,
-      barrierDismissible: true,
+      // the explanation before the phone's prompt cannot be closed: it always goes on to the prompt
+      barrierDismissible: mode != _Mode.ask,
       builder: (_) => _PermissionDialog(need: need, reason: reason, mode: mode),
     );
     return r == true;
@@ -188,7 +208,7 @@ class _PermissionDialogState extends State<_PermissionDialog> with WidgetsBindin
           t('It is turned off for WEBWEB in your phone settings. Open Settings, tap Permissions if you see it, and allow it. Then come back here.'),
           t('Open Settings'),
         ),
-      _Mode.ask => (t(need.title), null, t('Allow')),
+      _Mode.ask => (t(need.heading), null, t('Continue')),
     };
     return AlertDialog(
       backgroundColor: p.canvas,
@@ -226,11 +246,15 @@ class _PermissionDialogState extends State<_PermissionDialog> with WidgetsBindin
         ],
       ]),
       actions: [
-        Row(children: [
-          Expanded(child: GoldButton(label: t('Not now'), outlined: true, height: 44, onPressed: () => Navigator.pop(context, false))),
-          const SizedBox(width: 8),
-          Expanded(child: GoldButton(label: button, height: 44, loading: _busy, onPressed: _busy ? null : _primary)),
-        ]),
+        if (_mode == _Mode.ask)
+          // before the phone's prompt: one way on, to the prompt (the choice is made there)
+          PopScope(canPop: false, child: GoldButton(label: button, height: 44, loading: _busy, onPressed: _busy ? null : _primary))
+        else
+          Row(children: [
+            Expanded(child: GoldButton(label: t('Not now'), outlined: true, height: 44, onPressed: () => Navigator.pop(context, false))),
+            const SizedBox(width: 8),
+            Expanded(child: GoldButton(label: button, height: 44, loading: _busy, onPressed: _busy ? null : _primary)),
+          ]),
       ],
     );
   }

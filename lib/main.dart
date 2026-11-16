@@ -10,6 +10,7 @@ import 'i18n.dart';
 import 'notifications.dart';
 import 'outbox.dart';
 import 'realtime.dart';
+import 'screens/guest_home.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding.dart';
 import 'screens/shell.dart';
@@ -164,7 +165,7 @@ class _GateState extends State<Gate> {
       }
     });
     if (!auth.ready || !_splashSeen) return const SplashScreen();
-    if (!auth.isLoggedIn) return const LoginScreen();
+    if (!auth.isLoggedIn) return auth.guest ? const GuestHome() : const LoginScreen();
     if (!auth.profileLoaded) return const _ProfileLoading();
     if (auth.profile == null) return const OnboardingFlow();
     return const Shell();

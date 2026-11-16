@@ -43,6 +43,20 @@ class AuthProvider extends ChangeNotifier {
 
   bool get isLoggedIn => token != null;
 
+  /// Browsing without signing in (App Store guideline 5.1.1(v)): search members and open their public pages, as on
+  /// the website. Anything that needs an account (talk, call, ask, your own page) asks to sign in first.
+  bool guest = false;
+  void browseAsGuest() {
+    guest = true;
+    notifyListeners();
+  }
+
+  /// From browsing to the sign-in screen.
+  void endGuest() {
+    guest = false;
+    notifyListeners();
+  }
+
   /// The page's strength with the phone's location and contacts steps (see DevicePerms).
   Completion? get completion => DevicePerms.i.apply(profile?.completion);
 
@@ -263,6 +277,7 @@ class AuthProvider extends ChangeNotifier {
     otpSent = false;
     twoStepTicket = null;
     error = null;
+    guest = false;
     (await SharedPreferences.getInstance()).remove('token');
     await OfflineCache.clear(); // nothing of this account stays on the phone
     await Outbox.clear();
