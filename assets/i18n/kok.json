@@ -2906,5 +2906,19 @@
   "WEBWEB connects you with businesses and people near you. Your location decides who sees your asks and who you find nearby, so every member sets one.": "WEBWEB तुमकां लागसारच्या वेवसायां आनी लोकां कडेन जोडटा. तुमची सुवात थारायता की तुमची गरज कोण पळयता आनी लागसार तुमकां कोण मेळटा, देखून दर एक वांगडी ती थारायता.",
   "Only your area is shown to others, never the exact point. You can change it any time from your page.": "हेरांक फकत तुमचो वाठार दिसता, नेमकी सुवात केन्नाच ना. तुमी ती खंयच्याय वेळार तुमच्या पानावयल्यान बदलूं येता.",
   "Use my current location": "म्हजी सद्याची सुवात वापरात",
-  "Set it on the map": "नकाशाचेर थारायात"
+  "Set it on the map": "नकाशाचेर थारायात",
+  "{name} blocked": "{name} ब्लॉक केलो",
+  "Delete your account?": "तुमचें खातें काडून उडोवचें?",
+  "This permanently removes your profile, asks, catalog, chats and responses. This cannot be undone.": "हाका लागून तुमची प्रोफायल, गरजो, कॅटलॉग, चॅट आनी जापो सदांखातीर काडून उडयतले. हें परत करूंक जायना.",
+  "Delete forever": "सदांखातीर काडून उडयात",
+  "You have not blocked anyone.": "तुमी कोणाकूच ब्लॉक केल्लें ना.",
+  "Unblock": "अनब्लॉक करात",
+  "this ask": "ही गरज",
+  "Report or block": "रिपोर्ट वा ब्लॉक करात",
+  "The rest of your phone book stays on your phone. Turn off any time in Account.": "तुमचें उरिल्लें फोनबुक तुमच्या फोनांतूच उरता. खातें हांगा खंयच्याय वेळार बंद करात.",
+  "Posted {t}": "{t} पोस्ट केलें",
+  "from": "कडल्यान",
+  "Be the reason someone finds help today": "आयज कोणाकय मजत मेळपाचें कारण तुमी जायात",
+  "Right now, a family near you is stuck with a leaking pipe or a car that won't start. The plumber, electrician or driver you trust could be exactly who they need. Share them, and help your neighbourhood look after each other.": "आतां तुमच्या लागसार एक कुटुंब गळपी पायप वा सुरू नाशिल्ल्या गाडयेक लागून आडखळ्ळां. तुमच्या विस्वासाचो प्लंबर, इलेक्ट्रिशियन वा ड्रायव्हर कदाचित तांकां जाय तोच मनीस आसूं येता. तांकां वांटात, आनी तुमच्या वाठाराक एकामेकाची काळजी घेवपाक मजत करात.",
+  "Yes, I'll help my neighbours": "हय, हांव म्हज्या शेजाऱ्यांक मजत करतलों"
 }

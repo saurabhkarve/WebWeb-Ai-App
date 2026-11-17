@@ -2906,5 +2906,19 @@
   "WEBWEB connects you with businesses and people near you. Your location decides who sees your asks and who you find nearby, so every member sets one.": "WEBWEB तुम्हाला जवळच्या व्यवसायांशी आणि लोकांशी जोडते. तुमचे ठिकाण ठरवते की तुमची गरज कोण पाहील आणि जवळ तुम्हाला कोण सापडेल, म्हणून प्रत्येक सदस्य ते ठरवतो.",
   "Only your area is shown to others, never the exact point. You can change it any time from your page.": "इतरांना फक्त तुमचा भाग दिसतो, अचूक जागा कधीच नाही. तुम्ही ते कधीही तुमच्या पेजवरून बदलू शकता.",
   "Use my current location": "माझे सध्याचे ठिकाण वापरा",
-  "Set it on the map": "नकाशावर ठरवा"
+  "Set it on the map": "नकाशावर ठरवा",
+  "{name} blocked": "{name} ब्लॉक केले",
+  "Delete your account?": "तुमचे खाते हटवायचे?",
+  "This permanently removes your profile, asks, catalog, chats and responses. This cannot be undone.": "यामुळे तुमची प्रोफाइल, गरजा, कॅटलॉग, चॅट आणि उत्तरे कायमची हटतील. हे पूर्ववत करता येत नाही.",
+  "Delete forever": "कायमचे हटवा",
+  "You have not blocked anyone.": "तुम्ही कोणालाही ब्लॉक केलेले नाही.",
+  "Unblock": "अनब्लॉक करा",
+  "this ask": "ही गरज",
+  "Report or block": "रिपोर्ट किंवा ब्लॉक करा",
+  "The rest of your phone book stays on your phone. Turn off any time in Account.": "तुमचे बाकीचे फोनबुक तुमच्या फोनमध्येच राहते. खाते मधून कधीही बंद करा.",
+  "Posted {t}": "{t} पोस्ट केले",
+  "from": "कडून",
+  "Be the reason someone finds help today": "आज कोणाला तरी मदत मिळण्याचे कारण तुम्ही बना",
+  "Right now, a family near you is stuck with a leaking pipe or a car that won't start. The plumber, electrician or driver you trust could be exactly who they need. Share them, and help your neighbourhood look after each other.": "आत्ता तुमच्या जवळचे एखादे कुटुंब गळणाऱ्या पाइपमुळे किंवा सुरू न होणाऱ्या गाडीमुळे अडकले आहे. तुमच्या विश्वासातला प्लंबर, इलेक्ट्रिशियन किंवा ड्रायव्हर कदाचित त्यांना हवा असलेला माणूस असेल. त्यांना शेअर करा, आणि तुमच्या परिसराला एकमेकांची काळजी घ्यायला मदत करा.",
+  "Yes, I'll help my neighbours": "हो, मी माझ्या शेजाऱ्यांना मदत करेन"
 }

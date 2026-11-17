@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import 'contact_sync.dart';
 import 'i18n.dart';
@@ -29,19 +28,9 @@ Future<void> handlePermissionNudge(BuildContext context, String perm) async {
     case 'notifications':
       await ensure(Need.notifications, t('So you do not miss replies, messages and calls.'));
     case 'battery':
-      if (await Permission.ignoreBatteryOptimizations.isGranted || !context.mounted) break;
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(t('Do not miss calls')),
-          content: Text(t('Let WEBWEB run in the background so calls and messages reach you on time.')),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('Not now'))),
-            TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('Allow'))),
-          ],
-        ),
-      );
-      if (ok == true) await Permission.ignoreBatteryOptimizations.request();
+      // not asked: the app does not declare REQUEST_IGNORE_BATTERY_OPTIMIZATIONS (Google Play restricts it), so the
+      // request would show nothing; calls ring through push and the call notification instead
+      break;
     case 'fullScreenCalls':
       await NativeCalls.requestPermissions();
   }

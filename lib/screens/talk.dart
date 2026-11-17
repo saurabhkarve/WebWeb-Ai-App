@@ -1471,7 +1471,7 @@ class _ChatThreadState extends State<ChatThread> {
                   itemBuilder: (_) => [
                     PopupMenuItem(
                       value: 'safety',
-                      child: Row(children: [Icon(Icons.flag_outlined, size: 18, color: p.text), const SizedBox(width: 10), const Text('Report or block', style: TextStyle(fontWeight: FontWeight.w600))]),
+                      child: Row(children: [Icon(Icons.flag_outlined, size: 18, color: p.text), const SizedBox(width: 10), Text(t('Report or block'), style: const TextStyle(fontWeight: FontWeight.w600))]),
                     ),
                     PopupMenuItem(
                       value: 'delete',

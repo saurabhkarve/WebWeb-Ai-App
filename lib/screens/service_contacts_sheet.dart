@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../auth_provider.dart';
 import '../contact_sync.dart';
@@ -132,9 +133,12 @@ class _SheetState extends State<_Sheet> {
   }
 }
 
-/// Service contacts is on by default once contacts are allowed: the member sees what is shared (and can turn it off) the
-/// first time, then it looks quietly. Someone who turned it off is never switched on again (the server remembers).
-/// Safe to call often: it does nothing unless contacts are allowed, and asks nothing once the choice is made.
+/// Service contacts is off until the member turns it on (opt-in; App Store guideline 5.1.2 and the DPDP Act): once
+/// contacts are allowed, the invitation shows, with "Turn on" as the main button. Closing it or "Not now" shares
+/// nothing; the invitation comes back after 14 days. Someone who turned it off is never asked again (the server remembers).
+/// Safe to call often: it does nothing unless contacts are allowed, and asks at most once per 14 days.
+const _kAskedAt = 'svc_contacts_asked_at';
+
 Future<void> autoServiceContacts(BuildContext context) async {
   if (!ContactSync.supported || !await Permissions.granted(Need.contacts)) return;
   if (!context.mounted) return;
@@ -146,10 +150,13 @@ Future<void> autoServiceContacts(BuildContext context) async {
       return;
     }
     if (d['optedOut'] == true) return;
+    final prefs = await SharedPreferences.getInstance();
+    final last = prefs.getInt(_kAskedAt);
+    if (last != null && DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(last)) < const Duration(days: 14)) return;
     if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) return;
     final p = Pal.of(context);
-    // the notice first: what is shared, and the way to turn it off
-    final off = await showModalBottomSheet<bool>(
+    // the invitation: what is shared, and how to stop; nothing is shared unless "Turn on" is tapped
+    final on = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: p.canvas,
@@ -157,13 +164,11 @@ Future<void> autoServiceContacts(BuildContext context) async {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => const _Notice(),
     );
-    if (!context.mounted) return;
-    if (off == true) {
-      await ContactSync.setOn(api, false);
-      return;
-    }
+    await prefs.setInt(_kAskedAt, DateTime.now().millisecondsSinceEpoch);
+    if (on != true || !context.mounted) return;
     await ContactSync.setOn(api, true);
-    await ContactSync.run(api, force: true);
+    final n = await ContactSync.run(api, force: true);
+    if (context.mounted) toast(context, n > 0 ? t('Thank you! {n} service contacts shared.', {'n': n}) : t('Service contacts is on'));
   } catch (_) {
     // quietly try again next time
   }
@@ -183,22 +188,26 @@ class _Notice extends StatelessWidget {
           Row(children: [
             Container(width: 44, height: 44, alignment: Alignment.center, decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(14)), child: const WIcon(WI.contactCard, size: 22, color: kInk, strokeWidth: 1.8)),
             const SizedBox(width: 12),
-            Expanded(child: Text(t('Service contacts is on'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+            Expanded(child: Text(t('Be the reason someone finds help today'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.25))),
           ]),
           const SizedBox(height: 10),
-          Text(t('Only service contacts are shared, so members can find trusted help nearby.'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, height: 1.4)),
+          Text(t("Right now, a family near you is stuck with a leaking pipe or a car that won't start. The plumber, electrician or driver you trust could be exactly who they need. Share them, and help your neighbourhood look after each other."), style: const TextStyle(fontSize: 14, height: 1.45)),
           const SizedBox(height: 18),
           const ShareFlow(steps: [(WI.search, 'Finds service words on your phone'), (WI.send, 'Shares name, number, word and picture'), (WI.check, 'Our team reviews each one')]),
           const SizedBox(height: 16),
           Row(children: [
             WIcon(WI.lock, size: 14, color: p.muted),
             const SizedBox(width: 6),
-            Expanded(child: Text(t('The rest of your phone book stays on your phone. Checked once a day. Turn off any time.'), style: TextStyle(fontSize: 12.5, color: p.muted, height: 1.35))),
+            Expanded(child: Text(t('The rest of your phone book stays on your phone. Turn off any time in Account.'), style: TextStyle(fontSize: 12.5, color: p.muted, height: 1.35))),
           ]),
-          const SizedBox(height: 14),
-          GoldButton(label: t('OK'), wi: WI.check, onPressed: () => Navigator.pop(context, false)),
-          const SizedBox(height: 8),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(t('Turn off'))),
+          const SizedBox(height: 18),
+          // the main choice, large and gold; "Not now" stays visible below it, quieter
+          GoldButton(label: t("Yes, I'll help my neighbours"), wi: WI.check, height: 52, onPressed: () => Navigator.pop(context, true)),
+          const SizedBox(height: 6),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(t('Not now'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.muted)),
+          ),
         ]),
       ),
     );

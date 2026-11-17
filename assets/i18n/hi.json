@@ -2906,5 +2906,19 @@
   "WEBWEB connects you with businesses and people near you. Your location decides who sees your asks and who you find nearby, so every member sets one.": "WEBWEB आपको आपके पास के बिज़नेस और लोगों से जोड़ता है। आपका स्थान तय करता है कि आपकी ज़रूरत कौन देखे और आप पास में किसे पाएँ, इसलिए हर सदस्य इसे तय करता है।",
   "Only your area is shown to others, never the exact point. You can change it any time from your page.": "दूसरों को सिर्फ़ आपका इलाका दिखता है, सटीक जगह कभी नहीं। आप इसे कभी भी अपने पेज से बदल सकते हैं।",
   "Use my current location": "मेरा मौजूदा स्थान इस्तेमाल करें",
-  "Set it on the map": "नक्शे पर तय करें"
+  "Set it on the map": "नक्शे पर तय करें",
+  "{name} blocked": "{name} ब्लॉक किया गया",
+  "Delete your account?": "अपना खाता हटाएँ?",
+  "This permanently removes your profile, asks, catalog, chats and responses. This cannot be undone.": "इससे आपकी प्रोफ़ाइल, ज़रूरतें, कैटलॉग, चैट और जवाब हमेशा के लिए हट जाएँगे। इसे वापस नहीं किया जा सकता।",
+  "Delete forever": "हमेशा के लिए हटाएँ",
+  "You have not blocked anyone.": "आपने किसी को ब्लॉक नहीं किया है।",
+  "Unblock": "अनब्लॉक करें",
+  "this ask": "यह ज़रूरत",
+  "Report or block": "रिपोर्ट या ब्लॉक करें",
+  "The rest of your phone book stays on your phone. Turn off any time in Account.": "आपकी बाकी फ़ोनबुक आपके फ़ोन में ही रहती है। खाता में कभी भी बंद करें।",
+  "Posted {t}": "{t} पोस्ट किया",
+  "from": "से",
+  "Be the reason someone finds help today": "आज किसी को मदद मिलने की वजह आप बनें",
+  "Right now, a family near you is stuck with a leaking pipe or a car that won't start. The plumber, electrician or driver you trust could be exactly who they need. Share them, and help your neighbourhood look after each other.": "अभी आपके पास कोई परिवार टपकते पाइप या बंद पड़ी गाड़ी से परेशान है। जिस प्लंबर, इलेक्ट्रीशियन या ड्राइवर पर आप भरोसा करते हैं, शायद वही उन्हें चाहिए। उन्हें साझा करें, और अपने मोहल्ले को एक-दूसरे का साथ देने में मदद करें।",
+  "Yes, I'll help my neighbours": "हाँ, मैं अपने पड़ोसियों की मदद करूँगा"
 }

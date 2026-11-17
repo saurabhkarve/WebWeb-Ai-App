@@ -2906,5 +2906,19 @@
   "WEBWEB connects you with businesses and people near you. Your location decides who sees your asks and who you find nearby, so every member sets one.": "WEBWEB તમને નજીકના વ્યવસાયો અને લોકો સાથે જોડે છે. તમારું સ્થળ નક્કી કરે છે કે તમારી જરૂરિયાત કોણ જુએ અને નજીકમાં તમને કોણ મળે, તેથી દરેક સભ્ય તે નક્કી કરે છે.",
   "Only your area is shown to others, never the exact point. You can change it any time from your page.": "બીજાઓને ફક્ત તમારો વિસ્તાર દેખાય છે, ચોક્કસ જગ્યા ક્યારેય નહીં. તમે તેને ગમે ત્યારે તમારા પેજ પરથી બદલી શકો છો.",
   "Use my current location": "મારું હાલનું સ્થળ વાપરો",
-  "Set it on the map": "નકશા પર નક્કી કરો"
+  "Set it on the map": "નકશા પર નક્કી કરો",
+  "{name} blocked": "{name} બ્લૉક કર્યા",
+  "Delete your account?": "તમારું ખાતું કાઢી નાખવું છે?",
+  "This permanently removes your profile, asks, catalog, chats and responses. This cannot be undone.": "આથી તમારી પ્રોફાઇલ, જરૂરિયાતો, કૅટલૉગ, ચૅટ અને જવાબો કાયમ માટે દૂર થશે. આ પાછું ફેરવી શકાતું નથી.",
+  "Delete forever": "કાયમ માટે કાઢી નાખો",
+  "You have not blocked anyone.": "તમે કોઈને બ્લૉક કર્યા નથી.",
+  "Unblock": "અનબ્લૉક કરો",
+  "this ask": "આ જરૂરિયાત",
+  "Report or block": "રિપોર્ટ કે બ્લૉક કરો",
+  "The rest of your phone book stays on your phone. Turn off any time in Account.": "તમારી બાકીની ફોનબુક તમારા ફોનમાં જ રહે છે. ખાતુંમાંથી ગમે ત્યારે બંધ કરો.",
+  "Posted {t}": "{t} પોસ્ટ કર્યું",
+  "from": "તરફથી",
+  "Be the reason someone finds help today": "આજે કોઈને મદદ મળવાનું કારણ તમે બનો",
+  "Right now, a family near you is stuck with a leaking pipe or a car that won't start. The plumber, electrician or driver you trust could be exactly who they need. Share them, and help your neighbourhood look after each other.": "અત્યારે તમારી નજીક કોઈ પરિવાર ટપકતી પાઇપ કે ચાલુ ન થતી ગાડીથી અટવાયો છે. તમે જેના પર ભરોસો કરો છો તે પ્લમ્બર, ઇલેક્ટ્રિશિયન કે ડ્રાઇવર કદાચ એ જ છે જેની તેમને જરૂર છે. તેમને શેર કરો, અને તમારા વિસ્તારને એકબીજાનું ધ્યાન રાખવામાં મદદ કરો.",
+  "Yes, I'll help my neighbours": "હા, હું મારા પડોશીઓને મદદ કરીશ"
 }

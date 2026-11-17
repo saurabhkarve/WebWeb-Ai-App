@@ -18,15 +18,15 @@ Future<void> reportContent(BuildContext context, {required String kind, required
     context: context,
     builder: (ctx) => SafeArea(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Padding(padding: const EdgeInsets.fromLTRB(20, 18, 20, 6), child: Align(alignment: Alignment.centerLeft, child: Text('Report $what', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)))),
-        for (final r in _reasons) ListTile(title: Text(r), onTap: () => Navigator.pop(ctx, r)),
+        Padding(padding: const EdgeInsets.fromLTRB(20, 18, 20, 6), child: Align(alignment: Alignment.centerLeft, child: Text(t('Report {name}', {'name': what}), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)))),
+        for (final r in _reasons) ListTile(title: Text(t(r)), onTap: () => Navigator.pop(ctx, r)),
       ]),
     ),
   );
   if (reason == null || !context.mounted) return;
   try {
     await api.post('/app/report', {'kind': kind, 'targetId': targetId, 'reason': reason});
-    if (context.mounted) toast(context, 'Thanks, we will review this.');
+    if (context.mounted) toast(context, t('Thanks, we will review this.'));
   } catch (e) {
     if (context.mounted) toast(context, '$e', error: true);
   }
@@ -38,18 +38,18 @@ Future<bool> blockUser(BuildContext context, {required String uid, required Stri
   final yes = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: Text('Block $name?'),
-      content: Text('$name will not be able to message you, and you will not see their asks. You can unblock from Profile > Blocked people.'),
+      title: Text(t('Block {name}?', {'name': name})),
+      content: Text(t('{name} will not be able to message you, and you will not see their asks. You can unblock from Profile > Blocked people.', {'name': name})),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Block', style: TextStyle(color: Colors.redAccent))),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('Cancel'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('Block'), style: const TextStyle(color: Colors.redAccent))),
       ],
     ),
   );
   if (yes != true || !context.mounted) return false;
   try {
     await api.post('/app/blocks', {'uid': uid});
-    if (context.mounted) toast(context, '$name blocked');
+    if (context.mounted) toast(context, t('{name} blocked', {'name': name}));
     return true;
   } catch (e) {
     if (context.mounted) toast(context, '$e', error: true);
@@ -67,9 +67,9 @@ Future<bool> showSafetySheet(BuildContext context, {required String uid, require
         if (onAlert != null) ListTile(leading: WIcon(WI.bell, size: 20, color: Pal.of(ctx).text), title: Text(t('Alert me for similar asks')), onTap: () => Navigator.pop(ctx, 'alert')),
         // what follows reports or blocks
         if (onAlert != null) Divider(height: 1, color: Pal.of(ctx).border),
-        if (postId != null) ListTile(leading: const Icon(Icons.flag_outlined), title: const Text('Report this ask'), onTap: () => Navigator.pop(ctx, 'post')),
-        ListTile(leading: const Icon(Icons.flag_outlined), title: Text('Report $name'), onTap: () => Navigator.pop(ctx, 'user')),
-        ListTile(leading: const Icon(Icons.block, color: Colors.redAccent), title: Text('Block $name', style: const TextStyle(color: Colors.redAccent)), onTap: () => Navigator.pop(ctx, 'block')),
+        if (postId != null) ListTile(leading: const Icon(Icons.flag_outlined), title: Text(t('Report this ask')), onTap: () => Navigator.pop(ctx, 'post')),
+        ListTile(leading: const Icon(Icons.flag_outlined), title: Text(t('Report {name}', {'name': name})), onTap: () => Navigator.pop(ctx, 'user')),
+        ListTile(leading: const Icon(Icons.block, color: Colors.redAccent), title: Text(t('Block {name}', {'name': name}), style: const TextStyle(color: Colors.redAccent)), onTap: () => Navigator.pop(ctx, 'block')),
       ]),
     ),
   );
@@ -77,7 +77,7 @@ Future<bool> showSafetySheet(BuildContext context, {required String uid, require
   if (choice == 'alert') {
     onAlert?.call();
   } else if (choice == 'post') {
-    await reportContent(context, kind: 'post', targetId: postId!, what: 'this ask');
+    await reportContent(context, kind: 'post', targetId: postId!, what: t('this ask'));
   } else if (choice == 'user') {
     await reportContent(context, kind: 'user', targetId: uid, what: name);
   } else {
@@ -102,11 +102,11 @@ Future<void> deleteAccount(BuildContext context) async {
   final yes = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Delete your account?'),
-      content: const Text('This permanently removes your profile, asks, catalog, chats and responses. This cannot be undone.'),
+      title: Text(t('Delete your account?')),
+      content: Text(t('This permanently removes your profile, asks, catalog, chats and responses. This cannot be undone.')),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete forever', style: TextStyle(color: Colors.redAccent))),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('Cancel'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('Delete forever'), style: const TextStyle(color: Colors.redAccent))),
       ],
     ),
   );
@@ -159,18 +159,18 @@ class _BlockedPeopleScreenState extends State<BlockedPeopleScreen> {
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Blocked people')),
+      appBar: AppBar(title: Text(t('Blocked people'))),
       body: _items == null
           ? const PageLoader()
           : _items!.isEmpty
-              ? Center(child: Text('You have not blocked anyone.', style: TextStyle(color: p.muted)))
+              ? Center(child: Text(t('You have not blocked anyone.'), style: TextStyle(color: p.muted)))
               : ListView(children: [
                   for (final m in _items!)
                     ListTile(
                       leading: Avatar(name: '${m['name']}', photoUrl: m['photoURL'] as String?, size: 40),
                       title: Text('${m['name']}'),
                       subtitle: Text('${m['company'] ?? ''}'),
-                      trailing: TextButton(onPressed: () => _unblock(m), child: const Text('Unblock')),
+                      trailing: TextButton(onPressed: () => _unblock(m), child: Text(t('Unblock'))),
                     ),
                 ]),
     );

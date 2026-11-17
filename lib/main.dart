@@ -155,8 +155,9 @@ class _GateState extends State<Gate> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final rt = context.read<RealtimeService>();
-    // Live connection exists only while a logged-in user has a profile.
-    final live = auth.isLoggedIn && auth.profile != null;
+    // Live connection (and the notification prompt) only once a logged-in member has a profile and a location, so
+    // no system prompt lands on top of sign-up or the location step.
+    final live = auth.isLoggedIn && auth.profile != null && auth.profile!.location.trim().isNotEmpty;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (live) {
         rt.connect(auth.token!);
