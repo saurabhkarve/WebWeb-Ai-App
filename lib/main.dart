@@ -11,6 +11,7 @@ import 'notifications.dart';
 import 'outbox.dart';
 import 'realtime.dart';
 import 'screens/guest_home.dart';
+import 'screens/location_step.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding.dart';
 import 'screens/shell.dart';
@@ -168,6 +169,8 @@ class _GateState extends State<Gate> {
     if (!auth.isLoggedIn) return auth.guest ? const GuestHome() : const LoginScreen();
     if (!auth.profileLoaded) return const _ProfileLoading();
     if (auth.profile == null) return const OnboardingFlow();
+    // every member has a location (GPS or a pin on the map): the app connects people near each other
+    if (auth.profile!.location.trim().isEmpty) return const LocationStep();
     return const Shell();
   }
 }
