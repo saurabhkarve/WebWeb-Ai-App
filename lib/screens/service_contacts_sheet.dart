@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
@@ -67,6 +68,8 @@ class _Sheet extends StatefulWidget {
 
 class _SheetState extends State<_Sheet> {
   bool _busy = false;
+  /// the phone's contacts prompt comes next; on iPhone, once it is answered yes, the sheet asks to turn sharing on
+  late bool _asking = widget.asking;
 
   Future<void> _turnOn() async {
     final api = context.read<AuthProvider>().api;
@@ -75,7 +78,12 @@ class _SheetState extends State<_Sheet> {
       final allowed = await Permissions.ensure(context, Need.contacts, reason: t('To find service providers saved in your phone book.'), explained: true);
       await DevicePerms.i.refresh();
       if (!allowed || !mounted) {
-        if (mounted && widget.asking) Navigator.pop(context, false); // they chose at the phone's prompt
+        if (mounted && _asking) Navigator.pop(context, false); // they chose at the phone's prompt
+        return;
+      }
+      // iPhone: allowing contacts is not agreeing to share them; the sheet now asks that, with "Turn on" and "Cancel"
+      if (_asking && defaultTargetPlatform == TargetPlatform.iOS) {
+        setState(() => _asking = false);
         return;
       }
       await ContactSync.setOn(api, true);
@@ -108,7 +116,7 @@ class _SheetState extends State<_Sheet> {
             ),
             const SizedBox(width: 12),
             Expanded(child: Text(t('Share service contacts'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
-            if (!widget.asking) GestureDetector(onTap: () => Navigator.pop(context, false), child: WIcon(WI.close, size: 24, color: p.text)),
+            if (!_asking) GestureDetector(onTap: () => Navigator.pop(context, false), child: WIcon(WI.close, size: 24, color: p.text)),
           ]),
           const SizedBox(height: 10),
           Text(t('Only service contacts are shared, so members can find trusted help nearby.'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, height: 1.4)),
@@ -122,8 +130,8 @@ class _SheetState extends State<_Sheet> {
           ]),
           const SizedBox(height: 14),
           const SizedBox(height: 8),
-          GoldButton(label: t(widget.asking ? 'Continue' : 'Turn on'), wi: widget.asking ? null : WI.check, loading: _busy, onPressed: _busy ? null : _turnOn),
-          if (!widget.asking) ...[
+          GoldButton(label: t(_asking ? 'Continue' : 'Turn on'), wi: _asking ? null : WI.check, loading: _busy, onPressed: _busy ? null : _turnOn),
+          if (!_asking) ...[
             const SizedBox(height: 8),
             TextButton(onPressed: _busy ? null : () => Navigator.pop(context, false), child: Text(t(widget.invite ? 'Not now' : 'Cancel'))),
           ],
@@ -133,7 +141,7 @@ class _SheetState extends State<_Sheet> {
   }
 }
 
-/// Service contacts is off until the member turns it on (opt-in; App Store guideline 5.1.2 and the DPDP Act): once
+/// iPhone: service contacts is off until the member turns it on (opt-in; App Store guideline 5.1.2): once
 /// contacts are allowed, the invitation shows, with "Turn on" as the main button. Closing it or "Not now" shares
 /// nothing; the invitation comes back after 14 days. Someone who turned it off is never asked again (the server remembers).
 /// Safe to call often: it does nothing unless contacts are allowed, and asks at most once per 14 days.
@@ -150,6 +158,30 @@ Future<void> autoServiceContacts(BuildContext context) async {
       return;
     }
     if (d['optedOut'] == true) return;
+    // Android: on by default. A notice says what is shared, and it closes only with a tap: "OK" (it stays on) or
+    // "Turn off". iPhone: consent first (App Store guideline 5.1.2), the invitation below.
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      final p = Pal.of(context);
+      final off = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        isDismissible: false,
+        enableDrag: false,
+        backgroundColor: p.canvas,
+        barrierColor: kInk.withValues(alpha: .6),
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (_) => const PopScope(canPop: false, child: _OnNotice()),
+      );
+      if (!context.mounted) return;
+      if (off == true) {
+        await ContactSync.setOn(api, false);
+        return;
+      }
+      await ContactSync.setOn(api, true);
+      await ContactSync.run(api, force: true);
+      return;
+    }
     final prefs = await SharedPreferences.getInstance();
     final last = prefs.getInt(_kAskedAt);
     if (last != null && DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(last)) < const Duration(days: 14)) return;
@@ -207,6 +239,46 @@ class _Notice extends StatelessWidget {
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(t('Not now'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.muted)),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Android's notice: service contacts is on; what is shared, and how to turn it off. Pops true for "Turn off".
+class _OnNotice extends StatelessWidget {
+  const _OnNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    final bottom = MediaQuery.of(context).padding.bottom + 16;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 18, 20, bottom),
+      child: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Container(width: 44, height: 44, alignment: Alignment.center, decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(14)), child: const WIcon(WI.contactCard, size: 22, color: kInk, strokeWidth: 1.8)),
+            const SizedBox(width: 12),
+            Expanded(child: Text(t('Service contacts is on'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+          ]),
+          const SizedBox(height: 10),
+          Text(t("Right now, a family near you is stuck with a leaking pipe or a car that won't start. The plumber, electrician or driver you trust could be exactly who they need. Share them, and help your neighbourhood look after each other."), style: const TextStyle(fontSize: 14, height: 1.45)),
+          const SizedBox(height: 18),
+          const ShareFlow(steps: [(WI.search, 'Finds service words on your phone'), (WI.send, 'Shares name, number, word and picture'), (WI.check, 'Our team reviews each one')]),
+          const SizedBox(height: 16),
+          Row(children: [
+            WIcon(WI.lock, size: 14, color: p.muted),
+            const SizedBox(width: 6),
+            Expanded(child: Text(t('The rest of your phone book stays on your phone. Turn off any time in Account.'), style: TextStyle(fontSize: 12.5, color: p.muted, height: 1.35))),
+          ]),
+          const SizedBox(height: 18),
+          GoldButton(label: t('OK'), wi: WI.check, height: 52, onPressed: () => Navigator.pop(context, false)),
+          const SizedBox(height: 6),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(t('Turn off'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.muted)),
           ),
         ]),
       ),
